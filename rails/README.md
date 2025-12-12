@@ -36,48 +36,38 @@ Comprehensive, modular Rails patterns and best practices. Each file can be indep
 
 ## Usage
 
-### Include All
+### Include All Modules (Recommended)
 
-Add to `CLAUDE.md` or `AGENTS.md`:
+Single line includes everything:
 
 ```markdown
-## Rails
+## Rails Best Practices
+
+@rails/index.md
+```
+
+This loads all 17 Rails pattern modules automatically.
+
+### Include Specific Modules Only
+
+For granular control, include individual files:
+
+```markdown
+## Rails Patterns
 
 @rails/models.md
 @rails/controllers.md
 @rails/routes.md
-@rails/concerns.md
-@rails/tests.md
-@rails/views.md
-@rails/helpers.md
-@rails/javascript.md
-@rails/jobs.md
-@rails/mailers.md
-@rails/broadcasting.md
-@rails/migrations.md
-@rails/active_storage.md
-@rails/lib.md
-@rails/initializers.md
-@rails/validations.md
 ```
 
-### Include Selectively
+### Disable Specific Modules
 
-Only include what you need:
-
-```markdown
-## Rails
-
-@rails/models.md
-@rails/controllers.md
-```
-
-### Disable Temporarily
-
-Comment out to disable:
+Comment out any you don't need:
 
 ```markdown
-## Rails
+@rails/index.md  <!-- Includes all modules -->
+
+<!-- OR selective loading: -->
 
 @rails/models.md
 <!-- @rails/controllers.md -->  <!-- Disabled -->
@@ -91,11 +81,14 @@ Comment out to disable:
 ```
 rails/
 ├── README.md              # This file
+├── CLAUDE.md.example      # Example configuration
+├── index.md              # ⭐ Entry point (includes all modules)
 ├── models.md             # ✅ Complete
 ├── controllers.md        # ✅ Complete
 ├── routes.md             # ✅ Complete
 ├── concerns.md           # ✅ Complete
 ├── tests.md              # ✅ Complete
+├── style.md              # ✅ Complete
 ├── views.md              # ✅ Complete
 ├── helpers.md            # ✅ Complete
 ├── javascript.md         # ✅ Complete
