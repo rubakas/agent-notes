@@ -43,7 +43,7 @@ Single line includes everything:
 ```markdown
 ## Rails Best Practices
 
-@rails/index.md
+@agent-notes/rails/index.md
 ```
 
 This loads all 17 Rails pattern modules automatically.
@@ -55,9 +55,9 @@ For granular control, include individual files:
 ```markdown
 ## Rails Patterns
 
-@rails/models.md
-@rails/controllers.md
-@rails/routes.md
+@agent-notes/rails/models.md
+@agent-notes/rails/controllers.md
+@agent-notes/rails/routes.md
 ```
 
 ### Disable Specific Modules
@@ -65,13 +65,13 @@ For granular control, include individual files:
 Comment out any you don't need:
 
 ```markdown
-@rails/index.md  <!-- Includes all modules -->
+@agent-notes/rails/index.md  <!-- Includes all modules -->
 
 <!-- OR selective loading: -->
 
-@rails/models.md
-<!-- @rails/controllers.md -->  <!-- Disabled -->
-@rails/routes.md
+@agent-notes/rails/models.md
+<!-- @agent-notes/rails/controllers.md -->  <!-- Disabled -->
+@agent-notes/rails/routes.md
 ```
 
 ---

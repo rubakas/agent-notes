@@ -1,6 +1,8 @@
 # Rails Best Practices - Example Configuration
 
-Copy this file to your project as `CLAUDE.md` to enable Rails patterns.
+Copy this file to your project root as `CLAUDE.md` to enable Rails patterns.
+
+**Note:** This assumes you've copied/cloned the `agent-notes` repo into your project root.
 
 ---
 
@@ -8,7 +10,7 @@ Copy this file to your project as `CLAUDE.md` to enable Rails patterns.
 
 Single line includes all Rails modules:
 
-@rails/index.md
+@agent-notes/rails/index.md
 
 ---
 
@@ -18,38 +20,38 @@ For more control, include individual modules:
 
 ### Core Patterns
 
-@rails/models.md
-@rails/controllers.md
-@rails/routes.md
-@rails/concerns.md
-@rails/tests.md
+@agent-notes/rails/models.md
+@agent-notes/rails/controllers.md
+@agent-notes/rails/routes.md
+@agent-notes/rails/concerns.md
+@agent-notes/rails/tests.md
 
 ### Code Style
 
-@rails/style.md
+@agent-notes/rails/style.md
 
 ### Views & Frontend
 
-@rails/views.md
-@rails/helpers.md
-@rails/javascript.md
+@agent-notes/rails/views.md
+@agent-notes/rails/helpers.md
+@agent-notes/rails/javascript.md
 
 ### Background & Communication
 
-@rails/jobs.md
-@rails/mailers.md
-@rails/broadcasting.md
+@agent-notes/rails/jobs.md
+@agent-notes/rails/mailers.md
+@agent-notes/rails/broadcasting.md
 
 ### Database & Storage
 
-@rails/migrations.md
-@rails/active_storage.md
+@agent-notes/rails/migrations.md
+@agent-notes/rails/active_storage.md
 
 ### Infrastructure
 
-@rails/lib.md
-@rails/initializers.md
-@rails/validations.md
+@agent-notes/rails/lib.md
+@agent-notes/rails/initializers.md
+@agent-notes/rails/validations.md
 
 ---
 
@@ -60,9 +62,9 @@ For more control, include individual modules:
 Comment out any you don't need:
 
 ```markdown
-@rails/models.md
-<!-- @rails/controllers.md -->  <!-- Disabled -->
-@rails/routes.md
+@agent-notes/rails/models.md
+<!-- @agent-notes/rails/controllers.md -->  <!-- Disabled -->
+@agent-notes/rails/routes.md
 ```
 
 ### Enable Only Core
@@ -70,10 +72,10 @@ Comment out any you don't need:
 For a minimal setup, enable just the essentials:
 
 ```markdown
-@rails/models.md
-@rails/controllers.md
-@rails/routes.md
-@rails/style.md
+@agent-notes/rails/models.md
+@agent-notes/rails/controllers.md
+@agent-notes/rails/routes.md
+@agent-notes/rails/style.md
 ```
 
 ### Enable by Feature
@@ -82,24 +84,24 @@ Enable based on what you're working on:
 
 **Working on models?**
 ```markdown
-@rails/models.md
-@rails/concerns.md
-@rails/validations.md
-@rails/tests.md
+@agent-notes/rails/models.md
+@agent-notes/rails/concerns.md
+@agent-notes/rails/validations.md
+@agent-notes/rails/tests.md
 ```
 
 **Working on views?**
 ```markdown
-@rails/views.md
-@rails/helpers.md
-@rails/javascript.md
+@agent-notes/rails/views.md
+@agent-notes/rails/helpers.md
+@agent-notes/rails/javascript.md
 ```
 
 **Working on background jobs?**
 ```markdown
-@rails/jobs.md
-@rails/mailers.md
-@rails/broadcasting.md
+@agent-notes/rails/jobs.md
+@agent-notes/rails/mailers.md
+@agent-notes/rails/broadcasting.md
 ```
 
 ---

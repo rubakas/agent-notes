@@ -19,7 +19,7 @@ Instead of explaining patterns repeatedly in every conversation, include these o
 
 | Technology | Status | Modules | Quick Start |
 |------------|--------|---------|-------------|
-| **Rails** | ✅ Complete | 17 modules | `@rails/index.md` |
+| **Rails** | ✅ Complete | 17 modules | `@agent-notes/rails/index.md` |
 | **React** | 🚧 Planned | - | Coming soon |
 | **Next.js** | 🚧 Planned | - | Coming soon |
 | **Vue** | 🚧 Planned | - | Coming soon |
@@ -34,7 +34,7 @@ Comprehensive Rails patterns and best practices extracted from production codeba
 **Quick Start:**
 ```markdown
 # In your project's CLAUDE.md
-@rails/index.md
+@agent-notes/rails/index.md
 ```
 
 **Includes:**
@@ -49,10 +49,12 @@ Comprehensive Rails patterns and best practices extracted from production codeba
 
 ## How to Use
 
-1. **Copy to your project:**
+1. **Clone or copy this repo into your project:**
    ```bash
-   # Example: Add Rails patterns to your project
-   cp -r rails /path/to/your/project/
+   cd /path/to/your/project
+   git clone https://github.com/YOUR_USERNAME/agent-notes.git
+   # or
+   cp -r /path/to/agent-notes .
    ```
 
 2. **Create or update your project's `CLAUDE.md`:**
@@ -61,7 +63,7 @@ Comprehensive Rails patterns and best practices extracted from production codeba
 
    ## Rails Best Practices
 
-   @rails/index.md
+   @agent-notes/rails/index.md
    ```
 
 3. **Optional - Include specific modules only:**
@@ -70,15 +72,15 @@ Comprehensive Rails patterns and best practices extracted from production codeba
 
    ## Rails Patterns
 
-   @rails/models.md
-   @rails/controllers.md
-   @rails/style.md
-   <!-- @rails/jobs.md -->  <!-- Disabled -->
+   @agent-notes/rails/models.md
+   @agent-notes/rails/controllers.md
+   @agent-notes/rails/style.md
+   <!-- @agent-notes/rails/jobs.md -->  <!-- Disabled -->
    ```
 
 4. **Add project-specific patterns:**
    ```markdown
-   @rails/index.md
+   @agent-notes/rails/index.md
 
    ## Project-Specific Patterns
 
@@ -86,34 +88,37 @@ Comprehensive Rails patterns and best practices extracted from production codeba
    @docs/deployment.md
    ```
 
-## Structure
+## Repository Structure
 
 ```
-agent-notes/
-├── rails/                # Rails patterns and conventions
-│   ├── README.md         # Rails documentation
-│   ├── CLAUDE.md.example # Example configuration
-│   ├── index.md         # ⭐ Entry point (includes all modules)
-│   ├── models.md         # Model patterns
-│   ├── controllers.md    # Controller patterns
-│   └── ...               # Additional modules (17 total)
-├── react/                # Coming soon (will have index.md entry point)
-├── nextjs/               # Coming soon (will have index.md entry point)
-└── README.md             # This file
+your-project/
+├── agent-notes/          # This repository
+│   ├── rails/            # Rails patterns and conventions
+│   │   ├── README.md     # Rails documentation
+│   │   ├── CLAUDE.md.example # Example configuration
+│   │   ├── index.md     # ⭐ Entry point (includes all 17 modules)
+│   │   ├── models.md
+│   │   ├── controllers.md
+│   │   └── ...          # 14 more modules
+│   ├── react/            # Coming soon (will have index.md)
+│   ├── nextjs/           # Coming soon (will have index.md)
+│   └── README.md         # This file
+├── app/                  # Your application code
+└── CLAUDE.md            # ⭐ Your project configuration
 ```
 
-**Each folder has an entry point file:**
-- `rails/index.md` - Includes all Rails modules
-- `react/index.md` - (Coming soon) Includes all React modules
-- `nextjs/index.md` - (Coming soon) Includes all Next.js modules
+**Each technology folder has an entry point:**
+- `agent-notes/rails/index.md` - All Rails modules
+- `agent-notes/react/index.md` - (Coming soon) All React modules
+- `agent-notes/nextjs/index.md` - (Coming soon) All Next.js modules
 
-**This means your project's CLAUDE.md stays simple:**
+**Your project's CLAUDE.md stays simple:**
 ```markdown
 # My Project
 
-@rails/index.md
-@react/index.md
-@nextjs/index.md
+@agent-notes/rails/index.md
+@agent-notes/react/index.md
+@agent-notes/nextjs/index.md
 ```
 
 ## Contributing
