@@ -1,0 +1,131 @@
+# Rails Best Practices - Example Configuration
+
+Copy this file to your project as `CLAUDE.md` to enable Rails patterns.
+
+---
+
+## Rails Patterns (Modular)
+
+Enable modules below, or comment out any you don't need.
+
+### Core Patterns
+
+Essential Rails patterns for models, controllers, and routing:
+
+@rails/models.md
+@rails/controllers.md
+@rails/routes.md
+@rails/concerns.md
+@rails/tests.md
+
+### Code Style
+
+Coding conventions and style guidelines:
+
+@rails/style.md
+
+### Views & Frontend
+
+View layer patterns, helpers, and JavaScript:
+
+@rails/views.md
+@rails/helpers.md
+@rails/javascript.md
+
+### Background & Communication
+
+Background processing, email, and real-time updates:
+
+@rails/jobs.md
+@rails/mailers.md
+@rails/broadcasting.md
+
+### Database & Storage
+
+Database migrations, file uploads, and data management:
+
+@rails/migrations.md
+@rails/active_storage.md
+
+### Infrastructure
+
+Libraries, configuration, and custom code:
+
+@rails/lib.md
+@rails/initializers.md
+@rails/validations.md
+
+---
+
+## Customization
+
+### Disable Specific Modules
+
+Comment out any you don't need:
+
+```markdown
+@rails/models.md
+<!-- @rails/controllers.md -->  <!-- Disabled -->
+@rails/routes.md
+```
+
+### Enable Only Core
+
+For a minimal setup, enable just the essentials:
+
+```markdown
+@rails/models.md
+@rails/controllers.md
+@rails/routes.md
+@rails/style.md
+```
+
+### Enable by Feature
+
+Enable based on what you're working on:
+
+**Working on models?**
+```markdown
+@rails/models.md
+@rails/concerns.md
+@rails/validations.md
+@rails/tests.md
+```
+
+**Working on views?**
+```markdown
+@rails/views.md
+@rails/helpers.md
+@rails/javascript.md
+```
+
+**Working on background jobs?**
+```markdown
+@rails/jobs.md
+@rails/mailers.md
+@rails/broadcasting.md
+```
+
+---
+
+## Additional Configuration
+
+You can add project-specific instructions here:
+
+```markdown
+## Project-Specific Patterns
+
+@docs/architecture.md
+@docs/api_design.md
+@docs/deployment.md
+```
+
+---
+
+## Notes
+
+- All modules are independent and can be enabled/disabled
+- Auto-loads in every new dialog
+- Patterns are generic Rails best practices
+- Examples are production-ready
+- All patterns include testing examples
