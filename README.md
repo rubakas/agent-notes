@@ -1,41 +1,51 @@
 # AI Agent Notes
 
-Modular configuration files and best practices for AI coding agents. This repository provides reusable guides that help AI assistants understand your project's patterns and conventions.
+Modular configuration files and best practices for AI coding agents across different technologies and frameworks.
 
 ## Purpose
 
-AI coding agents work best when they have clear, structured context about your codebase. This repository collects modular configuration files that you can copy into your projects to provide that context automatically.
+AI coding agents work best when they have clear, structured context about your codebase. This repository provides reusable, modular patterns that you can include in your projects to give AI assistants comprehensive knowledge of your tech stack's best practices.
 
-Instead of explaining patterns repeatedly in every conversation, you can reference these guides once in your project's `CLAUDE.md` or `AGENTS.md` file, and the AI will have comprehensive knowledge of your tech stack's best practices.
+**Key Benefits:**
+- 📦 **Modular** - Include only what you need
+- 🔄 **Reusable** - Copy across all your projects
+- 🎯 **Focused** - One file per technology stack
+- ✅ **Production-Ready** - Extracted from real codebases
+- 📚 **Comprehensive** - Covers all major components
 
-## Available Guides
+Instead of explaining patterns repeatedly in every conversation, include these once in your project's `CLAUDE.md`, and AI assistants will automatically understand your conventions.
 
-### Rails
+## Available Patterns
+
+| Technology | Status | Modules | Quick Start |
+|------------|--------|---------|-------------|
+| **Rails** | ✅ Complete | 17 modules | `@rails/index.md` |
+| **React** | 🚧 Planned | - | Coming soon |
+| **Next.js** | 🚧 Planned | - | Coming soon |
+| **Vue** | 🚧 Planned | - | Coming soon |
+| **Docker** | 🚧 Planned | - | Coming soon |
+| **Docker Compose** | 🚧 Planned | - | Coming soon |
+| **Shell Scripts** | 🚧 Planned | - | Coming soon |
+
+### Rails (✅ Complete - 17 Modules)
 
 Comprehensive Rails patterns and best practices extracted from production codebases.
 
-**Location:** `rails/`
+**Quick Start:**
+```markdown
+# In your project's CLAUDE.md
+@rails/index.md
+```
 
-**Usage:** Copy `rails/CLAUDE.md.example` to your project as `CLAUDE.md` and customize which modules to include.
+**Includes:**
+- **Core:** Models, Controllers, Routes, Concerns, Tests
+- **Frontend:** Views, Helpers, JavaScript (Stimulus/Turbo)
+- **Background:** Jobs, Mailers, Broadcasting
+- **Data:** Migrations, Active Storage, Validations
+- **Infrastructure:** Lib, Initializers
+- **Code Style & Conventions**
 
-**Covers:**
-- Models, Controllers, Routes, Concerns
-- Views, Helpers, JavaScript (Stimulus/Turbo)
-- Background Jobs, Mailers, Broadcasting
-- Migrations, Active Storage
-- Testing, Validations
-- Code Style & Conventions
-
-See [rails/README.md](rails/README.md) for details.
-
-## Coming Soon
-
-- **React** - Component patterns, hooks, state management
-- **Next.js** - App Router, Server Components, routing patterns
-- **Vue** - Composition API, component structure, Pinia
-- **Docker** - Dockerfile best practices, multi-stage builds
-- **Docker Compose** - Service orchestration, networking
-- **Shell Scripts** - Bash scripting patterns and conventions
+**Documentation:** [rails/README.md](rails/README.md) | **Examples:** [rails/CLAUDE.md.example](rails/CLAUDE.md.example)
 
 ## How to Use
 
@@ -51,15 +61,30 @@ See [rails/README.md](rails/README.md) for details.
 
    ## Rails Best Practices
 
+   @rails/index.md
+   ```
+
+3. **Optional - Include specific modules only:**
+   ```markdown
+   # My Project
+
+   ## Rails Patterns
+
    @rails/models.md
    @rails/controllers.md
    @rails/style.md
+   <!-- @rails/jobs.md -->  <!-- Disabled -->
    ```
 
-3. **Customize which modules to include:**
-   - Enable only what you need
-   - Comment out what you don't want
-   - Add project-specific documentation alongside
+4. **Add project-specific patterns:**
+   ```markdown
+   @rails/index.md
+
+   ## Project-Specific Patterns
+
+   @docs/architecture.md
+   @docs/deployment.md
+   ```
 
 ## Structure
 
@@ -68,12 +93,27 @@ agent-notes/
 ├── rails/                # Rails patterns and conventions
 │   ├── README.md         # Rails documentation
 │   ├── CLAUDE.md.example # Example configuration
+│   ├── index.md         # ⭐ Entry point (includes all modules)
 │   ├── models.md         # Model patterns
 │   ├── controllers.md    # Controller patterns
-│   └── ...               # Additional modules
-├── react/                # Coming soon
-├── nextjs/               # Coming soon
+│   └── ...               # Additional modules (17 total)
+├── react/                # Coming soon (will have index.md entry point)
+├── nextjs/               # Coming soon (will have index.md entry point)
 └── README.md             # This file
+```
+
+**Each folder has an entry point file:**
+- `rails/index.md` - Includes all Rails modules
+- `react/index.md` - (Coming soon) Includes all React modules
+- `nextjs/index.md` - (Coming soon) Includes all Next.js modules
+
+**This means your project's CLAUDE.md stays simple:**
+```markdown
+# My Project
+
+@rails/index.md
+@react/index.md
+@nextjs/index.md
 ```
 
 ## Contributing
