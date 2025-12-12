@@ -4,13 +4,19 @@ Copy this file to your project as `CLAUDE.md` to enable Rails patterns.
 
 ---
 
-## Rails Patterns (Modular)
+## Option 1: Include All Rails Patterns (Recommended)
 
-Enable modules below, or comment out any you don't need.
+Single line includes all Rails modules:
+
+@rails/index.md
+
+---
+
+## Option 2: Include Specific Modules Only
+
+For more control, include individual modules:
 
 ### Core Patterns
-
-Essential Rails patterns for models, controllers, and routing:
 
 @rails/models.md
 @rails/controllers.md
@@ -20,13 +26,9 @@ Essential Rails patterns for models, controllers, and routing:
 
 ### Code Style
 
-Coding conventions and style guidelines:
-
 @rails/style.md
 
 ### Views & Frontend
-
-View layer patterns, helpers, and JavaScript:
 
 @rails/views.md
 @rails/helpers.md
@@ -34,22 +36,16 @@ View layer patterns, helpers, and JavaScript:
 
 ### Background & Communication
 
-Background processing, email, and real-time updates:
-
 @rails/jobs.md
 @rails/mailers.md
 @rails/broadcasting.md
 
 ### Database & Storage
 
-Database migrations, file uploads, and data management:
-
 @rails/migrations.md
 @rails/active_storage.md
 
 ### Infrastructure
-
-Libraries, configuration, and custom code:
 
 @rails/lib.md
 @rails/initializers.md
