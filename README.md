@@ -52,7 +52,7 @@ Comprehensive Rails patterns and best practices extracted from production codeba
 1. **Clone or copy this repo into your project:**
    ```bash
    cd /path/to/your/project
-   git clone https://github.com/YOUR_USERNAME/agent-notes.git
+   git clone git@github.com:rubakas/agent-notes.git
    # or
    cp -r /path/to/agent-notes .
    ```
