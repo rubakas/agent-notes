@@ -2,61 +2,20 @@
 
 This file includes all Rails pattern modules. Include just this file in your project's CLAUDE.md to load all Rails patterns.
 
----
-
-## Core Patterns
-
-Essential patterns for models, controllers, and routing:
-
-@rails/models.md
-@rails/controllers.md
-@rails/routes.md
-@rails/concerns.md
-@rails/tests.md
-
----
-
-## Code Style
-
-Coding conventions and style guidelines:
-
-@rails/style.md
-
----
-
-## Views & Frontend
-
-View layer patterns, helpers, and JavaScript:
-
-@rails/views.md
-@rails/helpers.md
-@rails/javascript.md
-
----
-
-## Background & Communication
-
-Background processing, email, and real-time updates:
-
-@rails/jobs.md
-@rails/mailers.md
-@rails/broadcasting.md
-
----
-
-## Database & Storage
-
-Database migrations, file uploads, and data management:
-
-@rails/migrations.md
-@rails/active_storage.md
-
----
-
-## Infrastructure
-
-Libraries, configuration, and custom code:
-
-@rails/lib.md
-@rails/initializers.md
-@rails/validations.md
+@agent-notes/rails/models.md
+@agent-notes/rails/controllers.md
+@agent-notes/rails/routes.md
+@agent-notes/rails/concerns.md
+@agent-notes/rails/tests.md
+@agent-notes/rails/style.md
+@agent-notes/rails/views.md
+@agent-notes/rails/helpers.md
+@agent-notes/rails/javascript.md
+@agent-notes/rails/jobs.md
+@agent-notes/rails/mailers.md
+@agent-notes/rails/broadcasting.md
+@agent-notes/rails/migrations.md
+@agent-notes/rails/active_storage.md
+@agent-notes/rails/lib.md
+@agent-notes/rails/initializers.md
+@agent-notes/rails/validations.md
