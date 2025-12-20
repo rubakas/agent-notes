@@ -40,13 +40,14 @@ Comprehensive Rails patterns and best practices extracted from production codeba
 
 **Includes:**
 - **Core:** Models, Controllers, Routes, Concerns, Tests
-- **Frontend:** Views, Helpers, JavaScript (Stimulus/Turbo)
+- **Frontend:** Views, ViewComponents, Helpers, JavaScript (Stimulus/Turbo)
 - **Background:** Jobs, Mailers, Broadcasting
 - **Data:** Migrations, Active Storage, Validations
 - **Infrastructure:** Lib, Initializers
 - **Code Style & Conventions**
 
-**Documentation:** [rails/README.md](rails/README.md) | **Examples:** [rails/CLAUDE.md.example](rails/CLAUDE.md.example)
+**Documentation:** [rails/README.md](rails/README.md)
+
 ### Docker (✅ Complete - 2 Modules)
 
 Production-ready Docker and Docker Compose patterns based on official Docker documentation.
@@ -113,10 +114,10 @@ your-project/
 ├── agent-notes/          # This repository
 │   ├── rails/            # Rails patterns and conventions
 │   │   ├── README.md     # Rails documentation
-│   │   ├── CLAUDE.md.example # Example configuration
-│   │   ├── index.md     # ⭐ Entry point (includes all 17 modules)
+│   │   ├── index.md     # ⭐ Entry point (includes all 19 modules)
 │   │   ├── models.md
 │   │   ├── controllers.md
+│   │   ├── viewcomponents.md
 │   │   └── ...          # 14 more modules
 │   ├── docker/           # Docker and Docker Compose patterns
 │   │   ├── README.md     # Docker documentation

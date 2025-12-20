@@ -9,6 +9,7 @@ This file includes all Rails pattern modules. Include just this file in your pro
 @agent-notes/rails/tests.md
 @agent-notes/rails/style.md
 @agent-notes/rails/views.md
+@agent-notes/rails/viewcomponents.md
 @agent-notes/rails/helpers.md
 @agent-notes/rails/javascript.md
 @agent-notes/rails/jobs.md
