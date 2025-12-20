@@ -20,6 +20,7 @@ Instead of explaining patterns repeatedly in every conversation, include these o
 | Technology | Status | Modules | Quick Start |
 |------------|--------|---------|-------------|
 | **Rails** | ✅ Complete | 17 modules | `@agent-notes/rails/index.md` |
+| **Docker** | ✅ Complete | 2 modules | `@agent-notes/docker/index.md` |
 | **React** | 🚧 Planned | - | Coming soon |
 | **Next.js** | 🚧 Planned | - | Coming soon |
 | **Vue** | 🚧 Planned | - | Coming soon |
@@ -46,6 +47,23 @@ Comprehensive Rails patterns and best practices extracted from production codeba
 - **Code Style & Conventions**
 
 **Documentation:** [rails/README.md](rails/README.md) | **Examples:** [rails/CLAUDE.md.example](rails/CLAUDE.md.example)
+### Docker (✅ Complete - 2 Modules)
+
+Production-ready Docker and Docker Compose patterns based on official Docker documentation.
+
+**Quick Start:**
+```markdown
+# In your project's CLAUDE.md
+@agent-notes/docker/index.md
+```
+
+**Includes:**
+- **Dockerfile Patterns:** Multi-stage builds, security (non-root UID > 10,000), health checks, layer optimization
+- **Docker Compose:** Service orchestration, health checks, dependencies, dev/prod configs
+- **Security:** Official Docker security best practices, vulnerability scanning
+- **Languages:** Node.js, Python, Ruby/Rails, Go patterns
+
+**Documentation:** [docker/README.md](docker/README.md)
 
 ## How to Use
 
@@ -100,6 +118,11 @@ your-project/
 │   │   ├── models.md
 │   │   ├── controllers.md
 │   │   └── ...          # 14 more modules
+│   ├── docker/           # Docker and Docker Compose patterns
+│   │   ├── README.md     # Docker documentation
+│   │   ├── index.md     # ⭐ Entry point (includes all 2 modules)
+│   │   ├── dockerfile.md
+│   │   └── compose.md
 │   ├── react/            # Coming soon (will have index.md)
 │   ├── nextjs/           # Coming soon (will have index.md)
 │   └── README.md         # This file
@@ -109,6 +132,7 @@ your-project/
 
 **Each technology folder has an entry point:**
 - `agent-notes/rails/index.md` - All Rails modules
+- `agent-notes/docker/index.md` - All Docker modules
 - `agent-notes/react/index.md` - (Coming soon) All React modules
 - `agent-notes/nextjs/index.md` - (Coming soon) All Next.js modules
 
@@ -119,6 +143,7 @@ your-project/
 @agent-notes/rails/index.md
 @agent-notes/react/index.md
 @agent-notes/nextjs/index.md
+@agent-notes/docker/index.md
 ```
 
 ## Contributing
