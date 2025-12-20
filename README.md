@@ -19,16 +19,14 @@ Instead of explaining patterns repeatedly in every conversation, include these o
 
 | Technology | Status | Modules | Quick Start |
 |------------|--------|---------|-------------|
-| **Rails** | ✅ Complete | 17 modules | `@agent-notes/rails/index.md` |
+| **Rails** | ✅ Complete | 19 modules | `@agent-notes/rails/index.md` |
 | **Docker** | ✅ Complete | 2 modules | `@agent-notes/docker/index.md` |
 | **React** | 🚧 Planned | - | Coming soon |
 | **Next.js** | 🚧 Planned | - | Coming soon |
 | **Vue** | 🚧 Planned | - | Coming soon |
-| **Docker** | 🚧 Planned | - | Coming soon |
-| **Docker Compose** | 🚧 Planned | - | Coming soon |
 | **Shell Scripts** | 🚧 Planned | - | Coming soon |
 
-### Rails (✅ Complete - 17 Modules)
+### Rails (✅ Complete - 19 Modules)
 
 Comprehensive Rails patterns and best practices extracted from production codebases.
 
@@ -43,7 +41,7 @@ Comprehensive Rails patterns and best practices extracted from production codeba
 - **Frontend:** Views, ViewComponents, Helpers, JavaScript (Stimulus/Turbo)
 - **Background:** Jobs, Mailers, Broadcasting
 - **Data:** Migrations, Active Storage, Validations
-- **Infrastructure:** Lib, Initializers
+- **Infrastructure:** Lib, Initializers, Kamal (Deployment)
 - **Code Style & Conventions**
 
 **Documentation:** [rails/README.md](rails/README.md)
@@ -118,6 +116,7 @@ your-project/
 │   │   ├── models.md
 │   │   ├── controllers.md
 │   │   ├── viewcomponents.md
+│   │   ├── kamal.md
 │   │   └── ...          # 14 more modules
 │   ├── docker/           # Docker and Docker Compose patterns
 │   │   ├── README.md     # Docker documentation
@@ -142,8 +141,6 @@ your-project/
 # My Project
 
 @agent-notes/rails/index.md
-@agent-notes/react/index.md
-@agent-notes/nextjs/index.md
 @agent-notes/docker/index.md
 ```
 

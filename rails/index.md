@@ -20,3 +20,4 @@ This file includes all Rails pattern modules. Include just this file in your pro
 @agent-notes/rails/lib.md
 @agent-notes/rails/initializers.md
 @agent-notes/rails/validations.md
+@agent-notes/rails/kamal.md

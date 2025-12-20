@@ -15,6 +15,7 @@ Comprehensive, modular Rails patterns and best practices. Each file can be indep
 
 ### Views & Frontend
 - **views.md** - Partials, Turbo Streams, JSON (Jbuilder), caching ✅
+- **viewcomponents.md** - ViewComponent patterns, slots, testing, previews ✅
 - **helpers.md** - View helpers, domain-specific helpers, application helpers ✅
 - **javascript.md** - Stimulus controllers, Turbo, Hotwire patterns ✅
 
@@ -31,6 +32,7 @@ Comprehensive, modular Rails patterns and best practices. Each file can be indep
 - **lib.md** - Custom libraries, Rails extensions, monkey patches ✅
 - **initializers.md** - Configuration, boot-time setup ✅
 - **validations.md** - Custom validators, validation patterns ✅
+- **kamal.md** - Deployment with Kamal, zero-downtime deploys, accessories ✅
 
 ---
 
@@ -90,6 +92,7 @@ rails/
 ├── tests.md              # ✅ Complete
 ├── style.md              # ✅ Complete
 ├── views.md              # ✅ Complete
+├── viewcomponents.md     # ✅ Complete
 ├── helpers.md            # ✅ Complete
 ├── javascript.md         # ✅ Complete
 ├── jobs.md               # ✅ Complete
@@ -99,7 +102,8 @@ rails/
 ├── active_storage.md     # ✅ Complete
 ├── lib.md                # ✅ Complete
 ├── initializers.md       # ✅ Complete
-└── validations.md        # ✅ Complete
+├── validations.md        # ✅ Complete
+└── kamal.md              # ✅ Complete
 ```
 
 ---
