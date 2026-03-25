@@ -13,7 +13,7 @@ AI coding agents work best when they have clear, structured context about your c
 - ✅ **Production-Ready** - Extracted from real codebases
 - 📚 **Comprehensive** - Covers all major components
 
-Instead of explaining patterns repeatedly in every conversation, include these once in your project's `CLAUDE.md`, and AI assistants will automatically understand your conventions.
+Instead of explaining patterns repeatedly in every conversation, include these once in your project's `AGENTS.md` (OpenCode) or `CLAUDE.md` (Claude Code), and AI assistants will automatically understand your conventions.
 
 ## Available Patterns
 
@@ -32,7 +32,7 @@ Comprehensive Rails patterns and best practices extracted from production codeba
 
 **Quick Start:**
 ```markdown
-# In your project's CLAUDE.md
+# In your project's AGENTS.md or CLAUDE.md
 @agent-notes/rails/index.md
 ```
 
@@ -52,7 +52,7 @@ Production-ready Docker and Docker Compose patterns based on official Docker doc
 
 **Quick Start:**
 ```markdown
-# In your project's CLAUDE.md
+# In your project's AGENTS.md or CLAUDE.md
 @agent-notes/docker/index.md
 ```
 
@@ -64,85 +64,140 @@ Production-ready Docker and Docker Compose patterns based on official Docker doc
 
 **Documentation:** [docker/README.md](docker/README.md)
 
-## How to Use
+## Getting Started
 
-1. **Clone or copy this repo into your project:**
-   ```bash
-   cd /path/to/your/project
-   git clone git@github.com:rubakas/agent-notes.git
-   # or
-   cp -r /path/to/agent-notes .
-   ```
+There are two ways to use agent-notes. Pick one or use both.
 
-2. **Create or update your project's `CLAUDE.md`:**
-   ```markdown
-   # My Project
+### Option A: Global Skills (recommended)
 
-   ## Rails Best Practices
+Skills are loaded **on-demand** mid-conversation (e.g. type `/rails-models`).
+They work across all your projects — install once, use everywhere.
 
-   @agent-notes/rails/index.md
-   ```
-
-3. **Optional - Include specific modules only:**
-   ```markdown
-   # My Project
-
-   ## Rails Patterns
-
-   @agent-notes/rails/models.md
-   @agent-notes/rails/controllers.md
-   @agent-notes/rails/style.md
-   <!-- @agent-notes/rails/jobs.md -->  <!-- Disabled -->
-   ```
-
-4. **Add project-specific patterns:**
-   ```markdown
-   @agent-notes/rails/index.md
-
-   ## Project-Specific Patterns
-
-   @docs/architecture.md
-   @docs/deployment.md
-   ```
-
-## Repository Structure
-
-```
-your-project/
-├── agent-notes/          # This repository
-│   ├── rails/            # Rails patterns and conventions
-│   │   ├── README.md     # Rails documentation
-│   │   ├── index.md     # ⭐ Entry point (includes all 19 modules)
-│   │   ├── models.md
-│   │   ├── controllers.md
-│   │   ├── viewcomponents.md
-│   │   ├── kamal.md
-│   │   └── ...          # 14 more modules
-│   ├── docker/           # Docker and Docker Compose patterns
-│   │   ├── README.md     # Docker documentation
-│   │   ├── index.md     # ⭐ Entry point (includes all 2 modules)
-│   │   ├── dockerfile.md
-│   │   └── compose.md
-│   ├── react/            # Coming soon (will have index.md)
-│   ├── nextjs/           # Coming soon (will have index.md)
-│   └── README.md         # This file
-├── app/                  # Your application code
-└── CLAUDE.md            # ⭐ Your project configuration
+**Step 1.** Clone the repo anywhere:
+```bash
+git clone git@github.com:rubakas/agent-notes.git ~/agent-notes
 ```
 
-**Each technology folder has an entry point:**
-- `agent-notes/rails/index.md` - All Rails modules
-- `agent-notes/docker/index.md` - All Docker modules
-- `agent-notes/react/index.md` - (Coming soon) All React modules
-- `agent-notes/nextjs/index.md` - (Coming soon) All Next.js modules
+**Step 2.** Run the install script:
+```bash
+bash ~/agent-notes/scripts/install-skills.sh
+```
 
-**Your project's CLAUDE.md stays simple:**
+This symlinks all 29 skills into:
+- `~/.claude/skills/` (Claude Code)
+- `~/.config/opencode/skills/` (OpenCode)
+- `~/.agents/skills/` (universal)
+
+To install for a specific tool only:
+```bash
+bash ~/agent-notes/scripts/install-skills.sh --opencode   # OpenCode only
+bash ~/agent-notes/scripts/install-skills.sh --claude      # Claude Code only
+```
+
+**Step 3.** Use skills in any project:
+```
+/rails-models
+/docker-compose
+/rails-testing-controllers
+```
+
+Updates are automatic — just `git pull` in the cloned repo.
+
+### Option B: Passive Include in Your Project
+
+Patterns are loaded **automatically** every session via your project's instructions file.
+Good when your whole team should always have the context.
+
+**Step 1.** Clone the repo inside your project:
+```bash
+cd /path/to/your/project
+git clone git@github.com:rubakas/agent-notes.git
+```
+
+**Step 2.** Reference the patterns in your instructions file:
+
+**OpenCode** — create or edit `AGENTS.md`:
 ```markdown
 # My Project
 
 @agent-notes/rails/index.md
 @agent-notes/docker/index.md
 ```
+
+Or use `opencode.json` instead:
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "agent-notes/rails/index.md",
+    "agent-notes/docker/index.md"
+  ]
+}
+```
+
+**Claude Code** — create or edit `CLAUDE.md`:
+```markdown
+# My Project
+
+@agent-notes/rails/index.md
+@agent-notes/docker/index.md
+```
+
+**Step 3 (optional).** Include only specific modules:
+```markdown
+@agent-notes/rails/models.md
+@agent-notes/rails/controllers.md
+@agent-notes/rails/style.md
+```
+
+### Which approach to use?
+
+| | Global Skills (A) | Passive Include (B) |
+|---|---|---|
+| **Scope** | All projects | Single project |
+| **Loading** | On-demand (`/rails-models`) | Always loaded every session |
+| **Setup** | Once, globally | Per project |
+| **Team sharing** | Each dev installs | Commit AGENTS.md / CLAUDE.md to git |
+| **Best for** | Personal reference | Team-wide conventions |
+
+You can use both — install skills globally AND include patterns in a project.
+
+### Available skills
+
+`/rails-models`, `/rails-controllers`, `/rails-routes`, `/rails-concerns`,
+`/rails-views`, `/rails-views-advanced`, `/rails-view-components`,
+`/rails-view-components-advanced`, `/rails-helpers`, `/rails-javascript`,
+`/rails-jobs`, `/rails-mailers`, `/rails-broadcasting`, `/rails-migrations`,
+`/rails-active-storage`, `/rails-validations`, `/rails-testing-controllers`,
+`/rails-testing-models`, `/rails-testing-system`, `/rails-style`,
+`/rails-controllers-advanced`, `/rails-models-advanced`, `/rails-initializers`,
+`/rails-lib`, `/rails-kamal`, `/docker-dockerfile`, `/docker-dockerfile-languages`,
+`/docker-compose`, `/docker-compose-advanced`
+
+## Repository Structure
+
+```
+agent-notes/
+├── rails/                # Rails patterns (19 modules)
+│   ├── index.md          # Entry point — includes all modules
+│   ├── models.md
+│   ├── controllers.md
+│   ├── views.md
+│   └── ...
+├── docker/               # Docker patterns (2 modules)
+│   ├── index.md          # Entry point — includes all modules
+│   ├── dockerfile.md
+│   └── compose.md
+├── rails-models/         # Skill directories (29 total)
+│   └── SKILL.md          #   Works with OpenCode + Claude Code
+├── scripts/
+│   └── install-skills.sh # Global skill installer
+└── README.md
+```
+
+**Each technology folder has an entry point:**
+- `rails/index.md` — All 19 Rails modules
+- `docker/index.md` — All 2 Docker modules
 
 ## Contributing
 
