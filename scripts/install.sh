@@ -50,7 +50,7 @@ place_file() {
       skip "$dst (exists, not a symlink)"
       return
     fi
-    ln -sf "$src" "$dst"
+    ln -sfn "$src" "$dst"
     link "$dst"
   fi
 }
