@@ -204,17 +204,20 @@ done
 echo ""
 echo "Checking for unclosed code blocks ..."
 
+CODEBLOCK_OK=true
 for f in $(find "$AGENT_NOTES_DIR" -name "*.md" -not -path "*/.git/*" -not -path "*/node_modules/*"); do
-  fence_count=$(grep -c '^\`\`\`' "$f" 2>/dev/null || true)
-  fence_count=${fence_count:-0}
+  fence_count=$(grep -c '^```' "$f" 2>/dev/null || echo 0)
   fence_count=$(echo "$fence_count" | tr -d '[:space:]')
   if [ "$fence_count" -gt 0 ] && [ $((fence_count % 2)) -ne 0 ]; then
     rel="${f#$AGENT_NOTES_DIR/}"
     err "$rel — unclosed code block ($fence_count fence markers)"
+    CODEBLOCK_OK=false
   fi
 done
 
-ok "Code blocks valid"
+if [ "$CODEBLOCK_OK" = true ]; then
+  ok "Code blocks valid"
+fi
 
 # --- Summary ---
 
