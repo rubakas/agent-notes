@@ -32,4 +32,7 @@
 - Use subagents when tasks can run in parallel or require isolated context.
 - For simple tasks, sequential operations, or single-file edits, work directly.
 - Use `explorer` (Haiku) for quick lookups to save context tokens.
+- Use `database-specialist` for schema, indexes, and query analysis.
+- Use `performance-profiler` for bottleneck identification.
+- Use `api-reviewer` for API design and consistency checks.
 - Use `lead` for complex multi-step tasks requiring coordination.

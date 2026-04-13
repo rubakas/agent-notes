@@ -169,6 +169,9 @@ Use agents for multi-step work. Use a single session for quick edits and questio
 | **spec-writer** | Sonnet 4 | Writes tests for any framework. |
 | **spec-runner** | Sonnet 4 | Diagnoses and fixes failing tests. |
 | **system-auditor** | Sonnet 4 | Codebase health: duplication, N+1, coupling. Read-only. |
+| **database-specialist** | Sonnet 4 | Schema design, indexes, query performance, migrations. Read-only. |
+| **performance-profiler** | Sonnet 4 | Response times, memory, caching, bundle size. Read-only. |
+| **api-reviewer** | Sonnet 4 | API design, versioning, error handling, backward compatibility. Read-only. |
 | **tech-writer** | Sonnet 4 | Documentation: READMEs, API docs, changelogs. |
 | **devops** | Sonnet 4 | Docker, CI/CD, deployment configs. |
 | **explorer** | Haiku 3 | Fast file discovery and pattern search. Read-only. |
@@ -202,6 +205,9 @@ You (human)
                            +-- Spec Runner (Sonnet) fix tests
                            +-- Security (Sonnet)    security audit
                            +-- Auditor (Sonnet)     codebase health
+                           +-- DB Specialist (Sonnet) schema & queries
+                           +-- Perf Profiler (Sonnet) performance
+                           +-- API Reviewer (Sonnet)  API design
                            +-- Tech Writer (Sonnet) documentation
                            +-- DevOps (Sonnet)      infrastructure
 ```
