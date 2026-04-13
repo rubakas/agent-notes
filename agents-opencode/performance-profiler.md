@@ -1,7 +1,7 @@
 ---
 description: Profiles application performance including response times, memory usage, query efficiency, and bundle size. Read-only analysis.
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
+model: github-copilot/claude-sonnet-4
 permission:
   edit: deny
   bash:

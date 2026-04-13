@@ -1,7 +1,7 @@
 ---
 description: Reviews API design for consistency, versioning, error handling, and backward compatibility. Read-only analysis.
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
+model: github-copilot/claude-sonnet-4
 permission:
   edit: deny
   bash:

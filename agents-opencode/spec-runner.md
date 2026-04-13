@@ -1,7 +1,7 @@
 ---
 description: Diagnoses and fixes failing tests. Runs specs, parses errors, identifies root cause, applies minimal fix.
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
+model: github-copilot/claude-sonnet-4
 permission:
   edit: allow
   bash: allow

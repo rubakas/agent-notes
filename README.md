@@ -174,7 +174,7 @@ Use agents for multi-step work. Use a single session for quick edits and questio
 | **api-reviewer** | Sonnet 4 | API design, versioning, error handling, backward compatibility. Read-only. |
 | **tech-writer** | Sonnet 4 | Documentation: READMEs, API docs, changelogs. |
 | **devops** | Sonnet 4 | Docker, CI/CD, deployment configs. |
-| **explorer** | Haiku 3 | Fast file discovery and pattern search. Read-only. |
+| **explorer** | Haiku 4.5 | Fast file discovery and pattern search. Read-only. |
 
 ### Format differences
 
@@ -182,7 +182,7 @@ Each agent exists in two formats with the same body content but different frontm
 
 | Feature | Claude Code (`agents/`) | OpenCode (`agents-opencode/`) |
 |---------|------------------------|-------------------------------|
-| Model ID | Shorthand (`opus`, `sonnet`, `haiku`) | Full ID (`anthropic/claude-opus-4-20250514`) |
+| Model ID | Shorthand (`opus`, `sonnet`, `haiku`) | Full ID (`github-copilot/claude-sonnet-4`) |
 | Mode | `role` (implicit) | `mode: primary` or `mode: subagent` |
 | Read-only | `disallowedTools: Write, Edit` | `permission: { edit: deny }` |
 | Bash restrict | `disallowedTools: Bash` | `permission: { bash: { "*": deny, "grep *": allow } }` |

@@ -1,7 +1,7 @@
 ---
 description: Reviews code for quality, readability, correctness, and adherence to project conventions. Read-only analysis with structured output.
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
+model: github-copilot/claude-sonnet-4
 permission:
   edit: deny
   bash:

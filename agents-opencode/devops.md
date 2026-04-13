@@ -1,7 +1,7 @@
 ---
 description: Manages infrastructure configs including Docker, CI/CD pipelines, deployment, and environment setup.
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
+model: github-copilot/claude-sonnet-4
 permission:
   edit: allow
   bash: allow

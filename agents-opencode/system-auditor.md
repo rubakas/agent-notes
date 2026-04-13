@@ -1,7 +1,7 @@
 ---
 description: Audits codebase health for duplication, dead code, N+1 queries, missing indexes, coupling, and convention violations.
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
+model: github-copilot/claude-sonnet-4
 permission:
   edit: deny
   bash:

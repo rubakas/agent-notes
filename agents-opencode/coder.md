@@ -1,7 +1,7 @@
 ---
 description: Implements features, fixes bugs, and refactors code. The hands-on builder that writes and edits files.
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
+model: github-copilot/claude-sonnet-4
 permission:
   edit: allow
   bash: allow

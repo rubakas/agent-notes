@@ -1,7 +1,7 @@
 ---
 description: Fast read-only codebase exploration for file discovery, pattern search, and architecture understanding.
 mode: subagent
-model: anthropic/claude-haiku-3-20250307
+model: github-copilot/claude-haiku-4.5
 permission:
   edit: deny
   bash:
