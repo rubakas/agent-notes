@@ -68,3 +68,40 @@ Never spawn one agent per bullet point from the user's prompt. Combine related s
 - Give each agent a specific, complete task with all necessary context (file paths, expected output, success criteria)
 - Do not re-delegate work an agent already completed unless it failed
 - Synthesize results yourself — do not spawn an agent to summarize
+
+## Cost reporting
+
+After every delegation round, run this query and include the output in your response:
+
+```bash
+sqlite3 -header -column ~/.local/share/opencode/opencode.db "
+WITH cs AS (SELECT id FROM session WHERE parent_id IS NULL ORDER BY time_updated DESC LIMIT 1),
+stats AS (
+  SELECT json_extract(m.data,'$.agent') as agent, json_extract(m.data,'$.modelID') as model,
+    SUM(json_extract(m.data,'$.tokens.input')) as inp, SUM(json_extract(m.data,'$.tokens.output')) as outp,
+    SUM(json_extract(m.data,'$.tokens.cache.read')) as cache,
+    ROUND((MAX(json_extract(m.data,'$.time.completed'))-MIN(json_extract(m.data,'$.time.created')))/1000.0,1) as sec
+  FROM session s JOIN message m ON m.session_id=s.id CROSS JOIN cs
+  WHERE s.parent_id=cs.id AND json_extract(m.data,'$.role')='assistant' GROUP BY s.id)
+SELECT agent||'('||model||')' as 'agent(model)',
+  inp||'/'||outp||'/'||cache as 'in/out/cache',
+  sec||'s' as time,
+  '\$'||ROUND(CASE WHEN model LIKE '%haiku%' THEN inp*1.0/1e6+outp*5.0/1e6+cache*0.10/1e6
+    WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
+    ELSE inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6 END,4) as actual,
+  '\$'||ROUND(inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6,4) as if_opus
+FROM stats
+UNION ALL
+SELECT 'TOTAL (saved '||ROUND((1.0-SUM(CASE WHEN model LIKE '%haiku%' THEN inp*1.0/1e6+outp*5.0/1e6+cache*0.10/1e6
+    WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
+    ELSE inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6 END)/SUM(inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6))*100,0)||'%)',
+  SUM(inp)||'/'||SUM(outp)||'/'||SUM(cache),
+  MAX(sec)||'s parallel / '||CAST(CAST(SUM(sec) AS INT) AS TEXT)||'s sequential',
+  '\$'||ROUND(SUM(CASE WHEN model LIKE '%haiku%' THEN inp*1.0/1e6+outp*5.0/1e6+cache*0.10/1e6
+    WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
+    ELSE inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6 END),4),
+  '\$'||ROUND(SUM(inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6),4)
+FROM stats"
+```
+
+Present the query output as a table. The `actual` column shows what delegation cost. The `if_opus` column shows what the same work would cost on Opus alone. The TOTAL row shows savings percentage and parallel vs sequential time.
