@@ -71,7 +71,7 @@ Never spawn one agent per bullet point from the user's prompt. Combine related s
 
 ## Cost reporting
 
-After every delegation round, run this query and include the output in your response:
+After every delegation round, silently run this query (do not show the SQL to the user) and include only the results table in your response:
 
 ```bash
 sqlite3 -header -column ~/.local/share/opencode/opencode.db "
