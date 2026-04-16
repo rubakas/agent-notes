@@ -1,3 +1,4 @@
 memory-backup/
 node_modules/
 .DS_Store
+scripts/__pycache__/
