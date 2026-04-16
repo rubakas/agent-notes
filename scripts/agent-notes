@@ -1,57 +1,53 @@
 #!/usr/bin/env bash
-#
-# agent-notes — CLI wrapper for agent-notes management scripts.
-#
-# Usage: agent-notes <command> [args...]
-#
 set -e
-
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 case "${1:-help}" in
   install)    shift; exec bash "$SCRIPTS_DIR/install.sh" "$@" ;;
   uninstall)  shift; exec bash "$SCRIPTS_DIR/uninstall.sh" "$@" ;;
+  update)     shift; exec bash "$SCRIPTS_DIR/update.sh" "$@" ;;
+  doctor)     shift; exec bash "$SCRIPTS_DIR/doctor.sh" "$@" ;;
+  info)       exec bash "$SCRIPTS_DIR/install.sh" --info ;;
+  list)       shift; exec bash "$SCRIPTS_DIR/list.sh" "$@" ;;
   validate)   shift; exec bash "$SCRIPTS_DIR/validate.sh" "$@" ;;
   memory)     shift; exec bash "$SCRIPTS_DIR/memory.sh" "$@" ;;
-  check)      exec bash "$SCRIPTS_DIR/install.sh" --check ;;
-  info)       exec bash "$SCRIPTS_DIR/install.sh" --info ;;
   help|--help|-h)
     cat <<'EOF'
-Usage: agent-notes <command> [args...]
+agent-notes — AI agent configuration manager
+
+Usage: agent-notes <command> [options]
 
 Commands:
-  install <what> <where> [--copy]   Install components
-  uninstall <what> <where>          Remove installed components
-  validate                          Lint all configs in the repo
-  memory [opts]                     Manage agent memory
-  check                             Validate existing symlinks
-  info                              Show component counts and status
-  help                              Show this help
+  install [--local] [--copy]    Build and install components (global by default)
+  uninstall [--local]           Remove installed components
+  update                        Pull latest changes, rebuild, and reinstall
+  doctor [--local] [--fix]      Check installation health, optionally fix issues
+  info                          Show installation status and component counts
+  list [agents|skills|rules]    List installed components
+  validate                      Lint source configuration files
+  memory [options]              Manage agent memory
 
-Install arguments:
-  <what>    all | skills | agents | rules
-  <where>   global | local
-  --copy    Copy files instead of symlink (local only)
-
-Memory options:
-  --list             List all memories (default)
-  --size             Total disk usage
-  --show <name>      View one agent's memory
-  --reset [name]     Clear memory (all or one agent)
-  --export           Back up to agent-notes/memory-backup/
-  --import           Restore from backup
+Options:
+  --local     Target current project instead of global (~/)
+  --copy      Copy files instead of symlink (with --local only)
+  --fix       Auto-fix found issues (with doctor only)
 
 Examples:
-  agent-notes install all global
-  agent-notes install agents local --copy
-  agent-notes uninstall all global
-  agent-notes validate
-  agent-notes memory --show coder
-  agent-notes check
-  agent-notes info
+  agent-notes install                Install globally (symlinks)
+  agent-notes install --local        Install to current project (symlinks)
+  agent-notes install --local --copy Install to current project (copies)
+  agent-notes uninstall              Remove global installation
+  agent-notes uninstall --local      Remove local installation
+  agent-notes update                 Update to latest version
+  agent-notes doctor                 Check global health
+  agent-notes doctor --local         Check local health
+  agent-notes doctor --fix           Check and fix global issues
+  agent-notes doctor --local --fix   Check and fix local issues
+  agent-notes list agents            List installed agents
+  agent-notes info                   Show status
 
-Make globally available:
-  ln -sf ~/agent-notes/scripts/agent-notes /usr/local/bin/agent-notes
+Setup:
+  ln -sf $(pwd)/scripts/agent-notes /usr/local/bin/agent-notes
 EOF
     ;;
   *)

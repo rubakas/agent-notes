@@ -3,12 +3,11 @@
 # install.sh — Install agent-notes components (skills, agents, rules).
 #
 # Usage:
-#   install.sh <what> <where> [--copy]
-#   install.sh --check | --info | --help
+#   install.sh [--local] [--copy]
+#   install.sh --info | --help
 #
-# What:   all | skills | agents | rules
-# Where:  global | local
-# Flags:  --copy  Copy files instead of symlink (only with 'local')
+# Default = global install with symlinks
+# --local = project install (symlinks unless --copy specified)
 #
 set -e
 
@@ -187,118 +186,6 @@ install_rules_local() {
   place_dir_contents "$AGENT_NOTES_DIR/global/rules" ".claude/rules" "*.md" "$mode"
 }
 
-# --- --check ---
-
-do_check() {
-  local issues=0
-
-  echo "Checking global installation ..."
-
-  # Claude agents
-  for f in "$AGENT_NOTES_DIR"/agents/*.md; do
-    [ -f "$f" ] || continue
-    local name target
-    name=$(basename "$f")
-    target="$HOME/.claude/agents/$name"
-    if [ ! -e "$target" ]; then
-      fail "$target  MISSING"
-      issues=$((issues + 1))
-    elif [ ! -L "$target" ]; then
-      warn "$target  SHADOWED (not a symlink)"
-      issues=$((issues + 1))
-    elif [ ! -e "$(readlink "$target")" ]; then
-      fail "$target  BROKEN (target does not exist)"
-      issues=$((issues + 1))
-    else
-      ok "$target"
-    fi
-  done
-
-  # OpenCode agents
-  for f in "$AGENT_NOTES_DIR"/agents-opencode/*.md; do
-    [ -f "$f" ] || continue
-    local name target
-    name=$(basename "$f")
-    target="$HOME/.config/opencode/agents/$name"
-    if [ ! -e "$target" ]; then
-      fail "$target  MISSING"
-      issues=$((issues + 1))
-    elif [ ! -L "$target" ]; then
-      warn "$target  SHADOWED (not a symlink)"
-      issues=$((issues + 1))
-    elif [ ! -e "$(readlink "$target")" ]; then
-      fail "$target  BROKEN (target does not exist)"
-      issues=$((issues + 1))
-    else
-      ok "$target"
-    fi
-  done
-
-  # Skills (check ~/.claude/skills only for brevity)
-  for skill_dir in "$AGENT_NOTES_DIR"/*/; do
-    [ -f "${skill_dir}SKILL.md" ] || continue
-    local skill_name target
-    skill_name=$(basename "$skill_dir")
-    target="$HOME/.claude/skills/$skill_name"
-    if [ ! -e "$target" ]; then
-      fail "$target  MISSING"
-      issues=$((issues + 1))
-    elif [ ! -L "$target" ]; then
-      warn "$target  SHADOWED (not a symlink)"
-      issues=$((issues + 1))
-    elif [ ! -e "$(readlink "$target")" ]; then
-      fail "$target  BROKEN"
-      issues=$((issues + 1))
-    else
-      ok "$target"
-    fi
-  done
-
-  # Global config files
-  local global_targets=(
-    "$HOME/.claude/CLAUDE.md"
-    "$HOME/.config/opencode/AGENTS.md"
-    "$HOME/.github/copilot-instructions.md"
-  )
-  for target in "${global_targets[@]}"; do
-    if [ ! -e "$target" ]; then
-      fail "$target  MISSING"
-      issues=$((issues + 1))
-    elif [ ! -L "$target" ]; then
-      warn "$target  SHADOWED (not a symlink)"
-      issues=$((issues + 1))
-    else
-      ok "$target"
-    fi
-  done
-
-  # Rules
-  for f in "$AGENT_NOTES_DIR"/global/rules/*.md; do
-    [ -f "$f" ] || continue
-    local name target
-    name=$(basename "$f")
-    target="$HOME/.claude/rules/$name"
-    if [ ! -e "$target" ]; then
-      fail "$target  MISSING"
-      issues=$((issues + 1))
-    elif [ ! -L "$target" ]; then
-      warn "$target  SHADOWED (not a symlink)"
-      issues=$((issues + 1))
-    else
-      ok "$target"
-    fi
-  done
-
-  echo ""
-  if [ "$issues" -gt 0 ]; then
-    echo -e "${RED}$issues issue(s) found.${NC} Run 'install.sh all global' to fix."
-    exit 1
-  else
-    echo -e "${GREEN}All checks passed.${NC}"
-    exit 0
-  fi
-}
-
 # --- --info ---
 
 do_info() {
@@ -324,7 +211,7 @@ do_info() {
 
   echo "Status:"
   if [ "$global_ok" = true ]; then
-    echo -e "  Global:  ${GREEN}installed${NC} (use --check for details)"
+    echo -e "  Global:  ${GREEN}installed${NC} (use doctor for details)"
   else
     echo -e "  Global:  ${YELLOW}not installed${NC}"
   fi
@@ -339,60 +226,44 @@ do_info() {
 
 do_help() {
   cat <<'EOF'
-Usage: install.sh <what> <where> [--copy]
-       install.sh --check | --info | --help
+Usage: install.sh [--local] [--copy]
+       install.sh --info | --help
 
 Install agent-notes components as symlinks or copies.
 
-Arguments:
-  <what>    What to install:
-              all      Everything (skills + agents + rules)
-              skills   Skill directories only (SKILL.md)
-              agents   Agent definitions only (Claude + OpenCode)
-              rules    Rules/instructions only (CLAUDE.md, AGENTS.md, rules/, copilot)
-
-  <where>   Where to install:
-              global   User home (~/.claude/, ~/.config/opencode/, ~/.github/)
-              local    Current project directory (.claude/, .opencode/)
-
-Flags:
-  --copy    Copy files instead of symlink (only valid with 'local')
+Options:
+  (none)    Install globally (symlinks to ~/.claude/, ~/.config/opencode/, ~/.github/)
+  --local   Install to current project (.claude/, .opencode/, CLAUDE.md, AGENTS.md)
+  --copy    Copy files instead of symlink (only valid with --local)
 
 Management:
-  --check   Validate existing global symlinks
   --info    Show component counts and install status
   --help    Show this help
 
+Notes:
+  • Global installs always use symlinks
+  • --copy only works with --local for editable project configs
+  • Always installs everything: skills + agents + rules
+
 Examples:
-  install.sh all global              Install everything globally (symlinks)
-  install.sh skills global           Only skills, globally
-  install.sh agents local            Symlink agents into current project
-  install.sh agents local --copy     Copy agents into project (editable)
-  install.sh rules local --copy      Copy rules into project for customization
-  install.sh all local --copy        Full standalone project setup
+  install.sh                       Install everything globally (symlinks)
+  install.sh --local               Install into project (symlinks)
+  install.sh --local --copy        Install into project (copies, editable)
 EOF
 }
 
 # --- Main ---
 
-WHAT=""
-WHERE=""
+WHERE="global"
 MODE="symlink"
 
 for arg in "$@"; do
   case "$arg" in
-    all|skills|agents|rules)
-      [ -z "$WHAT" ] && WHAT="$arg" || WHERE="$arg"
-      ;;
-    global|local)
-      WHERE="$arg"
+    --local)
+      WHERE="local"
       ;;
     --copy)
       MODE="copy"
-      ;;
-    --check)
-      do_check
-      exit $?
       ;;
     --info)
       do_info
@@ -411,57 +282,32 @@ for arg in "$@"; do
 done
 
 # Validate args
-if [ -z "$WHAT" ] || [ -z "$WHERE" ]; then
-  echo "Error: Both <what> and <where> are required."
-  echo ""
-  do_help
-  exit 1
-fi
-
 if [ "$MODE" = "copy" ] && [ "$WHERE" = "global" ]; then
-  echo "Error: --copy is only valid with 'local' installs."
+  echo "Error: --copy is only valid with --local installs."
   echo "Global installs always use symlinks."
   exit 1
 fi
 
+# Build first (silent unless error)
+echo "Building from source..."
+if ! bash "$AGENT_NOTES_DIR/scripts/build.sh" >/dev/null 2>&1; then
+  echo -e "${RED}Build failed.${NC} Check 'build.sh' for details."
+  exit 1
+fi
+
 # Execute
-echo "Installing $WHAT ($WHERE, $MODE) ..."
+echo "Installing ($WHERE, $MODE) ..."
 echo ""
 
-case "$WHAT" in
-  all)
-    if [ "$WHERE" = "global" ]; then
-      install_skills_global "$MODE"
-      install_agents_global "$MODE"
-      install_rules_global "$MODE"
-    else
-      install_skills_local "$MODE"
-      install_agents_local "$MODE"
-      install_rules_local "$MODE"
-    fi
-    ;;
-  skills)
-    if [ "$WHERE" = "global" ]; then
-      install_skills_global "$MODE"
-    else
-      install_skills_local "$MODE"
-    fi
-    ;;
-  agents)
-    if [ "$WHERE" = "global" ]; then
-      install_agents_global "$MODE"
-    else
-      install_agents_local "$MODE"
-    fi
-    ;;
-  rules)
-    if [ "$WHERE" = "global" ]; then
-      install_rules_global "$MODE"
-    else
-      install_rules_local "$MODE"
-    fi
-    ;;
-esac
+if [ "$WHERE" = "global" ]; then
+  install_skills_global "$MODE"
+  install_agents_global "$MODE"
+  install_rules_global "$MODE"
+else
+  install_skills_local "$MODE"
+  install_agents_local "$MODE"
+  install_rules_local "$MODE"
+fi
 
 echo ""
 echo -e "${GREEN}Done.${NC} Restart Claude Code / OpenCode to pick up changes."

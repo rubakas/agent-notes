@@ -2,10 +2,10 @@
 #
 # uninstall.sh — Remove agent-notes components installed by install.sh.
 #
-# Usage: uninstall.sh <what> <where>
+# Usage: uninstall.sh [--local]
 #
-# What:   all | skills | agents | rules
-# Where:  global | local
+# Default = global uninstall
+# --local = project uninstall
 #
 # Only removes symlinks pointing to the agent-notes repo.
 # Non-symlink files are reported but not deleted.
@@ -128,44 +128,32 @@ uninstall_rules_local() {
 
 do_help() {
   cat <<'EOF'
-Usage: uninstall.sh <what> <where>
+Usage: uninstall.sh [--local]
 
 Remove agent-notes components installed by install.sh.
 
-Arguments:
-  <what>    What to remove:
-              all      Everything (skills + agents + rules)
-              skills   Skill directories only
-              agents   Agent definitions only
-              rules    Rules/instructions only
-
-  <where>   Where to remove from:
-              global   User home (~/.claude/, ~/.config/opencode/, ~/.github/)
-              local    Current project directory
+Options:
+  (none)    Remove global installation (~/.claude/, ~/.config/opencode/, ~/.github/)
+  --local   Remove local installation (.claude/, .opencode/, CLAUDE.md, AGENTS.md)
 
 Notes:
   Only removes symlinks. Non-symlink files (e.g., from --copy installs)
   are reported but not deleted — remove them manually.
 
 Examples:
-  uninstall.sh all global        Remove all global installs
-  uninstall.sh agents global     Remove only global agents
-  uninstall.sh all local         Remove all project-level installs
+  uninstall.sh                   Remove global installation
+  uninstall.sh --local           Remove local installation
 EOF
 }
 
 # --- Main ---
 
-WHAT=""
-WHERE=""
+WHERE="global"
 
 for arg in "$@"; do
   case "$arg" in
-    all|skills|agents|rules)
-      [ -z "$WHAT" ] && WHAT="$arg" || WHERE="$arg"
-      ;;
-    global|local)
-      WHERE="$arg"
+    --local)
+      WHERE="local"
       ;;
     --help|-h)
       do_help
@@ -179,38 +167,18 @@ for arg in "$@"; do
   esac
 done
 
-if [ -z "$WHAT" ] || [ -z "$WHERE" ]; then
-  echo "Error: Both <what> and <where> are required."
-  echo ""
-  do_help
-  exit 1
-fi
-
-echo "Uninstalling $WHAT ($WHERE) ..."
+echo "Uninstalling ($WHERE) ..."
 echo ""
 
-case "$WHAT" in
-  all)
-    if [ "$WHERE" = "global" ]; then
-      uninstall_skills_global
-      uninstall_agents_global
-      uninstall_rules_global
-    else
-      uninstall_skills_local
-      uninstall_agents_local
-      uninstall_rules_local
-    fi
-    ;;
-  skills)
-    [ "$WHERE" = "global" ] && uninstall_skills_global || uninstall_skills_local
-    ;;
-  agents)
-    [ "$WHERE" = "global" ] && uninstall_agents_global || uninstall_agents_local
-    ;;
-  rules)
-    [ "$WHERE" = "global" ] && uninstall_rules_global || uninstall_rules_local
-    ;;
-esac
+if [ "$WHERE" = "global" ]; then
+  uninstall_skills_global
+  uninstall_agents_global
+  uninstall_rules_global
+else
+  uninstall_skills_local
+  uninstall_agents_local
+  uninstall_rules_local
+fi
 
 echo ""
 echo -e "${GREEN}Done.${NC}"
