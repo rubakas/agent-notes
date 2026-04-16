@@ -1,4 +1,4 @@
 memory-backup/
 node_modules/
 .DS_Store
-scripts/__pycache__/
+lib/__pycache__/

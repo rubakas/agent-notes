@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 set -e
-SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
-AGENT_NOTES_DIR="$(cd "$SCRIPTS_DIR/.." && pwd)"
+LIB_DIR="$(cd "$(dirname "$0")/../lib" && pwd)"
+AGENT_NOTES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION=$(cat "$AGENT_NOTES_DIR/VERSION" 2>/dev/null || echo "unknown")
 
 case "${1:-help}" in
-  install)    shift; exec bash "$SCRIPTS_DIR/install.sh" "$@" ;;
-  uninstall)  shift; exec bash "$SCRIPTS_DIR/uninstall.sh" "$@" ;;
-  update)     shift; exec bash "$SCRIPTS_DIR/update.sh" "$@" ;;
-  doctor)     shift; exec bash "$SCRIPTS_DIR/doctor.sh" "$@" ;;
-  info)       exec bash "$SCRIPTS_DIR/install.sh" --info ;;
-  list)       shift; exec bash "$SCRIPTS_DIR/list.sh" "$@" ;;
-  validate)   shift; exec bash "$SCRIPTS_DIR/validate.sh" "$@" ;;
-  memory)     shift; exec bash "$SCRIPTS_DIR/memory.sh" "$@" ;;
+  install)    shift; exec bash "$LIB_DIR/install.sh" "$@" ;;
+  uninstall)  shift; exec bash "$LIB_DIR/uninstall.sh" "$@" ;;
+  update)     shift; exec bash "$LIB_DIR/update.sh" "$@" ;;
+  doctor)     shift; exec bash "$LIB_DIR/doctor.sh" "$@" ;;
+  info)       exec bash "$LIB_DIR/install.sh" --info ;;
+  list)       shift; exec bash "$LIB_DIR/list.sh" "$@" ;;
+  validate)   shift; exec bash "$LIB_DIR/validate.sh" "$@" ;;
+  memory)     shift; exec bash "$LIB_DIR/memory.sh" "$@" ;;
   --version|-v)
     echo "agent-notes $VERSION"
     ;;
@@ -52,7 +52,7 @@ Examples:
   agent-notes info                   Show status
 
 Setup:
-  ln -sf $(pwd)/scripts/agent-notes /usr/local/bin/agent-notes
+  ln -sf $(pwd)/bin/agent-notes /usr/local/bin/agent-notes
 EOF
     ;;
   *)

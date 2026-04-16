@@ -99,9 +99,9 @@ check_stale_files() {
         name=$(basename "$installed_file")
         
         if [[ "$base_dir" == *"opencode"* ]]; then
-          source_file="$AGENT_NOTES_DIR/agents-opencode/$name"
+          source_file="$AGENT_NOTES_DIR/dist/agents-opencode/$name"
         else
-          source_file="$AGENT_NOTES_DIR/agents/$name"
+          source_file="$AGENT_NOTES_DIR/dist/agents/$name"
         fi
         
         if [ ! -f "$source_file" ]; then
@@ -132,7 +132,7 @@ check_stale_files() {
         [ -f "$installed_rule" ] || continue
         local name source_rule
         name=$(basename "$installed_rule")
-        source_rule="$AGENT_NOTES_DIR/global/rules/$name"
+        source_rule="$AGENT_NOTES_DIR/dist/global/rules/$name"
         
         if [ ! -f "$source_rule" ]; then
           add_issue "stale" "$installed_rule" "Not found in source. Likely left over from a previous version."
@@ -179,13 +179,13 @@ check_shadowed_files() {
     )
     
     # Agents
-    for f in "$AGENT_NOTES_DIR"/agents/*.md; do
+    for f in "$AGENT_NOTES_DIR"/dist/agents/*.md; do
       [ -f "$f" ] || continue
       local name="$(basename "$f")"
       files_to_check+=("$HOME/.claude/agents/$name")
     done
     
-    for f in "$AGENT_NOTES_DIR"/agents-opencode/*.md; do
+    for f in "$AGENT_NOTES_DIR"/dist/agents-opencode/*.md; do
       [ -f "$f" ] || continue
       local name="$(basename "$f")"
       files_to_check+=("$HOME/.config/opencode/agents/$name")
@@ -200,7 +200,7 @@ check_shadowed_files() {
     done
     
     # Rules
-    for f in "$AGENT_NOTES_DIR"/global/rules/*.md; do
+    for f in "$AGENT_NOTES_DIR"/dist/global/rules/*.md; do
       [ -f "$f" ] || continue
       local name="$(basename "$f")"
       files_to_check+=("$HOME/.claude/rules/$name")
@@ -213,13 +213,13 @@ check_shadowed_files() {
     )
     
     # Local agents
-    for f in "$AGENT_NOTES_DIR"/agents/*.md; do
+    for f in "$AGENT_NOTES_DIR"/dist/agents/*.md; do
       [ -f "$f" ] || continue
       local name="$(basename "$f")"
       files_to_check+=(".claude/agents/$name")
     done
     
-    for f in "$AGENT_NOTES_DIR"/agents-opencode/*.md; do
+    for f in "$AGENT_NOTES_DIR"/dist/agents-opencode/*.md; do
       [ -f "$f" ] || continue
       local name="$(basename "$f")"
       files_to_check+=(".opencode/agents/$name")
@@ -233,22 +233,22 @@ check_shadowed_files() {
       if [[ "$file" == *"/agents/"* ]]; then
         local name="$(basename "$file")"
         if [[ "$file" == *"opencode"* ]]; then
-          source_file="$AGENT_NOTES_DIR/agents-opencode/$name"
+          source_file="$AGENT_NOTES_DIR/dist/agents-opencode/$name"
         else
-          source_file="$AGENT_NOTES_DIR/agents/$name"
+          source_file="$AGENT_NOTES_DIR/dist/agents/$name"
         fi
       elif [[ "$file" == *"/skills/"* ]]; then
         local skill_name="$(basename "$file")"
         source_file="$AGENT_NOTES_DIR/$skill_name"
       elif [[ "$file" == *"/rules/"* ]]; then
         local name="$(basename "$file")"
-        source_file="$AGENT_NOTES_DIR/global/rules/$name"
+        source_file="$AGENT_NOTES_DIR/dist/global/rules/$name"
       elif [[ "$file" == *"CLAUDE.md" ]]; then
-        source_file="$AGENT_NOTES_DIR/global/CLAUDE.md"
+        source_file="$AGENT_NOTES_DIR/dist/global/CLAUDE.md"
       elif [[ "$file" == *"AGENTS.md" ]]; then
-        source_file="$AGENT_NOTES_DIR/global/AGENTS.md"
+        source_file="$AGENT_NOTES_DIR/dist/global/AGENTS.md"
       elif [[ "$file" == *"copilot-instructions.md" ]]; then
-        source_file="$AGENT_NOTES_DIR/global/copilot-instructions.md"
+        source_file="$AGENT_NOTES_DIR/dist/global/copilot-instructions.md"
       fi
       
       add_issue "shadowed" "$file" "Regular file instead of symlink. Won't receive updates."
@@ -263,9 +263,9 @@ check_missing_files() {
   if [ "$scope" = "global" ]; then
     # Check global config files
     local global_files=(
-      "$HOME/.claude/CLAUDE.md:$AGENT_NOTES_DIR/global/CLAUDE.md"
-      "$HOME/.config/opencode/AGENTS.md:$AGENT_NOTES_DIR/global/AGENTS.md"
-      "$HOME/.github/copilot-instructions.md:$AGENT_NOTES_DIR/global/copilot-instructions.md"
+      "$HOME/.claude/CLAUDE.md:$AGENT_NOTES_DIR/dist/global/CLAUDE.md"
+      "$HOME/.config/opencode/AGENTS.md:$AGENT_NOTES_DIR/dist/global/AGENTS.md"
+      "$HOME/.github/copilot-instructions.md:$AGENT_NOTES_DIR/dist/global/copilot-instructions.md"
     )
     
     for entry in "${global_files[@]}"; do
@@ -278,7 +278,7 @@ check_missing_files() {
     done
     
     # Check agents
-    for f in "$AGENT_NOTES_DIR"/agents/*.md; do
+    for f in "$AGENT_NOTES_DIR"/dist/agents/*.md; do
       [ -f "$f" ] || continue
       local name="$(basename "$f")"
       local target="$HOME/.claude/agents/$name"
@@ -288,7 +288,7 @@ check_missing_files() {
       fi
     done
     
-    for f in "$AGENT_NOTES_DIR"/agents-opencode/*.md; do
+    for f in "$AGENT_NOTES_DIR"/dist/agents-opencode/*.md; do
       [ -f "$f" ] || continue
       local name="$(basename "$f")"
       local target="$HOME/.config/opencode/agents/$name"
@@ -316,7 +316,7 @@ check_missing_files() {
     done
     
     # Check rules
-    for f in "$AGENT_NOTES_DIR"/global/rules/*.md; do
+    for f in "$AGENT_NOTES_DIR"/dist/global/rules/*.md; do
       [ -f "$f" ] || continue
       local name="$(basename "$f")"
       local target="$HOME/.claude/rules/$name"
@@ -349,19 +349,19 @@ check_content_drift() {
       if [[ "$file" == *"/agents/"* ]]; then
         local name="$(basename "$file")"
         if [[ "$file" == *"opencode"* ]]; then
-          source_file="$AGENT_NOTES_DIR/agents-opencode/$name"
+          source_file="$AGENT_NOTES_DIR/dist/agents-opencode/$name"
         else
-          source_file="$AGENT_NOTES_DIR/agents/$name"
+          source_file="$AGENT_NOTES_DIR/dist/agents/$name"
         fi
       elif [[ "$file" == *"/rules/"* ]]; then
         local name="$(basename "$file")"
-        source_file="$AGENT_NOTES_DIR/global/rules/$name"
+        source_file="$AGENT_NOTES_DIR/dist/global/rules/$name"
       elif [[ "$file" == *"CLAUDE.md" ]]; then
-        source_file="$AGENT_NOTES_DIR/global/CLAUDE.md"
+        source_file="$AGENT_NOTES_DIR/dist/global/CLAUDE.md"
       elif [[ "$file" == *"AGENTS.md" ]]; then
-        source_file="$AGENT_NOTES_DIR/global/AGENTS.md"
+        source_file="$AGENT_NOTES_DIR/dist/global/AGENTS.md"
       elif [[ "$file" == *"copilot-instructions.md" ]]; then
-        source_file="$AGENT_NOTES_DIR/global/copilot-instructions.md"
+        source_file="$AGENT_NOTES_DIR/dist/global/copilot-instructions.md"
       fi
       
       if [ -n "$source_file" ] && [ -f "$source_file" ] && files_differ "$file" "$source_file"; then
@@ -383,8 +383,8 @@ check_build_freshness() {
     local source_time="$(get_mtime "$source_dir/agents.yaml")"
     
     # Check generated agents directories
-    if [ -d "$AGENT_NOTES_DIR/agents" ]; then
-      for f in "$AGENT_NOTES_DIR"/agents/*.md; do
+    if [ -d "$AGENT_NOTES_DIR/dist/agents" ]; then
+      for f in "$AGENT_NOTES_DIR"/dist/agents/*.md; do
         [ -f "$f" ] || continue
         local gen_time="$(get_mtime "$f")"
         if [ "$source_time" -gt "$gen_time" ]; then
@@ -395,8 +395,8 @@ check_build_freshness() {
       done
     fi
     
-    if [ -d "$AGENT_NOTES_DIR/agents-opencode" ]; then
-      for f in "$AGENT_NOTES_DIR"/agents-opencode/*.md; do
+    if [ -d "$AGENT_NOTES_DIR/dist/agents-opencode" ]; then
+      for f in "$AGENT_NOTES_DIR"/dist/agents-opencode/*.md; do
         [ -f "$f" ] || continue
         local gen_time="$(get_mtime "$f")"
         if [ "$source_time" -gt "$gen_time" ]; then
@@ -416,8 +416,8 @@ check_build_freshness() {
       local source_time="$(get_mtime "$src_file")"
       
       # Check corresponding generated files
-      local claude_gen="$AGENT_NOTES_DIR/agents/$name"
-      local opencode_gen="$AGENT_NOTES_DIR/agents-opencode/$name"
+      local claude_gen="$AGENT_NOTES_DIR/dist/agents/$name"
+      local opencode_gen="$AGENT_NOTES_DIR/dist/agents-opencode/$name"
       
       if [ -f "$claude_gen" ]; then
         local gen_time="$(get_mtime "$claude_gen")"
@@ -439,9 +439,9 @@ check_build_freshness() {
   
   # Check global source files
   local global_sources=(
-    "$source_dir/global.md:$AGENT_NOTES_DIR/global/CLAUDE.md"
-    "$source_dir/global.md:$AGENT_NOTES_DIR/global/AGENTS.md"
-    "$source_dir/global-copilot.md:$AGENT_NOTES_DIR/global/copilot-instructions.md"
+    "$source_dir/global.md:$AGENT_NOTES_DIR/dist/global/CLAUDE.md"
+    "$source_dir/global.md:$AGENT_NOTES_DIR/dist/global/AGENTS.md"
+    "$source_dir/global-copilot.md:$AGENT_NOTES_DIR/dist/global/copilot-instructions.md"
   )
   
   for entry in "${global_sources[@]}"; do
@@ -713,7 +713,7 @@ do_fix() {
   # Handle bulk operations
   if [ "$needs_install" = true ]; then
     echo -e "  ${GREEN}RUNNING${NC} install.sh to install missing components..."
-    "$AGENT_NOTES_DIR/scripts/install.sh" all global >/dev/null 2>&1 || true
+    "$AGENT_NOTES_DIR/lib/install.sh" all global >/dev/null 2>&1 || true
   fi
   
   if [ "$needs_build" = true ]; then

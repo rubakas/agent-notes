@@ -9,6 +9,6 @@ if ! command -v python3 &>/dev/null; then
   exit 1
 fi
 
-python3 "$AGENT_NOTES_DIR/scripts/generate.py" "$AGENT_NOTES_DIR"
+python3 "$AGENT_NOTES_DIR/lib/generate.py" "$AGENT_NOTES_DIR"
 
 echo "Done."

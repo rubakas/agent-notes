@@ -39,4 +39,4 @@ fi
 
 # Rebuild and reinstall
 echo ""
-exec bash "$AGENT_NOTES_DIR/scripts/install.sh"
+exec bash "$AGENT_NOTES_DIR/lib/install.sh"

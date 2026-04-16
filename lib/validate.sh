@@ -46,14 +46,14 @@ line_count() {
 
 # --- Validate Claude agents ---
 
-echo "Validating Claude Code agents (agents/*.md) ..."
+echo "Validating Claude Code agents (dist/agents/*.md) ..."
 NAMES=()
 
-for f in "$AGENT_NOTES_DIR"/agents/*.md; do
+for f in "$AGENT_NOTES_DIR"/dist/agents/*.md; do
   [ -f "$f" ] || continue
   local_name=$(basename "$f" .md)
   lines=$(line_count "$f")
-  label="agents/$local_name.md ($lines lines)"
+  label="dist/agents/$local_name.md ($lines lines)"
 
   # Frontmatter exists
   if ! head -1 "$f" | grep -q "^---$"; then
@@ -89,13 +89,13 @@ done
 # --- Validate OpenCode agents ---
 
 echo ""
-echo "Validating OpenCode agents (agents-opencode/*.md) ..."
+echo "Validating OpenCode agents (dist/agents-opencode/*.md) ..."
 
-for f in "$AGENT_NOTES_DIR"/agents-opencode/*.md; do
+for f in "$AGENT_NOTES_DIR"/dist/agents-opencode/*.md; do
   [ -f "$f" ] || continue
   local_name=$(basename "$f" .md)
   lines=$(line_count "$f")
-  label="agents-opencode/$local_name.md ($lines lines)"
+  label="dist/agents-opencode/$local_name.md ($lines lines)"
 
   if ! head -1 "$f" | grep -q "^---$"; then
     err "$label — missing frontmatter"
@@ -184,11 +184,11 @@ echo ""
 echo "Checking global config files ..."
 
 REQUIRED_GLOBAL=(
-  "global/CLAUDE.md"
-  "global/AGENTS.md"
-  "global/copilot-instructions.md"
-  "global/rules/code-quality.md"
-  "global/rules/safety.md"
+  "dist/global/CLAUDE.md"
+  "dist/global/AGENTS.md"
+  "dist/global/copilot-instructions.md"
+  "dist/global/rules/code-quality.md"
+  "dist/global/rules/safety.md"
 )
 
 for rel in "${REQUIRED_GLOBAL[@]}"; do

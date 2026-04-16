@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPTS_DIR/.." && pwd)"
+AGENT_NOTES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Colors and helpers
 RED='\033[0;31m'
@@ -71,13 +70,13 @@ ok "GitHub CLI available"
 
 # Run validate.sh
 info "Running validation..."
-if ! bash "$SCRIPTS_DIR/validate.sh" > /dev/null 2>&1; then
-  error "Validation failed. Run 'scripts/validate.sh' to see details."
+if ! bash "$AGENT_NOTES_DIR/lib/validate.sh" > /dev/null 2>&1; then
+  error "Validation failed. Run 'lib/validate.sh' to see details."
 fi
 ok "Validation passed"
 
 # Read current version
-version_file="$REPO_ROOT/VERSION"
+version_file="$AGENT_NOTES_DIR/VERSION"
 if [[ ! -f "$version_file" ]]; then
   error "VERSION file not found at $version_file"
 fi
@@ -130,8 +129,8 @@ git checkout -b "$release_branch"
 
 # Run build.sh to ensure generated files are fresh
 info "Building fresh artifacts..."
-if ! bash "$SCRIPTS_DIR/build.sh" > /dev/null 2>&1; then
-  error "Build failed. Run 'scripts/build.sh' to see details."
+if ! bash "$AGENT_NOTES_DIR/lib/build.sh" > /dev/null 2>&1; then
+  error "Build failed. Run 'lib/build.sh' to see details."
 fi
 ok "Build completed"
 

@@ -77,13 +77,13 @@ uninstall_skills_local() {
 
 uninstall_agents_global() {
   echo "Removing Claude Code agents from ~/.claude/agents/ ..."
-  for f in "$AGENT_NOTES_DIR"/agents/*.md; do
+  for f in "$AGENT_NOTES_DIR"/dist/agents/*.md; do
     [ -f "$f" ] || continue
     remove_symlink "$HOME/.claude/agents/$(basename "$f")"
   done
 
   echo "Removing OpenCode agents from ~/.config/opencode/agents/ ..."
-  for f in "$AGENT_NOTES_DIR"/agents-opencode/*.md; do
+  for f in "$AGENT_NOTES_DIR"/dist/agents-opencode/*.md; do
     [ -f "$f" ] || continue
     remove_symlink "$HOME/.config/opencode/agents/$(basename "$f")"
   done
@@ -91,13 +91,13 @@ uninstall_agents_global() {
 
 uninstall_agents_local() {
   echo "Removing Claude Code agents from .claude/agents/ ..."
-  for f in "$AGENT_NOTES_DIR"/agents/*.md; do
+  for f in "$AGENT_NOTES_DIR"/dist/agents/*.md; do
     [ -f "$f" ] || continue
     remove_symlink ".claude/agents/$(basename "$f")"
   done
 
   echo "Removing OpenCode agents from .opencode/agents/ ..."
-  for f in "$AGENT_NOTES_DIR"/agents-opencode/*.md; do
+  for f in "$AGENT_NOTES_DIR"/dist/agents-opencode/*.md; do
     [ -f "$f" ] || continue
     remove_symlink ".opencode/agents/$(basename "$f")"
   done
@@ -108,7 +108,7 @@ uninstall_rules_global() {
   remove_symlink "$HOME/.claude/CLAUDE.md"
   remove_symlink "$HOME/.config/opencode/AGENTS.md"
   remove_symlink "$HOME/.github/copilot-instructions.md"
-  for f in "$AGENT_NOTES_DIR"/global/rules/*.md; do
+  for f in "$AGENT_NOTES_DIR"/dist/global/rules/*.md; do
     [ -f "$f" ] || continue
     remove_symlink "$HOME/.claude/rules/$(basename "$f")"
   done
@@ -118,7 +118,7 @@ uninstall_rules_local() {
   echo "Removing project rules ..."
   remove_symlink "./CLAUDE.md"
   remove_symlink "./AGENTS.md"
-  for f in "$AGENT_NOTES_DIR"/global/rules/*.md; do
+  for f in "$AGENT_NOTES_DIR"/dist/global/rules/*.md; do
     [ -f "$f" ] || continue
     remove_symlink ".claude/rules/$(basename "$f")"
   done
