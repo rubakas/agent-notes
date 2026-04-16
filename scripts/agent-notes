@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
+AGENT_NOTES_DIR="$(cd "$SCRIPTS_DIR/.." && pwd)"
+VERSION=$(cat "$AGENT_NOTES_DIR/VERSION" 2>/dev/null || echo "unknown")
 
 case "${1:-help}" in
   install)    shift; exec bash "$SCRIPTS_DIR/install.sh" "$@" ;;
@@ -11,9 +13,12 @@ case "${1:-help}" in
   list)       shift; exec bash "$SCRIPTS_DIR/list.sh" "$@" ;;
   validate)   shift; exec bash "$SCRIPTS_DIR/validate.sh" "$@" ;;
   memory)     shift; exec bash "$SCRIPTS_DIR/memory.sh" "$@" ;;
+  --version|-v)
+    echo "agent-notes $VERSION"
+    ;;
   help|--help|-h)
-    cat <<'EOF'
-agent-notes — AI agent configuration manager
+    cat <<EOF
+agent-notes $VERSION — AI agent configuration manager
 
 Usage: agent-notes <command> [options]
 

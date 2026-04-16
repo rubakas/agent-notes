@@ -189,7 +189,9 @@ install_rules_local() {
 # --- --info ---
 
 do_info() {
-  echo "agent-notes"
+  local version
+  version=$(cat "$AGENT_NOTES_DIR/VERSION" 2>/dev/null || echo "unknown")
+  echo "agent-notes $version"
   echo ""
   echo "Components:"
   echo "  Skills:              $(count_skills)"
