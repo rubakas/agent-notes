@@ -1,4 +1,6 @@
 memory-backup/
 node_modules/
 .DS_Store
-lib/__pycache__/
+__pycache__/
+*.pyc
+*.egg-info/

@@ -68,10 +68,11 @@ if ! command -v gh &> /dev/null; then
 fi
 ok "GitHub CLI available"
 
-# Run validate.sh
+# Run validate
 info "Running validation..."
-if ! bash "$AGENT_NOTES_DIR/lib/validate.sh" > /dev/null 2>&1; then
-  error "Validation failed. Run 'lib/validate.sh' to see details."
+export PYTHONPATH="$AGENT_NOTES_DIR/lib${PYTHONPATH:+:$PYTHONPATH}"
+if ! python3 -m agent_notes validate > /dev/null 2>&1; then
+  error "Validation failed. Run 'agent-notes validate' to see details."
 fi
 ok "Validation passed"
 
@@ -127,10 +128,10 @@ release_branch="release/$new_version"
 info "Creating release branch: $release_branch"
 git checkout -b "$release_branch"
 
-# Run build.sh to ensure generated files are fresh
-info "Building fresh artifacts..."
-if ! bash "$AGENT_NOTES_DIR/lib/build.sh" > /dev/null 2>&1; then
-  error "Build failed. Run 'lib/build.sh' to see details."
+# Run build to ensure generated files are fresh
+info "Building from source..."
+if ! python3 -m agent_notes build > /dev/null 2>&1; then
+  error "Build failed. Run 'agent-notes install' to see details."
 fi
 ok "Build completed"
 
