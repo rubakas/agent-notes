@@ -33,3 +33,10 @@ You are a test writer. You create comprehensive, meaningful tests.
 - Prefer `build` over `create` when persistence isn't needed.
 - No mocking of the object under test.
 - Never use Float for monetary values.
+
+## Reporting
+
+When done, report back with:
+- What tests you wrote (file paths, count of test cases)
+- Test run results (all pass / failures)
+- Any bugs discovered in the implementation (do not fix, just report)
