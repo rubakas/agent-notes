@@ -75,7 +75,7 @@ count_skills() {
 
 count_agents_claude() {
   local count=0
-  for f in "$AGENT_NOTES_DIR"/dist/agents/*.md; do
+  for f in "$AGENT_NOTES_DIR"/dist/cli/claude/agents/*.md; do
     [ -f "$f" ] && count=$((count + 1))
   done
   echo "$count"
@@ -83,7 +83,7 @@ count_agents_claude() {
 
 count_agents_opencode() {
   local count=0
-  for f in "$AGENT_NOTES_DIR"/dist/agents-opencode/*.md; do
+  for f in "$AGENT_NOTES_DIR"/dist/cli/opencode/agents/*.md; do
     [ -f "$f" ] && count=$((count + 1))
   done
   echo "$count"
@@ -91,10 +91,10 @@ count_agents_opencode() {
 
 count_global() {
   local count=0
-  [ -f "$AGENT_NOTES_DIR/dist/global/CLAUDE.md" ] && count=$((count + 1))
-  [ -f "$AGENT_NOTES_DIR/dist/global/AGENTS.md" ] && count=$((count + 1))
-  [ -f "$AGENT_NOTES_DIR/dist/global/copilot-instructions.md" ] && count=$((count + 1))
-  for f in "$AGENT_NOTES_DIR"/dist/global/rules/*.md; do
+  [ -f "$AGENT_NOTES_DIR/dist/cli/claude/CLAUDE.md" ] && count=$((count + 1))
+  [ -f "$AGENT_NOTES_DIR/dist/cli/opencode/AGENTS.md" ] && count=$((count + 1))
+  [ -f "$AGENT_NOTES_DIR/dist/cli/github/copilot-instructions.md" ] && count=$((count + 1))
+  for f in "$AGENT_NOTES_DIR"/dist/rules/*.md; do
     [ -f "$f" ] && count=$((count + 1))
   done
   echo "$count"
@@ -135,19 +135,19 @@ install_skills_local() {
 install_agents_global() {
   local mode="$1"
   echo "Installing Claude Code agents to ~/.claude/agents/ ..."
-  place_dir_contents "$AGENT_NOTES_DIR/dist/agents" "$HOME/.claude/agents" "*.md" "$mode"
+  place_dir_contents "$AGENT_NOTES_DIR/dist/cli/claude/agents" "$HOME/.claude/agents" "*.md" "$mode"
 
   echo "Installing OpenCode agents to ~/.config/opencode/agents/ ..."
-  place_dir_contents "$AGENT_NOTES_DIR/dist/agents-opencode" "$HOME/.config/opencode/agents" "*.md" "$mode"
+  place_dir_contents "$AGENT_NOTES_DIR/dist/cli/opencode/agents" "$HOME/.config/opencode/agents" "*.md" "$mode"
 }
 
 install_agents_local() {
   local mode="$1"
   echo "Installing Claude Code agents to .claude/agents/ ..."
-  place_dir_contents "$AGENT_NOTES_DIR/dist/agents" ".claude/agents" "*.md" "$mode"
+  place_dir_contents "$AGENT_NOTES_DIR/dist/cli/claude/agents" ".claude/agents" "*.md" "$mode"
 
   echo "Installing OpenCode agents to .opencode/agents/ ..."
-  place_dir_contents "$AGENT_NOTES_DIR/dist/agents-opencode" ".opencode/agents" "*.md" "$mode"
+  place_dir_contents "$AGENT_NOTES_DIR/dist/cli/opencode/agents" ".opencode/agents" "*.md" "$mode"
 }
 
 install_rules_global() {
@@ -155,19 +155,19 @@ install_rules_global() {
   echo "Installing global config ..."
 
   # CLAUDE.md → ~/.claude/CLAUDE.md
-  [ -f "$AGENT_NOTES_DIR/dist/global/CLAUDE.md" ] && \
-    place_file "$AGENT_NOTES_DIR/dist/global/CLAUDE.md" "$HOME/.claude/CLAUDE.md" "$mode"
+  [ -f "$AGENT_NOTES_DIR/dist/cli/claude/CLAUDE.md" ] && \
+    place_file "$AGENT_NOTES_DIR/dist/cli/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md" "$mode"
 
   # AGENTS.md → ~/.config/opencode/AGENTS.md
-  [ -f "$AGENT_NOTES_DIR/dist/global/AGENTS.md" ] && \
-    place_file "$AGENT_NOTES_DIR/dist/global/AGENTS.md" "$HOME/.config/opencode/AGENTS.md" "$mode"
+  [ -f "$AGENT_NOTES_DIR/dist/cli/opencode/AGENTS.md" ] && \
+    place_file "$AGENT_NOTES_DIR/dist/cli/opencode/AGENTS.md" "$HOME/.config/opencode/AGENTS.md" "$mode"
 
   # Rules → ~/.claude/rules/
-  place_dir_contents "$AGENT_NOTES_DIR/dist/global/rules" "$HOME/.claude/rules" "*.md" "$mode"
+  place_dir_contents "$AGENT_NOTES_DIR/dist/rules" "$HOME/.claude/rules" "*.md" "$mode"
 
   # Copilot → ~/.github/copilot-instructions.md
-  [ -f "$AGENT_NOTES_DIR/dist/global/copilot-instructions.md" ] && \
-    place_file "$AGENT_NOTES_DIR/dist/global/copilot-instructions.md" "$HOME/.github/copilot-instructions.md" "$mode"
+  [ -f "$AGENT_NOTES_DIR/dist/cli/github/copilot-instructions.md" ] && \
+    place_file "$AGENT_NOTES_DIR/dist/cli/github/copilot-instructions.md" "$HOME/.github/copilot-instructions.md" "$mode"
 }
 
 install_rules_local() {
@@ -175,15 +175,15 @@ install_rules_local() {
   echo "Installing project rules ..."
 
   # CLAUDE.md → ./CLAUDE.md
-  [ -f "$AGENT_NOTES_DIR/dist/global/CLAUDE.md" ] && \
-    place_file "$AGENT_NOTES_DIR/dist/global/CLAUDE.md" "./CLAUDE.md" "$mode"
+  [ -f "$AGENT_NOTES_DIR/dist/cli/claude/CLAUDE.md" ] && \
+    place_file "$AGENT_NOTES_DIR/dist/cli/claude/CLAUDE.md" "./CLAUDE.md" "$mode"
 
   # AGENTS.md → ./AGENTS.md
-  [ -f "$AGENT_NOTES_DIR/dist/global/AGENTS.md" ] && \
-    place_file "$AGENT_NOTES_DIR/dist/global/AGENTS.md" "./AGENTS.md" "$mode"
+  [ -f "$AGENT_NOTES_DIR/dist/cli/opencode/AGENTS.md" ] && \
+    place_file "$AGENT_NOTES_DIR/dist/cli/opencode/AGENTS.md" "./AGENTS.md" "$mode"
 
   # Rules → .claude/rules/
-  place_dir_contents "$AGENT_NOTES_DIR/dist/global/rules" ".claude/rules" "*.md" "$mode"
+  place_dir_contents "$AGENT_NOTES_DIR/dist/rules" ".claude/rules" "*.md" "$mode"
 }
 
 # --- --info ---

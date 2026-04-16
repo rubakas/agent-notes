@@ -3,10 +3,10 @@
 Generates CLI-specific agent configuration files from source/ directory.
 
 Reads source/agents.yaml + source/agents/*.md and generates:
-1. dist/agents/<name>.md (Claude Code format)
-2. dist/agents-opencode/<name>.md (OpenCode format)
-3. Global files: dist/global/CLAUDE.md, dist/global/AGENTS.md, dist/global/copilot-instructions.md
-4. Rules: dist/global/rules/*.md
+1. dist/cli/claude/agents/<name>.md (Claude Code format)
+2. dist/cli/opencode/agents/<name>.md (OpenCode format)
+3. Global files: dist/cli/claude/CLAUDE.md, dist/cli/opencode/AGENTS.md, dist/cli/github/copilot-instructions.md
+4. Rules: dist/rules/*.md
 """
 
 import sys
@@ -295,7 +295,7 @@ def generate_agent_files(agents_config, tiers, source_dir, agent_notes_dir):
         claude_frontmatter = generate_claude_frontmatter(agent_name, agent_config, tiers)
         claude_content = f"{claude_frontmatter}\n\n{prompt_content}"
         
-        claude_file = os.path.join(agent_notes_dir, 'dist', 'agents', f'{agent_name}.md')
+        claude_file = os.path.join(agent_notes_dir, 'dist', 'cli', 'claude', 'agents', f'{agent_name}.md')
         write_text(claude_file, claude_content)
         generated_files.append(claude_file)
         
@@ -304,7 +304,7 @@ def generate_agent_files(agents_config, tiers, source_dir, agent_notes_dir):
         opencode_prompt = strip_memory_section(prompt_content)
         opencode_content = f"{opencode_frontmatter}\n\n{opencode_prompt}"
         
-        opencode_file = os.path.join(agent_notes_dir, 'dist', 'agents-opencode', f'{agent_name}.md')
+        opencode_file = os.path.join(agent_notes_dir, 'dist', 'cli', 'opencode', 'agents', f'{agent_name}.md')
         write_text(opencode_file, opencode_content)
         generated_files.append(opencode_file)
     
@@ -318,23 +318,23 @@ def copy_global_files(source_dir, agent_notes_dir):
     # Copy global.md to both CLAUDE.md and AGENTS.md
     global_content = read_text(os.path.join(source_dir, 'global.md'))
     
-    claude_global = os.path.join(agent_notes_dir, 'dist', 'global', 'CLAUDE.md')
+    claude_global = os.path.join(agent_notes_dir, 'dist', 'cli', 'claude', 'CLAUDE.md')
     write_text(claude_global, global_content)
     copied_files.append(claude_global)
     
-    agents_global = os.path.join(agent_notes_dir, 'dist', 'global', 'AGENTS.md')
+    agents_global = os.path.join(agent_notes_dir, 'dist', 'cli', 'opencode', 'AGENTS.md')
     write_text(agents_global, global_content)
     copied_files.append(agents_global)
     
     # Copy global-copilot.md to copilot-instructions.md
     copilot_content = read_text(os.path.join(source_dir, 'global-copilot.md'))
-    copilot_global = os.path.join(agent_notes_dir, 'dist', 'global', 'copilot-instructions.md')
+    copilot_global = os.path.join(agent_notes_dir, 'dist', 'cli', 'github', 'copilot-instructions.md')
     write_text(copilot_global, copilot_content)
     copied_files.append(copilot_global)
     
     # Copy all rules files
     rules_src_dir = os.path.join(source_dir, 'rules')
-    rules_dest_dir = os.path.join(agent_notes_dir, 'dist', 'global', 'rules')
+    rules_dest_dir = os.path.join(agent_notes_dir, 'dist', 'rules')
     
     if os.path.exists(rules_src_dir):
         os.makedirs(rules_dest_dir, exist_ok=True)
