@@ -142,68 +142,61 @@ def remove_symlink(target: Path) -> None:
         skipped(str(target))
 
 
-def remove_symlinks_in_dir(dir_path: Path, pattern: str) -> None:
-    """Remove symlinks matching pattern in directory."""
-    if dir_path.exists():
-        for f in dir_path.glob(pattern):
-            if f.exists() or f.is_symlink():
-                remove_symlink(f)
+def remove_all_symlinks_in_dir(dir_path: Path) -> None:
+    """Remove all symlinks in a directory (files and dirs)."""
+    if not dir_path.exists():
+        return
+    for item in dir_path.iterdir():
+        if item.is_symlink():
+            item.unlink()
+            removed(str(item))
+        elif item.exists():
+            skipped(str(item))
+
+
+def remove_dir_if_empty(dir_path: Path) -> None:
+    """Remove directory if it exists and is empty."""
+    try:
+        if dir_path.exists() and not any(dir_path.iterdir()):
+            dir_path.rmdir()
+    except OSError:
+        pass
 
 
 def uninstall_skills_global() -> None:
     """Uninstall skills globally."""
-    if not DIST_SKILLS_DIR.exists():
-        return
     targets = [CLAUDE_HOME / "skills", OPENCODE_HOME / "skills", AGENTS_HOME / "skills"]
     for target_dir in targets:
         if target_dir.exists():
             print(f"Removing skills from {target_dir} ...")
-            for skill_dir in sorted(DIST_SKILLS_DIR.iterdir()):
-                if skill_dir.is_dir():
-                    remove_symlink(target_dir / skill_dir.name)
+            remove_all_symlinks_in_dir(target_dir)
+            remove_dir_if_empty(target_dir)
 
 
 def uninstall_skills_local() -> None:
     """Uninstall skills locally."""
-    if not DIST_SKILLS_DIR.exists():
-        return
     targets = [Path(".claude/skills"), Path(".opencode/skills")]
     for target_dir in targets:
         if target_dir.exists():
             print(f"Removing skills from {target_dir} ...")
-            for skill_dir in sorted(DIST_SKILLS_DIR.iterdir()):
-                if skill_dir.is_dir():
-                    remove_symlink(target_dir / skill_dir.name)
+            remove_all_symlinks_in_dir(target_dir)
+            remove_dir_if_empty(target_dir)
 
 
 def uninstall_agents_global() -> None:
     """Uninstall agents globally."""
-    print("Removing Claude Code agents from ~/.claude/agents/ ...")
-    if (DIST_CLAUDE_DIR / "agents").exists():
-        for f in (DIST_CLAUDE_DIR / "agents").glob("*.md"):
-            if f.exists():
-                remove_symlink(CLAUDE_HOME / "agents" / f.name)
-
-    print("Removing OpenCode agents from ~/.config/opencode/agents/ ...")
-    if (DIST_OPENCODE_DIR / "agents").exists():
-        for f in (DIST_OPENCODE_DIR / "agents").glob("*.md"):
-            if f.exists():
-                remove_symlink(OPENCODE_HOME / "agents" / f.name)
+    for label, agents_dir in [("Claude Code", CLAUDE_HOME / "agents"), ("OpenCode", OPENCODE_HOME / "agents")]:
+        print(f"Removing {label} agents from {agents_dir} ...")
+        remove_all_symlinks_in_dir(agents_dir)
+        remove_dir_if_empty(agents_dir)
 
 
 def uninstall_agents_local() -> None:
     """Uninstall agents locally."""
-    print("Removing Claude Code agents from .claude/agents/ ...")
-    if (DIST_CLAUDE_DIR / "agents").exists():
-        for f in (DIST_CLAUDE_DIR / "agents").glob("*.md"):
-            if f.exists():
-                remove_symlink(Path(".claude/agents") / f.name)
-
-    print("Removing OpenCode agents from .opencode/agents/ ...")
-    if (DIST_OPENCODE_DIR / "agents").exists():
-        for f in (DIST_OPENCODE_DIR / "agents").glob("*.md"):
-            if f.exists():
-                remove_symlink(Path(".opencode/agents") / f.name)
+    for agents_dir in [Path(".claude/agents"), Path(".opencode/agents")]:
+        print(f"Removing agents from {agents_dir} ...")
+        remove_all_symlinks_in_dir(agents_dir)
+        remove_dir_if_empty(agents_dir)
 
 
 def uninstall_rules_global() -> None:
@@ -212,10 +205,10 @@ def uninstall_rules_global() -> None:
     remove_symlink(CLAUDE_HOME / "CLAUDE.md")
     remove_symlink(OPENCODE_HOME / "AGENTS.md")
     remove_symlink(GITHUB_HOME / "copilot-instructions.md")
-    if DIST_RULES_DIR.exists():
-        for f in DIST_RULES_DIR.glob("*.md"):
-            if f.exists():
-                remove_symlink(CLAUDE_HOME / "rules" / f.name)
+    rules_dir = CLAUDE_HOME / "rules"
+    if rules_dir.exists():
+        remove_all_symlinks_in_dir(rules_dir)
+        remove_dir_if_empty(rules_dir)
 
 
 def uninstall_rules_local() -> None:
@@ -223,10 +216,10 @@ def uninstall_rules_local() -> None:
     print("Removing project rules ...")
     remove_symlink(Path("./CLAUDE.md"))
     remove_symlink(Path("./AGENTS.md"))
-    if DIST_RULES_DIR.exists():
-        for f in DIST_RULES_DIR.glob("*.md"):
-            if f.exists():
-                remove_symlink(Path(".claude/rules") / f.name)
+    rules_dir = Path(".claude/rules")
+    if rules_dir.exists():
+        remove_all_symlinks_in_dir(rules_dir)
+        remove_dir_if_empty(rules_dir)
 
 
 def count_skills() -> int:
