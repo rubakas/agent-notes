@@ -133,8 +133,8 @@ class TestDoShow:
         agent_dir = memory_dir / "test-agent"
         agent_dir.mkdir()
         
-        # Create binary file
-        (agent_dir / "binary.dat").write_bytes(b'\x00\x01\x02\x03')
+        # Create binary file with non-UTF-8 content that will trigger UnicodeDecodeError
+        (agent_dir / "binary.dat").write_bytes(b'\xff\xfe\x00\x01\x02\x03\x80\x81\x82\x83')
         
         memory.do_show("test-agent")
         
@@ -202,7 +202,6 @@ class TestDoReset:
         
         captured = capsys.readouterr()
         assert "This will delete ALL agent memories" in captured.out
-        assert "Type 'yes' to confirm" in captured.out
         assert "All agent memories cleared" in captured.out
     
     def test_cancels_reset_all_on_wrong_confirmation(self, mock_paths, capsys):

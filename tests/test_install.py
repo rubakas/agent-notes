@@ -138,17 +138,20 @@ class TestSkillInstallation:
     
     def test_install_skills_global(self, mock_paths, tmp_path, monkeypatch):
         """Should install skills globally."""
-        # Setup skills
-        skill1 = tmp_path / "skill-one"
+        # Setup dist skills directory
+        dist_skills = tmp_path / "dist" / "skills"
+        dist_skills.mkdir(parents=True)
+        
+        skill1 = dist_skills / "skill-one"
         skill1.mkdir()
         (skill1 / "SKILL.md").write_text("skill content")
         
-        skill2 = tmp_path / "skill-two" 
+        skill2 = dist_skills / "skill-two"
         skill2.mkdir()
         (skill2 / "SKILL.md").write_text("skill content")
         
-        with patch('agent_notes.install.find_skill_dirs', return_value=[skill1, skill2]):
-            install.install_skills_global()
+        monkeypatch.setattr(install, 'DIST_SKILLS_DIR', dist_skills)
+        install.install_skills_global()
         
         # Check symlinks were created
         claude_skills = mock_paths['claude'] / "skills"
@@ -164,18 +167,21 @@ class TestSkillInstallation:
     
     def test_install_skills_local(self, tmp_path, monkeypatch):
         """Should install skills locally."""
-        # Setup skills
-        skill1 = tmp_path / "skill-one"
+        # Setup dist skills directory
+        dist_skills = tmp_path / "dist" / "skills"
+        dist_skills.mkdir(parents=True)
+        
+        skill1 = dist_skills / "skill-one"
         skill1.mkdir()
         (skill1 / "SKILL.md").write_text("skill content")
         
         # Change to temp directory
         original_cwd = Path.cwd()
         monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(install, 'DIST_SKILLS_DIR', dist_skills)
         
         try:
-            with patch('agent_notes.install.find_skill_dirs', return_value=[skill1]):
-                install.install_skills_local()
+            install.install_skills_local()
             
             # Check local symlinks were created
             assert (tmp_path / ".claude" / "skills" / "skill-one").is_symlink()
@@ -350,17 +356,20 @@ class TestCountFunctions:
     
     def test_count_skills(self, tmp_path, monkeypatch):
         """Should count skill directories."""
-        skill1 = tmp_path / "skill1"
+        dist_skills = tmp_path / "dist" / "skills"
+        dist_skills.mkdir(parents=True)
+        
+        skill1 = dist_skills / "skill1"
         skill1.mkdir()
         (skill1 / "SKILL.md").write_text("skill")
         
-        skill2 = tmp_path / "skill2"
+        skill2 = dist_skills / "skill2"
         skill2.mkdir()
         (skill2 / "SKILL.md").write_text("skill")
         
-        with patch('agent_notes.install.find_skill_dirs', return_value=[skill1, skill2]):
-            count = install.count_skills()
-            assert count == 2
+        monkeypatch.setattr(install, 'DIST_SKILLS_DIR', dist_skills)
+        count = install.count_skills()
+        assert count == 2
     
     def test_count_agents_claude(self, tmp_path, monkeypatch):
         """Should count Claude agent files."""

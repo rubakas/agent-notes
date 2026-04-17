@@ -101,22 +101,25 @@ class TestFindSkillDirs:
     
     def test_finds_directories_with_skill_md(self, tmp_path, monkeypatch):
         """Should find directories containing SKILL.md."""
-        # Create test structure
-        skill1 = tmp_path / "skill-one"
+        # Create test structure in skills/ subdirectory
+        skills_dir = tmp_path / "skills"
+        skills_dir.mkdir()
+        
+        skill1 = skills_dir / "skill-one"
         skill1.mkdir()
         (skill1 / "SKILL.md").write_text("skill content")
         
-        skill2 = tmp_path / "skill-two"
+        skill2 = skills_dir / "skill-two"
         skill2.mkdir()
         (skill2 / "SKILL.md").write_text("skill content")
         
         # Directory without SKILL.md should be ignored
-        not_skill = tmp_path / "not-a-skill"
+        not_skill = skills_dir / "not-a-skill"
         not_skill.mkdir()
         (not_skill / "other.md").write_text("not a skill")
         
         # File (not directory) should be ignored
-        (tmp_path / "file.txt").write_text("just a file")
+        (skills_dir / "file.txt").write_text("just a file")
         
         # Mock ROOT and __file__ so both search locations point to tmp_path
         monkeypatch.setattr(config, 'ROOT', tmp_path)
@@ -227,7 +230,7 @@ class TestPathConstants:
         assert hasattr(config, 'DIST_OPENCODE_DIR')
         assert hasattr(config, 'DIST_GITHUB_DIR')
         assert hasattr(config, 'DIST_RULES_DIR')
-        assert hasattr(config, 'DIST_SKILLS_DIR')
+        # DIST_SKILLS_DIR removed — skills live at repo root/skills/, not in dist
     
     def test_install_paths_defined(self):
         """Install target paths should be defined."""

@@ -54,6 +54,30 @@ def mock_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(config, 'MEMORY_DIR', tmp_memory)
     monkeypatch.setattr(config, 'BACKUP_DIR', tmp_backup)
     
+    # Also patch modules that import from config at module level
+    import agent_notes.memory as memory
+    monkeypatch.setattr(memory, 'MEMORY_DIR', tmp_memory)
+    monkeypatch.setattr(memory, 'BACKUP_DIR', tmp_backup)
+    
+    import agent_notes.install as inst
+    monkeypatch.setattr(inst, 'CLAUDE_HOME', tmp_claude)
+    monkeypatch.setattr(inst, 'OPENCODE_HOME', tmp_opencode)
+    monkeypatch.setattr(inst, 'GITHUB_HOME', tmp_github)
+    monkeypatch.setattr(inst, 'AGENTS_HOME', tmp_agents)
+    
+    # Patch validate module paths
+    import agent_notes.validate as validate_mod
+    monkeypatch.setattr(validate_mod, 'ROOT', tmp_path)
+    # Create standard dist structure for validate
+    tmp_dist = tmp_path / "dist"
+    tmp_dist_claude = tmp_dist / "cli" / "claude"
+    tmp_dist_opencode = tmp_dist / "cli" / "opencode"
+    tmp_dist_github = tmp_dist / "cli" / "github"
+    tmp_dist_rules = tmp_dist / "rules"
+    monkeypatch.setattr(validate_mod, 'DIST_CLAUDE_DIR', tmp_dist_claude)
+    monkeypatch.setattr(validate_mod, 'DIST_OPENCODE_DIR', tmp_dist_opencode)
+    monkeypatch.setattr(validate_mod, 'DIST_RULES_DIR', tmp_dist_rules)
+    
     return {
         'claude': tmp_claude,
         'opencode': tmp_opencode,

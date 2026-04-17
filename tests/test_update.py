@@ -46,7 +46,7 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.update.install') as mock_install:
+            with patch('agent_notes.install.install') as mock_install:
                 update.update()
                 mock_install.assert_called_once()
         
@@ -73,7 +73,7 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.update.install') as mock_install:
+            with patch('agent_notes.install.install') as mock_install:
                 update.update()
                 mock_install.assert_called_once()
         
@@ -101,7 +101,7 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.update.install'):
+            with patch('agent_notes.install.install'):
                 update.update()
         
         captured = capsys.readouterr()
@@ -134,7 +134,7 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.update.install'):
+            with patch('agent_notes.install.install'):
                 update.update()
         
         captured = capsys.readouterr()
@@ -167,7 +167,7 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.update.install'):
+            with patch('agent_notes.install.install'):
                 update.update()
         
         captured = capsys.readouterr()
@@ -233,7 +233,7 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.update.install') as mock_install:
+            with patch('agent_notes.install.install') as mock_install:
                 update.update()
                 mock_install.assert_called_once()
     
@@ -260,7 +260,7 @@ class TestUpdateFunction:
             return MagicMock(stdout="", returncode=0)
         
         with patch('subprocess.run', side_effect=mock_run):
-            with patch('agent_notes.update.install'):
+            with patch('agent_notes.install.install'):
                 update.update()
         
         # Check git commands used
@@ -294,7 +294,7 @@ class TestGitOperationDetails:
         with patch('subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(stdout="abc123", returncode=0)
             
-            with patch('agent_notes.update.install'):
+            with patch('agent_notes.install.install'):
                 try:
                     update.update()
                 except:
@@ -315,7 +315,7 @@ class TestGitOperationDetails:
         with patch('subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(stdout="abc123", returncode=0)
             
-            with patch('agent_notes.update.install'):
+            with patch('agent_notes.install.install'):
                 try:
                     update.update()
                 except:
@@ -346,7 +346,11 @@ class TestGitOperationDetails:
                 log_calls.append(args[0])
                 return MagicMock(stdout="def456 New commit", returncode=0)
             elif "rev-parse" in args[0]:
-                if len(log_calls) == 0:
+                # First call returns before, second call returns after
+                if not hasattr(mock_run, 'call_count'):
+                    mock_run.call_count = 0
+                mock_run.call_count += 1
+                if mock_run.call_count == 1:
                     return MagicMock(stdout=commit_before, returncode=0)
                 else:
                     return MagicMock(stdout=commit_after, returncode=0)
@@ -354,7 +358,7 @@ class TestGitOperationDetails:
                 return MagicMock(stdout="", returncode=0)
         
         with patch('subprocess.run', side_effect=mock_run):
-            with patch('agent_notes.update.install'):
+            with patch('agent_notes.install.install'):
                 update.update()
         
         # Should call git log with commit range

@@ -6,9 +6,10 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Optional
 
 from .config import (
-    ROOT, DIST_DIR, SOURCE_DIR, DIST_CLI_DIR, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, 
-    DIST_GITHUB_DIR, DIST_RULES_DIR, Color, ok, warn, fail, error, info, 
-    linked, removed, skipped, find_skill_dirs
+    ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR, DIST_SKILLS_DIR,
+    CLAUDE_HOME, OPENCODE_HOME, GITHUB_HOME, AGENTS_HOME,
+    Color, info, issue, ok, fail,
+    linked, removed, skipped
 )
 
 class Issue:
@@ -168,11 +169,13 @@ def check_shadowed_files(scope: str, issues: List[Issue], fix_actions: List[FixA
                 files_to_check.append(Path.home() / ".config/opencode/agents" / f.name)
         
         # Skills
-        for skill_name in find_skill_dirs():
-            files_to_check.extend([
-                Path.home() / ".claude/skills" / skill_name,
-                Path.home() / ".config/opencode/skills" / skill_name
-            ])
+        if DIST_SKILLS_DIR.exists():
+            for skill_dir in sorted(DIST_SKILLS_DIR.iterdir()):
+                if skill_dir.is_dir():
+                    files_to_check.extend([
+                        Path.home() / ".claude/skills" / skill_dir.name,
+                        Path.home() / ".config/opencode/skills" / skill_dir.name
+                    ])
         
         # Rules
         if DIST_RULES_DIR.exists():
@@ -260,17 +263,19 @@ def check_missing_files(scope: str, issues: List[Issue], fix_actions: List[FixAc
                 fix_actions.append(FixAction("INSTALL", str(target), "install OpenCode agent"))
     
     # Skills
-    for skill_name in find_skill_dirs():
-        claude_target = Path.home() / ".claude/skills" / skill_name
-        opencode_target = Path.home() / ".config/opencode/skills" / skill_name
-        
-        if not claude_target.exists():
-            issues.append(Issue("missing", str(claude_target), "Source exists but not installed"))
-            fix_actions.append(FixAction("INSTALL", str(claude_target), "install skill"))
-        
-        if not opencode_target.exists():
-            issues.append(Issue("missing", str(opencode_target), "Source exists but not installed"))
-            fix_actions.append(FixAction("INSTALL", str(opencode_target), "install skill"))
+    if DIST_SKILLS_DIR.exists():
+        for skill_dir in sorted(DIST_SKILLS_DIR.iterdir()):
+            if skill_dir.is_dir():
+                claude_target = Path.home() / ".claude/skills" / skill_dir.name
+                opencode_target = Path.home() / ".config/opencode/skills" / skill_dir.name
+                
+                if not claude_target.exists():
+                    issues.append(Issue("missing", str(claude_target), "Source exists but not installed"))
+                    fix_actions.append(FixAction("INSTALL", str(claude_target), "install skill"))
+                
+                if not opencode_target.exists():
+                    issues.append(Issue("missing", str(opencode_target), "Source exists but not installed"))
+                    fix_actions.append(FixAction("INSTALL", str(opencode_target), "install skill"))
     
     # Rules
     if DIST_RULES_DIR.exists():

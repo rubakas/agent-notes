@@ -110,14 +110,11 @@ def get_version() -> str:
 
 def find_skill_dirs() -> list[Path]:
     """Find all skill directories (containing SKILL.md)."""
-    # In dev mode, skills are at the git repo root
-    repo_root = Path(__file__).resolve().parent.parent.parent
-    skills = []
-    for candidate in [ROOT, repo_root]:
-        if candidate.is_dir():
-            for d in sorted(candidate.iterdir()):
-                if d.is_dir() and (d / "SKILL.md").exists():
-                    skills.append(d)
-            if skills:
-                break
-    return skills
+    candidates = [
+        ROOT / "skills",  # pip install (data inside package)
+        Path(__file__).resolve().parent.parent.parent / "skills",  # dev mode (repo root)
+    ]
+    for skills_dir in candidates:
+        if skills_dir.is_dir():
+            return sorted(d for d in skills_dir.iterdir() if d.is_dir() and (d / "SKILL.md").exists())
+    return []

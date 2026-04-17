@@ -428,6 +428,9 @@ class TestBuild:
         monkeypatch.setattr(build, 'DIST_GITHUB_DIR', dist_dir / "cli" / "github")
         monkeypatch.setattr(build, 'DIST_RULES_DIR', dist_dir / "rules")
         
+        # Mock find_skill_dirs to return empty list for test
+        monkeypatch.setattr(build, 'find_skill_dirs', lambda: [])
+        
         # Run build
         build.build()
         

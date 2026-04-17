@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import List
 
 from .config import (
-    ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR,
+    ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR, DIST_SKILLS_DIR,
     CLAUDE_HOME, OPENCODE_HOME, GITHUB_HOME, AGENTS_HOME,
-    linked, removed, skipped, info, get_version, find_skill_dirs, Color
+    linked, removed, skipped, info, get_version, Color
 )
 from .build import build
 
@@ -48,22 +48,28 @@ def place_dir_contents(src_dir: Path, dst_dir: Path, pattern: str, copy_mode: bo
 
 def install_skills_global(copy_mode: bool = False) -> None:
     """Install skills globally."""
+    if not DIST_SKILLS_DIR.exists():
+        return
     targets = [CLAUDE_HOME / "skills", OPENCODE_HOME / "skills", AGENTS_HOME / "skills"]
     for target_dir in targets:
         print(f"Installing skills to {target_dir} ...")
         target_dir.mkdir(parents=True, exist_ok=True)
-        for skill_dir in find_skill_dirs():
-            place_file(skill_dir, target_dir / skill_dir.name, copy_mode)
+        for skill_dir in sorted(DIST_SKILLS_DIR.iterdir()):
+            if skill_dir.is_dir():
+                place_file(skill_dir, target_dir / skill_dir.name, copy_mode)
 
 
 def install_skills_local(copy_mode: bool = False) -> None:
     """Install skills locally."""
+    if not DIST_SKILLS_DIR.exists():
+        return
     targets = [Path(".claude/skills"), Path(".opencode/skills")]
     for target_dir in targets:
         print(f"Installing skills to {target_dir} ...")
         target_dir.mkdir(parents=True, exist_ok=True)
-        for skill_dir in find_skill_dirs():
-            place_file(skill_dir, target_dir / skill_dir.name, copy_mode)
+        for skill_dir in sorted(DIST_SKILLS_DIR.iterdir()):
+            if skill_dir.is_dir():
+                place_file(skill_dir, target_dir / skill_dir.name, copy_mode)
 
 
 def install_agents_global(copy_mode: bool = False) -> None:
@@ -146,22 +152,28 @@ def remove_symlinks_in_dir(dir_path: Path, pattern: str) -> None:
 
 def uninstall_skills_global() -> None:
     """Uninstall skills globally."""
+    if not DIST_SKILLS_DIR.exists():
+        return
     targets = [CLAUDE_HOME / "skills", OPENCODE_HOME / "skills", AGENTS_HOME / "skills"]
     for target_dir in targets:
         if target_dir.exists():
             print(f"Removing skills from {target_dir} ...")
-            for skill_dir in find_skill_dirs():
-                remove_symlink(target_dir / skill_dir.name)
+            for skill_dir in sorted(DIST_SKILLS_DIR.iterdir()):
+                if skill_dir.is_dir():
+                    remove_symlink(target_dir / skill_dir.name)
 
 
 def uninstall_skills_local() -> None:
     """Uninstall skills locally."""
+    if not DIST_SKILLS_DIR.exists():
+        return
     targets = [Path(".claude/skills"), Path(".opencode/skills")]
     for target_dir in targets:
         if target_dir.exists():
             print(f"Removing skills from {target_dir} ...")
-            for skill_dir in find_skill_dirs():
-                remove_symlink(target_dir / skill_dir.name)
+            for skill_dir in sorted(DIST_SKILLS_DIR.iterdir()):
+                if skill_dir.is_dir():
+                    remove_symlink(target_dir / skill_dir.name)
 
 
 def uninstall_agents_global() -> None:
@@ -219,7 +231,9 @@ def uninstall_rules_local() -> None:
 
 def count_skills() -> int:
     """Count skill directories."""
-    return len(find_skill_dirs())
+    if not DIST_SKILLS_DIR.exists():
+        return 0
+    return len([d for d in DIST_SKILLS_DIR.iterdir() if d.is_dir()])
 
 
 def count_agents_claude() -> int:

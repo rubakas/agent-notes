@@ -8,8 +8,8 @@ from typing import Dict, Any
 from .config import (
     SOURCE_AGENTS_YAML, SOURCE_AGENTS_DIR, SOURCE_GLOBAL_MD, 
     SOURCE_GLOBAL_COPILOT_MD, SOURCE_RULES_DIR,
-    DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR,
-    info, ROOT
+    DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR, DIST_DIR,
+    info, ROOT, find_skill_dirs
 )
 
 
@@ -177,6 +177,22 @@ def copy_global_files() -> list[Path]:
     return copied_files
 
 
+def copy_skills() -> list[Path]:
+    """Copy skill directories to dist/skills/."""
+    dist_skills = DIST_DIR / "skills"
+    # Clean and recreate
+    if dist_skills.exists():
+        shutil.rmtree(dist_skills)
+    dist_skills.mkdir(parents=True, exist_ok=True)
+    
+    copied = []
+    for skill_dir in find_skill_dirs():
+        dest = dist_skills / skill_dir.name
+        shutil.copytree(skill_dir, dest)
+        copied.append(dest)
+    return copied
+
+
 def count_lines(file_path: Path) -> int:
     """Count lines in a file."""
     try:
@@ -204,8 +220,12 @@ def build() -> None:
     print("Copying global files...")
     global_files = copy_global_files()
     
+    # Copy skills
+    print("Copying skills...")
+    skill_files = copy_skills()
+    
     # Report results
-    all_files = agent_files + global_files
+    all_files = agent_files + global_files + skill_files
     print(f"\nGenerated {len(all_files)} files:")
     
     total_lines = 0
