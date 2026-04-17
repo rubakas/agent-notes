@@ -1,5 +1,5 @@
 ---
-description: Writes tests and specs for any framework. Reads source code first, detects test framework, follows project conventions.
+description: Writes tests for any framework. Reads source code first, detects test framework, follows project conventions.
 mode: subagent
 model: github-copilot/claude-sonnet-4
 permission:

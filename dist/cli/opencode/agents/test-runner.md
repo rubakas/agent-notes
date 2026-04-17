@@ -1,5 +1,5 @@
 ---
-description: Diagnoses and fixes failing tests. Runs specs, parses errors, identifies root cause, applies minimal fix.
+description: Diagnoses and fixes failing tests. Runs tests, parses errors, identifies root cause, applies minimal fix.
 mode: subagent
 model: github-copilot/claude-sonnet-4
 permission:

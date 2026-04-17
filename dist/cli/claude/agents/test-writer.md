@@ -1,6 +1,6 @@
 ---
-name: spec-writer
-description: Writes tests and specs for any framework. Reads source code first, detects test framework, follows project conventions.
+name: test-writer
+description: Writes tests for any framework. Reads source code first, detects test framework, follows project conventions.
 model: sonnet
 tools: Read, Write, Edit, Bash, Grep, Glob
 memory: user

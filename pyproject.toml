@@ -15,6 +15,9 @@ dependencies = ["pyyaml>=6.0"]
 Homepage = "https://github.com/rubakas/agent-notes"
 Repository = "https://github.com/rubakas/agent-notes"
 
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
 [project.scripts]
 agent-notes = "agent_notes.cli:main"
 
@@ -23,3 +26,7 @@ version = {file = "VERSION"}
 
 [tool.setuptools.packages.find]
 where = ["lib"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["lib"]

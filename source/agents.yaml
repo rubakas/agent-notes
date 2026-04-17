@@ -9,7 +9,7 @@ agents:
     color: purple
     effort: high
     claude:
-      tools: "Agent(coder, reviewer, security-auditor, spec-writer, spec-runner, system-auditor, database-specialist, performance-profiler, api-reviewer, tech-writer, devops, explorer), Read, Grep, Glob, Bash"
+      tools: "Agent(coder, reviewer, security-auditor, test-writer, test-runner, system-auditor, database-specialist, performance-profiler, api-reviewer, tech-writer, devops, explorer), Read, Grep, Glob, Bash"
       memory: user
     opencode:
       permission:
@@ -88,8 +88,8 @@ agents:
           "find *": allow
           "wc *": allow
 
-  spec-writer:
-    description: "Writes tests and specs for any framework. Reads source code first, detects test framework, follows project conventions."
+  test-writer:
+    description: "Writes tests for any framework. Reads source code first, detects test framework, follows project conventions."
     tier: sonnet
     mode: subagent
     color: green
@@ -102,8 +102,8 @@ agents:
         edit: allow
         bash: allow
 
-  spec-runner:
-    description: "Diagnoses and fixes failing tests. Runs specs, parses errors, identifies root cause, applies minimal fix."
+  test-runner:
+    description: "Diagnoses and fixes failing tests. Runs tests, parses errors, identifies root cause, applies minimal fix."
     tier: sonnet
     mode: subagent
     color: green

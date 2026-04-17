@@ -1,6 +1,6 @@
 ---
-name: spec-runner
-description: Diagnoses and fixes failing tests. Runs specs, parses errors, identifies root cause, applies minimal fix.
+name: test-runner
+description: Diagnoses and fixes failing tests. Runs tests, parses errors, identifies root cause, applies minimal fix.
 model: sonnet
 tools: Read, Write, Edit, Bash, Grep, Glob
 memory: user

@@ -1,10 +1,26 @@
-name: Validate configs
+name: CI
+
 on: [push, pull_request]
 
 jobs:
-  validate:
+  test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
     steps:
       - uses: actions/checkout@v4
-      - name: Validate all configs
-        run: bash scripts/validate.sh
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          pip install pyyaml pytest
+          export PYTHONPATH=lib
+      - name: Run tests
+        run: PYTHONPATH=lib python3 -m pytest tests/ -v
+      - name: Validate configs
+        run: PYTHONPATH=lib python3 -m agent_notes validate
+      - name: Verify build
+        run: PYTHONPATH=lib python3 -m agent_notes build

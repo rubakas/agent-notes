@@ -19,7 +19,7 @@ def list_agents() -> None:
         try:
             with open(agents_yaml, 'r') as f:
                 yaml_data = yaml.safe_load(f)
-                if 'agents' in yaml_data:
+                if yaml_data and 'agents' in yaml_data:
                     agents_metadata = yaml_data['agents']
         except (yaml.YAMLError, FileNotFoundError):
             pass

@@ -160,15 +160,16 @@ def format_size(size_bytes: int) -> str:
     if size_bytes == 0:
         return "0B"
     
+    original_size = size_bytes
     for unit in ['B', 'K', 'M', 'G', 'T']:
-        if size_bytes < 1024:
+        if original_size < 1024:
             if unit == 'B':
-                return f"{size_bytes}B"
+                return f"{original_size}B"
             else:
-                return f"{size_bytes:.1f}{unit}"
-        size_bytes //= 1024
+                return f"{original_size:.1f}{unit}"
+        original_size /= 1024
     
-    return f"{size_bytes:.1f}P"
+    return f"{original_size:.1f}P"
 
 def show_help() -> None:
     """Show memory command help."""

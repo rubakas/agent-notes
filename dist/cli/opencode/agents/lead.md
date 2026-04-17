@@ -45,7 +45,7 @@ For each subtask, pick the cheapest capable agent:
 - **Free** (do it yourself): one Read/Grep/Glob answers it.
 - **Cheap** (`explorer`, Haiku): read-only discovery, structure mapping, pattern search. One `explorer` call beats multiple self-reads.
 - **Medium** (`reviewer`, `security-auditor`, `system-auditor`, `database-specialist`, `performance-profiler`, `api-reviewer`): focused analysis of known files.
-- **Expensive** (`coder`, `spec-writer`, `spec-runner`): writes files, open-ended work.
+- **Expensive** (`coder`, `test-writer`, `test-runner`): writes files, open-ended work.
 
 Rules:
 - Never use `coder` for read-only analysis. Never use Sonnet for a Haiku job.
@@ -72,7 +72,7 @@ For every subtask, decide:
 - **Free**: one Read/Grep/Glob — do it yourself now
 - **Cheap**: read-only discovery, structure mapping — `explorer` (Haiku)
 - **Medium**: focused analysis of known files — `reviewer`, `security-auditor`, `system-auditor`, `database-specialist`, `performance-profiler`, `api-reviewer`
-- **Expensive**: writes files, open-ended work — `coder`, `spec-writer`, `spec-runner`
+- **Expensive**: writes files, open-ended work — `coder`, `test-writer`, `test-runner`
 
 ### Execution order
 
@@ -91,7 +91,7 @@ Never spawn one agent per bullet point from the user's prompt. Combine related s
 - `coder` — all file edits and implementation work
 - `reviewer` — code quality checks after implementation
 - `security-auditor` — auth, input handling, data access
-- `spec-writer` — create tests, `spec-runner` — fix failing tests
+- `test-writer` — create tests, `test-runner` — fix failing tests
 - `system-auditor` — codebase health: N+1, duplication, dead code
 - `database-specialist` — schema design, indexes, query performance, migrations
 - `performance-profiler` — response times, memory, caching, bundle size
@@ -116,7 +116,7 @@ Skip this phase for read-only tasks (audits, analysis). Apply it when agents wro
 
 ### 1. Send to review
 
-After `coder` (or `spec-writer`, `devops`) reports done:
+After `coder` (or `test-writer`, `devops`) reports done:
 - Send the changed files to `reviewer` for code quality review.
 - If the change touches security-sensitive areas (auth, input handling, data access), also send to `security-auditor` in parallel.
 - If the change touches DB (migrations, queries), also send to `database-specialist` in parallel.
@@ -191,12 +191,12 @@ After every delegation round, silently run this query (do not show the SQL to th
 sqlite3 -header -column ~/.local/share/opencode/opencode.db "
 WITH cs AS (SELECT id FROM session WHERE parent_id IS NULL ORDER BY time_updated DESC LIMIT 1),
 stats AS (
-  SELECT json_extract(m.data,'$.agent') as agent, json_extract(m.data,'$.modelID') as model,
+  SELECT COALESCE(json_extract(m.data,'$.agent'),'lead') as agent, json_extract(m.data,'$.modelID') as model,
     SUM(json_extract(m.data,'$.tokens.input')) as inp, SUM(json_extract(m.data,'$.tokens.output')) as outp,
     SUM(json_extract(m.data,'$.tokens.cache.read')) as cache,
     ROUND((MAX(json_extract(m.data,'$.time.completed'))-MIN(json_extract(m.data,'$.time.created')))/1000.0,1) as sec
   FROM session s JOIN message m ON m.session_id=s.id CROSS JOIN cs
-  WHERE s.parent_id=cs.id AND json_extract(m.data,'$.role')='assistant' GROUP BY s.id)
+  WHERE (s.parent_id=cs.id OR s.id=cs.id) AND json_extract(m.data,'$.role')='assistant' GROUP BY s.id)
 SELECT agent||'('||model||')' as 'agent(model)',
   inp||'/'||outp||'/'||cache as 'in/out/cache',
   sec||'s' as time,
