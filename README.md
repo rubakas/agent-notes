@@ -1,35 +1,19 @@
-# AI Agent Notes
+# agent-notes
 
-Modular skills, agents, and rules for AI coding assistants. Clone once, install globally or per-project, use everywhere.
-
-Works with **Claude Code** and **OpenCode**. Skills also work with any tool that reads `SKILL.md` files.
+AI agent configuration manager for Claude Code, OpenCode, and GitHub Copilot.
 
 ## Quick Start
 
 ```bash
-git clone git@github.com:rubakas/agent-notes.git ~/agent-notes
-bash ~/agent-notes/scripts/agent-notes install all global
+git clone https://github.com/rubakas/agent-notes.git ~/agent-notes
+ln -sf ~/agent-notes/bin/agent-notes /usr/local/bin/agent-notes
+agent-notes install
+agent-notes doctor
 ```
 
-Optionally make the CLI available system-wide:
-
-```bash
-ln -sf ~/agent-notes/scripts/agent-notes /usr/local/bin/agent-notes
-```
-
-Then use from anywhere:
-
-```bash
-agent-notes install all global
-agent-notes info
-agent-notes check
-```
-
-Update anytime with `cd ~/agent-notes && git pull` — symlinks keep everything in sync.
+Update anytime with `cd ~/agent-notes && git pull && agent-notes update`.
 
 ## What's Included
-
-Run `agent-notes info` to see current counts and status.
 
 | Component | Description |
 |-----------|-------------|
@@ -40,204 +24,162 @@ Run `agent-notes info` to see current counts and status.
 ## CLI Reference
 
 ```
-agent-notes <command> [args...]
+agent-notes <command> [options]
 ```
 
 | Command | Description |
 |---------|-------------|
-| `install <what> <where> [--copy]` | Install components |
-| `uninstall <what> <where>` | Remove installed components |
-| `validate` | Lint all configs in the repo |
-| `memory [opts]` | Manage agent memory |
-| `check` | Validate existing symlinks |
-| `info` | Show component counts and status |
-| `help` | Show usage |
+| `install [--local] [--copy]` | Build and install components |
+| `uninstall [--local]` | Remove installed components |
+| `update` | Pull latest, rebuild, reinstall |
+| `doctor [--local] [--fix]` | Check installation health |
+| `info` | Show status and component counts |
+| `list [agents\|skills\|rules\|all]` | List installed components |
+| `validate` | Lint source configuration files |
+| `memory [list\|size\|show\|reset\|export\|import] [name]` | Manage agent memory |
 
-**Install/uninstall arguments:**
-
-| Arg | Values |
-|-----|--------|
-| `<what>` | `all` \| `skills` \| `agents` \| `rules` |
-| `<where>` | `global` \| `local` |
-| `--copy` | Copy files instead of symlink (local only) |
-
-## Install
-
-### Global (applies to all projects)
+### Examples
 
 ```bash
-agent-notes install all global       # everything
-agent-notes install skills global    # skills only
-agent-notes install agents global    # agents only
-agent-notes install rules global     # rules only
+# Global install (all projects)
+agent-notes install
+
+# Local install (current project only)
+agent-notes install --local
+
+# Copy files instead of symlink (for customization)
+agent-notes install --local --copy
+
+# Check health and fix issues
+agent-notes doctor --fix
+
+# Manage agent memory
+agent-notes memory list
+agent-notes memory show coder
+agent-notes memory reset reviewer
 ```
 
-### Local (current project only)
+## Agent Team
 
-```bash
-# Symlink — stays in sync with agent-notes repo
-agent-notes install all local
-
-# Copy — standalone, editable, independent
-agent-notes install all local --copy
-```
-
-Use `--copy` when you want to customize configs for a specific project. Use symlinks for projects that follow your standard setup.
-
-### Where things go
-
-**Global install:**
-
-| Source | Claude Code | OpenCode | Other |
-|--------|------------|----------|-------|
-| Skills | `~/.claude/skills/` | `~/.config/opencode/skills/` | `~/.agents/skills/` |
-| Agents | `~/.claude/agents/` | `~/.config/opencode/agents/` | — |
-| Rules | `~/.claude/CLAUDE.md`, `~/.claude/rules/` | `~/.config/opencode/AGENTS.md` | `~/.github/copilot-instructions.md` |
-
-**Local install:**
-
-| Source | Claude Code | OpenCode |
-|--------|------------|----------|
-| Skills | `.claude/skills/` | `.opencode/skills/` |
-| Agents | `.claude/agents/` | `.opencode/agents/` |
-| Rules | `CLAUDE.md`, `.claude/rules/` | `AGENTS.md` |
-
-## Uninstall
-
-```bash
-agent-notes uninstall all global      # remove all global installs
-agent-notes uninstall agents global   # remove only agents
-agent-notes uninstall all local       # remove project-level installs
-```
-
-Only removes symlinks. Copied files (from `--copy`) are reported but not deleted.
-
-## Management
-
-### Check installation health
-
-```bash
-agent-notes check
-```
-
-Reports `OK`, `MISSING`, `BROKEN`, or `SHADOWED` for every expected symlink.
-
-### Validate configs
-
-```bash
-agent-notes validate
-```
-
-Lints all agent and skill files: frontmatter, naming, line counts, duplicates. Also runs in CI on every push via GitHub Actions.
-
-### Manage agent memory
-
-```bash
-agent-notes memory                    # list all memories
-agent-notes memory --size             # disk usage
-agent-notes memory --show coder       # view one agent's memory
-agent-notes memory --reset reviewer   # clear one agent
-agent-notes memory --reset            # clear all
-agent-notes memory --export           # backup to repo
-agent-notes memory --import           # restore from backup
-```
-
-## Agents
-
-Specialized subagents with a hierarchical model strategy: **Opus decides, Sonnet executes, Haiku explores.**
-
-### Why agents instead of a single Opus session?
-
-A single Opus session works fine for simple tasks. The agent architecture saves tokens and improves quality on complex work:
-
-- **Opus lead** only plans and reviews (small context). Workers run in isolated windows.
-- **Sonnet workers** cost ~5x less than Opus for focused implementation tasks.
-- **Haiku explorer** costs ~60x less than Opus for quick lookups.
-- **Parallel execution**: independent subtasks run simultaneously.
-- **Isolated context**: each agent sees only what it needs, reducing noise.
-
-Use agents for multi-step work. Use a single session for quick edits and questions.
+Specialized subagents with hierarchical model strategy: **Opus 4.7 decides, Sonnet 4 executes, Haiku 4.5 explores.**
 
 ### Agent roster
 
 | Agent | Model | Role |
 |-------|-------|------|
-| **lead** | Opus 4 | Plans, delegates, reviews. The only Opus agent. |
+| **lead** | Opus 4.7 | Plans, delegates, reviews. The only Opus agent. |
 | **coder** | Sonnet 4 | Implements features, fixes bugs, edits files. |
 | **reviewer** | Sonnet 4 | Code quality review. Read-only. |
 | **security-auditor** | Sonnet 4 | Security vulnerability analysis. Read-only. |
-| **spec-writer** | Sonnet 4 | Writes tests for any framework. |
-| **spec-runner** | Sonnet 4 | Diagnoses and fixes failing tests. |
+| **test-writer** | Sonnet 4 | Writes tests for any framework. |
+| **test-runner** | Sonnet 4 | Diagnoses and fixes failing tests. |
 | **system-auditor** | Sonnet 4 | Codebase health: duplication, N+1, coupling. Read-only. |
 | **database-specialist** | Sonnet 4 | Schema design, indexes, query performance, migrations. Read-only. |
 | **performance-profiler** | Sonnet 4 | Response times, memory, caching, bundle size. Read-only. |
-| **api-reviewer** | Sonnet 4 | API design, versioning, error handling, backward compatibility. Read-only. |
-| **tech-writer** | Sonnet 4 | Documentation: READMEs, API docs, changelogs. |
+| **api-reviewer** | Haiku 4.5 | API design, versioning, error handling, backward compatibility. Read-only. |
+| **tech-writer** | Haiku 4.5 | Documentation: READMEs, API docs, changelogs. |
 | **devops** | Sonnet 4 | Docker, CI/CD, deployment configs. |
 | **explorer** | Haiku 4.5 | Fast file discovery and pattern search. Read-only. |
 
-### Format differences
+### 4-phase lead workflow
 
-Each agent exists in two formats with the same body content but different frontmatter:
+```
+1. ANALYZE — Lead reviews requirements, explores codebase
+2. EXECUTE — Delegates to specialized agents (parallel execution)
+3. REVIEW — Quality check by reviewer agents
+4. VERIFY — Final validation and integration
+```
 
-| Feature | Claude Code (`agents/`) | OpenCode (`agents-opencode/`) |
-|---------|------------------------|-------------------------------|
-| Model ID | Shorthand (`opus`, `sonnet`, `haiku`) | Full ID (`github-copilot/claude-sonnet-4`) |
-| Mode | `role` (implicit) | `mode: primary` or `mode: subagent` |
-| Read-only | `disallowedTools: Write, Edit` | `permission: { edit: deny }` |
-| Bash restrict | `disallowedTools: Bash` | `permission: { bash: { "*": deny, "grep *": allow } }` |
-| Effort | `effort: medium` | Not supported |
-| Memory | `memory: user` | Not supported |
-| Color | `color: yellow` | Not supported |
-
-### How the team works
+### Team diagram
 
 ```
 You (human)
   |
   +-- Simple task ------> Main session (direct work)
   |
-  +-- Complex task -----> Lead (Opus)
-                           +-- Explorer (Haiku)     quick lookups
-                           +-- Coder (Sonnet)       implementation
-                           +-- Reviewer (Sonnet)    code review
-                           +-- Spec Writer (Sonnet) tests
-                           +-- Spec Runner (Sonnet) fix tests
-                           +-- Security (Sonnet)    security audit
-                           +-- Auditor (Sonnet)     codebase health
-                           +-- DB Specialist (Sonnet) schema & queries
-                           +-- Perf Profiler (Sonnet) performance
-                           +-- API Reviewer (Sonnet)  API design
-                           +-- Tech Writer (Sonnet) documentation
-                           +-- DevOps (Sonnet)      infrastructure
+  +-- Complex task -----> Lead (Opus 4.7)
+                           +-- Explorer (Haiku 4.5)     quick lookups
+                           +-- Coder (Sonnet 4)         implementation
+                           +-- Reviewer (Sonnet 4)      code review
+                            +-- Test Writer (Sonnet 4)   tests
+                            +-- Test Runner (Sonnet 4)   fix tests
+                           +-- Security (Sonnet 4)      security audit
+                           +-- Auditor (Sonnet 4)       codebase health
+                           +-- DB Specialist (Sonnet 4) schema & queries
+                           +-- Perf Profiler (Sonnet 4) performance
+                           +-- API Reviewer (Haiku 4.5) API design
+                           +-- Tech Writer (Haiku 4.5)  documentation
+                           +-- DevOps (Sonnet 4)        infrastructure
 ```
 
-### Usage
+## Architecture
 
-**Claude Code:**
+**Single source of truth:** `agent_notes/data/` → `build` → `agent_notes/dist/` → `install`
+
+1. **Source** — YAML metadata + Markdown prompts
+2. **Build** — Generate platform-specific configs
+3. **Dist** — Built artifacts ready for installation  
+4. **Install** — Deploy via symlinks or copy
+
+## Project Structure
+
+```
+agent-notes/
+├── bin/agent-notes          # CLI wrapper (entry point)
+├── agent_notes/             # Python implementation
+│   ├── __init__.py, cli.py  # Core modules
+│   ├── VERSION              # Package version
+│   ├── data/                # Single source of truth
+│   │   ├── agents/
+│   │   │   ├── agents.yaml  # Agent metadata
+│   │   │   └── *.md         # Agent prompt files
+│   │   ├── skills/          # Skill directories
+│   │   ├── rules/           # Code quality rules
+│   │   ├── global.md        # Global instructions
+│   │   └── global-copilot.md
+│   └── dist/                # Built artifacts
+│       ├── claude/, opencode/, github/
+│       ├── rules/
+│       └── skills/
+├── scripts/                 # Build/utility scripts
+└── tests/                   # Test suite
+```
+
+## Install Methods
+
+### Git clone + wrapper (recommended)
+
 ```bash
-claude --agent lead                              # start with lead orchestrator
-```
-```
-Use the reviewer agent to review my recent changes
-@"coder (agent)" implement the search feature
+git clone https://github.com/rubakas/agent-notes.git ~/agent-notes
+ln -sf ~/agent-notes/bin/agent-notes /usr/local/bin/agent-notes
+agent-notes install
 ```
 
-**OpenCode:**
+### Pip install (future)
+
+```bash
+pip install agent-notes
+agent-notes install
 ```
-@lead plan the implementation of the auth module
-@reviewer check src/api/ for issues
+
+### Homebrew (future)
+
+```bash
+brew install rubakas/tap/agent-notes
+agent-notes install
 ```
 
-### Token efficiency
+## Project-Level Overrides
 
-Based on [Claude's prompting best practices](https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/be-clear-and-direct):
+Use `--local --copy` for project-specific customizations:
 
-- **Concise prompts**: each agent file is under 50 lines. Only adds context Claude doesn't already know.
-- **No over-prompting**: neutral language avoids overtriggering in Claude 4.x models.
-- **Effort levels** (Claude Code only): Opus `high`, Sonnet `medium`, Haiku `low` — per Claude docs.
-- **Anti-spawning rules**: the lead defines when NOT to spawn agents to prevent unnecessary overhead.
-- **User-level memory** (Claude Code only): agents accumulate learnings across sessions without consuming prompt tokens.
+```bash
+agent-notes install --local --copy
+```
+
+Then edit the copied files in `.claude/` or `.opencode/` directories.
+
+**Precedence:** Project-level configs replace global versions entirely.
 
 ## Skills
 
@@ -246,115 +188,66 @@ On-demand knowledge modules loaded mid-conversation.
 ### Available skills
 
 **Rails:**
-`/rails-models`, `/rails-controllers`, `/rails-routes`, `/rails-concerns`,
-`/rails-views`, `/rails-views-advanced`, `/rails-view-components`,
-`/rails-view-components-advanced`, `/rails-helpers`, `/rails-javascript`,
-`/rails-jobs`, `/rails-mailers`, `/rails-broadcasting`, `/rails-migrations`,
-`/rails-active-storage`, `/rails-validations`, `/rails-testing-controllers`,
-`/rails-testing-models`, `/rails-testing-system`, `/rails-style`,
-`/rails-controllers-advanced`, `/rails-models-advanced`, `/rails-initializers`,
-`/rails-lib`, `/rails-kamal`
+`commit`, `rails-models`, `rails-controllers`, `rails-routes`, `rails-concerns`, `rails-views`, `rails-views-advanced`, `rails-view-components`, `rails-view-components-advanced`, `rails-helpers`, `rails-javascript`, `rails-jobs`, `rails-mailers`, `rails-broadcasting`, `rails-migrations`, `rails-active-storage`, `rails-validations`, `rails-testing-controllers`, `rails-testing-models`, `rails-testing-system`, `rails-style`, `rails-controllers-advanced`, `rails-models-advanced`, `rails-initializers`, `rails-lib`, `rails-kamal`
 
 **Docker:**
-`/docker-dockerfile`, `/docker-dockerfile-languages`, `/docker-compose`, `/docker-compose-advanced`
+`docker-dockerfile`, `docker-dockerfile-languages`, `docker-compose`, `docker-compose-advanced`
 
 **Utility:**
-`/commit` — generates conventional commit messages from staged changes and branch name
+`commit` — generates conventional commit messages from staged changes and branch name
 
-### Passive include (alternative)
+### Usage
 
-Instead of skills, you can include patterns directly in your project instructions file:
-
-```markdown
-# In your project's CLAUDE.md or AGENTS.md
-@agent-notes/rails/index.md
-@agent-notes/docker/index.md
+**Claude Code / OpenCode:**
+```
+Use the rails-models skill to help with this association
+Load the docker-compose skill for multi-service setup
 ```
 
-## Project-Level Overrides
+## Development
 
-When you need project-specific customizations, use `--local --copy` to get standalone editable files:
+### Prerequisites
+
+- Python 3.9+
+- PyYAML (`pip install pyyaml`)
+
+### Running tests
 
 ```bash
-# Copy agents and rules into your project
-agent-notes install agents local --copy
-agent-notes install rules local --copy
+python3 -m pytest tests/
 ```
 
-Then edit the copies for your project:
+### Building
 
-**Claude Code** — `.claude/agents/reviewer.md`:
-```markdown
----
-name: reviewer
-description: Reviews code for this Rails 8 financial app.
-model: sonnet
-disallowedTools: Write, Edit
-memory: user
-color: yellow
----
-
-(global reviewer rules here, plus:)
-
-## Project-specific rules
-
-- Money-rails for all monetary values. Never Float, always decimal(19,4).
-- Pundit authorization required on every controller action.
-- All financial data access must have audit trail.
+```bash
+python3 -m agent_notes build
 ```
 
-**OpenCode** — `.opencode/agents/reviewer.md`:
-```markdown
----
-description: Reviews code for this Rails 8 financial app.
-mode: subagent
-model: anthropic/claude-sonnet-4-20250514
-permission:
-  edit: deny
----
+### Validating
 
-(same body with project-specific additions)
+```bash
+python3 -m agent_notes validate
 ```
 
-**Precedence**: Project-level agents with the same name **replace** the global version entirely. Project-level rules (CLAUDE.md, AGENTS.md) **extend** global rules.
+### Project layout
 
-## Repository Structure
-
-```
-agent-notes/
-+-- agents/                          # Claude Code agent definitions
-+-- agents-opencode/                 # OpenCode agent definitions
-+-- global/                          # Global config files
-|   +-- CLAUDE.md                    #   Claude Code instructions
-|   +-- AGENTS.md                    #   OpenCode instructions
-|   +-- rules/                       #   Code quality + safety rules
-|   +-- copilot-instructions.md      #   GitHub Copilot config
-+-- rails/                           # Rails passive-include modules
-+-- docker/                          # Docker passive-include modules
-+-- rails-*/                         # Rails skill directories
-+-- docker-*/                        # Docker skill directories
-+-- commit/                          # Commit message skill
-+-- scripts/
-|   +-- agent-notes                  # CLI wrapper (entry point)
-|   +-- install.sh                   # Install components
-|   +-- uninstall.sh                 # Remove components
-|   +-- validate.sh                  # Lint all configs
-|   +-- memory.sh                    # Agent memory management
-+-- .github/workflows/
-|   +-- validate.yml                 # CI validation
-+-- README.md
-```
+- `agent_notes/data/` — single source of truth (edit here)
+- `agent_notes/dist/` — generated output (do not edit)
+- `agent_notes/` — CLI implementation
+- `tests/` — test suite
+- `scripts/` — dev-only tools (release, etc.)
 
 ## Contributing
 
 When adding new content:
 
-1. **Keep it generic** — remove app-specific references
-2. **Show examples** — include code samples with explanations
-3. **Explain why** — document the reasoning behind patterns
-4. **Stay modular** — each file should be independently usable
-5. **Stay concise** — agent prompts under 60 lines, skills focused on one topic
-6. **Run validation** — `agent-notes validate` before committing
+1. **Edit source files** — all changes go in `agent_notes/data/` directory
+2. **Run build** — `agent-notes build` to generate platform configs
+3. **Validate** — `agent-notes validate` before committing
+4. **Keep it generic** — remove app-specific references
+5. **Show examples** — include code samples with explanations
+6. **Stay modular** — each skill should be independently usable
+7. **Stay concise** — agent prompts under 60 lines
 
 ## License
 

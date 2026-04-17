@@ -1,0 +1,1 @@
+"""agent-notes — AI agent configuration manager."""
