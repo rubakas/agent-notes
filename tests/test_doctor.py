@@ -332,12 +332,32 @@ class TestCheckMissingFiles:
         dist_claude.mkdir(parents=True)
         (dist_claude / "CLAUDE.md").write_text("source content")
         
-        # No corresponding file in home directory
-        home_claude = tmp_path / "home" / ".claude"
+        # Create empty directories to avoid finding real files
+        dist_opencode = tmp_path / "dist" / "opencode"
+        dist_opencode.mkdir(parents=True)
+        dist_github = tmp_path / "dist" / "github"
+        dist_github.mkdir(parents=True)
+        dist_rules = tmp_path / "dist" / "rules"
+        dist_rules.mkdir(parents=True)
+        
+        # Setup home directory with missing claude file but existing others
+        home = tmp_path / "home"
+        home_claude = home / ".claude"
         home_claude.mkdir(parents=True)
         
-        with patch('pathlib.Path.home', return_value=tmp_path / "home"):
+        home_opencode = home / ".config" / "opencode"
+        home_opencode.mkdir(parents=True)
+        (home_opencode / "AGENTS.md").write_text("existing")
+        
+        home_github = home / ".github"
+        home_github.mkdir(parents=True)
+        (home_github / "copilot-instructions.md").write_text("existing")
+        
+        with patch('pathlib.Path.home', return_value=home):
             monkeypatch.setattr(doctor, 'DIST_CLAUDE_DIR', dist_claude)
+            monkeypatch.setattr(doctor, 'DIST_OPENCODE_DIR', dist_opencode)
+            monkeypatch.setattr(doctor, 'DIST_GITHUB_DIR', dist_github)
+            monkeypatch.setattr(doctor, 'DIST_RULES_DIR', dist_rules)
             
             issues = []
             fix_actions = []
@@ -430,12 +450,17 @@ class TestDoctorFunction:
                 checks_called.append(name)
             return _check
         
+        def mock_build_check(name):
+            def _check(issues, fix_actions):  # build check doesn't take scope
+                checks_called.append(name)
+            return _check
+        
         with patch('agent_notes.doctor.check_stale_files', mock_check('stale')):
             with patch('agent_notes.doctor.check_broken_symlinks', mock_check('broken')):
                 with patch('agent_notes.doctor.check_shadowed_files', mock_check('shadowed')):
                     with patch('agent_notes.doctor.check_missing_files', mock_check('missing')):
                         with patch('agent_notes.doctor.check_content_drift', mock_check('drift')):
-                            with patch('agent_notes.doctor.check_build_freshness', mock_check('build')):
+                            with patch('agent_notes.doctor.check_build_freshness', mock_build_check('build')):
                                 doctor.doctor(local=False, fix=False)
         
         expected_checks = ['stale', 'broken', 'shadowed', 'missing', 'drift', 'build']
@@ -453,11 +478,16 @@ class TestDoctorFunction:
                 checks_called.append((name, scope))
             return _check
         
+        def mock_build_check(name):
+            def _check(issues, fix_actions):  # build check doesn't take scope
+                checks_called.append((name, 'none'))  # mark as 'none' for build check
+            return _check
+        
         with patch('agent_notes.doctor.check_stale_files', mock_check('stale')):
             with patch('agent_notes.doctor.check_broken_symlinks', mock_check('broken')):
                 with patch('agent_notes.doctor.check_shadowed_files', mock_check('shadowed')):
                     with patch('agent_notes.doctor.check_content_drift', mock_check('drift')):
-                        with patch('agent_notes.doctor.check_build_freshness', mock_check('build')):
+                        with patch('agent_notes.doctor.check_build_freshness', mock_build_check('build')):
                             doctor.doctor(local=True, fix=False)
         
         # Should call local-specific checks

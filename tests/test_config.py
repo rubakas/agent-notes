@@ -11,9 +11,23 @@ import agent_notes.config as config
 class TestFindRoot:
     """Test _find_root function."""
     
+    def test_finds_pkg_dir_when_version_and_source_exist_in_package(self, tmp_path, monkeypatch):
+        """Should find package directory when VERSION and source exist in the package."""
+        # Setup mock package structure (pip install scenario)
+        pkg_dir = tmp_path / "lib" / "agent_notes"
+        pkg_dir.mkdir(parents=True)
+        (pkg_dir / "VERSION").write_text("1.0.0")
+        (pkg_dir / "source").mkdir()
+        
+        config_file = pkg_dir / "config.py"
+        config_file.write_text("")
+        
+        with patch.object(config, '__file__', str(config_file)):
+            root = config._find_root()
+            assert root == pkg_dir
     def test_finds_dev_root_when_version_and_source_exist(self, tmp_path, monkeypatch):
-        """Should find root when VERSION and source directories exist."""
-        # Setup mock file structure
+        """Should find dev root when VERSION and source directories exist at repo root."""
+        # Setup mock file structure (dev scenario)
         dev_root = tmp_path / "agent-notes"
         dev_root.mkdir()
         (dev_root / "VERSION").write_text("1.0.0")
@@ -35,24 +49,30 @@ class TestFindRoot:
         
         monkeypatch.setenv("AGENT_NOTES_DIR", str(env_root))
         
-        # Mock __file__ to point somewhere else
-        with patch.object(config, '__file__', "/some/other/path/config.py"):
+        # Create package structure that would normally be found
+        pkg_dir = tmp_path / "lib" / "agent_notes"
+        pkg_dir.mkdir(parents=True)
+        
+        config_file = pkg_dir / "config.py"
+        config_file.write_text("")
+        
+        with patch.object(config, '__file__', str(config_file)):
             root = config._find_root()
             assert root == env_root
     
-    def test_falls_back_to_dev_root_when_env_not_set(self, tmp_path, monkeypatch):
-        """Should fall back to relative path when env var not set."""
+    def test_falls_back_to_pkg_dir_when_env_not_set(self, tmp_path, monkeypatch):
+        """Should fall back to package directory when env var not set and files not found."""
         # Ensure env var is not set
         monkeypatch.delenv("AGENT_NOTES_DIR", raising=False)
         
-        dev_root = tmp_path / "fallback"
-        config_file = dev_root / "lib" / "agent_notes" / "config.py"
+        pkg_dir = tmp_path / "fallback" / "lib" / "agent_notes"
+        config_file = pkg_dir / "config.py"
         config_file.parent.mkdir(parents=True)
         config_file.write_text("")
         
         with patch.object(config, '__file__', str(config_file)):
             root = config._find_root()
-            assert root == dev_root
+            assert root == pkg_dir
 
 
 class TestGetVersion:
@@ -98,22 +118,32 @@ class TestFindSkillDirs:
         # File (not directory) should be ignored
         (tmp_path / "file.txt").write_text("just a file")
         
+        # Mock ROOT and __file__ so both search locations point to tmp_path
         monkeypatch.setattr(config, 'ROOT', tmp_path)
+        config_file = tmp_path / "lib" / "agent_notes" / "config.py"
+        config_file.parent.mkdir(parents=True)
         
-        skills = config.find_skill_dirs()
-        skill_names = [s.name for s in skills]
-        
-        assert len(skills) == 2
-        assert "skill-one" in skill_names
-        assert "skill-two" in skill_names
-        assert "not-a-skill" not in skill_names
+        with patch.object(config, '__file__', str(config_file)):
+            skills = config.find_skill_dirs()
+            skill_names = [s.name for s in skills]
+            
+            assert len(skills) == 2
+            assert "skill-one" in skill_names
+            assert "skill-two" in skill_names
+            assert "not-a-skill" not in skill_names
     
     def test_returns_empty_when_no_skills(self, tmp_path, monkeypatch):
         """Should return empty list when no skill directories exist."""
+        # Mock both ROOT and the computed repo_root to point to tmp_path
         monkeypatch.setattr(config, 'ROOT', tmp_path)
         
-        skills = config.find_skill_dirs()
-        assert skills == []
+        # Also mock __file__ so repo_root computation points to tmp_path area
+        config_file = tmp_path / "lib" / "agent_notes" / "config.py"
+        config_file.parent.mkdir(parents=True)
+        
+        with patch.object(config, '__file__', str(config_file)):
+            skills = config.find_skill_dirs()
+            assert skills == []
 
 
 class TestColorClass:

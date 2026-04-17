@@ -4,3 +4,7 @@ node_modules/
 __pycache__/
 *.pyc
 *.egg-info/
+build/
+*.whl
+agent_notes-*.tar.gz
+*.egg-info/

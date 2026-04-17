@@ -8,17 +8,20 @@ from pathlib import Path
 # When running from source: lib/agent_notes/config.py → ../../ = project root
 # When installed via pip: use the package data location
 def _find_root() -> Path:
-    """Find the agent-notes project root directory."""
-    # Try relative to this file (development mode)
-    dev_root = Path(__file__).resolve().parent.parent.parent
+    """Find the agent-notes data root directory."""
+    # Package data location (works for both dev and pip install)
+    pkg_dir = Path(__file__).resolve().parent
+    if (pkg_dir / "VERSION").exists() and (pkg_dir / "source").exists():
+        return pkg_dir
+    # Dev mode: symlinks at repo root point back to pkg_dir anyway
+    dev_root = pkg_dir.parent.parent
     if (dev_root / "VERSION").exists() and (dev_root / "source").exists():
         return dev_root
-    # Try AGENT_NOTES_DIR env var
+    # Env var override
     env_root = os.environ.get("AGENT_NOTES_DIR")
     if env_root:
         return Path(env_root)
-    # Fallback
-    return dev_root
+    return pkg_dir
 
 ROOT = _find_root()
 VERSION_FILE = ROOT / "VERSION"
@@ -48,7 +51,7 @@ AGENTS_HOME = Path.home() / ".agents"
 
 # Memory
 MEMORY_DIR = CLAUDE_HOME / "agent-memory"
-BACKUP_DIR = ROOT / "memory-backup"
+BACKUP_DIR = Path.home() / ".agent-notes" / "memory-backup"
 
 # --- Colors ---
 class Color:
@@ -106,9 +109,15 @@ def get_version() -> str:
         return "unknown"
 
 def find_skill_dirs() -> list[Path]:
-    """Find all skill directories (containing SKILL.md) in the repo."""
+    """Find all skill directories (containing SKILL.md)."""
+    # In dev mode, skills are at the git repo root
+    repo_root = Path(__file__).resolve().parent.parent.parent
     skills = []
-    for d in sorted(ROOT.iterdir()):
-        if d.is_dir() and (d / "SKILL.md").exists():
-            skills.append(d)
+    for candidate in [ROOT, repo_root]:
+        if candidate.is_dir():
+            for d in sorted(candidate.iterdir()):
+                if d.is_dir() and (d / "SKILL.md").exists():
+                    skills.append(d)
+            if skills:
+                break
     return skills
