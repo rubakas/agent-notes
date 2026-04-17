@@ -247,7 +247,7 @@ class TestGenerateAgentFiles:
         (source_agents_dir / "test-agent.md").write_text(sample_agent_content)
         
         # Mock paths
-        monkeypatch.setattr(build, 'SOURCE_AGENTS_DIR', source_agents_dir)
+        monkeypatch.setattr(build, 'AGENTS_DIR', source_agents_dir)
         monkeypatch.setattr(build, 'DIST_CLAUDE_DIR', dist_claude_dir)
         monkeypatch.setattr(build, 'DIST_OPENCODE_DIR', dist_opencode_dir)
         
@@ -290,7 +290,7 @@ class TestGenerateAgentFiles:
         source_agents_dir = tmp_path / "source" / "agents"
         source_agents_dir.mkdir(parents=True)
         
-        monkeypatch.setattr(build, 'SOURCE_AGENTS_DIR', source_agents_dir)
+        monkeypatch.setattr(build, 'AGENTS_DIR', source_agents_dir)
         
         agents_config = {
             'missing-agent': {
@@ -335,9 +335,9 @@ class TestCopyGlobalFiles:
         dist_rules_dir = tmp_path / "dist" / "rules"
         
         # Mock paths
-        monkeypatch.setattr(build, 'SOURCE_GLOBAL_MD', source_dir / "global.md")
-        monkeypatch.setattr(build, 'SOURCE_GLOBAL_COPILOT_MD', source_dir / "global-copilot.md")
-        monkeypatch.setattr(build, 'SOURCE_RULES_DIR', source_rules_dir)
+        monkeypatch.setattr(build, 'GLOBAL_MD', source_dir / "global.md")
+        monkeypatch.setattr(build, 'GLOBAL_COPILOT_MD', source_dir / "global-copilot.md")
+        monkeypatch.setattr(build, 'RULES_DIR', source_rules_dir)
         monkeypatch.setattr(build, 'DIST_CLAUDE_DIR', dist_claude_dir)
         monkeypatch.setattr(build, 'DIST_OPENCODE_DIR', dist_opencode_dir)
         monkeypatch.setattr(build, 'DIST_GITHUB_DIR', dist_github_dir)
@@ -416,11 +416,11 @@ class TestBuild:
         # Mock ROOT and paths
         monkeypatch.setattr(config, 'ROOT', tmp_path)
         monkeypatch.setattr(build, 'ROOT', tmp_path)
-        monkeypatch.setattr(build, 'SOURCE_AGENTS_YAML', agents_yaml)
-        monkeypatch.setattr(build, 'SOURCE_AGENTS_DIR', source_agents_dir)
-        monkeypatch.setattr(build, 'SOURCE_GLOBAL_MD', source_dir / "global.md")
-        monkeypatch.setattr(build, 'SOURCE_GLOBAL_COPILOT_MD', source_dir / "global-copilot.md")
-        monkeypatch.setattr(build, 'SOURCE_RULES_DIR', source_dir / "rules")  # Non-existent
+        monkeypatch.setattr(build, 'AGENTS_YAML', agents_yaml)
+        monkeypatch.setattr(build, 'AGENTS_DIR', source_agents_dir)
+        monkeypatch.setattr(build, 'GLOBAL_MD', source_dir / "global.md")
+        monkeypatch.setattr(build, 'GLOBAL_COPILOT_MD', source_dir / "global-copilot.md")
+        monkeypatch.setattr(build, 'RULES_DIR', source_dir / "rules")  # Non-existent
         
         dist_dir = tmp_path / "dist"
         monkeypatch.setattr(build, 'DIST_CLAUDE_DIR', dist_dir / "cli" / "claude")
@@ -452,7 +452,7 @@ class TestBuild:
         """Should handle missing agents.yaml gracefully."""
         agents_yaml = tmp_path / "nonexistent" / "agents.yaml"
         
-        monkeypatch.setattr(build, 'SOURCE_AGENTS_YAML', agents_yaml)
+        monkeypatch.setattr(build, 'AGENTS_YAML', agents_yaml)
         
         build.build()
         

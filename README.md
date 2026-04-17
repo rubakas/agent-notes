@@ -114,7 +114,7 @@ You (human)
 
 ## Architecture
 
-**Single source of truth:** `source/` → `build` → `dist/` → `install`
+**Single source of truth:** `agent_notes/data/` → `build` → `agent_notes/dist/` → `install`
 
 1. **Source** — YAML metadata + Markdown prompts
 2. **Build** — Generate platform-specific configs
@@ -126,19 +126,23 @@ You (human)
 ```
 agent-notes/
 ├── bin/agent-notes          # CLI wrapper (entry point)
-├── lib/agent_notes/         # Python implementation
-├── source/                  # Single source of truth
-│   ├── agents.yaml          # Agent metadata
-│   ├── agents/              # Agent prompt files
-│   ├── global.md            # Global instructions
-│   └── rules/               # Code quality rules
-├── dist/                    # Built artifacts
-│   ├── cli/                 # Agent configs by platform
-│   ├── rules/               # Rule files
-│   └── skills/              # Skill directories
+├── agent_notes/             # Python implementation
+│   ├── __init__.py, cli.py  # Core modules
+│   ├── VERSION              # Package version
+│   ├── data/                # Single source of truth
+│   │   ├── agents/
+│   │   │   ├── agents.yaml  # Agent metadata
+│   │   │   └── *.md         # Agent prompt files
+│   │   ├── skills/          # Skill directories
+│   │   ├── rules/           # Code quality rules
+│   │   ├── global.md        # Global instructions
+│   │   └── global-copilot.md
+│   └── dist/                # Built artifacts
+│       ├── claude/, opencode/, github/
+│       ├── rules/
+│       └── skills/
 ├── scripts/                 # Build/utility scripts
-├── tests/                   # Test suite
-└── <skill-dirs>/            # Individual skill directories
+└── tests/                   # Test suite
 ```
 
 ## Install Methods
@@ -210,26 +214,26 @@ Load the docker-compose skill for multi-service setup
 ### Running tests
 
 ```bash
-PYTHONPATH=lib pytest tests/
+python3 -m pytest tests/
 ```
 
 ### Building
 
 ```bash
-PYTHONPATH=lib python3 -m agent_notes build
+python3 -m agent_notes build
 ```
 
 ### Validating
 
 ```bash
-PYTHONPATH=lib python3 -m agent_notes validate
+python3 -m agent_notes validate
 ```
 
 ### Project layout
 
-- `source/` — single source of truth (edit here)
-- `dist/` — generated output (do not edit)
-- `lib/agent_notes/` — CLI implementation
+- `agent_notes/data/` — single source of truth (edit here)
+- `agent_notes/dist/` — generated output (do not edit)
+- `agent_notes/` — CLI implementation
 - `tests/` — test suite
 - `scripts/` — dev-only tools (release, etc.)
 
@@ -237,7 +241,7 @@ PYTHONPATH=lib python3 -m agent_notes validate
 
 When adding new content:
 
-1. **Edit source files** — all changes go in `source/` directory
+1. **Edit source files** — all changes go in `agent_notes/data/` directory
 2. **Run build** — `agent-notes build` to generate platform configs
 3. **Validate** — `agent-notes validate` before committing
 4. **Keep it generic** — remove app-specific references

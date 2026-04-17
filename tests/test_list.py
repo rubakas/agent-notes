@@ -15,17 +15,17 @@ class TestListAgents:
         source_dir = tmp_path / "source"
         source_dir.mkdir()
         
-        # Create agents.yaml
-        agents_yaml = source_dir / "agents.yaml"
-        agents_yaml.write_text(sample_agents_yaml)
-        
-        # Create agent source files
+        # Create agent source files and agents.yaml inside agents directory
         agents_dir = source_dir / "agents"
         agents_dir.mkdir()
         (agents_dir / "test-agent.md").write_text("test agent content")
         (agents_dir / "test-reviewer.md").write_text("test reviewer content")
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        # Create agents.yaml inside agents directory
+        agents_yaml = agents_dir / "agents.yaml"
+        agents_yaml.write_text(sample_agents_yaml)
+        
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         list_module.list_agents()
         
@@ -48,7 +48,7 @@ class TestListAgents:
         agents_dir.mkdir()
         (agents_dir / "simple-agent.md").write_text("simple agent content")
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         list_module.list_agents()
         
@@ -61,7 +61,7 @@ class TestListAgents:
         source_dir = tmp_path / "source"
         source_dir.mkdir()
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         list_module.list_agents()
         
@@ -82,7 +82,7 @@ class TestListAgents:
         agents_dir.mkdir()
         (agents_dir / "test-agent.md").write_text("test content")
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         list_module.list_agents()
         
@@ -101,7 +101,7 @@ class TestListAgents:
         (agents_dir / "alpha-agent.md").write_text("alpha content")
         (agents_dir / "beta-agent.md").write_text("beta content")
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         list_module.list_agents()
         
@@ -189,7 +189,7 @@ class TestListRules:
         (rules_dir / "safety.md").write_text("safety rules")
         (rules_dir / "performance.md").write_text("performance rules")
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         list_module.list_rules()
         
@@ -208,7 +208,7 @@ class TestListRules:
         source_dir = tmp_path / "source"
         source_dir.mkdir()
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         list_module.list_rules()
         
@@ -229,7 +229,7 @@ class TestListRules:
         (rules_dir / "alpha-rules.md").write_text("alpha rules")
         (rules_dir / "beta-rules.md").write_text("beta rules")
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         list_module.list_rules()
         
@@ -324,7 +324,7 @@ class TestColorFormatting:
         agents_dir = source_dir / "agents"
         agents_dir.mkdir()
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         with patch('agent_notes.list.find_skill_dirs', return_value=[]):
             list_module.list_components("all")
@@ -353,7 +353,7 @@ class TestYamlHandling:
         agents_dir.mkdir()
         (agents_dir / "test-agent.md").write_text("test content")
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         list_module.list_agents()
         
@@ -373,7 +373,7 @@ class TestYamlHandling:
         agents_dir.mkdir()
         (agents_dir / "test-agent.md").write_text("test content")
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         list_module.list_agents()
         
@@ -389,7 +389,10 @@ class TestTierAndDescriptionFormatting:
         source_dir = tmp_path / "source"
         source_dir.mkdir()
         
-        # Create agents.yaml with varying length data
+        # Create agents.yaml with varying length data inside agents directory
+        agents_dir = source_dir / "agents"
+        agents_dir.mkdir()
+        
         agents_yaml_content = """
 agents:
   short:
@@ -399,15 +402,13 @@ agents:
     description: "Very long description that might affect formatting"
     tier: haiku
 """
-        agents_yaml = source_dir / "agents.yaml"
+        agents_yaml = agents_dir / "agents.yaml"
         agents_yaml.write_text(agents_yaml_content)
         
-        agents_dir = source_dir / "agents"
-        agents_dir.mkdir()
         (agents_dir / "short.md").write_text("short agent")
         (agents_dir / "very-long-agent-name.md").write_text("long agent")
         
-        monkeypatch.setattr(list_module, 'SOURCE_DIR', source_dir)
+        monkeypatch.setattr(list_module, 'DATA_DIR', source_dir)
         
         list_module.list_agents()
         

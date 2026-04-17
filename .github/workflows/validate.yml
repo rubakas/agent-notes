@@ -17,10 +17,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pyyaml pytest
-          export PYTHONPATH=lib
+          export PYTHONPATH=.
       - name: Run tests
-        run: PYTHONPATH=lib python3 -m pytest tests/ -v
+        run: PYTHONPATH=. python3 -m pytest tests/ -v
       - name: Validate configs
-        run: PYTHONPATH=lib python3 -m agent_notes validate
+        run: PYTHONPATH=. python3 -m agent_notes validate
       - name: Verify build
-        run: PYTHONPATH=lib python3 -m agent_notes build
+        run: PYTHONPATH=. python3 -m agent_notes build

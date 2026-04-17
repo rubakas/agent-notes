@@ -65,18 +65,13 @@ def mock_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(inst, 'GITHUB_HOME', tmp_github)
     monkeypatch.setattr(inst, 'AGENTS_HOME', tmp_agents)
     
-    # Patch validate module paths
+    # Patch validate module paths (only attrs it actually imports)
     import agent_notes.validate as validate_mod
     monkeypatch.setattr(validate_mod, 'ROOT', tmp_path)
-    # Create standard dist structure for validate
     tmp_dist = tmp_path / "dist"
-    tmp_dist_claude = tmp_dist / "cli" / "claude"
-    tmp_dist_opencode = tmp_dist / "cli" / "opencode"
-    tmp_dist_github = tmp_dist / "cli" / "github"
-    tmp_dist_rules = tmp_dist / "rules"
-    monkeypatch.setattr(validate_mod, 'DIST_CLAUDE_DIR', tmp_dist_claude)
-    monkeypatch.setattr(validate_mod, 'DIST_OPENCODE_DIR', tmp_dist_opencode)
-    monkeypatch.setattr(validate_mod, 'DIST_RULES_DIR', tmp_dist_rules)
+    monkeypatch.setattr(validate_mod, 'DIST_CLAUDE_DIR', tmp_dist / "claude")
+    monkeypatch.setattr(validate_mod, 'DIST_OPENCODE_DIR', tmp_dist / "opencode")
+    monkeypatch.setattr(validate_mod, 'DIST_RULES_DIR', tmp_dist / "rules")
     
     return {
         'claude': tmp_claude,

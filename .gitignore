@@ -27,4 +27,5 @@ venv/
 .pytest_cache/
 
 # Project
+agent_notes/dist/
 memory-backup/

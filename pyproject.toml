@@ -22,18 +22,17 @@ dev = ["pytest>=7.0"]
 agent-notes = "agent_notes.cli:main"
 
 [tool.setuptools.dynamic]
-version = {file = "lib/agent_notes/VERSION"}
+version = {file = "agent_notes/VERSION"}
 
 [tool.setuptools.package-data]
 agent_notes = [
     "VERSION",
-    "source/**/*",
-    "dist/**/*",
+    "data/**/*",
 ]
 
 [tool.setuptools.packages.find]
-where = ["lib"]
+where = ["."]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["lib"]
+pythonpath = ["."]

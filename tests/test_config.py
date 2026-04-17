@@ -8,71 +8,45 @@ import io
 import agent_notes.config as config
 
 
-class TestFindRoot:
-    """Test _find_root function."""
+class TestPathConstants:
+    """Test that path constants are properly defined."""
     
-    def test_finds_pkg_dir_when_version_and_source_exist_in_package(self, tmp_path, monkeypatch):
-        """Should find package directory when VERSION and source exist in the package."""
-        # Setup mock package structure (pip install scenario)
-        pkg_dir = tmp_path / "lib" / "agent_notes"
-        pkg_dir.mkdir(parents=True)
-        (pkg_dir / "VERSION").write_text("1.0.0")
-        (pkg_dir / "source").mkdir()
+    def test_pkg_paths_defined(self):
+        """Package paths should be defined."""
+        assert hasattr(config, 'PKG_DIR')
+        assert hasattr(config, 'VERSION_FILE')
+        assert hasattr(config, 'ROOT')  # alias for compatibility
         
-        config_file = pkg_dir / "config.py"
-        config_file.write_text("")
-        
-        with patch.object(config, '__file__', str(config_file)):
-            root = config._find_root()
-            assert root == pkg_dir
-    def test_finds_dev_root_when_version_and_source_exist(self, tmp_path, monkeypatch):
-        """Should find dev root when VERSION and source directories exist at repo root."""
-        # Setup mock file structure (dev scenario)
-        dev_root = tmp_path / "agent-notes"
-        dev_root.mkdir()
-        (dev_root / "VERSION").write_text("1.0.0")
-        (dev_root / "source").mkdir()
-        
-        # Mock __file__ to point to our test structure
-        config_file = dev_root / "lib" / "agent_notes" / "config.py"
-        config_file.parent.mkdir(parents=True)
-        config_file.write_text("")
-        
-        with patch.object(config, '__file__', str(config_file)):
-            root = config._find_root()
-            assert root == dev_root
+    def test_data_paths_defined(self):
+        """Data paths should be defined."""
+        assert hasattr(config, 'DATA_DIR')
+        assert hasattr(config, 'AGENTS_YAML')
+        assert hasattr(config, 'AGENTS_DIR')
+        assert hasattr(config, 'GLOBAL_MD')
+        assert hasattr(config, 'GLOBAL_COPILOT_MD')
+        assert hasattr(config, 'RULES_DIR')
+        assert hasattr(config, 'SKILLS_DIR')
     
-    def test_uses_env_var_when_set(self, tmp_path, monkeypatch):
-        """Should use AGENT_NOTES_DIR env var when set."""
-        env_root = tmp_path / "env-root"
-        env_root.mkdir()
-        
-        monkeypatch.setenv("AGENT_NOTES_DIR", str(env_root))
-        
-        # Create package structure that would normally be found
-        pkg_dir = tmp_path / "lib" / "agent_notes"
-        pkg_dir.mkdir(parents=True)
-        
-        config_file = pkg_dir / "config.py"
-        config_file.write_text("")
-        
-        with patch.object(config, '__file__', str(config_file)):
-            root = config._find_root()
-            assert root == env_root
+    def test_dist_paths_defined(self):
+        """Dist paths should be defined."""
+        assert hasattr(config, 'DIST_DIR')
+        assert hasattr(config, 'DIST_CLAUDE_DIR')
+        assert hasattr(config, 'DIST_OPENCODE_DIR')
+        assert hasattr(config, 'DIST_GITHUB_DIR')
+        assert hasattr(config, 'DIST_RULES_DIR')
+        assert hasattr(config, 'DIST_SKILLS_DIR')
     
-    def test_falls_back_to_pkg_dir_when_env_not_set(self, tmp_path, monkeypatch):
-        """Should fall back to package directory when env var not set and files not found."""
-        # Ensure env var is not set
-        monkeypatch.delenv("AGENT_NOTES_DIR", raising=False)
-        
-        pkg_dir = tmp_path / "fallback" / "lib" / "agent_notes"
-        config_file = pkg_dir / "config.py"
-        config_file.parent.mkdir(parents=True)
-        config_file.write_text("")
-        
-        with patch.object(config, '__file__', str(config_file)):
-            root = config._find_root()
-            assert root == pkg_dir
+    def test_install_paths_defined(self):
+        """Install target paths should be defined."""
+        assert hasattr(config, 'CLAUDE_HOME')
+        assert hasattr(config, 'OPENCODE_HOME')
+        assert hasattr(config, 'GITHUB_HOME')
+        assert hasattr(config, 'AGENTS_HOME')
+    
+    def test_memory_paths_defined(self):
+        """Memory paths should be defined."""
+        assert hasattr(config, 'MEMORY_DIR')
+        assert hasattr(config, 'BACKUP_DIR')
 
 
 class TestGetVersion:
@@ -121,32 +95,24 @@ class TestFindSkillDirs:
         # File (not directory) should be ignored
         (skills_dir / "file.txt").write_text("just a file")
         
-        # Mock ROOT and __file__ so both search locations point to tmp_path
-        monkeypatch.setattr(config, 'ROOT', tmp_path)
-        config_file = tmp_path / "lib" / "agent_notes" / "config.py"
-        config_file.parent.mkdir(parents=True)
+        # Mock SKILLS_DIR to point to our test skills directory
+        monkeypatch.setattr(config, 'SKILLS_DIR', skills_dir)
         
-        with patch.object(config, '__file__', str(config_file)):
-            skills = config.find_skill_dirs()
-            skill_names = [s.name for s in skills]
-            
-            assert len(skills) == 2
-            assert "skill-one" in skill_names
-            assert "skill-two" in skill_names
-            assert "not-a-skill" not in skill_names
+        skills = config.find_skill_dirs()
+        skill_names = [s.name for s in skills]
+        
+        assert len(skills) == 2
+        assert "skill-one" in skill_names
+        assert "skill-two" in skill_names
+        assert "not-a-skill" not in skill_names
     
     def test_returns_empty_when_no_skills(self, tmp_path, monkeypatch):
         """Should return empty list when no skill directories exist."""
-        # Mock both ROOT and the computed repo_root to point to tmp_path
-        monkeypatch.setattr(config, 'ROOT', tmp_path)
+        # Mock SKILLS_DIR to point to nonexistent directory
+        monkeypatch.setattr(config, 'SKILLS_DIR', tmp_path / "nonexistent")
         
-        # Also mock __file__ so repo_root computation points to tmp_path area
-        config_file = tmp_path / "lib" / "agent_notes" / "config.py"
-        config_file.parent.mkdir(parents=True)
-        
-        with patch.object(config, '__file__', str(config_file)):
-            skills = config.find_skill_dirs()
-            assert skills == []
+        skills = config.find_skill_dirs()
+        assert skills == []
 
 
 class TestColorClass:
@@ -208,41 +174,6 @@ class TestOutputHelpers:
             config.error("test error")
         
         assert exc_info.value.code == 1
-
-
-class TestPathConstants:
-    """Test that path constants are properly defined."""
-    
-    def test_source_paths_defined(self):
-        """Source paths should be defined."""
-        assert hasattr(config, 'SOURCE_DIR')
-        assert hasattr(config, 'SOURCE_AGENTS_YAML')
-        assert hasattr(config, 'SOURCE_AGENTS_DIR')
-        assert hasattr(config, 'SOURCE_GLOBAL_MD')
-        assert hasattr(config, 'SOURCE_GLOBAL_COPILOT_MD')
-        assert hasattr(config, 'SOURCE_RULES_DIR')
-    
-    def test_dist_paths_defined(self):
-        """Dist paths should be defined."""
-        assert hasattr(config, 'DIST_DIR')
-        assert hasattr(config, 'DIST_CLI_DIR')
-        assert hasattr(config, 'DIST_CLAUDE_DIR')
-        assert hasattr(config, 'DIST_OPENCODE_DIR')
-        assert hasattr(config, 'DIST_GITHUB_DIR')
-        assert hasattr(config, 'DIST_RULES_DIR')
-        # DIST_SKILLS_DIR removed — skills live at repo root/skills/, not in dist
-    
-    def test_install_paths_defined(self):
-        """Install target paths should be defined."""
-        assert hasattr(config, 'CLAUDE_HOME')
-        assert hasattr(config, 'OPENCODE_HOME')
-        assert hasattr(config, 'GITHUB_HOME')
-        assert hasattr(config, 'AGENTS_HOME')
-    
-    def test_memory_paths_defined(self):
-        """Memory paths should be defined."""
-        assert hasattr(config, 'MEMORY_DIR')
-        assert hasattr(config, 'BACKUP_DIR')
 
 
 class TestColorDisabledForNonTTY:
