@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Set, Optional
 
 from .config import (
-    ROOT, DIST_DIR, DATA_DIR, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_RULES_DIR,
+    ROOT, DIST_DIR, DATA_DIR, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR,
     Color, find_skill_dirs
 )
 
@@ -84,14 +84,14 @@ def validate() -> None:
     skill_names: Set[str] = set()
     
     # Validate Claude agents
-    print("Validating Claude Code agents (dist/cli/claude/agents/*.md) ...")
+    print("Validating Claude Code agents (dist/claude/agents/*.md) ...")
     
     claude_agents_dir = DIST_CLAUDE_DIR / "agents"
     if claude_agents_dir.exists():
         for f in claude_agents_dir.glob("*.md"):
             local_name = f.stem
             lines = line_count(f)
-            label = f"dist/cli/claude/agents/{local_name}.md ({lines} lines)"
+            label = f"dist/claude/agents/{local_name}.md ({lines} lines)"
             
             # Frontmatter exists
             if not has_frontmatter(f):
@@ -121,14 +121,14 @@ def validate() -> None:
     
     # Validate OpenCode agents
     print("")
-    print("Validating OpenCode agents (dist/cli/opencode/agents/*.md) ...")
+    print("Validating OpenCode agents (dist/opencode/agents/*.md) ...")
     
     opencode_agents_dir = DIST_OPENCODE_DIR / "agents"
     if opencode_agents_dir.exists():
         for f in opencode_agents_dir.glob("*.md"):
             local_name = f.stem
             lines = line_count(f)
-            label = f"dist/cli/opencode/agents/{local_name}.md ({lines} lines)"
+            label = f"dist/opencode/agents/{local_name}.md ({lines} lines)"
             
             if not has_frontmatter(f):
                 errors.append(ValidationError(label, "missing frontmatter"))
@@ -203,7 +203,7 @@ def validate() -> None:
     required_global = [
         DIST_CLAUDE_DIR / "CLAUDE.md",
         DIST_OPENCODE_DIR / "AGENTS.md",
-        ROOT / "dist/cli/github/copilot-instructions.md",
+        DIST_GITHUB_DIR / "copilot-instructions.md",
         DIST_RULES_DIR / "code-quality.md",
         DIST_RULES_DIR / "safety.md"
     ]

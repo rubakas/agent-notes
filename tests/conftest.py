@@ -71,6 +71,7 @@ def mock_paths(tmp_path, monkeypatch):
     tmp_dist = tmp_path / "dist"
     monkeypatch.setattr(validate_mod, 'DIST_CLAUDE_DIR', tmp_dist / "claude")
     monkeypatch.setattr(validate_mod, 'DIST_OPENCODE_DIR', tmp_dist / "opencode")
+    monkeypatch.setattr(validate_mod, 'DIST_GITHUB_DIR', tmp_dist / "github")
     monkeypatch.setattr(validate_mod, 'DIST_RULES_DIR', tmp_dist / "rules")
     
     return {

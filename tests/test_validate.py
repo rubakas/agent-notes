@@ -228,7 +228,7 @@ class TestValidateFunction:
     def test_validates_claude_agents(self, tmp_path, monkeypatch, capsys):
         """Should validate Claude agent files."""
         # Setup test structure
-        claude_agents_dir = tmp_path / "dist" / "cli" / "claude" / "agents"
+        claude_agents_dir = tmp_path / "dist" / "claude" / "agents"
         claude_agents_dir.mkdir(parents=True, exist_ok=True)
         
         # Valid agent
@@ -250,9 +250,11 @@ No frontmatter here.
         (claude_agents_dir / "invalid-agent.md").write_text(invalid_agent)
         
         monkeypatch.setattr(validate, 'ROOT', tmp_path)
-        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "cli" / "claude")
-        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "cli" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "claude")
+        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_GITHUB_DIR', tmp_path / "dist" / "github")
         monkeypatch.setattr(validate, 'DIST_RULES_DIR', tmp_path / "dist" / "rules")
+        monkeypatch.setattr(validate, 'find_skill_dirs', lambda: [])
         
         with pytest.raises(SystemExit) as exc_info:
             validate.validate()
@@ -268,7 +270,7 @@ No frontmatter here.
     def test_validates_opencode_agents(self, tmp_path, monkeypatch, capsys):
         """Should validate OpenCode agent files."""
         # Setup test structure
-        opencode_agents_dir = tmp_path / "dist" / "cli" / "opencode" / "agents"
+        opencode_agents_dir = tmp_path / "dist" / "opencode" / "agents"
         opencode_agents_dir.mkdir(parents=True, exist_ok=True)
         
         # Valid agent
@@ -293,9 +295,11 @@ Missing mode field.
         (opencode_agents_dir / "invalid-agent.md").write_text(invalid_agent)
         
         monkeypatch.setattr(validate, 'ROOT', tmp_path)
-        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "cli" / "claude")
-        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "cli" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "claude")
+        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_GITHUB_DIR', tmp_path / "dist" / "github")
         monkeypatch.setattr(validate, 'DIST_RULES_DIR', tmp_path / "dist" / "rules")
+        monkeypatch.setattr(validate, 'find_skill_dirs', lambda: [])
         
         with pytest.raises(SystemExit) as exc_info:
             validate.validate()
@@ -346,7 +350,7 @@ Wrong name.
     
     def test_checks_line_limits(self, tmp_path, monkeypatch, capsys):
         """Should check line count limits."""
-        claude_agents_dir = tmp_path / "dist" / "cli" / "claude" / "agents"
+        claude_agents_dir = tmp_path / "dist" / "claude" / "agents"
         claude_agents_dir.mkdir(parents=True, exist_ok=True)
         
         # Agent over 200 lines (error)
@@ -360,9 +364,11 @@ Wrong name.
         (claude_agents_dir / "medium-agent.md").write_text(medium_content)
         
         monkeypatch.setattr(validate, 'ROOT', tmp_path)
-        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "cli" / "claude")
-        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "cli" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "claude")
+        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_GITHUB_DIR', tmp_path / "dist" / "github")
         monkeypatch.setattr(validate, 'DIST_RULES_DIR', tmp_path / "dist" / "rules")
+        monkeypatch.setattr(validate, 'find_skill_dirs', lambda: [])
         
         with pytest.raises(SystemExit) as exc_info:
             validate.validate()
@@ -375,7 +381,7 @@ Wrong name.
     
     def test_checks_name_mismatch(self, tmp_path, monkeypatch, capsys):
         """Should check for name/filename mismatches."""
-        claude_agents_dir = tmp_path / "dist" / "cli" / "claude" / "agents"
+        claude_agents_dir = tmp_path / "dist" / "claude" / "agents"
         claude_agents_dir.mkdir(parents=True, exist_ok=True)
         
         # Agent with mismatched name
@@ -390,9 +396,11 @@ Content here.
         (claude_agents_dir / "actual-filename.md").write_text(content)
         
         monkeypatch.setattr(validate, 'ROOT', tmp_path)
-        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "cli" / "claude")
-        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "cli" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "claude")
+        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_GITHUB_DIR', tmp_path / "dist" / "github")
         monkeypatch.setattr(validate, 'DIST_RULES_DIR', tmp_path / "dist" / "rules")
+        monkeypatch.setattr(validate, 'find_skill_dirs', lambda: [])
         
         with pytest.raises(SystemExit) as exc_info:
             validate.validate()
@@ -404,7 +412,7 @@ Content here.
     
     def test_checks_duplicate_names(self, tmp_path, monkeypatch, capsys):
         """Should check for duplicate names."""
-        claude_agents_dir = tmp_path / "dist" / "cli" / "claude" / "agents"
+        claude_agents_dir = tmp_path / "dist" / "claude" / "agents"
         claude_agents_dir.mkdir(parents=True, exist_ok=True)
         
         # Two Claude agents with the same name - this should be flagged as a duplicate
@@ -432,14 +440,15 @@ Content 2
         # The set will dedupe, but we need to change the validation logic
         
         monkeypatch.setattr(validate, 'ROOT', tmp_path)
-        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "cli" / "claude")
-        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "cli" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "claude")
+        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_GITHUB_DIR', tmp_path / "dist" / "github")
         monkeypatch.setattr(validate, 'DIST_RULES_DIR', tmp_path / "dist" / "rules")
+        monkeypatch.setattr(validate, 'find_skill_dirs', lambda: [])
         
         # Don't mock skills to avoid the complexity 
-        with patch('agent_notes.validate.find_skill_dirs', return_value=[]):
-            with pytest.raises(SystemExit) as exc_info:
-                validate.validate()
+        with pytest.raises(SystemExit) as exc_info:
+            validate.validate()
         
         assert exc_info.value.code == 1
         
@@ -485,9 +494,11 @@ def hello():
         test_file.write_text(content)
         
         monkeypatch.setattr(validate, 'ROOT', tmp_path)
-        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "cli" / "claude")
-        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "cli" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "claude")
+        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_GITHUB_DIR', tmp_path / "dist" / "github")
         monkeypatch.setattr(validate, 'DIST_RULES_DIR', tmp_path / "dist" / "rules")
+        monkeypatch.setattr(validate, 'find_skill_dirs', lambda: [])
         
         with pytest.raises(SystemExit) as exc_info:
             validate.validate()
@@ -501,7 +512,7 @@ def hello():
     def test_passes_validation(self, tmp_path, monkeypatch, capsys):
         """Should pass validation when all files are valid."""
         # Setup valid Claude agent
-        claude_agents_dir = tmp_path / "dist" / "cli" / "claude" / "agents"
+        claude_agents_dir = tmp_path / "dist" / "claude" / "agents"
         claude_agents_dir.mkdir(parents=True, exist_ok=True)
         
         valid_agent = """---
@@ -515,7 +526,7 @@ Valid content.
         (claude_agents_dir / "valid-agent.md").write_text(valid_agent)
         
         # Setup valid OpenCode agent
-        opencode_agents_dir = tmp_path / "dist" / "cli" / "opencode" / "agents"
+        opencode_agents_dir = tmp_path / "dist" / "opencode" / "agents"
         opencode_agents_dir.mkdir(parents=True, exist_ok=True)
         
         valid_opencode = """---
@@ -543,29 +554,30 @@ Valid skill content.
         
         # Setup required global files
         required_dirs = [
-            tmp_path / "dist" / "cli" / "claude",
-            tmp_path / "dist" / "cli" / "opencode", 
-            tmp_path / "dist" / "cli" / "github",
+            tmp_path / "dist" / "claude",
+            tmp_path / "dist" / "opencode", 
+            tmp_path / "dist" / "github",
             tmp_path / "dist" / "rules"
         ]
         
         for d in required_dirs:
             d.mkdir(parents=True, exist_ok=True)
         
-        (tmp_path / "dist" / "cli" / "claude" / "CLAUDE.md").write_text("Claude config")
-        (tmp_path / "dist" / "cli" / "opencode" / "AGENTS.md").write_text("OpenCode config")
-        (tmp_path / "dist" / "cli" / "github" / "copilot-instructions.md").write_text("Copilot config")
+        (tmp_path / "dist" / "claude" / "CLAUDE.md").write_text("Claude config")
+        (tmp_path / "dist" / "opencode" / "AGENTS.md").write_text("OpenCode config")
+        (tmp_path / "dist" / "github" / "copilot-instructions.md").write_text("Copilot config")
         (tmp_path / "dist" / "rules" / "code-quality.md").write_text("Code quality rules")
         (tmp_path / "dist" / "rules" / "safety.md").write_text("Safety rules")
         
         monkeypatch.setattr(validate, 'ROOT', tmp_path)
-        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "cli" / "claude")
-        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "cli" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "claude")
+        monkeypatch.setattr(validate, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "opencode")
+        monkeypatch.setattr(validate, 'DIST_GITHUB_DIR', tmp_path / "dist" / "github")
         monkeypatch.setattr(validate, 'DIST_RULES_DIR', tmp_path / "dist" / "rules")
+        monkeypatch.setattr(validate, 'find_skill_dirs', lambda: [valid_skill])
         
-        with patch('agent_notes.validate.find_skill_dirs', return_value=[valid_skill]):
-            with pytest.raises(SystemExit) as exc_info:
-                validate.validate()
+        with pytest.raises(SystemExit) as exc_info:
+            validate.validate()
         
         assert exc_info.value.code == 0  # Should exit with success
         
