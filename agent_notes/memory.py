@@ -41,7 +41,7 @@ def do_show(name: str) -> None:
     agent_dir = MEMORY_DIR / name
     if not agent_dir.exists():
         print(f"No memory found for agent '{name}'")
-        available = [d.name for d in MEMORY_DIR.iterdir() if d.is_dir()] if MEMORY_DIR.exists() else []
+        available = sorted(d.name for d in MEMORY_DIR.iterdir() if d.is_dir()) if MEMORY_DIR.exists() else []
         if available:
             print(f"Available: {' '.join(available)}")
         exit(1)
