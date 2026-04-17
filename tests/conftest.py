@@ -27,9 +27,12 @@ def tmp_project(tmp_path):
     return project
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_paths(tmp_path, monkeypatch):
-    """Mock all config paths to use temporary directories."""
+    """Mock all config paths to use temporary directories.
+    
+    Autouse ensures NO test can ever write to real ~/.claude/ or ~/.config/opencode/.
+    """
     # Create temp directories
     tmp_claude = tmp_path / "claude"
     tmp_opencode = tmp_path / "opencode" 
@@ -73,6 +76,19 @@ def mock_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(validate_mod, 'DIST_OPENCODE_DIR', tmp_dist / "opencode")
     monkeypatch.setattr(validate_mod, 'DIST_GITHUB_DIR', tmp_dist / "github")
     monkeypatch.setattr(validate_mod, 'DIST_RULES_DIR', tmp_dist / "rules")
+    
+    # Patch doctor module paths
+    import agent_notes.doctor as doctor_mod
+    monkeypatch.setattr(doctor_mod, 'ROOT', tmp_path)
+    monkeypatch.setattr(doctor_mod, 'DIST_CLAUDE_DIR', tmp_dist / "claude")
+    monkeypatch.setattr(doctor_mod, 'DIST_OPENCODE_DIR', tmp_dist / "opencode")
+    monkeypatch.setattr(doctor_mod, 'DIST_GITHUB_DIR', tmp_dist / "github")
+    monkeypatch.setattr(doctor_mod, 'DIST_RULES_DIR', tmp_dist / "rules")
+    monkeypatch.setattr(doctor_mod, 'DIST_SKILLS_DIR', tmp_dist / "skills")
+    monkeypatch.setattr(doctor_mod, 'CLAUDE_HOME', tmp_claude)
+    monkeypatch.setattr(doctor_mod, 'OPENCODE_HOME', tmp_opencode)
+    monkeypatch.setattr(doctor_mod, 'GITHUB_HOME', tmp_github)
+    monkeypatch.setattr(doctor_mod, 'AGENTS_HOME', tmp_agents)
     
     return {
         'claude': tmp_claude,
