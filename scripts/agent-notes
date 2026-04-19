@@ -6,7 +6,13 @@
 #
 set -e
 
-SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
+MY_SCRIPT=$0
+if [[ -L "$MY_SCRIPT" ]]; then
+  MY_SCRIPT="$(readlink "$MY_SCRIPT")"
+fi
+SCRIPTS_DIR="$(cd "$(dirname "$MY_SCRIPT")" && pwd)"
+
+echo "Running agent-notes from: $MY_SCRIPT"
 
 case "${1:-help}" in
   install)    shift; exec bash "$SCRIPTS_DIR/install.sh" "$@" ;;
