@@ -148,7 +148,7 @@ ok "VERSION updated to $new_version"
 
 # Commit version bump and any build changes
 info "Committing changes..."
-git add agent_notes/VERSION agent_notes/dist/
+git add agent_notes/VERSION
 git commit -m "chore: bump version to $new_version"
 ok "Changes committed"
 
