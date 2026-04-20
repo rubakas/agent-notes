@@ -1,6 +1,8 @@
 # agent-notes
 
-AI agent configuration manager for Claude Code and OpenCode.
+AI agent configuration manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [OpenCode](https://github.com/opencode-ai/opencode).
+
+Configures a Lead agent (Opus) that orchestrates a team of 13 specialized subagents across three model tiers — so Opus plans, Sonnet executes, and Haiku explores.
 
 ## Quick Start
 
@@ -17,9 +19,10 @@ Update anytime with `cd ~/agent-notes && git pull && agent-notes update`.
 
 | Component | Description |
 |-----------|-------------|
-| **Skills** | On-demand knowledge modules (Rails, Docker, etc.) |
-| **Agents** | Specialized AI subagents with hierarchical model strategy |
-| **Rules** | Global instructions, code quality, and safety rules |
+| **Skills** | 31 on-demand knowledge modules (Rails, Docker, Git, Kamal) |
+| **Agents** | 14 specialized AI subagents with hierarchical model strategy |
+| **Rules** | Global instructions, code quality, and safety guardrails |
+| **Config** | Global instructions for Claude Code, OpenCode, and GitHub Copilot |
 
 ## CLI Reference
 
@@ -39,6 +42,14 @@ agent-notes <command> [options]
 | `validate` | Lint source configuration files |
 | `memory [list\|size\|show\|reset\|export\|import] [name]` | Manage agent memory |
 
+### Supported platforms
+
+| Platform | Install target | Config format |
+|----------|---------------|---------------|
+| **Claude Code** | `~/.claude/` | YAML frontmatter + Markdown prompts |
+| **OpenCode** | `~/.config/opencode/` | YAML frontmatter + Markdown prompts |
+| **GitHub Copilot** | `~/.github/` | `copilot-instructions.md` |
+
 ### Examples
 
 ```bash
@@ -46,20 +57,38 @@ agent-notes <command> [options]
 agent-notes install
 
 # Example wizard session:
+#
 #   Which CLI do you use?
-#     1) Claude Code  2) OpenCode  3) Both
-#   Choice [3]: 3
+#     1) [*] Claude Code
+#     2) [*] OpenCode
+#   Enter numbers to toggle (comma-separated), or press enter for defaults.
+#   Choice:                          ← press enter to keep both
 #
 #   Where to install?
-#     1) Global  2) Local (current project)
-#   Choice [1]: 1
+#     1) * Global (~/.claude, ~/.config/opencode)
+#     2)   Local (current project)
+#   Choice [1]:                      ← press enter for global
+#
+#   How to install?
+#     1) * Symlink (auto-updates when source changes)
+#     2)   Copy (standalone, allows local customization)
+#   Choice [1]:                      ← press enter for symlink
 #
 #   Which skills to include?
-#     1) Rails (22)  2) Docker (4)  3) Kamal (1)  4) Git (1)
-#   Choice [all]: 1,4
+#     1) [*] Rails — models, controllers, views, routes, testing (22 skills)
+#     2) [*] Docker — Dockerfile, Compose patterns (4 skills)
+#     3) [*] Kamal — deployment with Kamal (1 skill)
+#     4) [*] Git — commit workflow, conventional commits (1 skill)
+#   Choice:                          ← press enter for all
 #
 #   Ready to install:
-#     CLI: Claude Code + OpenCode | Scope: Global | Skills: Rails (22), Git (1)
+#     CLI:      Claude Code + OpenCode
+#     Scope:    Global (~/.claude, ~/.config/opencode)
+#     Mode:     Symlink
+#     Skills:   Rails (22), Docker (4), Kamal (1), Git (1)
+#     Agents:   13 (Claude Code) + 13 (OpenCode)
+#     Config:   CLAUDE.md, AGENTS.md
+#     Rules:    2
 #   Proceed? [Y/n]: Y
 
 # Direct install (scripted, no wizard)
@@ -176,13 +205,6 @@ After cloning, `agent-notes install` launches the interactive wizard to configur
 
 ```bash
 pip install agent-notes
-agent-notes install
-```
-
-### Homebrew (future)
-
-```bash
-brew install rubakas/tap/agent-notes
 agent-notes install
 ```
 
