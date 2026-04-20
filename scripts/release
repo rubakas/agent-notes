@@ -70,14 +70,20 @@ ok "GitHub CLI available"
 
 # Run validate
 info "Running validation..."
-export PYTHONPATH="$AGENT_NOTES_DIR/lib${PYTHONPATH:+:$PYTHONPATH}"
 if ! python3 -m agent_notes validate > /dev/null 2>&1; then
   error "Validation failed. Run 'agent-notes validate' to see details."
 fi
 ok "Validation passed"
 
+# Run tests
+info "Running tests..."
+if ! python3 -m pytest tests/ -x -q > /dev/null 2>&1; then
+  error "Tests failed. Run 'python3 -m pytest tests/' to see details."
+fi
+ok "Tests passed"
+
 # Read current version
-version_file="$AGENT_NOTES_DIR/VERSION"
+version_file="$AGENT_NOTES_DIR/agent_notes/VERSION"
 if [[ ! -f "$version_file" ]]; then
   error "VERSION file not found at $version_file"
 fi
@@ -131,7 +137,7 @@ git checkout -b "$release_branch"
 # Run build to ensure generated files are fresh
 info "Building from source..."
 if ! python3 -m agent_notes build > /dev/null 2>&1; then
-  error "Build failed. Run 'agent-notes install' to see details."
+  error "Build failed. Run 'agent-notes build' to see details."
 fi
 ok "Build completed"
 
@@ -142,7 +148,7 @@ ok "VERSION updated to $new_version"
 
 # Commit version bump and any build changes
 info "Committing changes..."
-git add .
+git add agent_notes/VERSION agent_notes/dist/
 git commit -m "chore: bump version to $new_version"
 ok "Changes committed"
 
@@ -178,15 +184,13 @@ ok "All branches and tags pushed"
 
 # Create GitHub release
 info "Creating GitHub release..."
-release_url=$(gh release create "v$new_version" \
+if release_url=$(gh release create "v$new_version" \
   --title "Release $new_version" \
   --generate-notes \
-  --target main)
-
-if [[ $? -eq 0 ]]; then
+  --target main); then
   ok "GitHub release created"
 else
-  warn "GitHub release creation may have failed"
+  warn "GitHub release creation failed. Create manually at: https://github.com/rubakas/agent-notes/releases/new"
 fi
 
 # Print summary
