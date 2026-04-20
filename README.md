@@ -1,6 +1,8 @@
 # agent-notes
 
-AI agent configuration manager for Claude Code and OpenCode.
+AI agent configuration manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [OpenCode](https://github.com/opencode-ai/opencode).
+
+Configures a Lead agent (Opus) that orchestrates a team of 13 specialized subagents across three model tiers — so Opus plans, Sonnet executes, and Haiku explores.
 
 ## Quick Start
 
@@ -17,9 +19,10 @@ Update anytime with `cd ~/agent-notes && git pull && agent-notes update`.
 
 | Component | Description |
 |-----------|-------------|
-| **Skills** | On-demand knowledge modules (Rails, Docker, etc.) |
-| **Agents** | Specialized AI subagents with hierarchical model strategy |
-| **Rules** | Global instructions, code quality, and safety rules |
+| **Skills** | 31 on-demand knowledge modules (Rails, Docker, Git, Kamal) |
+| **Agents** | 14 specialized AI subagents with hierarchical model strategy |
+| **Rules** | Global instructions, code quality, and safety guardrails |
+| **Config** | Global instructions for Claude Code, OpenCode, and GitHub Copilot |
 
 ## CLI Reference
 
@@ -38,6 +41,14 @@ agent-notes <command> [options]
 | `list [agents\|skills\|rules\|all]` | List installed components |
 | `validate` | Lint source configuration files |
 | `memory [list\|size\|show\|reset\|export\|import] [name]` | Manage agent memory |
+
+### Supported platforms
+
+| Platform | Install target | Config format |
+|----------|---------------|---------------|
+| **Claude Code** | `~/.claude/` | YAML frontmatter + Markdown prompts |
+| **OpenCode** | `~/.config/opencode/` | YAML frontmatter + Markdown prompts |
+| **GitHub Copilot** | `~/.github/` | `copilot-instructions.md` |
 
 ### Examples
 
@@ -176,13 +187,6 @@ After cloning, `agent-notes install` launches the interactive wizard to configur
 
 ```bash
 pip install agent-notes
-agent-notes install
-```
-
-### Homebrew (future)
-
-```bash
-brew install rubakas/tap/agent-notes
 agent-notes install
 ```
 
