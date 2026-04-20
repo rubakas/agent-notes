@@ -12,8 +12,8 @@ except ImportError:
     _HAS_TTY = False
 
 from .config import (
-    DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_SKILLS_DIR, DIST_RULES_DIR,
-    CLAUDE_HOME, OPENCODE_HOME, AGENTS_HOME, Color, get_version
+    DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_SKILLS_DIR, DIST_RULES_DIR,
+    CLAUDE_HOME, OPENCODE_HOME, GITHUB_HOME, AGENTS_HOME, Color, get_version
 )
 from .build import build
 from .install import (
@@ -433,6 +433,11 @@ def install_config_filtered(clis: Set[str], scope: str, copy_mode: bool = False)
 
             if DIST_RULES_DIR.exists():
                 place_dir_contents(DIST_RULES_DIR, CLAUDE_HOME / "rules", "*.md", copy_mode)
+
+            # Copilot → ~/.github/copilot-instructions.md
+            copilot_global = DIST_GITHUB_DIR / "copilot-instructions.md"
+            if copilot_global.exists():
+                place_file(copilot_global, GITHUB_HOME / "copilot-instructions.md", copy_mode)
 
         if "opencode" in clis:
             agents_global = DIST_OPENCODE_DIR / "AGENTS.md"

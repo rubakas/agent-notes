@@ -547,7 +547,6 @@ def _check_config(cli: str, scope: str) -> tuple:
     desc = ", ".join(installed_names) if installed_names else "not installed"
     
     return all_installed, desc, missing_names
-    return all_installed, desc
 
 def count_stale(issues: List[Issue], item_type: str) -> int:
     """Count stale issues of a specific type."""
