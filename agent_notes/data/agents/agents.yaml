@@ -1,0 +1,253 @@
+# Agent metadata — single source of truth for all CLI formats.
+# Prompts live in agent_notes/data/agents/<name>.md (no frontmatter).
+
+agents:
+  lead:
+    description: "Orchestrates complex multi-step tasks by planning, delegating to specialized agents, and reviewing results. Use for work requiring coordination across multiple agents."
+    tier: opus
+    mode: primary
+    color: purple
+    effort: high
+    claude:
+      tools: "Agent(coder, reviewer, security-auditor, test-writer, test-runner, system-auditor, database-specialist, performance-profiler, api-reviewer, tech-writer, devops, explorer), Read, Grep, Glob, Bash"
+      memory: user
+    opencode:
+      permission:
+        edit: allow
+        bash: allow
+
+  coder:
+    description: "Implements features, fixes bugs, and refactors code. The hands-on builder that writes and edits files."
+    tier: sonnet
+    mode: subagent
+    color: blue
+    effort: medium
+    claude:
+      tools: "Read, Write, Edit, Bash, Grep, Glob"
+      memory: user
+    opencode:
+      permission:
+        edit: allow
+        bash: allow
+
+  reviewer:
+    description: "Reviews code for quality, readability, correctness, and adherence to project conventions. Read-only analysis with structured output."
+    tier: sonnet
+    mode: subagent
+    color: yellow
+    effort: medium
+    claude:
+      disallowedTools: "Write, Edit"
+      memory: user
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "git diff*": allow
+          "git log*": allow
+          "rubocop *": allow
+          "eslint *": allow
+          "npx prettier*": allow
+
+  security-auditor:
+    description: "Audits code for security vulnerabilities including auth bypass, injection, XSS, secrets exposure, and insecure defaults."
+    tier: sonnet
+    mode: subagent
+    color: red
+    effort: medium
+    claude:
+      disallowedTools: "Write, Edit"
+      memory: user
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "brakeman *": allow
+          "bundler-audit *": allow
+          "npm audit*": allow
+          "grep *": allow
+          "git log*": allow
+
+  explorer:
+    description: "Fast read-only codebase exploration for file discovery, pattern search, and architecture understanding."
+    tier: haiku
+    mode: subagent
+    color: blue
+    effort: low
+    claude:
+      tools: "Read, Grep, Glob"
+      disallowedTools: "Write, Edit, Bash"
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "grep *": allow
+          "find *": allow
+          "wc *": allow
+
+  test-writer:
+    description: "Writes tests for any framework. Reads source code first, detects test framework, follows project conventions."
+    tier: sonnet
+    mode: subagent
+    color: green
+    effort: medium
+    claude:
+      tools: "Read, Write, Edit, Bash, Grep, Glob"
+      memory: user
+    opencode:
+      permission:
+        edit: allow
+        bash: allow
+
+  test-runner:
+    description: "Diagnoses and fixes failing tests. Runs tests, parses errors, identifies root cause, applies minimal fix."
+    tier: sonnet
+    mode: subagent
+    color: green
+    effort: medium
+    claude:
+      tools: "Read, Write, Edit, Bash, Grep, Glob"
+      memory: user
+    opencode:
+      permission:
+        edit: allow
+        bash: allow
+
+  system-auditor:
+    description: "Audits codebase health for duplication, dead code, coupling, and convention violations."
+    tier: sonnet
+    mode: subagent
+    color: orange
+    effort: medium
+    claude:
+      disallowedTools: "Write, Edit"
+      memory: user
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "grep *": allow
+          "find *": allow
+          "wc *": allow
+          "git log*": allow
+
+  database-specialist:
+    description: "Analyzes database schema design, query performance, indexes, and migrations. Read-only analysis with structured output."
+    tier: sonnet
+    mode: subagent
+    color: cyan
+    effort: medium
+    claude:
+      disallowedTools: "Write, Edit"
+      memory: user
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "rails db:migrate:status*": allow
+          "rails dbconsole*": allow
+          "grep *": allow
+          "git log*": allow
+
+  performance-profiler:
+    description: "Profiles application performance including response times, memory usage, query efficiency, and bundle size. Read-only analysis."
+    tier: sonnet
+    mode: subagent
+    color: magenta
+    effort: medium
+    claude:
+      disallowedTools: "Write, Edit"
+      memory: user
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "bundle exec derailed*": allow
+          "rails stats*": allow
+          "grep *": allow
+          "git log*": allow
+          "wc *": allow
+          "du *": allow
+
+  api-reviewer:
+    description: "Reviews API design for consistency, versioning, error handling, and backward compatibility. Read-only analysis."
+    tier: haiku
+    mode: subagent
+    color: teal
+    effort: medium
+    claude:
+      disallowedTools: "Write, Edit"
+      memory: user
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "rails routes*": allow
+          "curl *": allow
+          "grep *": allow
+          "git log*": allow
+
+  tech-writer:
+    description: "Writes and updates documentation including READMEs, API docs, architecture notes, and inline comments."
+    tier: haiku
+    mode: subagent
+    color: white
+    effort: low
+    claude:
+      tools: "Read, Write, Edit, Grep, Glob"
+      disallowedTools: "Bash"
+      memory: user
+    opencode:
+      permission:
+        edit: allow
+        bash:
+          "*": deny
+          "grep *": allow
+          "find *": allow
+
+  devops:
+    description: "Manages infrastructure configs including Docker, CI/CD pipelines, deployment, and environment setup."
+    tier: sonnet
+    mode: subagent
+    color: gray
+    effort: medium
+    claude:
+      tools: "Read, Write, Edit, Bash, Grep, Glob"
+      memory: user
+    opencode:
+      permission:
+        edit: allow
+        bash:
+          "*": deny
+          "docker *": allow
+          "docker-compose *": allow
+          "kamal *": allow
+          "kubectl *": allow
+          "helm *": allow
+          "terraform *": allow
+          "gh *": allow
+          "git *": allow
+          "grep *": allow
+          "find *": allow
+          "cat *": allow
+          "ls *": allow
+          "env": allow
+
+# Model tier mappings
+tiers:
+  opus:
+    claude: opus
+    opencode: "github-copilot/claude-opus-4.6"
+  sonnet:
+    claude: sonnet
+    opencode: "github-copilot/claude-sonnet-4"
+  haiku:
+    claude: haiku
+    opencode: "github-copilot/claude-haiku-4.5"

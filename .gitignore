@@ -1,3 +1,31 @@
-memory-backup/
-node_modules/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+*.whl
+agent_notes-*.tar.gz
+
+# Build
+build/
+dist_pkg/
+
+# Virtual environments
+venv/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
 .DS_Store
+
+# Test
+.pytest_cache/
+
+# Project
+agent_notes/dist/
+memory-backup/

@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+set -e
+
+AGENT_NOTES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Colors and helpers
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+error() { echo -e "${RED}Error: $1${NC}" >&2; exit 1; }
+ok() { echo -e "  ${GREEN}ok${NC}  $1"; }
+info() { echo -e "${BLUE}$1${NC}"; }
+warn() { echo -e "${YELLOW}$1${NC}"; }
+
+# Helper to bump semantic version
+bump_version() {
+  local version="$1"
+  local bump_type="$2"
+  
+  IFS='.' read -r -a parts <<< "$version"
+  local major="${parts[0]}"
+  local minor="${parts[1]}"
+  local patch="${parts[2]}"
+  
+  case "$bump_type" in
+    major)
+      major=$((major + 1))
+      minor=0
+      patch=0
+      ;;
+    minor)
+      minor=$((minor + 1))
+      patch=0
+      ;;
+    patch)
+      patch=$((patch + 1))
+      ;;
+    *)
+      error "Invalid bump type: $bump_type (must be major, minor, or patch)"
+      ;;
+  esac
+  
+  echo "$major.$minor.$patch"
+}
+
+# Pre-flight checks
+info "Running pre-flight checks..."
+
+# Check if on develop branch
+current_branch=$(git branch --show-current)
+if [[ "$current_branch" != "develop" ]]; then
+  error "Must be on 'develop' branch (currently on '$current_branch')"
+fi
+ok "On develop branch"
+
+# Check working directory is clean
+if ! git diff-index --quiet HEAD --; then
+  error "Working directory is not clean. Commit or stash changes first."
+fi
+ok "Working directory clean"
+
+# Check gh CLI is available
+if ! command -v gh &> /dev/null; then
+  error "GitHub CLI (gh) is not installed. Install with: brew install gh"
+fi
+ok "GitHub CLI available"
+
+# Run validate
+info "Running validation..."
+if ! python3 -m agent_notes validate > /dev/null 2>&1; then
+  error "Validation failed. Run 'agent-notes validate' to see details."
+fi
+ok "Validation passed"
+
+# Run tests
+info "Running tests..."
+if ! python3 -m pytest tests/ -x -q > /dev/null 2>&1; then
+  error "Tests failed. Run 'python3 -m pytest tests/' to see details."
+fi
+ok "Tests passed"
+
+# Read current version
+version_file="$AGENT_NOTES_DIR/agent_notes/VERSION"
+if [[ ! -f "$version_file" ]]; then
+  error "VERSION file not found at $version_file"
+fi
+
+current_version=$(cat "$version_file" | tr -d '[:space:]')
+if [[ -z "$current_version" ]]; then
+  error "VERSION file is empty"
+fi
+ok "Current version: $current_version"
+
+# Prompt for bump type
+echo
+info "Select version bump type:"
+echo "  1) patch (${current_version} → $(bump_version "$current_version" patch))"
+echo "  2) minor (${current_version} → $(bump_version "$current_version" minor)) [default]"
+echo "  3) major (${current_version} → $(bump_version "$current_version" major))"
+echo
+
+read -p "Enter choice (1-3) or bump type (patch/minor/major): " choice
+
+case "$choice" in
+  1|patch)
+    bump_type="patch"
+    ;;
+  2|minor|"")
+    bump_type="minor"
+    ;;
+  3|major)
+    bump_type="major"
+    ;;
+  *)
+    error "Invalid choice: $choice"
+    ;;
+esac
+
+# Calculate new version
+new_version=$(bump_version "$current_version" "$bump_type")
+ok "New version: $new_version"
+
+# Check tag doesn't already exist
+if git tag -l | grep -q "^v$new_version$"; then
+  error "Tag v$new_version already exists"
+fi
+ok "Tag v$new_version does not exist"
+
+# Create release branch
+release_branch="release/$new_version"
+info "Creating release branch: $release_branch"
+git checkout -b "$release_branch"
+
+# Run build to ensure generated files are fresh
+info "Building from source..."
+if ! python3 -m agent_notes build > /dev/null 2>&1; then
+  error "Build failed. Run 'agent-notes build' to see details."
+fi
+ok "Build completed"
+
+# Update VERSION file
+info "Updating VERSION file..."
+echo "$new_version" > "$version_file"
+ok "VERSION updated to $new_version"
+
+# Commit version bump and any build changes
+info "Committing changes..."
+git add agent_notes/VERSION
+git commit -m "chore: bump version to $new_version"
+ok "Changes committed"
+
+# Merge to main
+info "Switching to main branch..."
+git checkout main
+git pull origin main --ff-only
+
+info "Merging release branch to main..."
+git merge --no-ff "$release_branch" -m "release: version $new_version"
+
+# Create tag
+info "Creating tag..."
+git tag "v$new_version" -m "Release version $new_version"
+ok "Tag v$new_version created"
+
+# Merge back to develop
+info "Merging back to develop..."
+git checkout develop
+git merge --no-ff main -m "chore: merge release $new_version back to develop"
+
+# Delete release branch
+info "Cleaning up release branch..."
+git branch -d "$release_branch"
+ok "Release branch deleted"
+
+# Push everything
+info "Pushing to origin..."
+git push origin main
+git push origin develop
+git push origin "v$new_version"
+ok "All branches and tags pushed"
+
+# Create GitHub release
+info "Creating GitHub release..."
+if release_url=$(gh release create "v$new_version" \
+  --title "Release $new_version" \
+  --generate-notes \
+  --target main); then
+  ok "GitHub release created"
+else
+  warn "GitHub release creation failed. Create manually at: https://github.com/rubakas/agent-notes/releases/new"
+fi
+
+# Print summary
+echo
+info "🎉 Release $new_version completed successfully!"
+echo
+echo "Summary:"
+echo "  Previous version: $current_version"
+echo "  New version:      $new_version"
+echo "  Bump type:        $bump_type"
+echo "  Tag:              v$new_version"
+echo "  Release URL:      $release_url"
+echo
+ok "All done!"
