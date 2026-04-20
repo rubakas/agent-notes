@@ -43,13 +43,22 @@ class TestArgumentParsing:
         assert "agent-notes" in captured.out
     
     def test_install_command_parsing(self):
-        """Should parse install command correctly."""
+        """Should parse install command correctly and call wizard."""
         test_args = ["agent-notes", "install"]
+        
+        with patch.object(sys, 'argv', test_args):
+            with patch('agent_notes.wizard.interactive_install') as mock_wizard:
+                cli.main()
+                mock_wizard.assert_called_once()
+    
+    def test_install_with_flags_uses_old_install(self):
+        """Should use old install function when flags are provided."""
+        test_args = ["agent-notes", "install", "--local"]
         
         with patch.object(sys, 'argv', test_args):
             with patch('agent_notes.install.install') as mock_install:
                 cli.main()
-                mock_install.assert_called_once_with(local=False, copy=False)
+                mock_install.assert_called_once_with(local=True, copy=False)
     
     def test_install_with_local_flag(self):
         """Should parse install --local correctly."""
@@ -205,7 +214,6 @@ class TestCommandRouting:
         # Test that each subcommand is properly handled
         commands = [
             ("build", "agent_notes.build.build"),
-            ("install", "agent_notes.install.install"), 
             ("uninstall", "agent_notes.install.uninstall"),
             ("update", "agent_notes.update.update"),
             ("doctor", "agent_notes.doctor.doctor"),
@@ -222,6 +230,13 @@ class TestCommandRouting:
                 with patch(handler_path) as mock_handler:
                     cli.main()
                     mock_handler.assert_called_once()
+        
+        # Test install separately since it now routes to wizard
+        test_args = ["agent-notes", "install"]
+        with patch.object(sys, 'argv', test_args):
+            with patch('agent_notes.wizard.interactive_install') as mock_wizard:
+                cli.main()
+                mock_wizard.assert_called_once()
 
 
 class TestListFilterChoices:

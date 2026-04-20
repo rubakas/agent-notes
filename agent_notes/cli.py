@@ -63,8 +63,12 @@ def main():
         from .build import build
         build()
     elif args.command == "install":
-        from .install import install
-        install(local=args.local, copy=args.copy)
+        if args.local or args.copy:
+            from .install import install
+            install(local=args.local, copy=args.copy)
+        else:
+            from .wizard import interactive_install
+            interactive_install()
     elif args.command == "uninstall":
         from .install import uninstall
         uninstall(local=args.local)
