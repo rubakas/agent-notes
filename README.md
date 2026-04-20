@@ -1,13 +1,13 @@
 # agent-notes
 
-AI agent configuration manager for Claude Code, OpenCode, and GitHub Copilot.
+AI agent configuration manager for Claude Code and OpenCode.
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/rubakas/agent-notes.git ~/agent-notes
 ln -sf ~/agent-notes/bin/agent-notes /usr/local/bin/agent-notes
-agent-notes install
+agent-notes install    # interactive wizard guides you through setup
 agent-notes doctor
 ```
 
@@ -19,7 +19,7 @@ Update anytime with `cd ~/agent-notes && git pull && agent-notes update`.
 |-----------|-------------|
 | **Skills** | On-demand knowledge modules (Rails, Docker, etc.) |
 | **Agents** | Specialized AI subagents with hierarchical model strategy |
-| **Rules** | Global instructions, code quality, safety, and Copilot config |
+| **Rules** | Global instructions, code quality, and safety rules |
 
 ## CLI Reference
 
@@ -29,7 +29,8 @@ agent-notes <command> [options]
 
 | Command | Description |
 |---------|-------------|
-| `install [--local] [--copy]` | Build and install components |
+| `install` | Interactive installer wizard (CLI, scope, skills selection) |
+| `install --local [--copy]` | Direct install to current project (no wizard) |
 | `uninstall [--local]` | Remove installed components |
 | `update` | Pull latest, rebuild, reinstall |
 | `doctor [--local] [--fix]` | Check installation health |
@@ -41,13 +42,28 @@ agent-notes <command> [options]
 ### Examples
 
 ```bash
-# Global install (all projects)
+# Interactive install (recommended)
 agent-notes install
 
-# Local install (current project only)
-agent-notes install --local
+# Example wizard session:
+#   Which CLI do you use?
+#     1) Claude Code  2) OpenCode  3) Both
+#   Choice [3]: 3
+#
+#   Where to install?
+#     1) Global  2) Local (current project)
+#   Choice [1]: 1
+#
+#   Which skills to include?
+#     1) Rails (22)  2) Docker (4)  3) Kamal (1)  4) Git (1)
+#   Choice [all]: 1,4
+#
+#   Ready to install:
+#     CLI: Claude Code + OpenCode | Scope: Global | Skills: Rails (22), Git (1)
+#   Proceed? [Y/n]: Y
 
-# Copy files instead of symlink (for customization)
+# Direct install (scripted, no wizard)
+agent-notes install --local
 agent-notes install --local --copy
 
 # Check health and fix issues
@@ -61,13 +77,13 @@ agent-notes memory reset reviewer
 
 ## Agent Team
 
-Specialized subagents with hierarchical model strategy: **Opus 4.7 decides, Sonnet 4 executes, Haiku 4.5 explores.**
+Specialized subagents with hierarchical model strategy: **Opus 4.6 decides, Sonnet 4 executes, Haiku 4.5 explores.**
 
 ### Agent roster
 
 | Agent | Model | Role |
 |-------|-------|------|
-| **lead** | Opus 4.7 | Plans, delegates, reviews. The only Opus agent. |
+| **lead** | Opus 4.6 | Plans, delegates, reviews. The only Opus agent. |
 | **coder** | Sonnet 4 | Implements features, fixes bugs, edits files. |
 | **reviewer** | Sonnet 4 | Code quality review. Read-only. |
 | **security-auditor** | Sonnet 4 | Security vulnerability analysis. Read-only. |
@@ -97,7 +113,7 @@ You (human)
   |
   +-- Simple task ------> Main session (direct work)
   |
-  +-- Complex task -----> Lead (Opus 4.7)
+  +-- Complex task -----> Lead (Opus 4.6)
                            +-- Explorer (Haiku 4.5)     quick lookups
                            +-- Coder (Sonnet 4)         implementation
                            +-- Reviewer (Sonnet 4)      code review
@@ -135,10 +151,9 @@ agent-notes/
 │   │   │   └── *.md         # Agent prompt files
 │   │   ├── skills/          # Skill directories
 │   │   ├── rules/           # Code quality rules
-│   │   ├── global.md        # Global instructions
-│   │   └── global-copilot.md
+│   │   └── global.md        # Global instructions
 │   └── dist/                # Built artifacts
-│       ├── claude/, opencode/, github/
+│       ├── claude/, opencode/
 │       ├── rules/
 │       └── skills/
 ├── scripts/                 # Build/utility scripts
@@ -154,6 +169,8 @@ git clone https://github.com/rubakas/agent-notes.git ~/agent-notes
 ln -sf ~/agent-notes/bin/agent-notes /usr/local/bin/agent-notes
 agent-notes install
 ```
+
+After cloning, `agent-notes install` launches the interactive wizard to configure your setup.
 
 ### Pip install (future)
 
@@ -171,7 +188,7 @@ agent-notes install
 
 ## Project-Level Overrides
 
-Use `--local --copy` for project-specific customizations:
+Use `--local --copy` for project-specific customizations. The wizard handles local installs too, while `--local --copy` is for scripted/CI use:
 
 ```bash
 agent-notes install --local --copy
@@ -188,13 +205,16 @@ On-demand knowledge modules loaded mid-conversation.
 ### Available skills
 
 **Rails:**
-`commit`, `rails-models`, `rails-controllers`, `rails-routes`, `rails-concerns`, `rails-views`, `rails-views-advanced`, `rails-view-components`, `rails-view-components-advanced`, `rails-helpers`, `rails-javascript`, `rails-jobs`, `rails-mailers`, `rails-broadcasting`, `rails-migrations`, `rails-active-storage`, `rails-validations`, `rails-testing-controllers`, `rails-testing-models`, `rails-testing-system`, `rails-style`, `rails-controllers-advanced`, `rails-models-advanced`, `rails-initializers`, `rails-lib`, `rails-kamal`
+`rails-models`, `rails-controllers`, `rails-routes`, `rails-concerns`, `rails-views`, `rails-views-advanced`, `rails-view-components`, `rails-view-components-advanced`, `rails-helpers`, `rails-javascript`, `rails-jobs`, `rails-mailers`, `rails-broadcasting`, `rails-migrations`, `rails-active-storage`, `rails-validations`, `rails-testing-controllers`, `rails-testing-models`, `rails-testing-system`, `rails-style`, `rails-controllers-advanced`, `rails-models-advanced`, `rails-initializers`, `rails-lib`
 
 **Docker:**
 `docker-dockerfile`, `docker-dockerfile-languages`, `docker-compose`, `docker-compose-advanced`
 
-**Utility:**
-`commit` — generates conventional commit messages from staged changes and branch name
+**Kamal:**
+`rails-kamal`
+
+**Git:**
+`git` — git workflow, commit chunking, conventional commit messages
 
 ### Usage
 
