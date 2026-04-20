@@ -100,7 +100,7 @@ Never spawn one agent per bullet point from the user's prompt. Combine related s
 - Give each agent a specific, complete task with all necessary context (file paths, expected output, success criteria)
 - Do not re-delegate work an agent already completed unless it failed
 - Synthesize results yourself — do not spawn an agent to summarize
-- **MANDATORY**: Run the cost report query (see "Cost reporting" section) immediately when agents return results
+- **MANDATORY**: Always include the cost report at the end of every response (see "Cost reporting" section)
 
 ## Phase 3: Review and improve (after implementation, before verification)
 
@@ -177,7 +177,7 @@ Only after all checks pass and all agents are APPROVED, present the final result
 
 ## Cost reporting
 
-**MANDATORY**: Every time one or more Task tool calls return results, you MUST run the cost report query below IMMEDIATELY — before writing any other analysis or text to the user. No exceptions. If you delegated to agents, the very next thing you do when they return is run this query.
+**MANDATORY**: You MUST run the cost report query below and include the results at the END of every response to the user. No exceptions. Whether you delegated to agents or did the work yourself, always end with the cost table.
 
 Run this query silently (do not show the SQL) and include the results table in your response:
 
@@ -194,22 +194,41 @@ stats AS (
 SELECT agent||'('||model||')' as 'agent(model)',
   inp||'/'||outp||'/'||cache as 'in/out/cache',
   sec||'s' as time,
-  '\$'||ROUND(CASE WHEN model LIKE '%haiku%' THEN inp*1.0/1e6+outp*5.0/1e6+cache*0.10/1e6
+  '\$'||ROUND(CASE
+    WHEN model LIKE '%haiku%' THEN inp*0.80/1e6+outp*4.0/1e6+cache*0.08/1e6
     WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
-    ELSE inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6 END,4) as actual,
+    WHEN model LIKE '%opus%' THEN inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6
+    WHEN model LIKE 'gpt-%' OR model LIKE 'o1%' OR model LIKE 'o3%' OR model LIKE 'o4%' THEN inp*2.50/1e6+outp*10.0/1e6+cache*0.50/1e6
+    ELSE inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6 END,4) as actual,
   '\$'||ROUND(inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6,4) as if_opus
 FROM stats
 UNION ALL
-SELECT 'TOTAL (saved '||ROUND((1.0-SUM(CASE WHEN model LIKE '%haiku%' THEN inp*1.0/1e6+outp*5.0/1e6+cache*0.10/1e6
+SELECT 'TOTAL (saved '||ROUND((1.0-SUM(CASE
+    WHEN model LIKE '%haiku%' THEN inp*0.80/1e6+outp*4.0/1e6+cache*0.08/1e6
     WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
-    ELSE inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6 END)/SUM(inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6))*100,0)||'%)',
+    WHEN model LIKE '%opus%' THEN inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6
+    WHEN model LIKE 'gpt-%' OR model LIKE 'o1%' OR model LIKE 'o3%' OR model LIKE 'o4%' THEN inp*2.50/1e6+outp*10.0/1e6+cache*0.50/1e6
+    ELSE inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6 END)/SUM(inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6))*100,0)||'%)',
   SUM(inp)||'/'||SUM(outp)||'/'||SUM(cache),
   MAX(sec)||'s parallel / '||CAST(CAST(SUM(sec) AS INT) AS TEXT)||'s sequential',
-  '\$'||ROUND(SUM(CASE WHEN model LIKE '%haiku%' THEN inp*1.0/1e6+outp*5.0/1e6+cache*0.10/1e6
+  '\$'||ROUND(SUM(CASE
+    WHEN model LIKE '%haiku%' THEN inp*0.80/1e6+outp*4.0/1e6+cache*0.08/1e6
     WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
-    ELSE inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6 END),4),
+    WHEN model LIKE '%opus%' THEN inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6
+    WHEN model LIKE 'gpt-%' OR model LIKE 'o1%' OR model LIKE 'o3%' OR model LIKE 'o4%' THEN inp*2.50/1e6+outp*10.0/1e6+cache*0.50/1e6
+    ELSE inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6 END),4),
   '\$'||ROUND(SUM(inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6),4)
 FROM stats"
 ```
 
-Present the query output as a table. The `actual` column shows what delegation cost. The `if_opus` column shows what the same work would cost on Opus alone. The TOTAL row shows savings percentage and parallel vs sequential time.
+Present the query output as a table. Always prefix the table with the label:
+
+**Session cost** (cumulative for the entire conversation, not just the last request):
+
+Column descriptions:
+- `agent(model)` — agent name and model used
+- `in/out/cache` — input, output, and cache-read tokens
+- `time` — wall-clock time for that agent
+- `actual` — estimated cost based on the model's pricing
+- `if_opus` — what the same tokens would cost on Opus (baseline for savings calculation)
+- TOTAL row — aggregate cost, savings % vs all-Opus, and parallel vs sequential wall time
