@@ -23,7 +23,9 @@
 
 ## Commits
 
-- Format: `#<ticket> type(scope): short description`
+- Load the `git` skill when asked to commit and follow its workflow.
+- Analyze all changes, group into logical chunks, make small focused commits.
+- Format: `#<ticket> type(scope): short description` — title only, no body.
 - Extract ticket number from branch name when available.
 - Types: feat, fix, refactor, test, docs, chore, style, perf
 
