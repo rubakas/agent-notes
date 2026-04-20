@@ -25,7 +25,119 @@ class TestIssueAndFixAction:
         assert action.details == "Test details"
 
 
-class TestSymlinkHelpers:
+class TestFindDistSource:
+    """Test _find_dist_source function."""
+    
+    def test_finds_skill_source(self, tmp_path, monkeypatch):
+        """Should find skill source directory."""
+        # Create dist skill directory
+        dist_skills = tmp_path / "dist" / "skills"
+        dist_skills.mkdir(parents=True)
+        skill_dir = dist_skills / "test-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("skill content")
+        
+        monkeypatch.setattr(doctor, 'DIST_SKILLS_DIR', dist_skills)
+        
+        # Test global skill path
+        symlink = Path.home() / ".claude" / "skills" / "test-skill"
+        source = doctor._find_dist_source(symlink, "global")
+        
+        assert source == skill_dir
+    
+    def test_finds_agent_source(self, tmp_path, monkeypatch):
+        """Should find agent source file."""
+        # Create dist agent file
+        dist_claude = tmp_path / "dist" / "claude"
+        dist_claude.mkdir(parents=True)
+        agents_dir = dist_claude / "agents"
+        agents_dir.mkdir()
+        agent_file = agents_dir / "test-agent.md"
+        agent_file.write_text("agent content")
+        
+        monkeypatch.setattr(doctor, 'DIST_CLAUDE_DIR', dist_claude)
+        monkeypatch.setattr(doctor, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "opencode")
+        
+        # Test global agent path
+        symlink = Path.home() / ".claude" / "agents" / "test-agent.md"
+        source = doctor._find_dist_source(symlink, "global")
+        
+        assert source == agent_file
+    
+    def test_finds_config_source(self, tmp_path, monkeypatch):
+        """Should find config source files."""
+        # Create dist config files
+        dist_claude = tmp_path / "dist" / "claude"
+        dist_claude.mkdir(parents=True)
+        claude_config = dist_claude / "CLAUDE.md"
+        claude_config.write_text("claude config")
+        
+        dist_opencode = tmp_path / "dist" / "opencode"
+        dist_opencode.mkdir(parents=True)
+        agents_config = dist_opencode / "AGENTS.md"
+        agents_config.write_text("agents config")
+        
+        monkeypatch.setattr(doctor, 'DIST_CLAUDE_DIR', dist_claude)
+        monkeypatch.setattr(doctor, 'DIST_OPENCODE_DIR', dist_opencode)
+        
+        # Test CLAUDE.md mapping
+        symlink = Path.home() / ".claude" / "CLAUDE.md"
+        source = doctor._find_dist_source(symlink, "global")
+        assert source == claude_config
+        
+        # Test AGENTS.md mapping
+        symlink = Path.home() / ".config" / "opencode" / "AGENTS.md"
+        source = doctor._find_dist_source(symlink, "global")
+        assert source == agents_config
+    
+    def test_returns_none_when_no_source(self, tmp_path, monkeypatch):
+        """Should return None when no matching source exists."""
+        # Setup empty dist directories
+        dist_skills = tmp_path / "dist" / "skills"
+        dist_skills.mkdir(parents=True)
+        
+        monkeypatch.setattr(doctor, 'DIST_SKILLS_DIR', dist_skills)
+        
+        # Test with non-existent skill
+        symlink = Path.home() / ".claude" / "skills" / "nonexistent-skill"
+        source = doctor._find_dist_source(symlink, "global")
+        
+        assert source is None
+    
+    def test_finds_rules_source(self, tmp_path, monkeypatch):
+        """Should find rules source files."""
+        # Create dist rule file
+        dist_rules = tmp_path / "dist" / "rules"
+        dist_rules.mkdir(parents=True)
+        rule_file = dist_rules / "test-rule.md"
+        rule_file.write_text("rule content")
+        
+        monkeypatch.setattr(doctor, 'DIST_RULES_DIR', dist_rules)
+        
+        # Test global rule path
+        symlink = Path.home() / ".claude" / "rules" / "test-rule.md"
+        source = doctor._find_dist_source(symlink, "global")
+        
+        assert source == rule_file
+    
+    def test_local_scope_mappings(self, tmp_path, monkeypatch):
+        """Should handle local scope mappings."""
+        # Create dist skill directory
+        dist_skills = tmp_path / "dist" / "skills"
+        dist_skills.mkdir(parents=True)
+        skill_dir = dist_skills / "local-skill"
+        skill_dir.mkdir()
+        
+        monkeypatch.setattr(doctor, 'DIST_SKILLS_DIR', dist_skills)
+        
+        # Test local skill path
+        symlink = Path(".claude") / "skills" / "local-skill"
+        source = doctor._find_dist_source(symlink, "local")
+        
+        assert source == skill_dir
+
+
+class TestCheckStaleFiles:
     """Test symlink utility functions."""
     
     def test_resolve_symlink(self, tmp_path):
@@ -167,9 +279,9 @@ class TestCheckStaleFiles:
         old_skill.mkdir()
         (old_skill / "SKILL.md").write_text("old skill")
         
-        # Mock Path.home() and ROOT (no matching source skill)
+        # Mock Path.home() and DIST_SKILLS_DIR (no matching source skill)
         with patch('pathlib.Path.home', return_value=tmp_path / "home"):
-            monkeypatch.setattr(doctor, 'ROOT', tmp_path / "root")
+            monkeypatch.setattr(doctor, 'DIST_SKILLS_DIR', tmp_path / "dist" / "skills")
             
             issues = []
             fix_actions = []
@@ -260,6 +372,73 @@ class TestCheckBrokenSymlinks:
             
             assert len(issues) == 0
             assert len(fix_actions) == 0
+    
+    def test_emits_relink_when_source_exists(self, tmp_path, monkeypatch):
+        """Should emit RELINK action when source exists."""
+        # Create broken symlink
+        home_claude = tmp_path / "home" / ".claude"
+        home_claude.mkdir(parents=True)
+        agents_dir = home_claude / "agents"
+        agents_dir.mkdir()
+        
+        broken_link = agents_dir / "test-agent.md"
+        broken_link.symlink_to("/nonexistent/path")
+        
+        # Create source that exists
+        dist_claude = tmp_path / "dist" / "claude"
+        dist_claude.mkdir(parents=True)
+        dist_agents_dir = dist_claude / "agents"
+        dist_agents_dir.mkdir()
+        source_file = dist_agents_dir / "test-agent.md"
+        source_file.write_text("agent content")
+        
+        with patch('pathlib.Path.home', return_value=tmp_path / "home"):
+            monkeypatch.setattr(doctor, 'DIST_CLAUDE_DIR', dist_claude)
+            monkeypatch.setattr(doctor, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "opencode")
+            
+            issues = []
+            fix_actions = []
+            
+            doctor.check_broken_symlinks("global", issues, fix_actions)
+            
+            assert len(issues) == 1
+            assert issues[0].type == "broken"
+            
+            assert len(fix_actions) == 1
+            assert fix_actions[0].action == "RELINK"
+            assert str(source_file) in fix_actions[0].details
+    
+    def test_emits_delete_when_no_source(self, tmp_path, monkeypatch):
+        """Should emit DELETE action when no source exists."""
+        # Create broken symlink
+        home_claude = tmp_path / "home" / ".claude"
+        home_claude.mkdir(parents=True)
+        agents_dir = home_claude / "agents"
+        agents_dir.mkdir()
+        
+        broken_link = agents_dir / "orphan-agent.md"
+        broken_link.symlink_to("/nonexistent/path")
+        
+        # Setup empty dist directories (no source exists)
+        dist_claude = tmp_path / "dist" / "claude"
+        dist_claude.mkdir(parents=True)
+        (dist_claude / "agents").mkdir()
+        
+        with patch('pathlib.Path.home', return_value=tmp_path / "home"):
+            monkeypatch.setattr(doctor, 'DIST_CLAUDE_DIR', dist_claude)
+            monkeypatch.setattr(doctor, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "opencode")
+            
+            issues = []
+            fix_actions = []
+            
+            doctor.check_broken_symlinks("global", issues, fix_actions)
+            
+            assert len(issues) == 1
+            assert issues[0].type == "broken"
+            
+            assert len(fix_actions) == 1
+            assert fix_actions[0].action == "DELETE"
+            assert "no source available" in fix_actions[0].details
 
 
 class TestCheckShadowedFiles:
@@ -435,6 +614,65 @@ class TestCheckContentDrift:
             doctor.check_content_drift("global", issues, fix_actions)
             
             assert len(issues) == 0
+
+
+class TestDoFix:
+    """Test updated do_fix function."""
+    
+    def test_deletes_broken_symlinks(self, tmp_path, capsys):
+        """Should delete broken symlinks."""
+        # Create broken symlink
+        broken_link = tmp_path / "broken-link.md"
+        broken_link.symlink_to("/nonexistent/path")
+        
+        # Create DELETE action
+        fix_actions = [doctor.FixAction("DELETE", str(broken_link), "broken symlink")]
+        
+        with patch('builtins.input', return_value='y'):
+            result = doctor.do_fix([], fix_actions)
+        
+        assert result is True
+        assert not broken_link.exists()  # Symlink should be deleted
+        
+        captured = capsys.readouterr()
+        assert "DELETED" in captured.out
+    
+    def test_deletes_regular_files(self, tmp_path, capsys):
+        """Should delete regular files."""
+        # Create regular file
+        regular_file = tmp_path / "regular-file.txt"
+        regular_file.write_text("content")
+        
+        # Create DELETE action
+        fix_actions = [doctor.FixAction("DELETE", str(regular_file), "stale file")]
+        
+        with patch('builtins.input', return_value='y'):
+            result = doctor.do_fix([], fix_actions)
+        
+        assert result is True
+        assert not regular_file.exists()  # File should be deleted
+        
+        captured = capsys.readouterr()
+        assert "DELETED" in captured.out
+    
+    def test_deletes_directories(self, tmp_path, capsys):
+        """Should delete directories."""
+        # Create directory
+        test_dir = tmp_path / "test-dir"
+        test_dir.mkdir()
+        (test_dir / "file.txt").write_text("content")
+        
+        # Create DELETE action
+        fix_actions = [doctor.FixAction("DELETE", str(test_dir), "stale directory")]
+        
+        with patch('builtins.input', return_value='y'):
+            result = doctor.do_fix([], fix_actions)
+        
+        assert result is True
+        assert not test_dir.exists()  # Directory should be deleted
+        
+        captured = capsys.readouterr()
+        assert "DELETED" in captured.out
 
 
 class TestDoctorFunction:

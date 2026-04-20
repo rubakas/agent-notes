@@ -100,6 +100,7 @@ Never spawn one agent per bullet point from the user's prompt. Combine related s
 - Give each agent a specific, complete task with all necessary context (file paths, expected output, success criteria)
 - Do not re-delegate work an agent already completed unless it failed
 - Synthesize results yourself — do not spawn an agent to summarize
+- **MANDATORY**: Run the cost report query (see "Cost reporting" section) immediately when agents return results
 
 ## Phase 3: Review and improve (after implementation, before verification)
 
@@ -176,7 +177,9 @@ Only after all checks pass and all agents are APPROVED, present the final result
 
 ## Cost reporting
 
-After every delegation round, silently run this query (do not show the SQL to the user) and include only the results table in your response:
+**MANDATORY**: Every time one or more Task tool calls return results, you MUST run the cost report query below IMMEDIATELY — before writing any other analysis or text to the user. No exceptions. If you delegated to agents, the very next thing you do when they return is run this query.
+
+Run this query silently (do not show the SQL) and include the results table in your response:
 
 ```bash
 sqlite3 -header -column ~/.local/share/opencode/opencode.db "

@@ -93,7 +93,7 @@ def check_stale_files(scope: str, issues: List[Issue], fix_actions: List[FixActi
                 if not installed_skill.is_dir():
                     continue
                 skill_name = installed_skill.name
-                source_skill = ROOT / skill_name / "SKILL.md"
+                source_skill = DIST_SKILLS_DIR / skill_name
                 
                 if not source_skill.exists():
                     issues.append(Issue("stale", str(installed_skill),
@@ -114,6 +114,65 @@ def check_stale_files(scope: str, issues: List[Issue], fix_actions: List[FixActi
                                           "Not found in source. Likely left over from a previous version."))
                         fix_actions.append(FixAction("DELETE", str(installed_rule),
                                                    "stale, no matching source"))
+
+def _find_dist_source(symlink: Path, scope: str) -> Optional[Path]:
+    """Map an installed path back to its dist source for relinking."""
+    symlink = symlink.resolve() if symlink.exists() else Path(os.path.abspath(symlink))
+    name = symlink.name
+    parent_name = symlink.parent.name
+
+    if scope == "global":
+        # Skills: ~/.claude/skills/<name> or ~/.config/opencode/skills/<name> or ~/.agents/skills/<name>
+        if parent_name == "skills":
+            source = DIST_SKILLS_DIR / name
+            if source.exists():
+                return source
+
+        # Agents: ~/.claude/agents/<name>.md → dist/claude/agents/<name>.md
+        if parent_name == "agents":
+            for dist_dir in [DIST_CLAUDE_DIR, DIST_OPENCODE_DIR]:
+                source = dist_dir / "agents" / name
+                if source.exists():
+                    return source
+
+        # Rules: ~/.claude/rules/<name> or ~/.config/opencode/rules/<name>
+        if parent_name == "rules":
+            source = DIST_RULES_DIR / name
+            if source.exists():
+                return source
+
+        # Global config files
+        config_map = {
+            "CLAUDE.md": DIST_CLAUDE_DIR / "CLAUDE.md",
+            "AGENTS.md": DIST_OPENCODE_DIR / "AGENTS.md",
+            "copilot-instructions.md": DIST_GITHUB_DIR / "copilot-instructions.md",
+        }
+        if name in config_map:
+            source = config_map[name]
+            if source.exists():
+                return source
+    else:
+        # Local skills
+        if parent_name == "skills":
+            source = DIST_SKILLS_DIR / name
+            if source.exists():
+                return source
+
+        # Local agents
+        if parent_name == "agents":
+            for dist_dir in [DIST_CLAUDE_DIR, DIST_OPENCODE_DIR]:
+                source = dist_dir / "agents" / name
+                if source.exists():
+                    return source
+
+        # Local rules
+        if parent_name == "rules":
+            source = DIST_RULES_DIR / name
+            if source.exists():
+                return source
+
+    return None
+
 
 def check_broken_symlinks(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
     """Check for symlinks with non-existent targets."""
@@ -136,15 +195,23 @@ def check_broken_symlinks(scope: str, issues: List[Issue], fix_actions: List[Fix
             for file in files:
                 symlink = root_path / file
                 if symlink.is_symlink() and not symlink_target_exists(symlink):
+                    source = _find_dist_source(symlink, scope)
                     issues.append(Issue("broken", str(symlink), "Symlink target does not exist"))
-                    fix_actions.append(FixAction("DELETE", str(symlink), "broken symlink"))
+                    if source:
+                        fix_actions.append(FixAction("RELINK", str(symlink), f"symlink to {source}"))
+                    else:
+                        fix_actions.append(FixAction("DELETE", str(symlink), "broken symlink, no source available"))
             
             # Check directory symlinks too
             for dir_name in dirs:
                 symlink = root_path / dir_name
                 if symlink.is_symlink() and not symlink_target_exists(symlink):
+                    source = _find_dist_source(symlink, scope)
                     issues.append(Issue("broken", str(symlink), "Symlink target does not exist"))
-                    fix_actions.append(FixAction("DELETE", str(symlink), "broken symlink"))
+                    if source:
+                        fix_actions.append(FixAction("RELINK", str(symlink), f"symlink to {source}"))
+                    else:
+                        fix_actions.append(FixAction("DELETE", str(symlink), "broken symlink, no source available"))
 
 def check_shadowed_files(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
     """Check for regular files where symlinks are expected."""
@@ -212,7 +279,7 @@ def check_shadowed_files(scope: str, issues: List[Issue], fix_actions: List[FixA
                     source_file = DIST_CLAUDE_DIR / "agents" / name
             elif "/skills/" in str(file):
                 skill_name = file.name
-                source_file = ROOT / skill_name
+                source_file = DIST_SKILLS_DIR / skill_name
             elif "/rules/" in str(file):
                 name = file.name
                 source_file = DIST_RULES_DIR / name
@@ -545,8 +612,10 @@ def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
     for action in fix_actions:
         if action.action == "DELETE":
             file_path = Path(action.file)
-            if file_path.exists():
-                if file_path.is_dir():
+            if file_path.exists() or file_path.is_symlink():
+                if file_path.is_symlink():
+                    file_path.unlink()
+                elif file_path.is_dir():
                     import shutil
                     shutil.rmtree(file_path)
                 else:

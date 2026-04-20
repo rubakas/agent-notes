@@ -12,14 +12,60 @@ from .config import (
 from .build import build
 
 
+def _files_identical(a: Path, b: Path) -> bool:
+    """Check if two files or directories have identical content."""
+    try:
+        if a.is_dir() and b.is_dir():
+            # Compare directory contents recursively
+            a_files = {f.relative_to(a): f.read_bytes() for f in a.rglob("*") if f.is_file()}
+            b_files = {f.relative_to(b): f.read_bytes() for f in b.rglob("*") if f.is_file()}
+            return a_files == b_files
+        elif a.is_file() and b.is_file():
+            return a.read_bytes() == b.read_bytes()
+        return False
+    except OSError:
+        return False
+
+
+def _handle_existing(src: Path, dst: Path) -> bool:
+    """Handle an existing non-symlink destination file.
+    
+    Returns True if install should proceed, False to skip.
+    """
+    if _files_identical(src, dst):
+        skipped(str(dst), "exists, identical content")
+        return False
+    
+    print(f"\n  {Color.YELLOW}CONFLICT{Color.NC}  {dst}")
+    print(f"             File exists and differs from source.")
+    response = input("             (b)ackup and replace, (s)kip? [b/s] ").strip().lower()
+    
+    if response == 'b':
+        backup_path = Path(str(dst) + ".bak")
+        if dst.is_dir():
+            if backup_path.exists():
+                shutil.rmtree(backup_path)
+            shutil.copytree(dst, backup_path)
+            shutil.rmtree(dst)
+        else:
+            if backup_path.exists():
+                backup_path.unlink()
+            dst.rename(backup_path)
+        print(f"  {Color.CYAN}BACKUP{Color.NC}   {backup_path}")
+        return True
+    else:
+        skipped(str(dst), "user skipped")
+        return False
+
+
 def place_file(src: Path, dst: Path, copy_mode: bool = False) -> None:
     """Place file as symlink or copy, handling existing files."""
     dst.parent.mkdir(parents=True, exist_ok=True)
     
     if copy_mode:
         if dst.exists() and not dst.is_symlink():
-            skipped(str(dst), "exists, not a symlink")
-            return
+            if not _handle_existing(src, dst):
+                return
         if dst.is_symlink():
             dst.unlink()
         if src.is_dir():
@@ -29,8 +75,8 @@ def place_file(src: Path, dst: Path, copy_mode: bool = False) -> None:
         info(f"COPIED  {dst}")
     else:
         if dst.exists() and not dst.is_symlink():
-            skipped(str(dst), "exists, not a symlink")
-            return
+            if not _handle_existing(src, dst):
+                return
         if dst.is_symlink():
             dst.unlink()
         dst.symlink_to(src)

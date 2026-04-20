@@ -8,6 +8,158 @@ import agent_notes.install as install
 import agent_notes.config as config
 
 
+class TestFilesIdentical:
+    """Test _files_identical helper function."""
+    
+    def test_identical_files(self, tmp_path):
+        """Should return True for identical files."""
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("same content")
+        
+        file2 = tmp_path / "file2.txt" 
+        file2.write_text("same content")
+        
+        assert install._files_identical(file1, file2)
+    
+    def test_different_files(self, tmp_path):
+        """Should return False for different files."""
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("content 1")
+        
+        file2 = tmp_path / "file2.txt"
+        file2.write_text("content 2")
+        
+        assert not install._files_identical(file1, file2)
+    
+    def test_identical_directories(self, tmp_path):
+        """Should return True for directories with identical contents."""
+        dir1 = tmp_path / "dir1"
+        dir1.mkdir()
+        (dir1 / "file1.txt").write_text("content1")
+        (dir1 / "subdir").mkdir()
+        (dir1 / "subdir" / "file2.txt").write_text("content2")
+        
+        dir2 = tmp_path / "dir2"
+        dir2.mkdir()
+        (dir2 / "file1.txt").write_text("content1")
+        (dir2 / "subdir").mkdir()
+        (dir2 / "subdir" / "file2.txt").write_text("content2")
+        
+        assert install._files_identical(dir1, dir2)
+    
+    def test_different_directories(self, tmp_path):
+        """Should return False for directories with different contents."""
+        dir1 = tmp_path / "dir1"
+        dir1.mkdir()
+        (dir1 / "file1.txt").write_text("content1")
+        
+        dir2 = tmp_path / "dir2"
+        dir2.mkdir()
+        (dir2 / "file1.txt").write_text("different content")
+        
+        assert not install._files_identical(dir1, dir2)
+    
+    def test_file_vs_directory(self, tmp_path):
+        """Should return False for file vs directory comparison."""
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("content")
+        
+        dir1 = tmp_path / "dir1"
+        dir1.mkdir()
+        
+        assert not install._files_identical(file1, dir1)
+    
+    def test_missing_files(self, tmp_path):
+        """Should return False for missing files."""
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("content")
+        
+        file2 = tmp_path / "missing.txt"
+        
+        assert not install._files_identical(file1, file2)
+
+
+class TestHandleExisting:
+    """Test _handle_existing helper function."""
+    
+    def test_returns_false_for_identical_files(self, tmp_path, capsys):
+        """Should return False and skip for identical files."""
+        src = tmp_path / "source.txt"
+        src.write_text("identical content")
+        
+        dst = tmp_path / "existing.txt"
+        dst.write_text("identical content")
+        
+        result = install._handle_existing(src, dst)
+        
+        assert result is False
+        captured = capsys.readouterr()
+        assert "SKIP" in captured.out
+        assert "identical content" in captured.out
+    
+    def test_backup_and_proceed_for_different_files(self, tmp_path, capsys):
+        """Should backup and return True when user chooses backup."""
+        src = tmp_path / "source.txt"
+        src.write_text("new content")
+        
+        dst = tmp_path / "existing.txt"
+        dst.write_text("old content")
+        
+        with patch('builtins.input', return_value='b'):
+            result = install._handle_existing(src, dst)
+        
+        assert result is True
+        
+        # Check backup was created
+        backup_path = tmp_path / "existing.txt.bak"
+        assert backup_path.exists()
+        assert backup_path.read_text() == "old content"
+        assert not dst.exists()  # Original should be removed
+        
+        captured = capsys.readouterr()
+        assert "BACKUP" in captured.out
+    
+    def test_skip_when_user_chooses_skip(self, tmp_path, capsys):
+        """Should return False when user chooses skip."""
+        src = tmp_path / "source.txt"
+        src.write_text("new content")
+        
+        dst = tmp_path / "existing.txt"
+        dst.write_text("old content")
+        
+        with patch('builtins.input', return_value='s'):
+            result = install._handle_existing(src, dst)
+        
+        assert result is False
+        assert dst.read_text() == "old content"  # Should be unchanged
+        
+        captured = capsys.readouterr()
+        assert "SKIP" in captured.out
+        assert "user skipped" in captured.out
+    
+    def test_backup_existing_directory(self, tmp_path, capsys):
+        """Should backup directory when user chooses backup."""
+        src_dir = tmp_path / "source_dir"
+        src_dir.mkdir()
+        (src_dir / "new_file.txt").write_text("new")
+        
+        dst_dir = tmp_path / "existing_dir"
+        dst_dir.mkdir()
+        (dst_dir / "old_file.txt").write_text("old")
+        
+        with patch('builtins.input', return_value='b'):
+            result = install._handle_existing(src_dir, dst_dir)
+        
+        assert result is True
+        
+        # Check backup directory was created
+        backup_path = tmp_path / "existing_dir.bak"
+        assert backup_path.exists()
+        assert backup_path.is_dir()
+        assert (backup_path / "old_file.txt").read_text() == "old"
+        assert not dst_dir.exists()  # Original should be removed
+
+
 class TestPlaceFile:
     """Test place_file function."""
     
@@ -73,24 +225,93 @@ class TestPlaceFile:
         assert dst.readlink() == src
         assert dst.read_text() == "new content"
     
-    def test_skips_existing_non_symlink(self, tmp_path, capsys):
-        """Should skip existing non-symlink files."""
+    def test_skips_identical_existing_file(self, tmp_path, capsys):
+        """Should skip existing files with identical content."""
         src = tmp_path / "source.txt"
-        src.write_text("source content")
+        src.write_text("identical content")
         
         dst = tmp_path / "existing.txt"
-        dst.write_text("existing content")
+        dst.write_text("identical content")  # Same content
         
         install.place_file(src, dst)
         
         # File should remain unchanged
-        assert dst.read_text() == "existing content"
+        assert dst.read_text() == "identical content"
         assert not dst.is_symlink()
         
-        # Should print skip message
+        # Should print skip message for identical content
         captured = capsys.readouterr()
         assert "SKIP" in captured.out
-        assert "not a symlink" in captured.out
+        assert "identical content" in captured.out
+    
+    def test_backup_and_replace_existing_file(self, tmp_path, capsys):
+        """Should backup and replace existing file when user chooses backup."""
+        src = tmp_path / "source.txt"
+        src.write_text("new content")
+        
+        dst = tmp_path / "existing.txt"
+        dst.write_text("old content")  # Different content
+        
+        with patch('builtins.input', return_value='b'):
+            install.place_file(src, dst)
+        
+        # Should create backup and new symlink
+        backup_path = tmp_path / "existing.txt.bak"
+        assert backup_path.exists()
+        assert backup_path.read_text() == "old content"
+        
+        assert dst.is_symlink()
+        assert dst.readlink() == src
+        assert dst.read_text() == "new content"
+        
+        captured = capsys.readouterr()
+        assert "BACKUP" in captured.out
+        assert "LINKED" in captured.out
+    
+    def test_skip_on_user_choice(self, tmp_path, capsys):
+        """Should skip file when user chooses skip."""
+        src = tmp_path / "source.txt"
+        src.write_text("new content")
+        
+        dst = tmp_path / "existing.txt"
+        dst.write_text("old content")  # Different content
+        
+        with patch('builtins.input', return_value='s'):
+            install.place_file(src, dst)
+        
+        # File should remain unchanged
+        assert dst.read_text() == "old content"
+        assert not dst.is_symlink()
+        
+        captured = capsys.readouterr()
+        assert "SKIP" in captured.out
+        assert "user skipped" in captured.out
+    
+    def test_backup_existing_directory(self, tmp_path, capsys):
+        """Should backup and replace existing directory when user chooses backup."""
+        src_dir = tmp_path / "source_dir"
+        src_dir.mkdir()
+        (src_dir / "new_file.txt").write_text("new content")
+        
+        dst_dir = tmp_path / "existing_dir"
+        dst_dir.mkdir()
+        (dst_dir / "old_file.txt").write_text("old content")
+        
+        with patch('builtins.input', return_value='b'):
+            install.place_file(src_dir, dst_dir)
+        
+        # Should create backup directory and new symlink
+        backup_path = tmp_path / "existing_dir.bak"
+        assert backup_path.exists()
+        assert backup_path.is_dir()
+        assert (backup_path / "old_file.txt").read_text() == "old content"
+        
+        assert dst_dir.is_symlink()
+        assert dst_dir.readlink() == src_dir
+        
+        captured = capsys.readouterr()
+        assert "BACKUP" in captured.out
+        assert "LINKED" in captured.out
     
     def test_replaces_existing_symlink_in_copy_mode(self, tmp_path):
         """Should replace existing symlink with copy in copy mode."""
