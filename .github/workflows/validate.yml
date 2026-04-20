@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
           export PYTHONPATH=.
       - name: Run tests
         run: PYTHONPATH=. python3 -m pytest tests/ -v
-      - name: Validate configs
-        run: PYTHONPATH=. python3 -m agent_notes validate
       - name: Verify build
         run: PYTHONPATH=. python3 -m agent_notes build
+      - name: Validate configs
+        run: PYTHONPATH=. python3 -m agent_notes validate

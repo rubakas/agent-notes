@@ -353,14 +353,14 @@ Wrong name.
         claude_agents_dir = tmp_path / "dist" / "claude" / "agents"
         claude_agents_dir.mkdir(parents=True, exist_ok=True)
         
-        # Agent over 200 lines (error)
+        # Agent over 250 lines (error)
         long_content = "---\nname: long-agent\ndescription: Long agent\nmodel: sonnet\n---\n\n"
-        long_content += "line\n" * 200  # Total will be > 200 lines
+        long_content += "line\n" * 250  # Total will be > 250 lines
         (claude_agents_dir / "long-agent.md").write_text(long_content)
         
-        # Agent over 80 lines but under 200 (warning)
+        # Agent over 80 lines but under 250 (warning)
         medium_content = "---\nname: medium-agent\ndescription: Medium agent\nmodel: sonnet\n---\n\n"
-        medium_content += "line\n" * 80  # Total will be > 80 but < 200 lines
+        medium_content += "line\n" * 80  # Total will be > 80 but < 250 lines
         (claude_agents_dir / "medium-agent.md").write_text(medium_content)
         
         monkeypatch.setattr(validate, 'ROOT', tmp_path)
@@ -373,10 +373,10 @@ Wrong name.
         with pytest.raises(SystemExit) as exc_info:
             validate.validate()
         
-        assert exc_info.value.code == 1  # Should exit with error due to >200 line file
+        assert exc_info.value.code == 1  # Should exit with error due to >250 line file
         
         captured = capsys.readouterr()
-        assert "exceeds 200 line limit" in captured.out
+        assert "exceeds 250 line limit" in captured.out
         assert "over 80 lines (consider trimming)" in captured.out
     
     def test_checks_name_mismatch(self, tmp_path, monkeypatch, capsys):
