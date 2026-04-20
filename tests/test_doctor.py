@@ -518,37 +518,42 @@ class TestCheckMissingFiles:
         dist_github.mkdir(parents=True)
         dist_rules = tmp_path / "dist" / "rules"
         dist_rules.mkdir(parents=True)
+        dist_skills = tmp_path / "dist" / "skills"
+        dist_skills.mkdir(parents=True)
         
-        # Setup home directory with missing claude file but existing others
-        home = tmp_path / "home"
-        home_claude = home / ".claude"
+        # Setup home directories
+        home_claude = tmp_path / "home" / ".claude"
         home_claude.mkdir(parents=True)
         
-        home_opencode = home / ".config" / "opencode"
+        home_opencode = tmp_path / "home" / ".config" / "opencode"
         home_opencode.mkdir(parents=True)
         (home_opencode / "AGENTS.md").write_text("existing")
         
-        home_github = home / ".github"
+        home_github = tmp_path / "home" / ".github"
         home_github.mkdir(parents=True)
         (home_github / "copilot-instructions.md").write_text("existing")
         
-        with patch('pathlib.Path.home', return_value=home):
-            monkeypatch.setattr(doctor, 'DIST_CLAUDE_DIR', dist_claude)
-            monkeypatch.setattr(doctor, 'DIST_OPENCODE_DIR', dist_opencode)
-            monkeypatch.setattr(doctor, 'DIST_GITHUB_DIR', dist_github)
-            monkeypatch.setattr(doctor, 'DIST_RULES_DIR', dist_rules)
-            
-            issues = []
-            fix_actions = []
-            
-            doctor.check_missing_files("global", issues, fix_actions)
-            
-            assert len(issues) == 1
-            assert issues[0].type == "missing"
-            assert "CLAUDE.md" in issues[0].file
-            
-            assert len(fix_actions) == 1
-            assert fix_actions[0].action == "INSTALL"
+        # Patch module-level constants used by new helpers
+        monkeypatch.setattr(doctor, 'CLAUDE_HOME', home_claude)
+        monkeypatch.setattr(doctor, 'OPENCODE_HOME', home_opencode)
+        monkeypatch.setattr(doctor, 'GITHUB_HOME', home_github)
+        monkeypatch.setattr(doctor, 'DIST_CLAUDE_DIR', dist_claude)
+        monkeypatch.setattr(doctor, 'DIST_OPENCODE_DIR', dist_opencode)
+        monkeypatch.setattr(doctor, 'DIST_GITHUB_DIR', dist_github)
+        monkeypatch.setattr(doctor, 'DIST_RULES_DIR', dist_rules)
+        monkeypatch.setattr(doctor, 'DIST_SKILLS_DIR', dist_skills)
+        
+        issues = []
+        fix_actions = []
+        
+        doctor.check_missing_files("global", issues, fix_actions)
+        
+        # Should detect missing CLAUDE.md config
+        missing_issues = [i for i in issues if i.type == "missing" and "CLAUDE.md" in i.file]
+        assert len(missing_issues) == 1
+        
+        install_actions = [a for a in fix_actions if a.action == "INSTALL" and "CLAUDE.md" in a.file]
+        assert len(install_actions) == 1
     
     def test_skips_local_mode(self, tmp_path):
         """Should skip missing file checks in local mode."""
@@ -705,7 +710,7 @@ class TestDoctorFunction:
         assert all(check in checks_called for check in expected_checks)
         
         captured = capsys.readouterr()
-        assert "Checking global installation" in captured.out
+        assert "Checking AgentNotes global installation" in captured.out
     
     def test_local_mode(self, mock_paths, tmp_path, monkeypatch, capsys):
         """Should run in local mode when requested."""
@@ -733,7 +738,7 @@ class TestDoctorFunction:
         assert len(local_checks) > 0
         
         captured = capsys.readouterr()
-        assert "Checking local installation" in captured.out
+        assert "Checking AgentNotes local installation" in captured.out
     
     def test_fix_mode_prompts_user(self, mock_paths, tmp_path, monkeypatch, capsys):
         """Should prompt user in fix mode."""
@@ -760,9 +765,9 @@ class TestDoctorFunction:
 class TestCountFunctions:
     """Test counting functions."""
     
-    def test_count_installed_agents(self, tmp_path):
-        """Should count installed agents correctly."""
-        # Setup agent files
+    def test_count_agents(self, tmp_path, monkeypatch):
+        """Should count installed agents per CLI."""
+        # Setup agent files for claude
         home_claude = tmp_path / "home" / ".claude"
         home_claude.mkdir(parents=True)
         agents_dir = home_claude / "agents"
@@ -770,13 +775,24 @@ class TestCountFunctions:
         (agents_dir / "agent1.md").write_text("agent1")
         (agents_dir / "agent2.md").write_text("agent2")
         
-        with patch('pathlib.Path.home', return_value=tmp_path / "home"):
-            count = doctor.count_installed("agents", "global")
-            assert count == 2  # Should count both Claude and OpenCode (but OpenCode dir doesn't exist)
+        # Setup dist
+        dist_claude = tmp_path / "dist" / "claude"
+        dist_claude.mkdir(parents=True)
+        dist_agents = dist_claude / "agents"
+        dist_agents.mkdir()
+        (dist_agents / "agent1.md").write_text("a1")
+        (dist_agents / "agent2.md").write_text("a2")
+        (dist_agents / "agent3.md").write_text("a3")
+        
+        monkeypatch.setattr(doctor, 'CLAUDE_HOME', home_claude)
+        monkeypatch.setattr(doctor, 'DIST_CLAUDE_DIR', dist_claude)
+        
+        installed, expected = doctor._count_agents("claude", "global")
+        assert installed == 2
+        assert expected == 3
     
-    def test_count_installed_skills(self, tmp_path):
-        """Should count installed skills correctly."""
-        # Setup skill directories
+    def test_count_skills(self, tmp_path, monkeypatch):
+        """Should count installed skills per CLI."""
         home_claude = tmp_path / "home" / ".claude"
         home_claude.mkdir(parents=True)
         skills_dir = home_claude / "skills"
@@ -787,9 +803,17 @@ class TestCountFunctions:
         skill2 = skills_dir / "skill2"
         skill2.mkdir()
         
-        with patch('pathlib.Path.home', return_value=tmp_path / "home"):
-            count = doctor.count_installed("skills", "global")
-            assert count == 2
+        dist_skills = tmp_path / "dist" / "skills"
+        dist_skills.mkdir(parents=True)
+        (dist_skills / "skill1").mkdir()
+        (dist_skills / "skill2").mkdir()
+        
+        monkeypatch.setattr(doctor, 'CLAUDE_HOME', home_claude)
+        monkeypatch.setattr(doctor, 'DIST_SKILLS_DIR', dist_skills)
+        
+        installed, expected = doctor._count_skills("claude", "global")
+        assert installed == 2
+        assert expected == 2
     
     def test_count_stale(self):
         """Should count stale issues correctly."""

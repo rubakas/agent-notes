@@ -58,14 +58,14 @@ if not sys.stdout.isatty():
     Color.disable()
 
 # --- Output helpers ---
-def ok(msg: str) -> None:
-    print(f"  {Color.GREEN}ok{Color.NC}  {msg}")
+def ok(msg: str, indent: int = 2) -> None:
+    print(f"{' ' * indent}{Color.GREEN}OK{Color.NC}   {msg}")
 
-def warn(msg: str) -> None:
-    print(f"  {Color.YELLOW}WARN{Color.NC}  {msg}")
+def warn(msg: str, indent: int = 2) -> None:
+    print(f"{' ' * indent}{Color.YELLOW}WARN{Color.NC} {msg}")
 
-def fail(msg: str) -> None:
-    print(f"  {Color.RED}FAIL{Color.NC}  {msg}")
+def fail(msg: str, indent: int = 2) -> None:
+    print(f"{' ' * indent}{Color.RED}FAIL{Color.NC} {msg}")
 
 def error(msg: str) -> None:
     print(f"{Color.RED}Error: {msg}{Color.NC}", file=sys.stderr)

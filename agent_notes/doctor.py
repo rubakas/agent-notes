@@ -9,7 +9,7 @@ from .config import (
     ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR, DIST_SKILLS_DIR,
     CLAUDE_HOME, OPENCODE_HOME, GITHUB_HOME, AGENTS_HOME,
     DATA_DIR, AGENTS_YAML, AGENTS_DIR, GLOBAL_MD, GLOBAL_COPILOT_MD,
-    Color, info, issue, ok, fail,
+    Color, info, issue, ok, warn, fail,
     linked, removed, skipped
 )
 
@@ -301,57 +301,73 @@ def check_missing_files(scope: str, issues: List[Issue], fix_actions: List[FixAc
     if scope != "global":
         return  # Only check global installations for missing files
     
-    # Global config files
-    global_files = [
-        (Path.home() / ".claude/CLAUDE.md", DIST_CLAUDE_DIR / "CLAUDE.md"),
-        (Path.home() / ".config/opencode/AGENTS.md", DIST_OPENCODE_DIR / "AGENTS.md"),
-        (Path.home() / ".github/copilot-instructions.md", DIST_GITHUB_DIR / "copilot-instructions.md")
-    ]
-    
-    for target, source in global_files:
-        if source.exists() and not target.exists():
-            issues.append(Issue("missing", str(target), "Source exists but not installed"))
-            fix_actions.append(FixAction("INSTALL", str(target), f"install from {source}"))
-    
-    # Agents
-    claude_agents_dir = DIST_CLAUDE_DIR / "agents"
-    if claude_agents_dir.exists():
-        for f in claude_agents_dir.glob("*.md"):
-            target = Path.home() / ".claude/agents" / f.name
-            if not target.exists():
-                issues.append(Issue("missing", str(target), "Source exists but not installed"))
-                fix_actions.append(FixAction("INSTALL", str(target), "install Claude agent"))
-    
-    opencode_agents_dir = DIST_OPENCODE_DIR / "agents"
-    if opencode_agents_dir.exists():
-        for f in opencode_agents_dir.glob("*.md"):
-            target = Path.home() / ".config/opencode/agents" / f.name
-            if not target.exists():
-                issues.append(Issue("missing", str(target), "Source exists but not installed"))
-                fix_actions.append(FixAction("INSTALL", str(target), "install OpenCode agent"))
-    
-    # Skills
-    if DIST_SKILLS_DIR.exists():
-        for skill_dir in sorted(DIST_SKILLS_DIR.iterdir()):
-            if skill_dir.is_dir():
-                claude_target = Path.home() / ".claude/skills" / skill_dir.name
-                opencode_target = Path.home() / ".config/opencode/skills" / skill_dir.name
-                
-                if not claude_target.exists():
-                    issues.append(Issue("missing", str(claude_target), "Source exists but not installed"))
-                    fix_actions.append(FixAction("INSTALL", str(claude_target), "install skill"))
-                
-                if not opencode_target.exists():
-                    issues.append(Issue("missing", str(opencode_target), "Source exists but not installed"))
-                    fix_actions.append(FixAction("INSTALL", str(opencode_target), "install skill"))
-    
-    # Rules
-    if DIST_RULES_DIR.exists():
-        for f in DIST_RULES_DIR.glob("*.md"):
-            target = Path.home() / ".claude/rules" / f.name
-            if not target.exists():
-                issues.append(Issue("missing", str(target), "Source exists but not installed"))
-                fix_actions.append(FixAction("INSTALL", str(target), "install rule"))
+    for cli in ["claude", "opencode"]:
+        base = _cli_base_dir(cli, scope)
+        dist_dir = DIST_CLAUDE_DIR if cli == "claude" else DIST_OPENCODE_DIR
+        
+        # Agents
+        installed, expected = _count_agents(cli, scope)
+        if expected > 0 and installed == 0:
+            issues.append(Issue("missing_group", f"{cli}/agents", f"not installed ({expected} available)"))
+            fix_actions.append(FixAction("INSTALL", f"{cli}/agents", f"install {expected} agents"))
+        elif expected > installed:
+            agents_src = dist_dir / "agents"
+            if agents_src.exists():
+                for f in agents_src.glob("*.md"):
+                    target = base / "agents" / f.name
+                    if not target.exists():
+                        issues.append(Issue("missing", str(target), "Source exists but not installed"))
+                        fix_actions.append(FixAction("INSTALL", str(target), f"install {cli} agent"))
+        
+        # Skills
+        installed, expected = _count_skills(cli, scope)
+        if expected > 0 and installed == 0:
+            issues.append(Issue("missing_group", f"{cli}/skills", f"not installed ({expected} available)"))
+            fix_actions.append(FixAction("INSTALL", f"{cli}/skills", f"install {expected} skills"))
+        elif expected > installed:
+            if DIST_SKILLS_DIR.exists():
+                for skill_dir in sorted(DIST_SKILLS_DIR.iterdir()):
+                    if skill_dir.is_dir():
+                        target = base / "skills" / skill_dir.name
+                        if not target.exists():
+                            issues.append(Issue("missing", str(target), "Source exists but not installed"))
+                            fix_actions.append(FixAction("INSTALL", str(target), "install skill"))
+        
+        # Config
+        all_ok, desc, missing = _check_config(cli, scope)
+        if not all_ok:
+            if desc == "not installed":
+                issues.append(Issue("missing_group", f"{cli}/config", "not installed"))
+                fix_actions.append(FixAction("INSTALL", f"{cli}/config", "install config files"))
+            else:
+                # Some installed, some missing - list individual missing
+                if cli == "claude":
+                    config_files = [
+                        (CLAUDE_HOME / "CLAUDE.md", DIST_CLAUDE_DIR / "CLAUDE.md"),
+                        (GITHUB_HOME / "copilot-instructions.md", DIST_GITHUB_DIR / "copilot-instructions.md")
+                    ]
+                else:
+                    config_files = [
+                        (OPENCODE_HOME / "AGENTS.md", DIST_OPENCODE_DIR / "AGENTS.md")
+                    ]
+                for target, source in config_files:
+                    if source.exists() and not target.exists():
+                        issues.append(Issue("missing", str(target), "Source exists but not installed"))
+                        fix_actions.append(FixAction("INSTALL", str(target), f"install from {source}"))
+        
+        # Rules (Claude only)
+        if cli == "claude":
+            installed, expected = _count_rules(scope)
+            if expected > 0 and installed == 0:
+                issues.append(Issue("missing_group", f"{cli}/rules", f"not installed ({expected} available)"))
+                fix_actions.append(FixAction("INSTALL", f"{cli}/rules", f"install {expected} rules"))
+            elif expected > installed:
+                if DIST_RULES_DIR.exists():
+                    for f in DIST_RULES_DIR.glob("*.md"):
+                        target = CLAUDE_HOME / "rules" / f.name
+                        if not target.exists():
+                            issues.append(Issue("missing", str(target), "Source exists but not installed"))
+                            fix_actions.append(FixAction("INSTALL", str(target), "install rule"))
 
 def check_content_drift(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
     """Check for copied files that differ from source."""
@@ -464,34 +480,74 @@ def check_build_freshness(issues: List[Issue], fix_actions: List[FixAction]):
                 issues.append(Issue("build_stale", str(gen), f"{src} is newer than generated file"))
                 fix_actions.append(FixAction("BUILD", str(gen), "regenerate from source"))
 
-def count_installed(what: str, scope: str) -> int:
-    """Count installed components."""
-    count = 0
-    
+def _cli_base_dir(cli: str, scope: str) -> Path:
+    """Get base directory for a CLI."""
     if scope == "global":
-        base_dirs = [Path.home() / ".claude", Path.home() / ".config/opencode"]
+        return CLAUDE_HOME if cli == "claude" else OPENCODE_HOME
     else:
-        base_dirs = [Path(".claude"), Path(".opencode")]
+        return Path(".claude") if cli == "claude" else Path(".opencode")
+
+def _count_agents(cli: str, scope: str) -> tuple:
+    """Count (installed, expected) agents for a CLI."""
+    base = _cli_base_dir(cli, scope)
+    agents_dir = base / "agents"
+    installed = len(list(agents_dir.glob("*.md"))) if agents_dir.exists() else 0
     
-    if what == "agents":
-        for base_dir in base_dirs:
-            agents_dir = base_dir / "agents"
-            if agents_dir.exists():
-                count += len(list(agents_dir.glob("*.md")))
-    elif what == "skills":
-        for base_dir in base_dirs:
-            skills_dir = base_dir / "skills"
-            if skills_dir.exists():
-                count += len([d for d in skills_dir.iterdir() if d.is_dir()])
-    elif what == "rules":
+    dist_dir = DIST_CLAUDE_DIR if cli == "claude" else DIST_OPENCODE_DIR
+    expected_dir = dist_dir / "agents"
+    expected = len(list(expected_dir.glob("*.md"))) if expected_dir.exists() else 0
+    
+    return installed, expected
+
+def _count_skills(cli: str, scope: str) -> tuple:
+    """Count (installed, expected) skills for a CLI. Excludes broken symlinks."""
+    base = _cli_base_dir(cli, scope)
+    skills_dir = base / "skills"
+    if skills_dir.exists():
+        installed = len([d for d in skills_dir.iterdir() if d.is_dir() and d.exists()])
+    else:
+        installed = 0
+    expected = len([d for d in DIST_SKILLS_DIR.iterdir() if d.is_dir()]) if DIST_SKILLS_DIR.exists() else 0
+    return installed, expected
+
+def _count_rules(scope: str) -> tuple:
+    """Count (installed, expected) rules. Only for Claude Code."""
+    if scope == "global":
+        rules_dir = CLAUDE_HOME / "rules"
+    else:
+        rules_dir = Path(".claude/rules")
+    installed = len(list(rules_dir.glob("*.md"))) if rules_dir.exists() else 0
+    expected = len(list(DIST_RULES_DIR.glob("*.md"))) if DIST_RULES_DIR.exists() else 0
+    return installed, expected
+
+def _check_config(cli: str, scope: str) -> tuple:
+    """Check config files for a CLI. Returns (all_installed: bool, description: str).
+    
+    For Claude Code global: CLAUDE.md + copilot-instructions.md
+    For Claude Code local: CLAUDE.md
+    For OpenCode: AGENTS.md
+    """
+    if cli == "claude":
         if scope == "global":
-            rules_dir = Path.home() / ".claude/rules"
+            files = [
+                (CLAUDE_HOME / "CLAUDE.md", "CLAUDE.md"),
+                (GITHUB_HOME / "copilot-instructions.md", "copilot-instructions.md")
+            ]
         else:
-            rules_dir = Path(".claude/rules")
-        if rules_dir.exists():
-            count = len(list(rules_dir.glob("*.md")))
+            files = [(Path("./CLAUDE.md"), "CLAUDE.md")]
+    else:
+        if scope == "global":
+            files = [(OPENCODE_HOME / "AGENTS.md", "AGENTS.md")]
+        else:
+            files = [(Path("./AGENTS.md"), "AGENTS.md")]
     
-    return count
+    installed_names = [name for path, name in files if path.exists()]
+    missing_names = [name for path, name in files if not path.exists()]
+    all_installed = len(missing_names) == 0
+    desc = ", ".join(installed_names) if installed_names else "not installed"
+    
+    return all_installed, desc, missing_names
+    return all_installed, desc
 
 def count_stale(issues: List[Issue], item_type: str) -> int:
     """Count stale issues of a specific type."""
@@ -501,50 +557,50 @@ def count_stale(issues: List[Issue], item_type: str) -> int:
             count += 1
     return count
 
-def print_summary(scope: str, issues: List[Issue]):
-    """Print installation summary."""
-    print(f"Checking {scope} installation...")
+def _print_status(label: str, installed: int, expected: int):
+    """Print OK/WARN status for a component."""
+    if installed == 0 and expected == 0:
+        ok(f"{label} (none available)", indent=4)
+    elif installed == 0:
+        warn(f"{label} (not installed, {expected} available)", indent=4)
+    elif installed >= expected:
+        ok(f"{label} ({installed} installed)", indent=4)
+    else:
+        missing = expected - installed
+        warn(f"{label} ({installed} installed, {missing} missing)", indent=4)
+
+def print_summary(scope: str):
+    """Print installation summary grouped by CLI."""
+    label = "global" if scope == "global" else "local"
+    print(f"Checking AgentNotes {label} installation:")
     print("")
     
-    # Count installed and stale items
-    agents_installed = count_installed("agents", scope)
-    stale_agents = count_stale(issues, "agents")
-    skills_installed = count_installed("skills", scope)
-    stale_skills = count_stale(issues, "skills")
-    
-    if scope == "global":
-        rules_installed = count_installed("rules", scope)
-        stale_rules = count_stale(issues, "rules")
+    for cli, cli_name in [("claude", "Claude Code"), ("opencode", "OpenCode")]:
+        base = _cli_base_dir(cli, scope)
+        print(f"  {cli_name} ({base})")
         
-        # Check global config files
-        config_files = [
-            Path.home() / ".claude/CLAUDE.md",
-            Path.home() / ".config/opencode/AGENTS.md", 
-            Path.home() / ".github/copilot-instructions.md"
-        ]
-        config_ok = all(f.exists() for f in config_files)
+        # Agents
+        installed, expected = _count_agents(cli, scope)
+        _print_status("agents", installed, expected)
         
-        ok(f"Claude Code agents ({agents_installed} installed, {stale_agents} stale)")
-        ok("OpenCode agents (counted above)")
-        ok(f"Skills ({skills_installed} installed, {stale_skills} stale)")
+        # Skills
+        installed, expected = _count_skills(cli, scope)
+        _print_status("skills", installed, expected)
         
-        if config_ok:
-            ok("Global config files")
+        # Config
+        all_ok, desc, missing = _check_config(cli, scope)
+        if all_ok:
+            ok(f"config ({desc})", indent=4)
+        elif desc == "not installed":
+            warn("config (not installed)", indent=4)
         else:
-            fail("Global config files (some missing)")
+            missing_str = ", ".join(missing)
+            warn(f"config ({desc}) — missing: {missing_str}", indent=4)
         
-        ok(f"Rules ({rules_installed} installed, {stale_rules} stale)")
-    else:
-        ok(f"Local agents ({agents_installed} installed, {stale_agents} stale)")
-        ok(f"Local skills ({skills_installed} installed, {stale_skills} stale)")
-        
-        # Check local config files
-        local_config_ok = Path("./CLAUDE.md").exists() and Path("./AGENTS.md").exists()
-        
-        if local_config_ok:
-            ok("Local config files")
-        else:
-            info("Local config files (optional, not installed)")
+        # Rules (Claude Code only)
+        if cli == "claude":
+            installed, expected = _count_rules(scope)
+            _print_status("rules", installed, expected)
 
 def print_issues(issues: List[Issue]) -> bool:
     """Print found issues. Returns True if no issues."""
@@ -553,32 +609,72 @@ def print_issues(issues: List[Issue]) -> bool:
         print(f"{Color.GREEN}No issues found.{Color.NC}")
         return True
     
-    print("")
-    print(f"{Color.YELLOW}Warning: {len(issues)} issue(s) found{Color.NC}")
+    # Check if fully not installed
+    non_build_issues = [i for i in issues if i.type != "build_stale"]
+    if non_build_issues and all(i.type == "missing_group" for i in non_build_issues):
+        print(f"\nNot installed. Run '{Color.CYAN}agent-notes install{Color.NC}' to set up.")
+        return False
+    
     print("")
     
-    for issue in issues:
-        if issue.type == "stale":
-            print(f"  {Color.RED}✗ Stale file: {Color.NC}{issue.file}")
-        elif issue.type == "broken":
-            print(f"  {Color.RED}✗ Broken symlink: {Color.NC}{issue.file}")
-        elif issue.type == "shadowed":
-            print(f"  {Color.YELLOW}✗ Shadowed file: {Color.NC}{issue.file}")
-        elif issue.type == "missing":
-            print(f"  {Color.YELLOW}✗ Missing file: {Color.NC}{issue.file}")
-        elif issue.type == "drift":
-            print(f"  {Color.CYAN}✗ Content drift: {Color.NC}{issue.file}")
-        elif issue.type == "build_stale":
-            print(f"  {Color.YELLOW}✗ Build stale: {Color.NC}{issue.file}")
-        
-        print(f"    {issue.message}")
+    # Group broken symlinks by directory for cleaner output
+    broken_by_dir: Dict[str, int] = {}
+    other_issues: List[Issue] = []
+    for iss in issues:
+        if iss.type == "broken":
+            parent = str(Path(iss.file).parent)
+            broken_by_dir[parent] = broken_by_dir.get(parent, 0) + 1
+        elif iss.type == "missing_group":
+            continue  # Already shown in summary
+        else:
+            other_issues.append(iss)
+    
+    display_count = len(broken_by_dir) + len(other_issues)
+    print(f"{Color.YELLOW}Warning: {display_count} issue(s) found{Color.NC}")
+    print("")
+    
+    # Print grouped broken symlinks
+    for dir_path, count in broken_by_dir.items():
+        print(f"  {Color.RED}✗ Broken symlinks: {Color.NC}{dir_path}/ ({count} broken)")
+        print(f"    Fix: run '{Color.CYAN}agent-notes install{Color.NC}' to recreate")
         print("")
     
-    print("Run 'agent-notes doctor --fix' to resolve these issues.")
+    # Print other issues
+    for iss in other_issues:
+        if iss.type == "stale":
+            print(f"  {Color.RED}✗ Stale: {Color.NC}{iss.file}")
+            print(f"    {iss.message}")
+            print(f"    Fix: run '{Color.CYAN}agent-notes doctor --fix{Color.NC}' to remove")
+        elif iss.type == "shadowed":
+            print(f"  {Color.YELLOW}✗ Shadowed: {Color.NC}{iss.file}")
+            print(f"    {iss.message}")
+            print(f"    Fix: run '{Color.CYAN}agent-notes doctor --fix{Color.NC}' to replace with symlink")
+        elif iss.type == "missing":
+            print(f"  {Color.YELLOW}✗ Missing: {Color.NC}{iss.file}")
+            print(f"    {iss.message}")
+            print(f"    Fix: run '{Color.CYAN}agent-notes doctor --fix{Color.NC}' or '{Color.CYAN}agent-notes install{Color.NC}'")
+        elif iss.type == "drift":
+            print(f"  {Color.CYAN}✗ Content drift: {Color.NC}{iss.file}")
+            print(f"    {iss.message}")
+        elif iss.type == "build_stale":
+            print(f"  {Color.YELLOW}✗ Build stale: {Color.NC}{iss.file}")
+            print(f"    {iss.message}")
+            print(f"    Fix: run '{Color.CYAN}agent-notes build{Color.NC}'")
+        else:
+            continue
+        
+        print("")
+    
+    print(f"Run '{Color.CYAN}agent-notes doctor --fix{Color.NC}' to resolve these issues.")
     return False
 
 def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
     """Apply fixes with user confirmation."""
+    non_build = [i for i in issues if i.type != "build_stale"]
+    if non_build and all(i.type == "missing_group" for i in non_build):
+        print(f"Not installed. Run '{Color.CYAN}agent-notes install{Color.NC}' to set up.")
+        return True
+    
     if not fix_actions:
         print(f"{Color.GREEN}No fixes needed.{Color.NC}")
         return True
@@ -671,14 +767,14 @@ def doctor(local: bool = False, fix: bool = False) -> None:
     
     # Run all checks
     if scope == "global":
-        print_summary("global", issues)
+        print_summary("global")
         check_stale_files("global", issues, fix_actions)
         check_broken_symlinks("global", issues, fix_actions)
         check_shadowed_files("global", issues, fix_actions)
         check_missing_files("global", issues, fix_actions)
         check_content_drift("global", issues, fix_actions)
     else:
-        print_summary("local", issues)
+        print_summary("local")
         check_stale_files("local", issues, fix_actions)
         check_broken_symlinks("local", issues, fix_actions)
         check_shadowed_files("local", issues, fix_actions)
