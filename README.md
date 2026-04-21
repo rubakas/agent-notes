@@ -106,13 +106,13 @@ agent-notes memory reset reviewer
 
 ## Agent Team
 
-Specialized subagents with hierarchical model strategy: **Opus 4.6 decides, Sonnet 4 executes, Haiku 4.5 explores.**
+Specialized subagents with hierarchical model strategy: **Opus 4.7 decides, Sonnet 4 executes, Haiku 4.5 explores.**
 
 ### Agent roster
 
 | Agent | Model | Role |
 |-------|-------|------|
-| **lead** | Opus 4.6 | Plans, delegates, reviews. The only Opus agent. |
+| **lead** | Opus 4.7 | Plans, delegates, reviews. The only Opus agent. |
 | **coder** | Sonnet 4 | Implements features, fixes bugs, edits files. |
 | **reviewer** | Sonnet 4 | Code quality review. Read-only. |
 | **security-auditor** | Sonnet 4 | Security vulnerability analysis. Read-only. |
@@ -142,7 +142,7 @@ You (human)
   |
   +-- Simple task ------> Main session (direct work)
   |
-  +-- Complex task -----> Lead (Opus 4.6)
+  +-- Complex task -----> Lead (Opus 4.7)
                            +-- Explorer (Haiku 4.5)     quick lookups
                            +-- Coder (Sonnet 4)         implementation
                            +-- Reviewer (Sonnet 4)      code review

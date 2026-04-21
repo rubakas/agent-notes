@@ -244,7 +244,7 @@ agents:
 tiers:
   opus:
     claude: opus
-    opencode: "github-copilot/claude-opus-4.6"
+    opencode: "github-copilot/claude-opus-4.7"
   sonnet:
     claude: sonnet
     opencode: "github-copilot/claude-sonnet-4"
