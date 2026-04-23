@@ -1,0 +1,5 @@
+name: worker
+label: Worker
+description: Implements code, writes tests, does focused analysis. Medium volume.
+typical_class: sonnet
+color: blue

@@ -1,0 +1,45 @@
+#!/bin/bash
+sqlite3 -header -column ~/.local/share/opencode/opencode.db "
+WITH cs AS (SELECT id FROM session WHERE parent_id IS NULL ORDER BY time_updated DESC LIMIT 1),
+costs(pat, inp, out, cch) AS (VALUES
+  ('%haiku%',    0.80,  4.00, 0.08),
+  ('%sonnet%',   3.00, 15.00, 0.30),
+  ('%opus-4.7%', 5.00, 25.00, 0.50),
+  ('%opus-4.6%', 5.00, 25.00, 0.50),
+  ('%opus-4.5%', 5.00, 25.00, 0.50),
+  ('%opus%',    15.00, 75.00, 1.50),
+  ('%gpt-%',     2.50, 10.00, 0.50),
+  ('%o1%',       2.50, 10.00, 0.50),
+  ('%o3%',       2.50, 10.00, 0.50),
+  ('%o4%',       2.50, 10.00, 0.50)
+),
+stats AS (
+  SELECT COALESCE(json_extract(m.data,'$.agent'),'lead') as agent,
+    json_extract(m.data,'$.modelID') as model,
+    SUM(json_extract(m.data,'$.tokens.input')) as inp,
+    SUM(json_extract(m.data,'$.tokens.output')) as outp,
+    SUM(json_extract(m.data,'$.tokens.cache.read')) as cache,
+    ROUND((MAX(json_extract(m.data,'$.time.completed'))-MIN(json_extract(m.data,'$.time.created')))/1000.0,1) as sec
+  FROM session s JOIN message m ON m.session_id=s.id CROSS JOIN cs
+  WHERE (s.parent_id=cs.id OR s.id=cs.id) AND json_extract(m.data,'$.role')='assistant' GROUP BY s.id
+),
+rated AS (
+  SELECT agent, model, inp, outp, cache, sec,
+    COALESCE((SELECT c.inp FROM costs c WHERE model LIKE c.pat LIMIT 1), 3.00) as r_inp,
+    COALESCE((SELECT c.out FROM costs c WHERE model LIKE c.pat LIMIT 1), 15.00) as r_out,
+    COALESCE((SELECT c.cch FROM costs c WHERE model LIKE c.pat LIMIT 1), 0.30) as r_cch
+  FROM stats
+)
+SELECT agent||'('||model||')' as 'agent(model)',
+  inp||'/'||outp||'/'||cache as 'in/out/cache',
+  sec||'s' as time,
+  '\$'||ROUND((inp*r_inp + outp*r_out + cache*r_cch)/1e6, 4) as actual,
+  '\$'||ROUND((inp*5.0 + outp*25.0 + cache*0.50)/1e6, 4) as if_opus
+FROM rated
+UNION ALL
+SELECT 'TOTAL (saved '||ROUND((1.0-SUM(inp*r_inp+outp*r_out+cache*r_cch)/SUM(inp*5.0+outp*25.0+cache*0.50))*100,0)||'%)',
+  SUM(inp)||'/'||SUM(outp)||'/'||SUM(cache),
+  MAX(sec)||'s parallel / '||CAST(CAST(SUM(sec) AS INT) AS TEXT)||'s sequential',
+  '\$'||ROUND(SUM(inp*r_inp+outp*r_out+cache*r_cch)/1e6, 4),
+  '\$'||ROUND(SUM(inp*5.0+outp*25.0+cache*0.50)/1e6, 4)
+FROM rated"

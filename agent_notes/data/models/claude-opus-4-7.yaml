@@ -1,0 +1,15 @@
+id: claude-opus-4-7
+label: Claude Opus 4.7
+family: claude
+class: opus
+aliases:
+  anthropic:      claude-opus-4-7
+  github-copilot: github-copilot/claude-opus-4.7
+pricing:
+  input:  5.00
+  output: 25.00
+  cache:  0.50
+capabilities:
+  vision: true
+  long_context: true
+  tool_use: true

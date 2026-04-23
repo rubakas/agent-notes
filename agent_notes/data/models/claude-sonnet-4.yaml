@@ -1,0 +1,15 @@
+id: claude-sonnet-4
+label: Claude Sonnet 4
+family: claude
+class: sonnet
+aliases:
+  anthropic:      sonnet
+  github-copilot: github-copilot/claude-sonnet-4
+pricing:
+  input:  3.00
+  output: 15.00
+  cache:  0.30
+capabilities:
+  vision: true
+  long_context: true
+  tool_use: true

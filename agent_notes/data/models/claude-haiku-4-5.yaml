@@ -1,0 +1,15 @@
+id: claude-haiku-4-5
+label: Claude Haiku 4.5
+family: claude
+class: haiku
+aliases:
+  anthropic:      haiku
+  github-copilot: github-copilot/claude-haiku-4.5
+pricing:
+  input:  0.80
+  output: 4.00
+  cache:  0.08
+capabilities:
+  vision: true
+  long_context: false
+  tool_use: true
