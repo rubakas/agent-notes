@@ -36,7 +36,7 @@ agents:
         assert test_agent.role == "worker"
         assert test_agent.mode == "subagent"
         assert test_agent.color == "blue"
-        assert test_agent.claude == {"tools": "Read, Write"}
+        assert test_agent.backend_config("claude") == {"tools": "Read, Write"}
         
         simple_agent = registry.get("simple-agent")
         assert simple_agent.role == "scout"

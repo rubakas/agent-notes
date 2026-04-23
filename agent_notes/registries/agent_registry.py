@@ -51,6 +51,9 @@ def load_agent_registry(yaml_path: Optional[Path] = None) -> AgentRegistry:
     if not agents_data:
         return AgentRegistry([])
     
+    # Known top-level keys that are NOT per-backend config
+    NON_BACKEND_KEYS = {"description", "role", "mode", "color", "effort", "claude_exclude"}
+    
     agents = []
     for name, config in agents_data.items():
         # Extract required fields
@@ -61,6 +64,26 @@ def load_agent_registry(yaml_path: Optional[Path] = None) -> AgentRegistry:
         if "mode" not in config:
             raise ValueError(f"Missing 'mode' field for agent '{name}' in {yaml_path}")
         
+        # Everything that is NOT in NON_BACKEND_KEYS is treated as per-backend config.
+        # This is what makes the loader registry-driven: adding a new CLI named
+        # "gemini" just means agents.yaml may have a 'gemini:' key and it flows
+        # through automatically.
+        backends: dict[str, dict] = {}
+        for key, value in config.items():
+            if key in NON_BACKEND_KEYS:
+                continue
+            if isinstance(value, dict):
+                backends[key] = value
+            else:
+                # Non-dict top-level keys are unknown; ignore with no error to be
+                # lenient with user-edited YAML (could log a warning later).
+                pass
+
+        # Backward compat: translate legacy top-level claude_exclude into backends
+        # Note: This is the only hardcoded "claude" reference for backward compatibility
+        if config.get("claude_exclude"):
+            backends.setdefault("claude", {})["exclude"] = True
+
         agent = AgentSpec(
             name=name,
             description=config["description"],
@@ -68,9 +91,7 @@ def load_agent_registry(yaml_path: Optional[Path] = None) -> AgentRegistry:
             mode=config["mode"],
             color=config.get("color"),
             effort=config.get("effort"),
-            claude_exclude=config.get("claude_exclude", False),
-            claude=config.get("claude"),
-            opencode=config.get("opencode")
+            backends=backends,
         )
         agents.append(agent)
     

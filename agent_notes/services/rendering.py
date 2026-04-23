@@ -81,8 +81,21 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
                 continue
                 
             # Skip if agent is excluded for this backend
+            # Check both new backend-specific exclusion and legacy exclude_flag
+            excluded = False
+            
+            # New backend-specific exclusion: check if backend.name key exists and has exclude: true
+            if backend.name in agent_config and isinstance(agent_config[backend.name], dict):
+                backend_cfg = agent_config[backend.name]
+                if backend_cfg.get("exclude"):
+                    excluded = True
+            
+            # Legacy exclusion: check if exclude_flag is set (for backward compat)
             exclude_flag = backend.exclude_flag
-            if exclude_flag and agent_config.get(exclude_flag):
+            if not excluded and exclude_flag and agent_config.get(exclude_flag):
+                excluded = True
+            
+            if excluded:
                 continue
             
             # Get frontmatter generator

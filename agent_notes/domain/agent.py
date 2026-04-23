@@ -1,7 +1,7 @@
 """Agent domain type for agent metadata."""
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
 
 
@@ -14,13 +14,21 @@ class AgentSpec:
     mode: str  # primary, subagent
     color: Optional[str] = None
     effort: Optional[str] = None  # low, medium, high
-    claude_exclude: bool = False
-    claude: Optional[Dict[str, Any]] = None
-    opencode: Optional[Dict[str, Any]] = None
+    backends: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # backends is keyed by CLI backend name (e.g. "claude", "opencode", "copilot", ...).
+    # Each value is the per-backend override dict as declared in agents.yaml.
+    # Example: {"claude": {"exclude": True}, "opencode": {"mode": "subagent"}}
     
-    def __post_init__(self):
-        # Ensure claude and opencode are dicts if provided
-        if self.claude is not None and not isinstance(self.claude, dict):
-            object.__setattr__(self, 'claude', {})
-        if self.opencode is not None and not isinstance(self.opencode, dict):
-            object.__setattr__(self, 'opencode', {})
+    def backend_config(self, backend_name: str) -> Dict[str, Any]:
+        """Return per-backend config for backend_name, or {} if none declared."""
+        return self.backends.get(backend_name, {}) or {}
+
+    def excluded_from(self, backend_name: str) -> bool:
+        """Return True if the agent is excluded from this backend's build.
+
+        A backend is excluded when its config has exclude: true. For backward
+        compat, also treat the legacy top-level 'claude_exclude' key as meaning
+        excluded-from-claude — the loader maps this into backends["claude"]["exclude"].
+        """
+        cfg = self.backend_config(backend_name)
+        return bool(cfg.get("exclude", False))
