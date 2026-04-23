@@ -146,8 +146,13 @@ def _select_models_per_role(clis: Set[str]) -> Dict[str, Dict[str, str]]:
         
         cli_role_models = {}
         for role in roles_sorted:
-            # Default: first model whose class == role.typical_class; else first compatible.
-            default_model = next((m for m in compatible if m.model_class == role.typical_class), compatible[0])
+            # Default: newest model (by registry order; iterate reversed so e.g.
+            # claude-opus-4-7 wins over claude-opus-4-6) whose class == role.typical_class.
+            # Fallback to first compatible if nothing matches.
+            default_model = next(
+                (m for m in reversed(compatible) if m.model_class == role.typical_class),
+                compatible[0],
+            )
             default_idx = compatible.index(default_model)
             
             # Build options: "Claude Opus 4.7 (via anthropic)" style

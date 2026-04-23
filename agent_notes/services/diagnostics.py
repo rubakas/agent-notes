@@ -669,15 +669,16 @@ def _check_role_models(state):
                         role = role_registry.get(role_id)
                         model = model_registry.get(model_id)
                         
-                        # Check compatibility
-                        compatible_model = backend.first_alias_for(model.aliases)
-                        if compatible_model:
-                            model_display = f"{model.display_name} (as {compatible_model})"
-                            print(f"    {role.display_name} → {model_display}")
+                        # Check compatibility: first_alias_for returns (provider, alias) | None
+                        resolved = backend.first_alias_for(model.aliases)
+                        if resolved is not None:
+                            _provider, alias_str = resolved
+                            model_display = f"{model.label} (as {alias_str})"
+                            print(f"    {role.label} → {model_display}")
                         else:
-                            model_display = f"{model.display_name} (INCOMPATIBLE - {backend.label} doesn't support this provider)"
-                            print(f"    {role.display_name} → {Color.RED}{model_display}{Color.NC}")
-                            issues.append(f"Global {backend.label}: {role.display_name} assigned to incompatible model {model.display_name}")
+                            model_display = f"{model.label} (INCOMPATIBLE - {backend.label} doesn't support this provider)"
+                            print(f"    {role.label} → {Color.RED}{model_display}{Color.NC}")
+                            issues.append(f"Global {backend.label}: {role.label} assigned to incompatible model {model.label}")
                     except KeyError as e:
                         print(f"    {role_id} → {Color.RED}{model_id} (not found: {e}){Color.NC}")
                         issues.append(f"Global {backend.label}: Invalid assignment {role_id} → {model_id}")
@@ -702,15 +703,15 @@ def _check_role_models(state):
                         role = role_registry.get(role_id)
                         model = model_registry.get(model_id)
                         
-                        # Check compatibility
-                        compatible_model = backend.first_alias_for(model.aliases)
-                        if compatible_model:
-                            model_display = f"{model.display_name} (as {compatible_model})"
-                            print(f"    {role.display_name} → {model_display}")
+                        resolved = backend.first_alias_for(model.aliases)
+                        if resolved is not None:
+                            _provider, alias_str = resolved
+                            model_display = f"{model.label} (as {alias_str})"
+                            print(f"    {role.label} → {model_display}")
                         else:
-                            model_display = f"{model.display_name} (INCOMPATIBLE - {backend.label} doesn't support this provider)"
-                            print(f"    {role.display_name} → {Color.RED}{model_display}{Color.NC}")
-                            issues.append(f"Local {project_path} {backend.label}: {role.display_name} assigned to incompatible model {model.display_name}")
+                            model_display = f"{model.label} (INCOMPATIBLE - {backend.label} doesn't support this provider)"
+                            print(f"    {role.label} → {Color.RED}{model_display}{Color.NC}")
+                            issues.append(f"Local {project_path} {backend.label}: {role.label} assigned to incompatible model {model.label}")
                     except KeyError as e:
                         print(f"    {role_id} → {Color.RED}{model_id} (not found: {e}){Color.NC}")
                         issues.append(f"Local {project_path} {backend.label}: Invalid assignment {role_id} → {model_id}")
