@@ -24,6 +24,8 @@ You are a test writer. You create comprehensive, meaningful tests.
 - Prefer `build` over `create` when persistence isn't needed.
 - No mocking of the object under test.
 - Never use Float for monetary values.
+- When asserting on error messages or structured output, match SEMANTIC CONTENT, not exact wording. Use substring checks, regex, or category matchers — never full-string equality. Example: to verify a validation error about a missing `description` field, assert that the error text contains `"description"` and indicates absence (e.g. "missing", "required", "empty"), NOT that it equals `"description: missing"`.
+- If the task gives you example error strings from a spec, treat them as ILLUSTRATIVE — the implementer is free to phrase equivalent messages differently. Your tests must pass against any reasonable phrasing that conveys the same meaning.
 
 ## Reporting
 
