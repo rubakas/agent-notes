@@ -61,10 +61,25 @@ def expected_paths_for_install(
     return expected
 
 
-def check_missing(scope, registry, issues, fix_actions):
-    """Files that exist in dist/ but are not installed."""
+def check_missing(scope, registry, issues, fix_actions, scope_state: Optional[ScopeState] = None):
+    """Files that exist in dist/ but are not installed.
+
+    If ``scope_state`` is provided, only flag missing files for backends the
+    user actually installed — backends absent from state were opted-out of
+    and legitimately have no files on disk. When ``scope_state`` is None,
+    fall back to expecting every registry backend (legacy behavior).
+    """
     from .doctor import Issue, FixAction  # reuse existing classes
+    installed_backends: Optional[set[str]] = None
+    if scope_state is not None:
+        installed_backends = set(scope_state.clis.keys())
+
     for src, dst, backend_name, component in expected_paths_for_install(registry, scope):
+        # "scripts" / "universal" are shared (not per-CLI-backend); always expected.
+        if (installed_backends is not None
+                and backend_name not in ("scripts", "universal")
+                and backend_name not in installed_backends):
+            continue
         if not dst.exists() and not dst.is_symlink():
             issues.append(Issue("missing", str(dst), "Source exists but not installed"))
             fix_actions.append(FixAction("INSTALL", str(dst), f"install {component}"))

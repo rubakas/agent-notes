@@ -27,16 +27,21 @@ def _get_skill_groups() -> Dict[str, List[str]]:
             from ..registries import default_skill_registry
             registry = default_skill_registry()
             
-            # Use the registry's by_group method if available
+            # If the registry has per-skill grouping (skill.group field), use it.
+            # If every skill falls into "uncategorized" (the default), fall through
+            # to the hardcoded prefix-based grouping below so the wizard still
+            # presents meaningful groups.
             if hasattr(registry, 'by_group'):
                 groups = registry.by_group()
-                # Convert Skill objects to names
-                result = {}
-                for group_name, skills in groups.items():
-                    skill_names = [skill.name for skill in skills]
-                    if skill_names and group_name != "uncategorized":
-                        result[group_name] = skill_names
-                return result
+                real_groups = {
+                    gn: [s.name for s in skills]
+                    for gn, skills in groups.items()
+                    if gn != "uncategorized" and skills
+                }
+                if real_groups:
+                    return real_groups
+                # else fall through to hardcoded grouping with registry's skill list
+                all_skills = [s.name for s in registry.all()]
             else:
                 # Fallback to old hardcoded grouping
                 all_skills = [skill.name for skill in registry.all()]
@@ -485,6 +490,12 @@ def interactive_install() -> None:
     print(f"\nInstalling ({scope}, {'copy' if copy_mode else 'symlink'}) ...")
     print("")
 
+    # Install shared scripts (global scope only). These are CLI-agnostic —
+    # they live under ~/.local/bin/ and serve any AI CLI (e.g. cost-report).
+    if scope == "global":
+        from ..services.installer import install_scripts_global
+        install_scripts_global()
+
     # Install skills
     if selected_skills:
         from ..cli_backend import load_registry
@@ -521,6 +532,7 @@ def interactive_install() -> None:
             repo_root=_shim.PKG_DIR.parent,
             project_path=project_path,
             role_models=role_models,
+            selected_clis=set(clis),
         )
         install_state.record_install_state(st)
     except Exception as e:

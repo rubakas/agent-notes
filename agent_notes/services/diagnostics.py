@@ -141,10 +141,26 @@ def check_missing_files(scope: str, issues: List[Issue], fix_actions: List[FixAc
     """Check for source files that aren't installed - DELEGATED to doctor_checks."""
     # This function is kept for backwards compatibility but delegates to the new module
     from ..cli_backend import load_registry
-    from .. import doctor_checks
+    from .. import doctor_checks, install_state
+    from ..state import get_scope
+    from pathlib import Path
     
     registry = load_registry()
-    doctor_checks.check_missing(scope, registry, issues, fix_actions)
+    # Pass scope state so opted-out backends aren't flagged as "missing".
+    state = install_state.load_current_state()
+    scope_state = None
+    if state is not None:
+        try:
+            project_path = Path.cwd().resolve() if scope == "local" else None
+            scope_state = get_scope(state, scope, project_path)
+        except (ValueError, KeyError):
+            scope_state = None
+    # Call via kwargs only when we actually have scope_state — tests that
+    # replace doctor_checks.check_missing with a narrower signature still work.
+    if scope_state is not None:
+        doctor_checks.check_missing(scope, registry, issues, fix_actions, scope_state=scope_state)
+    else:
+        doctor_checks.check_missing(scope, registry, issues, fix_actions)
 
 def check_content_drift(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
     """Check for copied files that differ from source - DELEGATED to doctor_checks."""

@@ -139,6 +139,7 @@ class TestGetSkillGroups:
     def test_no_skills_dir(self, monkeypatch):
         fake_skills_dir = Path("/nonexistent")
         monkeypatch.setattr(wizard, 'DIST_SKILLS_DIR', fake_skills_dir)
+        monkeypatch.setenv('_WIZARD_TEST_MODE', '1')
         result = wizard._get_skill_groups()
         assert result == {}
 
@@ -182,6 +183,7 @@ class TestGetSkillGroups:
         (skills_dir / "rails-models.txt").write_text("content")
         (skills_dir / "docker-compose.md").write_text("content")
         monkeypatch.setattr(wizard, 'DIST_SKILLS_DIR', skills_dir)
+        monkeypatch.setenv('_WIZARD_TEST_MODE', '1')
         result = wizard._get_skill_groups()
         assert result == {}
 

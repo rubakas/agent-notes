@@ -33,6 +33,10 @@ def build_install_state(
     project_path: Optional[Path] = None,  # required when scope == "local"
     role_models: Optional[dict[str, dict[str, str]]] = None,
     # ^^ {cli_name: {role_name: model_id}}, optional — empty dict fine for now
+    selected_clis: Optional[set[str]] = None,
+    # ^^ If given, only these backends are recorded as installed. None = all
+    # backends with shipped content (legacy behavior, used by the plain
+    # `agent-notes install` non-wizard path).
 ) -> State:
     """Build a complete State snapshot.
     
@@ -74,6 +78,9 @@ def build_install_state(
     clis = {}
     
     for backend in registry.all():
+        # Skip backends the user opted out of during wizard selection.
+        if selected_clis is not None and backend.name not in selected_clis:
+            continue
         backend_state = BackendState()
         backend_has_content = False
         
