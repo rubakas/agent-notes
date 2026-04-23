@@ -1,0 +1,522 @@
+"""Interactive install wizard for agent-notes."""
+
+import sys
+from pathlib import Path
+from typing import List, Dict, Set, Optional
+
+from .build import build
+from ._install_helpers import (
+    count_agents, count_global, count_skills
+)
+from ..services.fs import place_file, place_dir_contents
+
+
+
+def _get_skill_groups() -> Dict[str, List[str]]:
+    """Get skill names grouped by technology."""
+    from .. import wizard as parent_module
+    
+    # For testing, allow bypassing the registry
+    import os
+    if os.environ.get('_WIZARD_TEST_MODE'):
+        if not parent_module.DIST_SKILLS_DIR.exists():
+            return {}
+        all_skills = [d.name for d in parent_module.DIST_SKILLS_DIR.iterdir() if d.is_dir()]
+    else:
+        try:
+            from ..registries import default_skill_registry
+            registry = default_skill_registry()
+            
+            # Use the registry's by_group method if available
+            if hasattr(registry, 'by_group'):
+                groups = registry.by_group()
+                # Convert Skill objects to names
+                result = {}
+                for group_name, skills in groups.items():
+                    skill_names = [skill.name for skill in skills]
+                    if skill_names and group_name != "uncategorized":
+                        result[group_name] = skill_names
+                return result
+            else:
+                # Fallback to old hardcoded grouping
+                all_skills = [skill.name for skill in registry.all()]
+        except Exception:
+            # Fallback to old behavior if registry fails
+            from .. import wizard as _shim
+            if not _shim.DIST_SKILLS_DIR.exists():
+                return {}
+            all_skills = [d.name for d in _shim.DIST_SKILLS_DIR.iterdir() if d.is_dir()]
+    
+    # Hardcoded grouping for backward compatibility
+    groups = {
+        "Rails": [s for s in all_skills if s.startswith("rails-") and s != "rails-kamal"],
+        "Docker": [s for s in all_skills if s.startswith("docker-")],
+        "Kamal": [s for s in all_skills if s == "rails-kamal"],
+        "Git": [s for s in all_skills if s == "git"]
+    }
+
+    return {k: v for k, v in groups.items() if v}
+
+
+def _count_rules() -> int:
+    """Count rule files."""
+    from .. import wizard as parent_module
+    
+    # For testing, allow bypassing the registry
+    import os
+    if os.environ.get('_WIZARD_TEST_MODE'):
+        if not parent_module.DIST_RULES_DIR.exists():
+            return 0
+        return len(list(parent_module.DIST_RULES_DIR.glob("*.md")))
+    else:
+        try:
+            from ..registries import default_rule_registry
+            registry = default_rule_registry()
+            return len(registry.all())
+        except Exception:
+            # Fallback to old behavior if registry fails
+            if not parent_module.DIST_RULES_DIR.exists():
+                return 0
+            return len(list(parent_module.DIST_RULES_DIR.glob("*.md")))
+
+
+def _select_cli() -> Set[str]:
+    """Step 1: CLI selection."""
+    from ..cli_backend import load_registry
+    registry = load_registry()
+    # Show only CLIs that have a global_template (i.e. are meant to be user-selectable)
+    # AND support at least one meaningful component (not just copilot which is config-only).
+    options = []
+    for backend in sorted(registry.all(), key=lambda b: b.name):
+        options.append((backend.label, backend.name))
+    
+    # Safe defaults - all available backends that support agents
+    safe_defaults = {b.name for b in registry.all() if b.supports("agents")}
+    
+    from .. import wizard as _shim
+    
+    if _shim._can_interactive():
+        result = _shim._checkbox_select("Which CLI do you use?", options, defaults=safe_defaults)
+    else:
+        result = _shim._checkbox_select_fallback("Which CLI do you use?", options, defaults=safe_defaults)
+
+    labels = [label for label, val in options if val in result]
+    print(f"  {_shim.Color.GREEN}✓{_shim.Color.NC} CLI: {', '.join(labels) if labels else 'None'}")
+    return result
+
+
+def _select_models_per_role(clis: Set[str]) -> Dict[str, Dict[str, str]]:
+    """For each CLI that supports agents, ask user to pick a model per role.
+    
+    Returns: {cli_name: {role_name: model_id}}. Config-only CLIs are skipped (no entry).
+    """
+    from ..cli_backend import load_registry
+    from ..model_registry import load_model_registry
+    from ..role_registry import load_role_registry
+    from .. import wizard as _shim
+    
+    registry = load_registry()
+    models = load_model_registry().all()
+    roles = load_role_registry().all()
+    
+    # Sort roles by name for deterministic UI (registry already returns sorted)
+    roles_sorted = sorted(roles, key=lambda r: r.name)
+    
+    result = {}
+    for backend_name in sorted(clis):
+        backend = registry.get(backend_name)
+        if backend is None or not backend.supports("agents"):
+            continue
+        
+        print(f"\n{_shim.Color.CYAN}Models for {backend.label}{_shim.Color.NC}\n")
+        
+        # Compatible models = those with at least one alias in backend.accepted_providers
+        compatible = [m for m in models if backend.first_alias_for(m.aliases) is not None]
+        if not compatible:
+            # Could be: empty accepted_providers, or no models declare an alias for
+            # any accepted provider. Either way, we can't drive this CLI — skip it
+            # with a clear warning rather than hard-crashing the wizard.
+            print(
+                f"  {_shim.Color.YELLOW}Warning:{_shim.Color.NC} no compatible models found for "
+                f"{backend.label} (accepted providers: "
+                f"{list(backend.accepted_providers) or 'none'}). Skipping model selection; "
+                f"this CLI will rely on legacy tier resolution."
+            )
+            continue
+        
+        cli_role_models = {}
+        for role in roles_sorted:
+            # Default: first model whose class == role.typical_class; else first compatible.
+            default_model = next((m for m in compatible if m.model_class == role.typical_class), compatible[0])
+            default_idx = compatible.index(default_model)
+            
+            # Build options: "Claude Opus 4.7 (via anthropic)" style
+            options = []
+            for m in compatible:
+                prov_alias = backend.first_alias_for(m.aliases)
+                provider = prov_alias[0] if prov_alias else "?"
+                options.append((f"{m.label} (via {provider})", m.id))
+            
+            title = f"{role.label} — {role.description}\n  typical class: {role.typical_class}"
+            if _shim._can_interactive():
+                picked = _shim._radio_select(title, options, default=default_idx)
+            else:
+                picked = _shim._radio_select_fallback(title, options, default=default_idx)
+            cli_role_models[role.name] = picked
+            
+            picked_label = next(label for label, mid in options if mid == picked)
+            print(f"  {_shim.Color.GREEN}✓{_shim.Color.NC} {role.label}: {picked_label}")
+        
+        result[backend_name] = cli_role_models
+    return result
+
+
+def _select_scope() -> str:
+    """Step 3: Install scope."""
+    from .. import wizard as _shim
+    
+    options = [
+        ("Global (~/.claude, ~/.config/opencode)", "global"),
+        ("Local (current project)", "local"),
+    ]
+    if _shim._can_interactive():
+        result = _shim._radio_select("Where to install?", options, default=0)
+    else:
+        result = _shim._radio_select_fallback("Where to install?", options, default=0)
+
+    label = "Global" if result == "global" else "Local"
+    print(f"  {_shim.Color.GREEN}✓{_shim.Color.NC} Scope: {label}")
+    return result
+
+
+def _select_mode() -> bool:
+    """Step 4: Install mode."""
+    from .. import wizard as _shim
+    
+    options = [
+        ("Symlink (auto-updates when source changes)", "symlink"),
+        ("Copy (standalone, allows local customization)", "copy"),
+    ]
+    if _shim._can_interactive():
+        result = _shim._radio_select("How to install?", options, default=0)
+    else:
+        result = _shim._radio_select_fallback("How to install?", options, default=0)
+
+    label = "Symlink" if result == "symlink" else "Copy"
+    print(f"  {_shim.Color.GREEN}✓{_shim.Color.NC} Mode: {label}")
+    return result == "copy"
+
+
+def _select_skills() -> List[str]:
+    """Step 5: Skill selection."""
+    from .. import wizard as _shim
+    skill_groups = _shim._get_skill_groups()
+
+    if not skill_groups:
+        return []
+
+    descriptions = {
+        "Rails": "models, controllers, views, routes, testing",
+        "Docker": "Dockerfile, Compose patterns",
+        "Kamal": "deployment with Kamal",
+        "Git": "commit workflow, conventional commits",
+    }
+
+    options = []
+    for group_name, skills in skill_groups.items():
+        desc = descriptions.get(group_name, group_name.lower())
+        count = len(skills)
+        label = f"{group_name} — {desc} ({count} {'skill' if count == 1 else 'skills'})"
+        options.append((label, group_name))
+
+    all_group_names = {name for name in skill_groups.keys()}
+
+    if _shim._can_interactive():
+        selected_groups = _shim._checkbox_select("Which skills to include?", options, defaults=all_group_names)
+    else:
+        selected_groups = _shim._checkbox_select_fallback("Which skills to include?", options, defaults=all_group_names)
+
+    selected_skills = []
+    skill_summary_parts = []
+    for group_name, skills in skill_groups.items():
+        if group_name in selected_groups:
+            selected_skills.extend(skills)
+            skill_summary_parts.append(f"{group_name} ({len(skills)})")
+
+    summary = ", ".join(skill_summary_parts) if skill_summary_parts else "None"
+    print(f"  {_shim.Color.GREEN}✓{_shim.Color.NC} Skills: {summary}")
+    return selected_skills
+
+
+def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]]) -> bool:
+    """Step 6: Confirmation."""
+    from .. import wizard as _shim
+    skill_groups = _shim._get_skill_groups()
+
+    print("\nReady to install:\n")
+
+    # CLI
+    from ..cli_backend import load_registry
+    registry = load_registry()
+    selected_labels = [b.label for b in registry.all() if b.name in clis]
+    cli_desc = " + ".join(selected_labels) if selected_labels else "(none)"
+    print(f"  CLI:      {cli_desc}")
+
+    # Models (show role→model assignments if any)
+    if role_models:
+        from ..model_registry import load_model_registry
+        models_registry = load_model_registry()
+        print(f"\n  Models:")
+        for backend_name in sorted(role_models.keys()):
+            backend = registry.get(backend_name)
+            print(f"    {backend.label}:")
+            for role_name, model_id in sorted(role_models[backend_name].items()):
+                try:
+                    model = models_registry.get(model_id)
+                    prov_alias = backend.first_alias_for(model.aliases)
+                    provider = prov_alias[0] if prov_alias else "?"
+                    print(f"      {role_name}: {model_id} (via {provider})")
+                except KeyError:
+                    print(f"      {role_name}: {model_id}")
+        print("")
+
+    # Scope
+    if scope == "global":
+        scope_desc = "Global (~/.claude, ~/.config/opencode)"
+    else:
+        scope_desc = "Local (current project)"
+    print(f"  Scope:    {scope_desc}")
+
+    # Mode
+    mode_desc = "Copy" if copy_mode else "Symlink"
+    print(f"  Mode:     {mode_desc}")
+
+    # Skills
+    if selected_skills:
+        skill_counts = {}
+        for group_name, group_skills in skill_groups.items():
+            count = sum(1 for skill in selected_skills if skill in group_skills)
+            if count > 0:
+                skill_counts[group_name] = count
+
+        if skill_counts:
+            skill_desc = ", ".join(f"{name} ({count})" for name, count in skill_counts.items())
+        else:
+            skill_desc = "None"
+    else:
+        skill_desc = "None"
+    print(f"  Skills:   {skill_desc}")
+
+    # Agents
+    from ..cli_backend import load_registry
+    registry = load_registry()
+    agent_parts = []
+    for backend in registry.all():
+        if backend.name not in clis or not backend.supports("agents"):
+            continue
+        count = _shim.count_agents(backend)  # from install.py
+        agent_parts.append(f"{count} ({backend.label})")
+    if agent_parts:
+        print(f"  Agents:   {' + '.join(agent_parts)}")
+
+    # Config
+    from ..cli_backend import load_registry
+    from .. import installer
+    registry = load_registry()
+    config_files = []
+    for backend in registry.all():
+        if backend.name not in clis:
+            continue
+        config_file = installer.config_filename_for(backend)
+        if config_file:
+            config_files.append(config_file)
+    config_desc = ", ".join(config_files) if config_files else "None"
+    print(f"  Config:   {config_desc}")
+
+    # Rules
+    rules_count = _count_rules()
+    print(f"  Rules:    {rules_count}")
+
+    print("")
+    from .. import wizard as _shim
+    choice = _shim._safe_input("Proceed? [Y/n]: ", "Y").lower()
+    return choice != "n"
+
+
+def install_skills_filtered(skill_names: List[str], targets: List[Path], copy_mode: bool = False) -> None:
+    """Install only specified skills to target directories."""
+    from .. import wizard as parent_module
+    
+    if not skill_names or not parent_module.DIST_SKILLS_DIR.exists():
+        return
+
+    for target_dir in targets:
+        print(f"Installing skills to {target_dir} ...")
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        for skill_name in sorted(skill_names):
+            skill_dir = parent_module.DIST_SKILLS_DIR / skill_name
+            if skill_dir.is_dir():
+                parent_module.place_file(skill_dir, target_dir / skill_name, copy_mode)
+
+
+def install_agents_filtered(clis: Set[str], scope: str, copy_mode: bool = False) -> None:
+    """Install agents for selected CLIs (filtered by the wizard)."""
+    from .. import installer
+    from ..cli_backend import load_registry
+    from .. import wizard as _shim  # Import shim for test compatibility
+    
+    registry = load_registry()
+    for backend in registry.all():
+        if backend.name not in clis:
+            continue
+        # Use installer module but import the functions locally to preserve test compatibility
+        src = installer.dist_source_for(backend, "agents")
+        if src is None:
+            continue
+        dst = installer.target_dir_for(backend, "agents", scope)
+        if dst is None:
+            continue
+        
+        # Only install if there are files to install
+        files = list(src.glob("*.md"))
+        if not files:
+            continue
+        
+        print(f"Installing {backend.label} agents to {dst} ...")
+        
+        _shim.place_dir_contents(src, dst, "*.md", copy_mode)
+
+
+def install_config_filtered(clis: Set[str], scope: str, copy_mode: bool = False) -> None:
+    """Install config + rules for selected CLIs."""
+    from .. import installer
+    from ..cli_backend import load_registry
+    from .. import wizard as _shim  # Import shim for test compatibility
+    
+    registry = load_registry()
+    
+    header = "Installing global config ..." if scope == "global" else "Installing project rules ..."
+    print(header)
+    
+    for backend in registry.all():
+        if backend.name not in clis:
+            continue
+        
+        # Install config file (CLAUDE.md / AGENTS.md / copilot-instructions.md)
+        config_src = installer.dist_source_for(backend, "config")
+        config_dst = installer.target_dir_for(backend, "config", scope)
+        if config_src is not None and config_dst is not None:
+            filename = installer.config_filename_for(backend)
+            if filename:
+                src_file = config_src / filename
+                if src_file.exists():
+                    _shim.place_file(src_file, config_dst / filename, copy_mode)
+        
+        # Install rules (only backends that support it — currently just claude)
+        rules_src = installer.dist_source_for(backend, "rules")
+        rules_dst = installer.target_dir_for(backend, "rules", scope)
+        if rules_src is not None and rules_dst is not None:
+            files = list(rules_src.glob("*.md"))
+            if files:
+                _shim.place_dir_contents(rules_src, rules_dst, "*.md", copy_mode)
+
+
+
+def interactive_install() -> None:
+    """Run the interactive install wizard."""
+    # Welcome
+    from .. import wizard as _shim
+    version = _shim.get_version()
+    from ..cli_backend import load_registry
+    registry = load_registry()
+    
+    # Get total agent count across all backends that support agents
+    total_agents = 0
+    for backend in registry.all():
+        if backend.supports("agents"):
+            total_agents += _shim.count_agents(backend)
+    
+    n_skills = _shim.count_skills()
+    n_rules = _shim._count_rules()
+
+    print(f"\n  AgentNotes {_shim.Color.CYAN}v{version}{_shim.Color.NC}")
+    print(f"  AI agent configuration manager for Claude Code and OpenCode.\n")
+    print(f"  Includes {total_agents} agents, {n_skills} skills, and {n_rules} rules.\n")
+
+    # Step 1: CLI selection
+    clis = _shim._select_cli()
+
+    if not clis:
+        print("No CLI selected. Installation cancelled.")
+        return
+
+    # Step 2: Model selection per role (for CLIs that support agents)
+    role_models = _shim._select_models_per_role(clis)
+
+    # Step 3: Install scope
+    scope = _shim._select_scope()
+
+    # Step 4: Install mode (always shown)
+    copy_mode = _shim._select_mode()
+
+    # Step 5: Skill selection
+    selected_skills = _shim._select_skills()
+
+    # Step 6: Confirmation
+    if not _shim._confirm_install(clis, scope, copy_mode, selected_skills, role_models):
+        print("Installation cancelled.")
+        return
+
+    # Build first
+    print("\nBuilding from source...")
+    try:
+        _shim.build()
+    except Exception as e:
+        print(f"{_shim.Color.RED}Build failed: {e}{_shim.Color.NC}")
+        return
+
+    # Execute installation
+    print(f"\nInstalling ({scope}, {'copy' if copy_mode else 'symlink'}) ...")
+    print("")
+
+    # Install skills
+    if selected_skills:
+        from ..cli_backend import load_registry
+        from .. import installer
+        registry = load_registry()
+        targets = []
+        for backend in registry.all():
+            if backend.name in clis and backend.supports("skills"):
+                target = installer.target_dir_for(backend, "skills", scope)
+                if target is not None:
+                    targets.append(target)
+        # Plus the universal ~/.agents/skills if global scope (current behavior)
+        if scope == "global":
+            targets.append(_shim.AGENTS_HOME / "skills")
+
+        _shim.install_skills_filtered(selected_skills, targets, copy_mode)
+
+    # Install agents
+    _shim.install_agents_filtered(clis, scope, copy_mode)
+
+    # Install config
+    _shim.install_config_filtered(clis, scope, copy_mode)
+
+    print("")
+    print(f"{_shim.Color.GREEN}Done.{_shim.Color.NC} Restart Claude Code / OpenCode to pick up changes.")
+    
+    # Write state.json
+    from .. import install_state
+    project_path = Path.cwd() if scope == "local" else None
+    try:
+        st = install_state.build_install_state(
+            mode="copy" if copy_mode else "symlink",
+            scope=scope,
+            repo_root=_shim.PKG_DIR.parent,
+            project_path=project_path,
+            role_models=role_models,
+        )
+        install_state.record_install_state(st)
+    except Exception as e:
+        print(f"{_shim.Color.YELLOW}Warning: failed to write state.json: {e}{_shim.Color.NC}")
