@@ -404,6 +404,98 @@ class TestGenerateAgentFilesWithState:
         # Should use tier model since role not in state
         assert 'model: claude-sonnet-3-5' in claude_content
 
+    def test_role_class_fallback_when_no_state_and_no_tier(
+        self, tmp_path, monkeypatch, sample_agent_content
+    ):
+        """Regression: fresh build from shipped YAMLs must work with no state
+        and no legacy 'tier' field, by matching role.typical_class to a model
+        whose class matches and which has an alias for the backend's providers.
+
+        This exercises the "agent-notes build on a clean checkout" scenario —
+        the one where the whole promise of 'zero Python changes to add a new
+        CLI/model/role' gets tested end-to-end.
+        """
+        from agent_notes.cli_backend import CLIBackend, CLIRegistry
+        from agent_notes.domain.model import Model
+        from agent_notes.registries.model_registry import ModelRegistry
+        from agent_notes.domain.role import Role
+        from agent_notes.registries.role_registry import RoleRegistry
+        from pathlib import Path
+
+        # Source agent markdown
+        source_agents_dir = tmp_path / "source" / "agents"
+        source_agents_dir.mkdir(parents=True)
+        (source_agents_dir / "test-agent.md").write_text(sample_agent_content)
+        dist_dir = tmp_path / "dist"
+        monkeypatch.setattr('agent_notes.config.AGENTS_DIR', source_agents_dir)
+        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_dir)
+
+        # Backend that accepts anthropic provider
+        claude = CLIBackend(
+            name="claude", label="Claude Code",
+            global_home=Path("~/.claude").expanduser(), local_dir=".claude",
+            layout={"agents": "agents/"},
+            features={"agents": True, "frontmatter": "claude"},
+            global_template=None,
+            accepted_providers=("anthropic",),
+        )
+        registry = CLIRegistry([claude])
+
+        # Role registry with a 'worker' role that prefers sonnet class
+        role_registry = RoleRegistry([
+            Role(
+                name="worker", label="Worker",
+                description="Implements code",
+                typical_class="sonnet",
+                color="blue",
+            ),
+        ])
+
+        # Model registry with a sonnet model that has an anthropic alias
+        model_registry = ModelRegistry([
+            Model(
+                id="claude-sonnet-4", label="Claude Sonnet 4",
+                family="claude", model_class="sonnet",
+                aliases={"anthropic": "sonnet"},
+            ),
+        ])
+
+        # Agent config declares ONLY role, no tier (this is the v1.1 shape)
+        agents_config = {
+            'test-agent': {
+                'description': 'Test agent',
+                'role': 'worker',
+                'mode': 'primary',
+                'color': 'blue',
+                'effort': 'medium',
+                'claude': {},
+            }
+        }
+
+        def mock_dist_source_for(backend, component):
+            if component == "agents":
+                return dist_dir / backend.name / "agents"
+            return None
+
+        with patch('agent_notes.cli_backend.load_registry', return_value=registry), \
+             patch('agent_notes.registries.model_registry.load_model_registry',
+                   return_value=model_registry), \
+             patch('agent_notes.registries.role_registry.load_role_registry',
+                   return_value=role_registry), \
+             patch('agent_notes.installer.dist_source_for', side_effect=mock_dist_source_for):
+            build.generate_agent_files(
+                agents_config, tiers={},  # empty tiers: this path must not be taken
+                state=None,  # no state: the headline scenario
+            )
+
+        claude_file = dist_dir / 'claude' / 'agents' / 'test-agent.md'
+        assert claude_file.exists(), "role-class fallback should still produce output"
+        content = claude_file.read_text()
+        # The model alias for the anthropic provider should be rendered.
+        assert 'model: sonnet' in content, (
+            f"expected role-class fallback to pick sonnet alias, got:\n{content}"
+        )
+
 
 class TestCopyGlobalFiles:
     """Test copy_global_files function."""
