@@ -1,82 +1,20 @@
-"""List installed components."""
+"""DEPRECATED shim. Import from agent_notes.commands.list instead."""
 
-import yaml
-from pathlib import Path
-from typing import Dict, Any, Optional
+from agent_notes.commands.list import *  # noqa: F401,F403
 
-from .config import ROOT, DATA_DIR, Color, find_skill_dirs
+# Re-export config constants that tests patch
+from agent_notes.config import (  # noqa: F401
+    ROOT, PKG_DIR, DATA_DIR, DIST_DIR,
+    AGENTS_DIR, SKILLS_DIR, RULES_DIR, SCRIPTS_DIR, MODELS_DIR, ROLES_DIR,
+    AGENTS_YAML,
+    GLOBAL_CLAUDE_MD, GLOBAL_OPENCODE_MD, GLOBAL_COPILOT_MD,
+    DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR,
+    DIST_RULES_DIR, DIST_SKILLS_DIR, DIST_SCRIPTS_DIR,
+    BIN_HOME, CLAUDE_HOME, OPENCODE_HOME, GITHUB_HOME, AGENTS_HOME,
+    MEMORY_DIR, BACKUP_DIR,
+    Color, ok, warn, fail, error, info, issue, linked, removed, skipped,
+    get_version, find_skill_dirs
+)
 
-def list_agents() -> None:
-    """List all agents with tier and description."""
-    print(f"{Color.CYAN}Agents:{Color.NC}")
-    
-    source_agents_dir = DATA_DIR / "agents"
-    agents_yaml = DATA_DIR / "agents" / "agents.yaml"
-    
-    # Load agents metadata from YAML if available
-    agents_metadata: Dict[str, Dict[str, Any]] = {}
-    if agents_yaml.exists():
-        try:
-            with open(agents_yaml, 'r') as f:
-                yaml_data = yaml.safe_load(f)
-                if yaml_data and 'agents' in yaml_data:
-                    agents_metadata = yaml_data['agents']
-        except (yaml.YAMLError, FileNotFoundError):
-            pass
-    
-    if source_agents_dir.exists():
-        for f in sorted(source_agents_dir.glob("*.md")):
-            name = f.stem
-            
-            if name in agents_metadata:
-                tier = agents_metadata[name].get('tier', '')
-                description = agents_metadata[name].get('description', '')
-                print(f"  {name:<22} {Color.DIM}({tier:<8}){Color.NC} {description}")
-            else:
-                print(f"  {name}")
-    
-    print("")
-
-def list_skills() -> None:
-    """List all skills."""
-    print(f"{Color.CYAN}Skills:{Color.NC}")
-    
-    skill_dirs = find_skill_dirs()
-    for skill_path in sorted(skill_dirs):
-        skill_name = skill_path.name
-        print(f"  {skill_name}")
-    
-    print("")
-
-def list_rules() -> None:
-    """List all rules and global configs."""
-    print(f"{Color.CYAN}Rules:{Color.NC}")
-    
-    source_rules_dir = DATA_DIR / "rules"
-    if source_rules_dir.exists():
-        for f in sorted(source_rules_dir.glob("*.md")):
-            print(f"  {f.stem}")
-    
-    print("")
-    
-    print(f"{Color.CYAN}Global configs:{Color.NC}")
-    print("  global.md")
-    print("  global-copilot.md")
-    print("")
-
-def list_components(filter_type: str = "all") -> None:
-    """List installed components."""
-    if filter_type == "agents":
-        list_agents()
-    elif filter_type == "skills":
-        list_skills()
-    elif filter_type == "rules":
-        list_rules()
-    elif filter_type == "all":
-        list_agents()
-        list_skills()
-        list_rules()
-    else:
-        print(f"Unknown filter: {filter_type}")
-        print("Usage: agent-notes list [agents|skills|rules]")
-        exit(1)
+# Re-export registries that tests patch  
+from agent_notes.registries import default_skill_registry, default_rule_registry  # noqa: F401
