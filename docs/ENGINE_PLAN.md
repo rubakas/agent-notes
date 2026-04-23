@@ -31,6 +31,8 @@ Vision: **agent-notes is a true engine.** Adding a new AI CLI, a new AI model, o
 
 **Post-13 Status (April 2026):** Engine is v1.1.0-ready. All 502 tests passing. Zero Python changes required to add a new CLI, model, role, agent, skill, or rule — drop YAML under `agent_notes/data/`. 4-layer bounded-context architecture (`domain` → `registries` → `services` → `commands`) enforced by `tests/test_package_layout.py` (6 tests). Detailed architecture guide: `docs/ARCHITECTURE.md`.
 
+**Self-improvement round 1 (April 2026):** Made `AgentSpec` backend-agnostic — replaced hardcoded `claude` / `opencode` / `claude_exclude` fields with a generic `backends: Dict[str, Dict[str, Any]]` map plus `backend_config(name)` / `excluded_from(name)` helpers. The agent loader in `registries/agent_registry.py` now populates `backends` from every non-reserved YAML key, so adding a new CLI backend (e.g. Gemini) requires zero changes to domain or registry code. Legacy `claude_exclude: true` in YAML still works via backward-compat translation. `rg '"claude"|"opencode"|"copilot"' agent_notes/registries/` is down to a single line (the legacy-key translation). 502 tests still green.
+
 **Non-goals for 1.1.0:**
 - Plugin installation (Claude Code `/plugins`, OpenCode equivalent). CLI YAMLs gain a `features.supports_plugins: bool` flag in Phase 3 for forward-compat, but no installer code is written.
 - Hooks/MCP server generation from YAML (future — CLI_CAPABILITIES.md documents these so we don't paint into a corner).
