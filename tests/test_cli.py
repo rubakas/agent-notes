@@ -39,7 +39,7 @@ class TestArgumentParsing:
             cli.main()
         
         captured = capsys.readouterr()
-        assert "usage:" in captured.out
+        assert "Usage:" in captured.out
         assert "agent-notes" in captured.out
     
     def test_install_command_parsing(self):
@@ -58,7 +58,7 @@ class TestArgumentParsing:
         with patch.object(sys, 'argv', test_args):
             with patch('agent_notes.install.install') as mock_install:
                 cli.main()
-                mock_install.assert_called_once_with(local=True, copy=False)
+                mock_install.assert_called_once_with(local=True, copy=False, reconfigure=False)
     
     def test_install_with_local_flag(self):
         """Should parse install --local correctly."""
@@ -67,7 +67,7 @@ class TestArgumentParsing:
         with patch.object(sys, 'argv', test_args):
             with patch('agent_notes.install.install') as mock_install:
                 cli.main()
-                mock_install.assert_called_once_with(local=True, copy=False)
+                mock_install.assert_called_once_with(local=True, copy=False, reconfigure=False)
     
     def test_install_with_copy_flag(self):
         """Should parse install --local --copy correctly."""
@@ -76,7 +76,16 @@ class TestArgumentParsing:
         with patch.object(sys, 'argv', test_args):
             with patch('agent_notes.install.install') as mock_install:
                 cli.main()
-                mock_install.assert_called_once_with(local=True, copy=True)
+                mock_install.assert_called_once_with(local=True, copy=True, reconfigure=False)
+    
+    def test_install_with_reconfigure_flag(self):
+        """Should parse install --reconfigure correctly."""
+        test_args = ["agent-notes", "install", "--local", "--reconfigure"]
+        
+        with patch.object(sys, 'argv', test_args):
+            with patch('agent_notes.install.install') as mock_install:
+                cli.main()
+                mock_install.assert_called_once_with(local=True, copy=False, reconfigure=True)
     
     def test_build_command_parsing(self):
         """Should parse build command correctly."""
@@ -283,10 +292,11 @@ class TestHelpText:
                 cli.main()
         
         captured = capsys.readouterr()
-        assert "AI agent configuration manager" in captured.out
+        assert "hub for installing AI best-practices" in captured.out
         assert "install" in captured.out
         assert "build" in captured.out
         assert "uninstall" in captured.out
+        assert "Examples:" in captured.out
     
     def test_install_help(self, capsys):
         """Should show install command help."""

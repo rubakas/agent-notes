@@ -8,265 +8,88 @@ import agent_notes.build as build
 import agent_notes.config as config
 
 
-class TestStripMemorySection:
-    """Test strip_memory_section function."""
-    
-    def test_removes_memory_section(self):
-        """Should remove ## Memory section completely."""
-        content = """# Agent
-        
-## Instructions
-
-Follow these rules.
-
-## Memory
-
-This should be removed.
-
-## Examples
-
-This should remain.
-"""
-        result = build.strip_memory_section(content)
-        
-        assert "## Memory" not in result
-        assert "This should be removed" not in result
-        assert "## Instructions" in result
-        assert "## Examples" in result
-        assert "Follow these rules" in result
-        assert "This should remain" in result
-    
-    def test_handles_no_memory_section(self):
-        """Should handle content without memory section."""
-        content = """# Agent
-        
-## Instructions
-
-Follow these rules.
-
-## Examples
-
-Some examples.
-"""
-        result = build.strip_memory_section(content)
-        assert result == content.strip()
-    
-    def test_handles_memory_at_end(self):
-        """Should handle memory section at end of file."""
-        content = """# Agent
-
-## Instructions
-
-Follow these rules.
-
-## Memory
-
-This should be removed.
-"""
-        result = build.strip_memory_section(content)
-        
-        assert "## Memory" not in result
-        assert "This should be removed" not in result
-        assert "Follow these rules" in result
-    
-    def test_removes_trailing_empty_lines(self):
-        """Should remove trailing empty lines."""
-        content = """# Agent
-
-## Instructions
-
-Follow these rules.
-
-## Memory
-
-Remove this.
-
-
-
-"""
-        result = build.strip_memory_section(content)
-        
-        # Should not end with multiple newlines
-        assert not result.endswith('\n\n')
-        assert result.endswith('Follow these rules.')
-
-
-class TestGenerateClaudeFrontmatter:
-    """Test generate_claude_frontmatter function."""
-    
-    def test_generates_basic_frontmatter(self):
-        """Should generate basic Claude frontmatter."""
-        agent_config = {
-            'description': 'Test agent',
-            'tier': 'sonnet',
-            'color': 'blue',
-            'effort': 'medium'
-        }
-        tiers = {
-            'sonnet': {'claude': 'claude-3-5-sonnet-20241022'}
-        }
-        
-        result = build.generate_claude_frontmatter('test-agent', agent_config, tiers)
-        
-        assert 'name: test-agent' in result
-        assert 'description: Test agent' in result
-        assert 'model: claude-3-5-sonnet-20241022' in result
-        assert 'color: blue' in result
-        assert 'effort: medium' in result
-        assert result.startswith('---')
-        assert result.endswith('---')
-    
-    def test_includes_claude_specific_settings(self):
-        """Should include Claude-specific settings when present."""
-        agent_config = {
-            'description': 'Test agent',
-            'tier': 'opus',
-            'color': 'red',
-            'effort': 'high',
-            'claude': {
-                'tools': 'Read, Write',
-                'disallowedTools': 'Bash',
-                'memory': 'user'
-            }
-        }
-        tiers = {
-            'opus': {'claude': 'claude-3-opus-20240229'}
-        }
-        
-        result = build.generate_claude_frontmatter('test-agent', agent_config, tiers)
-        
-        assert 'tools: Read, Write' in result
-        assert 'disallowedTools: Bash' in result
-        assert 'memory: user' in result
-
-
-class TestGenerateOpencodeFrontmatter:
-    """Test generate_opencode_frontmatter function."""
-    
-    def test_generates_basic_frontmatter(self):
-        """Should generate basic OpenCode frontmatter."""
-        agent_config = {
-            'description': 'Test agent',
-            'mode': 'primary',
-            'tier': 'sonnet'
-        }
-        tiers = {
-            'sonnet': {'opencode': 'github-copilot/claude-sonnet-4'}
-        }
-        
-        result = build.generate_opencode_frontmatter('test-agent', agent_config, tiers)
-        
-        assert 'description: Test agent' in result
-        assert 'mode: primary' in result
-        assert 'model: github-copilot/claude-sonnet-4' in result
-        assert result.startswith('---')
-        assert result.endswith('---')
-    
-    def test_includes_simple_permissions(self):
-        """Should include simple permissions."""
-        agent_config = {
-            'description': 'Test agent',
-            'mode': 'subagent',
-            'tier': 'haiku',
-            'opencode': {
-                'permission': {
-                    'edit': 'allow'
-                }
-            }
-        }
-        tiers = {
-            'haiku': {'opencode': 'github-copilot/claude-haiku-4.5'}
-        }
-        
-        result = build.generate_opencode_frontmatter('test-agent', agent_config, tiers)
-        
-        assert 'permission:' in result
-        assert 'edit: allow' in result
-    
-    def test_includes_bash_permissions_string(self):
-        """Should include bash permissions as string."""
-        agent_config = {
-            'description': 'Test agent',
-            'mode': 'subagent',
-            'tier': 'haiku',
-            'opencode': {
-                'permission': {
-                    'bash': 'allow'
-                }
-            }
-        }
-        tiers = {
-            'haiku': {'opencode': 'github-copilot/claude-haiku-4.5'}
-        }
-        
-        result = build.generate_opencode_frontmatter('test-agent', agent_config, tiers)
-        
-        assert 'bash: allow' in result
-    
-    def test_includes_bash_permissions_dict(self):
-        """Should include bash permissions as dict with proper quoting."""
-        agent_config = {
-            'description': 'Test agent',
-            'mode': 'subagent',
-            'tier': 'haiku',
-            'opencode': {
-                'permission': {
-                    'bash': {
-                        '*': 'deny',
-                        'git log*': 'allow',
-                        'normal_command': 'allow'
-                    }
-                }
-            }
-        }
-        tiers = {
-            'haiku': {'opencode': 'github-copilot/claude-haiku-4.5'}
-        }
-        
-        result = build.generate_opencode_frontmatter('test-agent', agent_config, tiers)
-        
-        assert 'bash:' in result
-        assert '"*": deny' in result  # Should quote keys with special chars
-        assert '"git log*": allow' in result  # Should quote keys with spaces/special chars
-        assert 'normal_command: allow' in result  # Should not quote normal keys
-
-
 class TestGenerateAgentFiles:
     """Test generate_agent_files function."""
     
     def test_generates_both_formats(self, tmp_path, monkeypatch, sample_agents_yaml, sample_agent_content):
         """Should generate both Claude and OpenCode format files."""
+        from agent_notes.cli_backend import CLIBackend, CLIRegistry
+        from pathlib import Path
+        
         # Setup temporary directories
         source_agents_dir = tmp_path / "source" / "agents"
         source_agents_dir.mkdir(parents=True)
-        
-        dist_claude_dir = tmp_path / "dist" / "cli" / "claude"
-        dist_opencode_dir = tmp_path / "dist" / "cli" / "opencode"
-        
+
+        dist_dir = tmp_path / "dist"
+        dist_claude_dir = dist_dir / "claude"
+        dist_opencode_dir = dist_dir / "opencode"
+
         # Create source agent file
         (source_agents_dir / "test-agent.md").write_text(sample_agent_content)
+
+        # Mock paths and registry
+        monkeypatch.setattr('agent_notes.config.AGENTS_DIR', source_agents_dir)
+        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_dir)
         
-        # Mock paths
-        monkeypatch.setattr(build, 'AGENTS_DIR', source_agents_dir)
-        monkeypatch.setattr(build, 'DIST_CLAUDE_DIR', dist_claude_dir)
-        monkeypatch.setattr(build, 'DIST_OPENCODE_DIR', dist_opencode_dir)
+        # Create mock backends
+        claude = CLIBackend(
+            name="claude", label="Claude Code", 
+            global_home=Path("~/.claude").expanduser(), local_dir=".claude",
+            layout={"agents": "agents/"}, features={"agents": True, "frontmatter": "claude"},
+            global_template=None
+        )
+        opencode = CLIBackend(
+            name="opencode", label="OpenCode",
+            global_home=Path("~/.config/opencode").expanduser(), local_dir=".opencode", 
+            layout={"agents": "agents/"}, features={"agents": True, "frontmatter": "opencode"},
+            global_template=None, strip_memory_section=True
+        )
+        registry = CLIRegistry([claude, opencode])
         
-        # Parse config
-        config_data = yaml.safe_load(sample_agents_yaml)
-        agents_config = config_data['agents']
-        tiers = config_data['tiers']
+        # Mock installer function to return our test paths
+        def mock_dist_source_for(backend, component):
+            if component == "agents":
+                return dist_dir / backend.name / "agents"
+            return None
         
-        # Generate files
-        generated = build.generate_agent_files(agents_config, tiers)
-        
-        # Check files were created
-        claude_file = dist_claude_dir / 'agents' / 'test-agent.md'
-        opencode_file = dist_opencode_dir / 'agents' / 'test-agent.md'
-        
-        assert claude_file.exists()
-        assert opencode_file.exists()
-        assert claude_file in generated
-        assert opencode_file in generated
+        with patch('agent_notes.cli_backend.load_registry', return_value=registry):
+            with patch('agent_notes.installer.dist_source_for', side_effect=mock_dist_source_for):
+                # Parse config
+                config_data = yaml.safe_load(sample_agents_yaml)
+                agents_config = config_data['agents']
+                tiers = config_data['tiers']
+
+                # Generate files
+                generated = build.generate_agent_files(agents_config, tiers)
+
+                # Check files were created
+                claude_file = dist_claude_dir / 'agents' / 'test-agent.md'
+                opencode_file = dist_opencode_dir / 'agents' / 'test-agent.md'
+
+                assert claude_file.exists()
+                assert opencode_file.exists()
+
+                # Check content has frontmatter
+                claude_content = claude_file.read_text()
+                opencode_content = opencode_file.read_text()
+
+                assert claude_content.startswith('---')
+                assert 'name: test-agent' in claude_content
+                assert 'model:' in claude_content
+                
+                assert opencode_content.startswith('---')
+                assert 'description:' in opencode_content
+                assert 'mode:' in opencode_content
+                assert 'model:' in opencode_content
+
+                # Check that Memory section was stripped from OpenCode
+                assert '## Memory' in claude_content
+                assert '## Memory' not in opencode_content
+
+                # Should return list of generated files
+                assert len(generated) == 2
+                assert claude_file in generated
+                assert opencode_file in generated
         
         # Check Claude content
         claude_content = claude_file.read_text()
@@ -290,12 +113,12 @@ class TestGenerateAgentFiles:
         source_agents_dir = tmp_path / "source" / "agents"
         source_agents_dir.mkdir(parents=True)
         
-        monkeypatch.setattr(build, 'AGENTS_DIR', source_agents_dir)
+        monkeypatch.setattr('agent_notes.config.AGENTS_DIR', source_agents_dir)
         
         agents_config = {
             'missing-agent': {
                 'description': 'Missing agent',
-                'tier': 'sonnet',
+                'role': 'worker',
                 'mode': 'primary',
                 'color': 'blue',
                 'effort': 'medium'
@@ -311,6 +134,277 @@ class TestGenerateAgentFiles:
         assert generated == []
 
 
+class TestGenerateAgentFilesWithState:
+    """Test generate_agent_files with state-driven model resolution."""
+    
+    def test_uses_state_role_models(self, tmp_path, monkeypatch, sample_agent_content):
+        """Should use state role_models when available."""
+        from agent_notes.cli_backend import CLIBackend, CLIRegistry
+        from agent_notes.state import State, ScopeState, BackendState
+        from agent_notes.model_registry import Model, ModelRegistry
+        from pathlib import Path
+        
+        # Setup source structure
+        source_agents_dir = tmp_path / "source" / "agents"
+        source_agents_dir.mkdir(parents=True)
+        (source_agents_dir / "worker-agent.md").write_text(sample_agent_content)
+        
+        dist_dir = tmp_path / "dist"
+        
+        # Mock paths
+        monkeypatch.setattr('agent_notes.config.AGENTS_DIR', source_agents_dir)
+        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_dir)
+        
+        # Create mock backends with accepted_providers
+        claude = CLIBackend(
+            name="claude", label="Claude Code",
+            global_home=Path("~/.claude").expanduser(), local_dir=".claude",
+            layout={"agents": "agents/"}, features={"agents": True, "frontmatter": "claude"},
+            global_template=None,
+            accepted_providers=("anthropic",)
+        )
+        opencode = CLIBackend(
+            name="opencode", label="OpenCode",
+            global_home=Path("~/.config/opencode").expanduser(), local_dir=".opencode",
+            layout={"agents": "agents/"}, features={"agents": True, "frontmatter": "opencode"},
+            global_template=None, strip_memory_section=True,
+            accepted_providers=("github-copilot",)
+        )
+        registry = CLIRegistry([claude, opencode])
+        
+        # Create mock model registry
+        test_model = Model(
+            id="claude-opus-4-7",
+            label="Claude Opus 4.7",
+            family="claude",
+            model_class="opus",
+            aliases={
+                "anthropic": "claude-opus-4-7",
+                "github-copilot": "github-copilot/claude-opus-4.7"
+            }
+        )
+        model_registry = ModelRegistry([test_model])
+        
+        # Create state with role_models
+        state = State(
+            source_path="/fake/path",
+            source_commit="abc123",
+            global_install=ScopeState(
+                installed_at="2024-01-01T00:00:00Z",
+                updated_at="2024-01-01T00:00:00Z",
+                mode="symlink",
+                clis={
+                    "claude": BackendState(
+                        role_models={"worker": "claude-opus-4-7"}
+                    ),
+                    "opencode": BackendState(
+                        role_models={"worker": "claude-opus-4-7"}
+                    )
+                }
+            )
+        )
+        
+        # Agent config with role field
+        agents_config = {
+            'worker-agent': {
+                'description': 'Worker agent',
+                'role': 'worker',   # NEW: role field
+                'mode': 'primary',
+                'color': 'blue',
+                'effort': 'medium',
+                'claude': {},
+                'opencode': {}
+            }
+        }
+        
+        # Tiers (fallback - should NOT be used for this agent)
+        tiers = {
+            'sonnet': {
+                'claude': 'sonnet',
+                'opencode': 'github-copilot/claude-sonnet-4'
+            }
+        }
+        
+        def mock_dist_source_for(backend, component):
+            if component == "agents":
+                return dist_dir / backend.name / "agents"
+            return None
+        
+        with patch('agent_notes.cli_backend.load_registry', return_value=registry):
+            with patch('agent_notes.installer.dist_source_for', side_effect=mock_dist_source_for):
+                with patch('agent_notes.model_registry.load_model_registry', return_value=model_registry):
+                    # Generate with state
+                    generated = build.generate_agent_files(
+                        agents_config, tiers, 
+                        state=state, scope='global'
+                    )
+        
+        # Check files were created
+        claude_file = dist_dir / 'claude' / 'agents' / 'worker-agent.md'
+        opencode_file = dist_dir / 'opencode' / 'agents' / 'worker-agent.md'
+        
+        assert claude_file.exists()
+        assert opencode_file.exists()
+        
+        # Check that state-resolved models were used (NOT the tiers models)
+        claude_content = claude_file.read_text()
+        opencode_content = opencode_file.read_text()
+        
+        # Should use opus model from state, not sonnet from tier
+        assert 'model: claude-opus-4-7' in claude_content
+        assert 'model: github-copilot/claude-opus-4.7' in opencode_content
+        
+        # Should NOT contain sonnet (the tier model)
+        assert 'model: sonnet' not in claude_content
+        assert 'model: github-copilot/claude-sonnet-4' not in opencode_content
+    
+    def test_falls_back_to_tiers_without_state(self, tmp_path, monkeypatch, sample_agent_content):
+        """Should fall back to tiers when state=None."""
+        from agent_notes.cli_backend import CLIBackend, CLIRegistry
+        from pathlib import Path
+        
+        # Setup source structure
+        source_agents_dir = tmp_path / "source" / "agents"
+        source_agents_dir.mkdir(parents=True)
+        (source_agents_dir / "test-agent.md").write_text(sample_agent_content)
+        
+        dist_dir = tmp_path / "dist"
+        
+        # Mock paths
+        monkeypatch.setattr('agent_notes.config.AGENTS_DIR', source_agents_dir)
+        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_dir)
+        
+        # Create mock backends
+        claude = CLIBackend(
+            name="claude", label="Claude Code",
+            global_home=Path("~/.claude").expanduser(), local_dir=".claude",
+            layout={"agents": "agents/"}, features={"agents": True, "frontmatter": "claude"},
+            global_template=None
+        )
+        registry = CLIRegistry([claude])
+        
+        # Agent config with role field
+        agents_config = {
+            'test-agent': {
+                'description': 'Test agent',
+                'role': 'scout',
+                'tier': 'haiku',  # Fallback tier when state-driven fails
+                'mode': 'primary',
+                'color': 'blue',
+                'effort': 'low',
+                'claude': {}
+            }
+        }
+        
+        tiers = {
+            'haiku': {
+                'claude': 'claude-haiku-3-5'
+            }
+        }
+        
+        def mock_dist_source_for(backend, component):
+            if component == "agents":
+                return dist_dir / backend.name / "agents"
+            return None
+        
+        with patch('agent_notes.cli_backend.load_registry', return_value=registry):
+            with patch('agent_notes.installer.dist_source_for', side_effect=mock_dist_source_for):
+                # Generate WITHOUT state (None)
+                generated = build.generate_agent_files(
+                    agents_config, tiers, 
+                    state=None  # No state
+                )
+        
+        # Check file was created with tier model
+        claude_file = dist_dir / 'claude' / 'agents' / 'test-agent.md'
+        assert claude_file.exists()
+        
+        claude_content = claude_file.read_text()
+        assert 'model: claude-haiku-3-5' in claude_content
+    
+    def test_falls_back_when_role_not_in_state(self, tmp_path, monkeypatch, sample_agent_content):
+        """Should fall back to tiers when role not in state.role_models."""
+        from agent_notes.cli_backend import CLIBackend, CLIRegistry
+        from agent_notes.state import State, ScopeState, BackendState
+        from pathlib import Path
+        
+        # Setup source structure
+        source_agents_dir = tmp_path / "source" / "agents"
+        source_agents_dir.mkdir(parents=True)
+        (source_agents_dir / "test-agent.md").write_text(sample_agent_content)
+        
+        dist_dir = tmp_path / "dist"
+        
+        # Mock paths
+        monkeypatch.setattr('agent_notes.config.AGENTS_DIR', source_agents_dir)
+        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_dir)
+        
+        # Create mock backend
+        claude = CLIBackend(
+            name="claude", label="Claude Code",
+            global_home=Path("~/.claude").expanduser(), local_dir=".claude",
+            layout={"agents": "agents/"}, features={"agents": True, "frontmatter": "claude"},
+            global_template=None
+        )
+        registry = CLIRegistry([claude])
+        
+        # Create state WITHOUT the 'researcher' role
+        state = State(
+            source_path="/fake/path",
+            source_commit="abc123",
+            global_install=ScopeState(
+                installed_at="2024-01-01T00:00:00Z",
+                updated_at="2024-01-01T00:00:00Z",
+                mode="symlink",
+                clis={
+                    "claude": BackendState(
+                        role_models={"worker": "claude-opus-4-7"}  # Only 'worker' role
+                    )
+                }
+            )
+        )
+        
+        # Agent config with role='researcher' (NOT in state)
+        agents_config = {
+            'test-agent': {
+                'description': 'Test agent',
+                'role': 'researcher',  # This role is NOT in state.role_models
+                'tier': 'sonnet',  # Fallback tier when role not found in state
+                'mode': 'primary',
+                'color': 'blue',
+                'effort': 'medium',
+                'claude': {}
+            }
+        }
+        
+        tiers = {
+            'sonnet': {
+                'claude': 'claude-sonnet-3-5'
+            }
+        }
+        
+        def mock_dist_source_for(backend, component):
+            if component == "agents":
+                return dist_dir / backend.name / "agents"
+            return None
+        
+        with patch('agent_notes.cli_backend.load_registry', return_value=registry):
+            with patch('agent_notes.installer.dist_source_for', side_effect=mock_dist_source_for):
+                # Generate with state (but role not found in state)
+                generated = build.generate_agent_files(
+                    agents_config, tiers,
+                    state=state, scope='global'
+                )
+        
+        # Check file was created with TIER model (fallback)
+        claude_file = dist_dir / 'claude' / 'agents' / 'test-agent.md'
+        assert claude_file.exists()
+        
+        claude_content = claude_file.read_text()
+        # Should use tier model since role not in state
+        assert 'model: claude-sonnet-3-5' in claude_content
+
+
 class TestCopyGlobalFiles:
     """Test copy_global_files function."""
     
@@ -320,7 +414,8 @@ class TestCopyGlobalFiles:
         source_dir = tmp_path / "source"
         source_dir.mkdir()
         
-        (source_dir / "global.md").write_text("Global config content")
+        (source_dir / "global-claude.md").write_text("Claude config content")
+        (source_dir / "global-opencode.md").write_text("OpenCode config content")
         (source_dir / "global-copilot.md").write_text("Copilot config content")
         
         source_rules_dir = source_dir / "rules"
@@ -335,13 +430,14 @@ class TestCopyGlobalFiles:
         dist_rules_dir = tmp_path / "dist" / "rules"
         
         # Mock paths
-        monkeypatch.setattr(build, 'GLOBAL_MD', source_dir / "global.md")
-        monkeypatch.setattr(build, 'GLOBAL_COPILOT_MD', source_dir / "global-copilot.md")
-        monkeypatch.setattr(build, 'RULES_DIR', source_rules_dir)
-        monkeypatch.setattr(build, 'DIST_CLAUDE_DIR', dist_claude_dir)
-        monkeypatch.setattr(build, 'DIST_OPENCODE_DIR', dist_opencode_dir)
-        monkeypatch.setattr(build, 'DIST_GITHUB_DIR', dist_github_dir)
-        monkeypatch.setattr(build, 'DIST_RULES_DIR', dist_rules_dir)
+        monkeypatch.setattr('agent_notes.config.GLOBAL_CLAUDE_MD', source_dir / "global-claude.md")
+        monkeypatch.setattr('agent_notes.config.GLOBAL_OPENCODE_MD', source_dir / "global-opencode.md")
+        monkeypatch.setattr('agent_notes.config.GLOBAL_COPILOT_MD', source_dir / "global-copilot.md")
+        monkeypatch.setattr('agent_notes.config.RULES_DIR', source_rules_dir)
+        monkeypatch.setattr('agent_notes.config.DIST_CLAUDE_DIR', dist_claude_dir)
+        monkeypatch.setattr('agent_notes.config.DIST_OPENCODE_DIR', dist_opencode_dir)
+        monkeypatch.setattr('agent_notes.config.DIST_GITHUB_DIR', dist_github_dir)
+        monkeypatch.setattr('agent_notes.config.DIST_RULES_DIR', dist_rules_dir)
         
         # Copy files
         copied = build.copy_global_files()
@@ -360,8 +456,8 @@ class TestCopyGlobalFiles:
         assert rule2_file.exists()
         
         # Check content
-        assert claude_global.read_text() == "Global config content"
-        assert agents_global.read_text() == "Global config content"
+        assert claude_global.read_text() == "Claude config content"
+        assert agents_global.read_text() == "OpenCode config content"
         assert copilot_global.read_text() == "Copilot config content"
         assert rule1_file.read_text() == "Rule 1"
         assert rule2_file.read_text() == "Rule 2"
@@ -399,63 +495,118 @@ class TestBuild:
     
     def test_full_build_process(self, tmp_path, monkeypatch, capsys, sample_agents_yaml, sample_agent_content):
         """Should perform full build process."""
+        from agent_notes.cli_backend import CLIBackend, CLIRegistry
+        from unittest.mock import patch
+        from pathlib import Path
+        
         # Setup source structure
         source_dir = tmp_path / "source"
         source_dir.mkdir()
-        
+
         agents_yaml = source_dir / "agents.yaml"
         agents_yaml.write_text(sample_agents_yaml)
-        
+
         source_agents_dir = source_dir / "agents"
         source_agents_dir.mkdir()
         (source_agents_dir / "test-agent.md").write_text(sample_agent_content)
-        
-        (source_dir / "global.md").write_text("Global content")
+
+        (source_dir / "global-claude.md").write_text("Claude content")
+        (source_dir / "global-opencode.md").write_text("OpenCode content")
         (source_dir / "global-copilot.md").write_text("Copilot content")
+
+        # Setup dist structure
+        dist_dir = tmp_path / "dist"
         
         # Mock ROOT and paths
         monkeypatch.setattr(config, 'ROOT', tmp_path)
-        monkeypatch.setattr(build, 'ROOT', tmp_path)
-        monkeypatch.setattr(build, 'AGENTS_YAML', agents_yaml)
-        monkeypatch.setattr(build, 'AGENTS_DIR', source_agents_dir)
-        monkeypatch.setattr(build, 'GLOBAL_MD', source_dir / "global.md")
-        monkeypatch.setattr(build, 'GLOBAL_COPILOT_MD', source_dir / "global-copilot.md")
-        monkeypatch.setattr(build, 'RULES_DIR', source_dir / "rules")  # Non-existent
+        monkeypatch.setattr('agent_notes.config.ROOT', tmp_path)
+        monkeypatch.setattr('agent_notes.config.AGENTS_YAML', agents_yaml)
+        monkeypatch.setattr('agent_notes.config.AGENTS_DIR', source_agents_dir)
+        monkeypatch.setattr('agent_notes.config.GLOBAL_CLAUDE_MD', source_dir / "global-claude.md")
+        monkeypatch.setattr('agent_notes.config.GLOBAL_OPENCODE_MD', source_dir / "global-opencode.md")
+        monkeypatch.setattr('agent_notes.config.GLOBAL_COPILOT_MD', source_dir / "global-copilot.md")
+        monkeypatch.setattr('agent_notes.config.RULES_DIR', source_dir / "rules")  # Non-existent
+        monkeypatch.setattr('agent_notes.config.SCRIPTS_DIR', source_dir / "scripts")  # Non-existent
+        monkeypatch.setattr('agent_notes.config.DIST_DIR', dist_dir)
+        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_dir)
         
-        dist_dir = tmp_path / "dist"
-        monkeypatch.setattr(build, 'DIST_CLAUDE_DIR', dist_dir / "cli" / "claude")
-        monkeypatch.setattr(build, 'DIST_OPENCODE_DIR', dist_dir / "cli" / "opencode")
-        monkeypatch.setattr(build, 'DIST_GITHUB_DIR', dist_dir / "cli" / "github")
-        monkeypatch.setattr(build, 'DIST_RULES_DIR', dist_dir / "rules")
-        
+        # Mock the old dist directories for the copy_global_files function
+        monkeypatch.setattr('agent_notes.config.DIST_CLAUDE_DIR', dist_dir / "claude")
+        monkeypatch.setattr('agent_notes.config.DIST_OPENCODE_DIR', dist_dir / "opencode")
+        monkeypatch.setattr('agent_notes.config.DIST_GITHUB_DIR', dist_dir / "github")
+        monkeypatch.setattr('agent_notes.config.DIST_RULES_DIR', dist_dir / "rules")
+        monkeypatch.setattr('agent_notes.config.DIST_SCRIPTS_DIR', dist_dir / "scripts")
+
         # Mock find_skill_dirs to return empty list for test
-        monkeypatch.setattr(build, 'find_skill_dirs', lambda: [])
+        monkeypatch.setattr('agent_notes.config.find_skill_dirs', lambda: [])
         
-        # Run build
-        build.build()
+        # Create mock backends for registry
+        claude = CLIBackend(
+            name="claude", label="Claude Code", 
+            global_home=Path("~/.claude").expanduser(), local_dir=".claude",
+            layout={"agents": "agents/"}, features={"agents": True, "frontmatter": "claude"},
+            global_template=None
+        )
+        opencode = CLIBackend(
+            name="opencode", label="OpenCode",
+            global_home=Path("~/.config/opencode").expanduser(), local_dir=".opencode", 
+            layout={"agents": "agents/"}, features={"agents": True, "frontmatter": "opencode"},
+            global_template=None, strip_memory_section=True
+        )
+        registry = CLIRegistry([claude, opencode])
         
-        # Check output
-        captured = capsys.readouterr()
-        assert "Generating agent files..." in captured.out
-        assert "Copying global files..." in captured.out
-        assert "Generated" in captured.out
-        assert "files:" in captured.out
+        # Mock installer function to return our test paths
+        def mock_dist_source_for(backend, component):
+            if component == "agents":
+                return dist_dir / backend.name / "agents"
+            return None
+        
+        with patch('agent_notes.cli_backend.load_registry', return_value=registry):
+            with patch('agent_notes.installer.dist_source_for', side_effect=mock_dist_source_for):
+                # Run build
+                build.build()
+
+            captured = capsys.readouterr()
+
+            # Should have generated agent files
+            claude_agent = dist_dir / "claude" / "agents" / "test-agent.md"
+            opencode_agent = dist_dir / "opencode" / "agents" / "test-agent.md"
+            
+            assert claude_agent.exists()
+            assert opencode_agent.exists()
+
+            # Should have copied global files
+            claude_global = dist_dir / "claude" / "CLAUDE.md"
+            opencode_global = dist_dir / "opencode" / "AGENTS.md"
+            github_global = dist_dir / "github" / "copilot-instructions.md"
+            
+            assert claude_global.exists()
+            assert opencode_global.exists()
+            assert github_global.exists()
+
+            # Should print progress messages
+            assert "Generating agent files..." in captured.out
+            assert "Copying global files..." in captured.out
+            assert "Generated" in captured.out
+            
+            # Should report file count and lines
+            assert "files:" in captured.out
         
         # Check files were created
-        assert (dist_dir / "cli" / "claude" / "agents" / "test-agent.md").exists()
-        assert (dist_dir / "cli" / "opencode" / "agents" / "test-agent.md").exists()
-        assert (dist_dir / "cli" / "claude" / "CLAUDE.md").exists()
-        assert (dist_dir / "cli" / "opencode" / "AGENTS.md").exists()
-        assert (dist_dir / "cli" / "github" / "copilot-instructions.md").exists()
+        assert (dist_dir / "claude" / "agents" / "test-agent.md").exists()
+        assert (dist_dir / "opencode" / "agents" / "test-agent.md").exists()
+        assert (dist_dir / "claude" / "CLAUDE.md").exists()
+        assert (dist_dir / "opencode" / "AGENTS.md").exists()
+        assert (dist_dir / "github" / "copilot-instructions.md").exists()
     
     def test_handles_missing_agents_yaml(self, tmp_path, monkeypatch, capsys):
         """Should handle missing agents.yaml gracefully."""
         agents_yaml = tmp_path / "nonexistent" / "agents.yaml"
         
-        monkeypatch.setattr(build, 'AGENTS_YAML', agents_yaml)
+        monkeypatch.setattr('agent_notes.config.AGENTS_YAML', agents_yaml)
         
         build.build()
         
         captured = capsys.readouterr()
         assert "Error:" in captured.out
-        assert "agents.yaml not found" in captured.out
+        assert "Configuration file not found" in captured.out

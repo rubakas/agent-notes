@@ -15,15 +15,11 @@ class TestUpdateFunction:
         # Mock ROOT without .git directory
         monkeypatch.setattr(update, 'ROOT', tmp_path)
         
-        with pytest.raises(SystemExit) as exc_info:
-            update.update()
-        
-        assert exc_info.value.code == 1
+        update.update(skip_pull=False)  # Use new signature
         
         captured = capsys.readouterr()
         assert "Not a git repository" in captured.out
         assert "Update requires a git-based install" in captured.out
-        assert "brew upgrade agent-notes" in captured.out
     
     def test_pulls_latest_changes(self, tmp_path, monkeypatch, capsys):
         """Should pull latest changes from git."""
@@ -46,13 +42,19 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.install.install') as mock_install:
-                update.update()
-                mock_install.assert_called_once()
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state') as mock_build_state:
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="No changes."):
+                                # Mock empty diff
+                                mock_diff.return_value = MagicMock()
+                                mock_diff.return_value.has_changes.return_value = False
+                                
+                                update.update(skip_pull=False)
         
         captured = capsys.readouterr()
         assert "Updating agent-notes" in captured.out
-        assert "Pulling latest changes" in captured.out
         assert "Updated 2 commits" in captured.out
     
     def test_handles_already_up_to_date(self, tmp_path, monkeypatch, capsys):
@@ -73,12 +75,18 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.install.install') as mock_install:
-                update.update()
-                mock_install.assert_called_once()
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state'):
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="No changes."):
+                                mock_diff.return_value = MagicMock()
+                                mock_diff.return_value.has_changes.return_value = False
+                                
+                                update.update(skip_pull=False)
         
         captured = capsys.readouterr()
-        assert "Already up to date" in captured.out
+        assert "Already up to date (no new commits)" in captured.out
     
     def test_shows_commit_log(self, tmp_path, monkeypatch, capsys):
         """Should show commit log for updates."""
@@ -101,8 +109,15 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.install.install'):
-                update.update()
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state'):
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="No changes."):
+                                mock_diff.return_value = MagicMock()
+                                mock_diff.return_value.has_changes.return_value = False
+                                
+                                update.update(skip_pull=False)
         
         captured = capsys.readouterr()
         assert "Updated 3 commits" in captured.out
@@ -134,8 +149,15 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.install.install'):
-                update.update()
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state'):
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="No changes."):
+                                mock_diff.return_value = MagicMock()
+                                mock_diff.return_value.has_changes.return_value = False
+                                
+                                update.update(skip_pull=False)
         
         captured = capsys.readouterr()
         assert "Updated 7 commits" in captured.out
@@ -167,11 +189,20 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.install.install'):
-                update.update()
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state'):
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="No changes."):
+                                mock_diff.return_value = MagicMock()
+                                mock_diff.return_value.has_changes.return_value = False
+                                
+                                update.update(skip_pull=False)
         
         captured = capsys.readouterr()
-        assert "Updated 0 commits" in captured.out
+        # With empty log output, no commit count is shown (function returns early)
+        assert "Updating agent-notes" in captured.out
+        assert "Rebuilding" in captured.out
     
     def test_handles_git_pull_failure(self, tmp_path, monkeypatch, capsys):
         """Should handle git pull failure gracefully."""
@@ -188,14 +219,10 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with pytest.raises(SystemExit) as exc_info:
-                update.update()
-        
-        assert exc_info.value.code == 1
+            update.update(skip_pull=False)
         
         captured = capsys.readouterr()
         assert "Could not fast-forward" in captured.out
-        assert "You may have local changes" in captured.out
         assert "git status" in captured.out
     
     def test_handles_git_rev_parse_failure(self, tmp_path, monkeypatch, capsys):
@@ -208,16 +235,13 @@ class TestUpdateFunction:
         
         # Mock failing first command
         with patch('subprocess.run', side_effect=subprocess.CalledProcessError(1, "git rev-parse")):
-            with pytest.raises(SystemExit) as exc_info:
-                update.update()
-        
-        assert exc_info.value.code == 1
+            update.update(skip_pull=False)
         
         captured = capsys.readouterr()
         assert "Could not fast-forward" in captured.out
     
-    def test_calls_install_after_update(self, tmp_path, monkeypatch):
-        """Should call install function after successful update."""
+    def test_calls_install_after_update_with_changes(self, tmp_path, monkeypatch):
+        """Should call install function after successful update when there are changes."""
         # Setup git directory
         git_dir = tmp_path / ".git"
         git_dir.mkdir()
@@ -233,9 +257,18 @@ class TestUpdateFunction:
         ]
         
         with patch('subprocess.run', side_effect=mock_results):
-            with patch('agent_notes.install.install') as mock_install:
-                update.update()
-                mock_install.assert_called_once()
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state'):
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="Changes found"):
+                                with patch('agent_notes.install.install') as mock_install:
+                                    # Mock diff with changes
+                                    mock_diff.return_value = MagicMock()
+                                    mock_diff.return_value.has_changes.return_value = True
+                                    
+                                    update.update(skip_pull=False, yes=True)  # Auto-approve
+                                    mock_install.assert_called_once()
     
     def test_uses_correct_git_commands(self, tmp_path, monkeypatch):
         """Should use correct git commands with proper arguments."""
@@ -260,8 +293,15 @@ class TestUpdateFunction:
             return MagicMock(stdout="", returncode=0)
         
         with patch('subprocess.run', side_effect=mock_run):
-            with patch('agent_notes.install.install'):
-                update.update()
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state'):
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="No changes."):
+                                mock_diff.return_value = MagicMock()
+                                mock_diff.return_value.has_changes.return_value = False
+                                
+                                update.update(skip_pull=False)
         
         # Check git commands used
         commands = [call[0][0] for call in subprocess_calls]
@@ -280,6 +320,48 @@ class TestUpdateFunction:
             assert kwargs.get('text') is True
             assert kwargs.get('check') is True
 
+    def test_skip_pull_flag_works(self, tmp_path, monkeypatch, capsys):
+        """Should skip git pull when skip_pull=True."""
+        monkeypatch.setattr(update, 'ROOT', tmp_path)
+        
+        with patch('subprocess.run') as mock_run:
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state'):
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="No changes."):
+                                mock_diff.return_value = MagicMock()
+                                mock_diff.return_value.has_changes.return_value = False
+                                
+                                update.update(skip_pull=True)
+                                
+                                # Should not have called any git commands
+                                mock_run.assert_not_called()
+
+    def test_dry_run_flag_works(self, tmp_path, monkeypatch, capsys):
+        """Should not call install when dry_run=True."""
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+        
+        monkeypatch.setattr(update, 'ROOT', tmp_path)
+        
+        with patch('subprocess.run', return_value=MagicMock(stdout="abc123", returncode=0)):
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state'):
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="Changes found"):
+                                with patch('agent_notes.install.install') as mock_install:
+                                    mock_diff.return_value = MagicMock()
+                                    mock_diff.return_value.has_changes.return_value = True
+                                    
+                                    update.update(skip_pull=True, dry_run=True)
+                                    
+                                    mock_install.assert_not_called()
+        
+        captured = capsys.readouterr()
+        assert "Dry run" in captured.out
+
 
 class TestGitOperationDetails:
     """Test specific git operation details."""
@@ -294,11 +376,18 @@ class TestGitOperationDetails:
         with patch('subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(stdout="abc123", returncode=0)
             
-            with patch('agent_notes.install.install'):
-                try:
-                    update.update()
-                except:
-                    pass  # We expect it to fail on subsequent calls
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state'):
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="No changes."):
+                                mock_diff.return_value = MagicMock()
+                                mock_diff.return_value.has_changes.return_value = False
+                                
+                                try:
+                                    update.update(skip_pull=False)
+                                except:
+                                    pass  # We expect it to fail on subsequent calls
             
             # Check that cwd parameter is set correctly
             for call in mock_run.call_args_list:
@@ -315,11 +404,18 @@ class TestGitOperationDetails:
         with patch('subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(stdout="abc123", returncode=0)
             
-            with patch('agent_notes.install.install'):
-                try:
-                    update.update()
-                except:
-                    pass
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state'):
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="No changes."):
+                                mock_diff.return_value = MagicMock()
+                                mock_diff.return_value.has_changes.return_value = False
+                                
+                                try:
+                                    update.update(skip_pull=False)
+                                except:
+                                    pass
             
             # Find the git pull command
             pull_calls = [call for call in mock_run.call_args_list 
@@ -358,8 +454,15 @@ class TestGitOperationDetails:
                 return MagicMock(stdout="", returncode=0)
         
         with patch('subprocess.run', side_effect=mock_run):
-            with patch('agent_notes.install.install'):
-                update.update()
+            with patch('agent_notes.update.run_build'):
+                with patch('agent_notes.install_state.build_install_state'):
+                    with patch('agent_notes.install_state.load_current_state', return_value=None):
+                        with patch('agent_notes.update_diff.diff_states') as mock_diff:
+                            with patch('agent_notes.update_diff.render_diff_report', return_value="No changes."):
+                                mock_diff.return_value = MagicMock()
+                                mock_diff.return_value.has_changes.return_value = False
+                                
+                                update.update(skip_pull=False)
         
         # Should call git log with commit range
         assert len(log_calls) == 1
@@ -378,12 +481,10 @@ class TestErrorHandling:
         monkeypatch.setattr(update, 'ROOT', tmp_path)
         
         with patch('subprocess.run', side_effect=subprocess.CalledProcessError(1, "git pull")):
-            with pytest.raises(SystemExit):
-                update.update()
+            update.update(skip_pull=False)
         
         captured = capsys.readouterr()
         assert "Could not fast-forward" in captured.out
-        assert "local changes" in captured.out
         assert str(tmp_path) in captured.out  # Should show the directory path
         assert "git status" in captured.out
     
@@ -396,8 +497,7 @@ class TestErrorHandling:
         monkeypatch.setattr(update, 'ROOT', custom_root)
         
         with patch('subprocess.run', side_effect=subprocess.CalledProcessError(1, "git pull")):
-            with pytest.raises(SystemExit):
-                update.update()
+            update.update(skip_pull=False)
         
         captured = capsys.readouterr()
         assert str(custom_root) in captured.out

@@ -594,27 +594,61 @@ class TestCountFunctions:
     
     def test_count_agents_claude(self, tmp_path, monkeypatch):
         """Should count Claude agent files."""
-        agents_dir = tmp_path / "dist" / "cli" / "claude" / "agents"
+        from agent_notes.cli_backend import CLIBackend
+        
+        # Setup the dist structure that installer expects
+        dist_base = tmp_path / "dist"
+        agents_dir = dist_base / "claude" / "agents"
         agents_dir.mkdir(parents=True)
         (agents_dir / "agent1.md").write_text("agent1")
         (agents_dir / "agent2.md").write_text("agent2")
         (agents_dir / "not_agent.txt").write_text("not an agent")
         
-        monkeypatch.setattr(install, 'DIST_CLAUDE_DIR', tmp_path / "dist" / "cli" / "claude")
+        # Mock the DIST_DIR in installer module
+        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_base)
         
-        count = install.count_agents_claude()
+        # Create backend
+        backend = CLIBackend(
+            name="claude",
+            label="Claude Code",
+            global_home=Path("~/.claude").expanduser(),
+            local_dir=".claude",
+            layout={"agents": "agents/"},
+            features={"agents": True},
+            global_template=None,
+
+        )
+        
+        count = install.count_agents(backend)
         assert count == 2
     
     def test_count_agents_opencode(self, tmp_path, monkeypatch):
         """Should count OpenCode agent files."""
-        agents_dir = tmp_path / "dist" / "cli" / "opencode" / "agents"
+        from agent_notes.cli_backend import CLIBackend
+        
+        # Setup the dist structure that installer expects  
+        dist_base = tmp_path / "dist"
+        agents_dir = dist_base / "opencode" / "agents"
         agents_dir.mkdir(parents=True)
         (agents_dir / "agent1.md").write_text("agent1")
         (agents_dir / "agent2.md").write_text("agent2")
         
-        monkeypatch.setattr(install, 'DIST_OPENCODE_DIR', tmp_path / "dist" / "cli" / "opencode")
+        # Mock the DIST_DIR in installer module
+        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_base)
         
-        count = install.count_agents_opencode()
+        # Create backend
+        backend = CLIBackend(
+            name="opencode",
+            label="OpenCode",
+            global_home=Path("~/.config/opencode").expanduser(),
+            local_dir=".opencode",
+            layout={"agents": "agents/"},
+            features={"agents": True},
+            global_template=None,
+
+        )
+        
+        count = install.count_agents(backend)
         assert count == 2
     
     def test_count_global(self, tmp_path, monkeypatch):
@@ -650,7 +684,8 @@ class TestInstallFunction:
     
     def test_rejects_copy_without_local(self, capsys):
         """Should reject --copy without --local."""
-        install.install(local=False, copy=True)
+        with patch('agent_notes.install.install_state.load_current_state', return_value=None):
+            install.install(local=False, copy=True)
         
         captured = capsys.readouterr()
         assert "Error: --copy is only valid with --local installs" in captured.out
@@ -663,11 +698,10 @@ class TestInstallFunction:
             nonlocal build_called
             build_called = True
             
-        with patch('agent_notes.install.build', mock_build):
-            with patch('agent_notes.install.install_skills_global'):
-                with patch('agent_notes.install.install_agents_global'):
-                    with patch('agent_notes.install.install_rules_global'):
-                        install.install(local=False, copy=False)
+        with patch('agent_notes.install.install_state.load_current_state', return_value=None):
+            with patch('agent_notes.install.build', mock_build):
+                with patch('agent_notes.installer.install_all'):
+                    install.install(local=False, copy=False)
         
         assert build_called
     
@@ -676,8 +710,9 @@ class TestInstallFunction:
         def mock_build():
             raise Exception("Build failed")
             
-        with patch('agent_notes.install.build', mock_build):
-            install.install(local=False, copy=False)
+        with patch('agent_notes.install.install_state.load_current_state', return_value=None):
+            with patch('agent_notes.install.build', mock_build):
+                install.install(local=False, copy=False)
         
         captured = capsys.readouterr()
         assert "Build failed" in captured.out
@@ -688,37 +723,250 @@ class TestShowInfo:
     
     def test_shows_version_and_counts(self, mock_paths, tmp_path, monkeypatch, capsys):
         """Should show version and component counts."""
-        # Mock version
+        from agent_notes.cli_backend import CLIBackend, CLIRegistry
+        from pathlib import Path
+        
+        # Create mock backends
+        claude = CLIBackend(
+            name="claude",
+            label="Claude Code", 
+            global_home=Path("~/.claude").expanduser(),
+            local_dir=".claude",
+            layout={"agents": "agents/"},
+            features={"agents": True},
+            global_template=None,
+
+        )
+        opencode = CLIBackend(
+            name="opencode",
+            label="OpenCode",
+            global_home=Path("~/.config/opencode").expanduser(), 
+            local_dir=".opencode",
+            layout={"agents": "agents/"},
+            features={"agents": True},
+            global_template=None,
+
+        )
+        registry = CLIRegistry([claude, opencode])
+        
+        # Mock version and registry
         with patch('agent_notes.install.get_version', return_value="1.2.3"):
-            # Mock counts
-            with patch('agent_notes.install.count_skills', return_value=5):
-                with patch('agent_notes.install.count_agents_claude', return_value=10):
-                    with patch('agent_notes.install.count_agents_opencode', return_value=10):
+            with patch('agent_notes.cli_backend.load_registry', return_value=registry):
+                # Mock counts
+                with patch('agent_notes.install.count_skills', return_value=5):
+                    with patch('agent_notes.install.count_agents') as mock_count_agents:
                         with patch('agent_notes.install.count_global', return_value=3):
+                            # Set up count_agents to return different values for different backends
+                            def count_agents_side_effect(backend):
+                                if backend.name == "claude":
+                                    return 10
+                                elif backend.name == "opencode":
+                                    return 8
+                                return 0
+                            mock_count_agents.side_effect = count_agents_side_effect
+                            
                             install.show_info()
         
         captured = capsys.readouterr()
         assert "agent-notes 1.2.3" in captured.out
         assert "Skills:              5" in captured.out
-        assert "Agents (Claude):     10" in captured.out
-        assert "Agents (OpenCode):   10" in captured.out
+        assert "Agents (Claude Code):  10" in captured.out
+        assert "Agents (OpenCode):  8" in captured.out
         assert "Global config:       3 files" in captured.out
-        assert "Claude Code:   ~/.claude/" in captured.out
-        assert "OpenCode:      ~/.config/opencode/" in captured.out
+        assert "Claude Code:  /Users/en3e/.claude" in captured.out
+        assert "OpenCode:  /Users/en3e/.config/opencode" in captured.out
     
     def test_shows_install_status(self, mock_paths, tmp_path, monkeypatch, capsys):
         """Should show installation status."""
+        from agent_notes.cli_backend import CLIBackend, CLIRegistry
+        from pathlib import Path
+        
         # Create some agents to simulate installation
         claude_agents = mock_paths['claude'] / "agents"
         claude_agents.mkdir()
         (claude_agents / "test-agent.md").write_text("test")
         
+        # Create mock backends
+        claude = CLIBackend(
+            name="claude",
+            label="Claude Code", 
+            global_home=Path("~/.claude").expanduser(),
+            local_dir=".claude",
+            layout={"agents": "agents/"},
+            features={"agents": True},
+            global_template=None,
+
+        )
+        opencode = CLIBackend(
+            name="opencode",
+            label="OpenCode",
+            global_home=Path("~/.config/opencode").expanduser(), 
+            local_dir=".opencode",
+            layout={"agents": "agents/"},
+            features={"agents": True},
+            global_template=None,
+
+        )
+        registry = CLIRegistry([claude, opencode])
+        
         with patch('agent_notes.install.get_version', return_value="1.0.0"):
-            with patch('agent_notes.install.count_skills', return_value=0):
-                with patch('agent_notes.install.count_agents_claude', return_value=0):
-                    with patch('agent_notes.install.count_agents_opencode', return_value=0):
+            with patch('agent_notes.cli_backend.load_registry', return_value=registry):
+                with patch('agent_notes.install.count_skills', return_value=0):
+                    with patch('agent_notes.install.count_agents', return_value=0):
                         with patch('agent_notes.install.count_global', return_value=0):
-                            install.show_info()
+                            with patch('agent_notes.install.install_state') as mock_state:
+                                mock_state.load_current_state.return_value = None
+                                install.show_info()
         
         captured = capsys.readouterr()
         assert "installed" in captured.out  # Should detect global installation
+
+
+class TestInstallVerifyAndReconfigure:
+    """Test verify-and-exit and --reconfigure functionality."""
+
+    @pytest.fixture
+    def mock_registry(self):
+        """Mock registry with Claude backend."""
+        from agent_notes.cli_backend import CLIBackend, CLIRegistry
+        claude = CLIBackend(
+            name="claude",
+            label="Claude Code", 
+            global_home=Path("~/.claude").expanduser(),
+            local_dir=".claude",
+            layout={"agents": "agents/"},
+            features={"agents": True},
+            global_template=None,
+
+        )
+        return CLIRegistry([claude])
+
+    @pytest.fixture
+    def existing_state(self, tmp_path, monkeypatch):
+        """Create fake existing state for tests."""
+        from agent_notes.state import State, ScopeState, BackendState, InstalledItem
+        from agent_notes import state as state_mod
+        
+        # Mock state directory
+        config_home = tmp_path / "config"
+        config_home.mkdir(parents=True)
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(config_home))
+        
+        # Create state
+        state = State()
+        scope_state = ScopeState()
+        scope_state.installed_at = "2026-04-22T13:05:00Z"
+        scope_state.mode = "symlink"
+        
+        backend_state = BackendState()
+        backend_state.installed["agents"] = {
+            "lead.md": InstalledItem(sha="abc123", target="/fake/target/lead.md", mode="symlink")
+        }
+        scope_state.clis["claude"] = backend_state
+        
+        state.global_install = scope_state
+        state_mod.save(state)
+        return state
+
+    def test_install_verify_exits_when_state_exists(self, tmp_path, monkeypatch, mock_registry, existing_state, capsys):
+        """Install should verify existing install and exit without running wizard."""
+        with patch('agent_notes.cli_backend.load_registry', return_value=mock_registry):
+            with patch('agent_notes.install.install_state.load_current_state', return_value=existing_state):
+                # Mock Path.exists to simulate healthy install
+                with patch('pathlib.Path.exists', return_value=True):
+                    install.install()
+        
+        captured = capsys.readouterr()
+        assert "Found existing global installation" in captured.out
+        assert "Installed: 2026-04-22T13:05:00Z" in captured.out
+        assert "CLIs:      Claude Code" in captured.out
+        assert "Mode:      symlink" in captured.out
+        assert "Verifying ..." in captured.out
+        assert "Installation is healthy." in captured.out
+        assert "--reconfigure" in captured.out
+        # Should NOT contain the build output
+        assert "Building from source..." not in captured.out
+
+    def test_install_reconfigure_clears_state_and_reinstalls(self, tmp_path, monkeypatch, mock_registry, existing_state, capsys):
+        """Install with --reconfigure should clear existing state and proceed with install."""
+        with patch('agent_notes.cli_backend.load_registry', return_value=mock_registry):
+            with patch('agent_notes.install.install_state.load_current_state', return_value=existing_state):
+                with patch('agent_notes.install.build'):  # Don't actually build
+                    with patch('agent_notes.installer.install_all'):  # Don't actually install
+                        install.install(reconfigure=True)
+        
+        captured = capsys.readouterr()
+        assert "Clearing existing global state (--reconfigure) ..." in captured.out
+        assert "Building from source..." in captured.out
+        # Should proceed with normal install flow
+        assert "Installing (global, symlink) ..." in captured.out
+
+    def test_install_verify_reports_missing_files(self, tmp_path, monkeypatch, mock_registry, existing_state, capsys):
+        """Install should report missing files and suggest fixes."""
+        with patch('agent_notes.cli_backend.load_registry', return_value=mock_registry):
+            with patch('agent_notes.install.install_state.load_current_state', return_value=existing_state):
+                # Mock Path.exists to simulate missing files
+                with patch('pathlib.Path.exists', return_value=False):
+                    with patch('pathlib.Path.is_symlink', return_value=False):
+                        install.install()
+        
+        captured = capsys.readouterr()
+        assert "Found existing global installation" in captured.out
+        assert "Verifying ..." in captured.out
+        assert "✗ Claude Code agents: 1 missing" in captured.out
+        assert "Installation has 1 issue(s)." in captured.out
+        assert "agent-notes doctor --fix" in captured.out
+        assert "--reconfigure" in captured.out
+
+    def test_install_no_state_proceeds_normally(self, tmp_path, monkeypatch, mock_registry, capsys):
+        """Install should proceed normally when no state exists."""
+        # Mock state directory but no state file
+        config_home = tmp_path / "config"
+        config_home.mkdir(parents=True)
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(config_home))
+        
+        with patch('agent_notes.cli_backend.load_registry', return_value=mock_registry):
+            with patch('agent_notes.install.install_state.load_current_state', return_value=None):
+                with patch('agent_notes.install.build'):  # Don't actually build
+                    with patch('agent_notes.installer.install_all'):  # Don't actually install
+                        install.install()
+        
+        captured = capsys.readouterr()
+        # Should NOT have verify output
+        assert "Found existing" not in captured.out
+        assert "Verifying ..." not in captured.out
+        # Should proceed with normal install
+        assert "Building from source..." in captured.out
+        assert "Installing (global, symlink) ..." in captured.out
+
+    def test_install_local_verify_exits(self, tmp_path, monkeypatch, mock_registry, capsys):
+        """Install --local should verify existing local install and exit."""
+        from agent_notes.state import State, ScopeState, BackendState, InstalledItem
+        
+        # Create local state
+        state = State()
+        scope_state = ScopeState()
+        scope_state.installed_at = "2026-04-22T13:05:00Z"
+        scope_state.mode = "symlink"
+        
+        backend_state = BackendState()
+        backend_state.installed["agents"] = {
+            "lead.md": InstalledItem(sha="abc123", target=str(tmp_path / ".claude" / "agents" / "lead.md"), mode="symlink")
+        }
+        scope_state.clis["claude"] = backend_state
+        
+        # Use current directory as project path
+        project_key = str(tmp_path.resolve())
+        state.local_installs[project_key] = scope_state
+        
+        # Change to that directory
+        monkeypatch.chdir(tmp_path)
+        
+        with patch('agent_notes.cli_backend.load_registry', return_value=mock_registry):
+            with patch('agent_notes.install.install_state.load_current_state', return_value=state):
+                with patch('pathlib.Path.exists', return_value=True):
+                    install.install(local=True)
+        
+        captured = capsys.readouterr()
+        assert "Found existing local installation" in captured.out
+        assert "Installation is healthy." in captured.out
