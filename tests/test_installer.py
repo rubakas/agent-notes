@@ -209,8 +209,8 @@ class TestConfigFilenameFor:
 class TestInstallComponentForBackend:
     """Test install_component_for_backend function."""
     
-    @patch('agent_notes.install.place_file')
-    @patch('agent_notes.install.place_dir_contents')
+    @patch('agent_notes.services.installer.place_file')
+    @patch('agent_notes.services.installer.place_dir_contents')
     def test_install_agents(self, mock_place_dir, mock_place_file, mock_claude_backend, tmp_path, monkeypatch):
         """Should install agents using place_dir_contents."""
         # Setup source
@@ -227,8 +227,8 @@ class TestInstallComponentForBackend:
         mock_place_dir.assert_called_once_with(agents_src, expected_dst, "*.md", False)
         mock_place_file.assert_not_called()
     
-    @patch('agent_notes.install.place_file')
-    @patch('agent_notes.install.place_dir_contents')
+    @patch('agent_notes.services.installer.place_file')
+    @patch('agent_notes.services.installer.place_dir_contents')
     def test_install_config(self, mock_place_dir, mock_place_file, mock_claude_backend, tmp_path, monkeypatch):
         """Should install config using place_file."""
         # Setup source
@@ -246,7 +246,7 @@ class TestInstallComponentForBackend:
         mock_place_file.assert_called_once_with(config_file, expected_dst, False)
         mock_place_dir.assert_not_called()
     
-    @patch('agent_notes.install.place_file')
+    @patch('agent_notes.services.installer.place_file')
     def test_install_skills(self, mock_place_file, mock_claude_backend, tmp_path, monkeypatch):
         """Should install skills as directories."""
         # Setup source
@@ -279,7 +279,7 @@ class TestInstallComponentForBackend:
 class TestUninstallComponentForBackend:
     """Test uninstall_component_for_backend function."""
     
-    @patch('agent_notes.install.remove_symlink')
+    @patch('agent_notes.services.installer.remove_symlink')
     def test_uninstall_config(self, mock_remove_symlink, mock_claude_backend):
         """Should remove config file."""
         installer.uninstall_component_for_backend(mock_claude_backend, "config", "global")
@@ -287,8 +287,8 @@ class TestUninstallComponentForBackend:
         expected_path = mock_claude_backend.global_home / "CLAUDE.md"
         mock_remove_symlink.assert_called_once_with(expected_path)
     
-    @patch('agent_notes.install.remove_all_symlinks_in_dir')
-    @patch('agent_notes.install.remove_dir_if_empty')
+    @patch('agent_notes.services.installer.remove_all_symlinks_in_dir')
+    @patch('agent_notes.services.installer.remove_dir_if_empty')
     def test_uninstall_agents(self, mock_remove_dir, mock_remove_symlinks, mock_claude_backend, tmp_path):
         """Should remove all symlinks and empty directory."""
         # Create a temporary target directory
@@ -310,7 +310,7 @@ class TestUninstallComponentForBackend:
 class TestInstallUninstallAll:
     """Test install_all and uninstall_all functions."""
     
-    @patch('agent_notes.install.install_scripts_global')
+    @patch('agent_notes.services.installer.install_scripts_global')
     @patch('agent_notes.installer.install_component_for_backend')
     @patch('agent_notes.installer._install_universal_skills')
     def test_install_all_global(self, mock_universal, mock_component, mock_scripts, mock_claude_backend):
@@ -325,7 +325,7 @@ class TestInstallUninstallAll:
         expected_calls = len(installer.COMPONENT_TYPES)
         assert mock_component.call_count == expected_calls
     
-    @patch('agent_notes.install.install_scripts_global')
+    @patch('agent_notes.services.installer.install_scripts_global')
     @patch('agent_notes.installer.install_component_for_backend')
     @patch('agent_notes.installer._install_universal_skills')
     def test_install_all_local(self, mock_universal, mock_component, mock_scripts, mock_claude_backend):
@@ -340,7 +340,7 @@ class TestInstallUninstallAll:
         expected_calls = len(installer.COMPONENT_TYPES)
         assert mock_component.call_count == expected_calls
     
-    @patch('agent_notes.install.uninstall_scripts_global')
+    @patch('agent_notes.services.installer.uninstall_scripts_global')
     @patch('agent_notes.installer.uninstall_component_for_backend')
     @patch('agent_notes.installer._uninstall_universal_skills')
     def test_uninstall_all_global(self, mock_universal, mock_component, mock_scripts, mock_claude_backend):

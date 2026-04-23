@@ -7,6 +7,10 @@ from typing import Optional
 
 from ..cli_backend import CLIBackend, CLIRegistry, load_registry
 from .. import config
+from .fs import (
+    place_file, place_dir_contents,
+    remove_symlink, remove_all_symlinks_in_dir, remove_dir_if_empty,
+)
 
 # Helper to get DIST_DIR - check if the main installer module has a patched version
 def _get_dist_dir():
@@ -106,8 +110,6 @@ def install_component_for_backend(
     copy_mode: bool,
 ) -> None:
     """Install one component for one backend. No-op if unsupported or no source."""
-    # Import install functions through shim to allow mocking
-    import agent_notes.install as install
     # Import installer to get potentially-mocked functions
     import agent_notes.installer as installer_mod
     
@@ -126,7 +128,7 @@ def install_component_for_backend(
         if not src_file.exists():
             return
         print(f"Installing {backend.label} config to {dst} ...")
-        install.place_file(src_file, dst / filename, copy_mode)
+        place_file(src_file, dst / filename, copy_mode)
     elif component in ("agents", "rules", "commands"):
         # Directory of *.md files — flat copy
         # Only print if there are files to install
@@ -134,7 +136,7 @@ def install_component_for_backend(
         if not files:
             return
         print(f"Installing {backend.label} {component} to {dst} ...")
-        install.place_dir_contents(src, dst, "*.md", copy_mode)
+        place_dir_contents(src, dst, "*.md", copy_mode)
     elif component == "skills":
         # Each top-level subdir of src is a skill — install each as a directory
         # Only print if there are skills to install
@@ -143,7 +145,7 @@ def install_component_for_backend(
             return
         print(f"Installing {backend.label} skills to {dst} ...")
         for skill_dir in sorted(skill_dirs):
-            install.place_file(skill_dir, dst / skill_dir.name, copy_mode)
+            place_file(skill_dir, dst / skill_dir.name, copy_mode)
 
 
 def uninstall_component_for_backend(
@@ -152,8 +154,6 @@ def uninstall_component_for_backend(
     scope: str
 ) -> None:
     """Uninstall one component for one backend."""
-    # Import install functions through shim to allow mocking
-    import agent_notes.install as install
     # Import installer to get potentially-mocked functions
     import agent_notes.installer as installer_mod
     
@@ -166,19 +166,17 @@ def uninstall_component_for_backend(
         if filename:
             config_file = dst / filename
             print(f"Removing {backend.label} config from {dst} ...")
-            install.remove_symlink(config_file)
+            remove_symlink(config_file)
     else:
         # Only print if directory exists and has content
         if any(dst.iterdir()):
             print(f"Removing {backend.label} {component} from {dst} ...")
-        install.remove_all_symlinks_in_dir(dst)
-        install.remove_dir_if_empty(dst)
+        remove_all_symlinks_in_dir(dst)
+        remove_dir_if_empty(dst)
 
 
 def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = None) -> None:
     """Top-level: install scripts (global only) + every (backend, component) combo."""
-    from ..install import install_scripts_global  # keep using existing
-    
     if registry is None:
         registry = load_registry()
     
@@ -201,7 +199,7 @@ def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = N
 
 def _install_universal_skills(copy_mode: bool, registry: CLIRegistry) -> None:
     """Mirror skills to ~/.agents/skills/ for backwards compatibility."""
-    import agent_notes.install as install
+    
     dist_skills_dir = _get_dist_skills_dir()
     if not dist_skills_dir.exists():
         return []
@@ -214,13 +212,11 @@ def _install_universal_skills(copy_mode: bool, registry: CLIRegistry) -> None:
         return
     print(f"Installing universal skills to {target} ...")
     for skill_dir in sorted(skill_dirs):
-        install.place_file(skill_dir, target / skill_dir.name, copy_mode)
+        place_file(skill_dir, target / skill_dir.name, copy_mode)
 
 
 def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
     """Top-level uninstall."""
-    from ..install import uninstall_scripts_global  # keep using existing
-    
     if registry is None:
         registry = load_registry()
     
@@ -240,9 +236,41 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
 
 
 def _uninstall_universal_skills() -> None:
-    import agent_notes.install as install
+    
     target = _get_agents_home() / "skills"
     if target.exists() and any(target.iterdir()):
         print(f"Removing universal skills from {target} ...")
-        install.remove_all_symlinks_in_dir(target)
-        install.remove_dir_if_empty(target)
+        remove_all_symlinks_in_dir(target)
+        remove_dir_if_empty(target)
+
+
+def install_scripts_global() -> None:
+    """Install scripts to ~/.local/bin/."""
+    from .fs import place_file
+    
+    dist_scripts_dir = _get_dist_dir() / "scripts"
+    bin_home = Path.home() / ".local" / "bin"
+    
+    if not dist_scripts_dir.exists():
+        return
+    print(f"Installing scripts to {bin_home} ...")
+    bin_home.mkdir(parents=True, exist_ok=True)
+    for script in sorted(dist_scripts_dir.iterdir()):
+        if script.is_file():
+            place_file(script, bin_home / script.name)
+            (bin_home / script.name).chmod(0o755)
+
+
+def uninstall_scripts_global() -> None:
+    """Uninstall scripts from ~/.local/bin/."""
+    from .fs import remove_symlink
+    
+    dist_scripts_dir = _get_dist_dir() / "scripts"
+    bin_home = Path.home() / ".local" / "bin"
+    
+    if not dist_scripts_dir.exists():
+        return
+    print(f"Removing scripts from {bin_home} ...")
+    for script in sorted(dist_scripts_dir.iterdir()):
+        if script.is_file():
+            remove_symlink(bin_home / script.name)

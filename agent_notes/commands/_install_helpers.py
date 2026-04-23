@@ -19,16 +19,8 @@ from ..services.fs import (
 
 def install_scripts_global() -> None:
     """Install scripts to ~/.local/bin/."""
-    import agent_notes.install as _shim
-    
-    if not _shim.DIST_SCRIPTS_DIR.exists():
-        return
-    print(f"Installing scripts to {_shim.BIN_HOME} ...")
-    _shim.BIN_HOME.mkdir(parents=True, exist_ok=True)
-    for script in sorted(_shim.DIST_SCRIPTS_DIR.iterdir()):
-        if script.is_file():
-            _shim.place_file(script, _shim.BIN_HOME / script.name)
-            (_shim.BIN_HOME / script.name).chmod(0o755)
+    from ..services.installer import install_scripts_global as _service_impl
+    _service_impl()
 
 
 def install_skills_global(copy_mode: bool = False) -> None:
@@ -139,14 +131,8 @@ def install_rules_local(copy_mode: bool = False) -> None:
 
 def uninstall_scripts_global() -> None:
     """Uninstall scripts from ~/.local/bin/."""
-    from .. import install as _shim
-    
-    if not _shim.DIST_SCRIPTS_DIR.exists():
-        return
-    print(f"Removing scripts from {_shim.BIN_HOME} ...")
-    for script in sorted(_shim.DIST_SCRIPTS_DIR.iterdir()):
-        if script.is_file():
-            remove_symlink(_shim.BIN_HOME / script.name)
+    from ..services.installer import uninstall_scripts_global as _service_impl
+    _service_impl()
 
 
 def uninstall_skills_global() -> None:

@@ -71,7 +71,13 @@ def diagnose(scope: str, fix: bool = False) -> bool:
         return True  # No issues
     
     if fix:
-        return do_fix(issues, fix_actions)
+        result = do_fix(issues, fix_actions)
+        # Services layer flagged that an install is needed — invoke it here
+        # (commands layer), avoiding a services→commands dependency.
+        if any(a.action == "_TRIGGER_INSTALL" for a in fix_actions):
+            from .. import install as _install_shim
+            _install_shim.install()
+        return result
     else:
         return False  # Issues found but not fixed
 

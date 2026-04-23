@@ -7,6 +7,7 @@ import tempfile
 from dataclasses import dataclass
 
 import agent_notes.doctor as doctor
+import agent_notes.config as config
 from conftest import MockCLIBackend, MockCLIRegistry
 
 
@@ -40,7 +41,7 @@ class TestFindDistSource:
         skill_dir.mkdir(exist_ok=True)
         (skill_dir / "SKILL.md").write_text("skill content")
         
-        monkeypatch.setattr(doctor, 'DIST_SKILLS_DIR', dist_skills)
+        monkeypatch.setattr(config, 'DIST_SKILLS_DIR', dist_skills)
         
         # Test global skill path
         symlink = Path.home() / ".claude" / "skills" / "test-skill"
@@ -141,7 +142,7 @@ class TestFindDistSource:
         dist_skills = tmp_path / "dist" / "skills"
         dist_skills.mkdir(parents=True, exist_ok=True)
         
-        monkeypatch.setattr(doctor, 'DIST_SKILLS_DIR', dist_skills)
+        monkeypatch.setattr(config, 'DIST_SKILLS_DIR', dist_skills)
         
         # Test with non-existent skill
         symlink = Path.home() / ".claude" / "skills" / "nonexistent-skill"
@@ -188,7 +189,7 @@ class TestFindDistSource:
         skill_dir = dist_skills / "local-skill"
         skill_dir.mkdir(exist_ok=True)
         
-        monkeypatch.setattr(doctor, 'DIST_SKILLS_DIR', dist_skills)
+        monkeypatch.setattr(config, 'DIST_SKILLS_DIR', dist_skills)
         
         # Test local skill path
         symlink = Path(".claude") / "skills" / "local-skill"
@@ -385,7 +386,7 @@ class TestCheckStaleFiles:
         dist_skills = tmp_path / "dist" / "skills"
         dist_skills.mkdir(parents=True, exist_ok=True)
         
-        monkeypatch.setattr(doctor, 'DIST_SKILLS_DIR', dist_skills)
+        monkeypatch.setattr(config, 'DIST_SKILLS_DIR', dist_skills)
         
         issues = []
         fix_actions = []
@@ -1255,7 +1256,7 @@ class TestCountFunctions:
         (dist_skills / "skill2").mkdir(exist_ok=True)
         
         monkeypatch.setattr(doctor, 'CLAUDE_HOME', home_claude)
-        monkeypatch.setattr(doctor, 'DIST_SKILLS_DIR', dist_skills)
+        monkeypatch.setattr(config, 'DIST_SKILLS_DIR', dist_skills)
         
         # Create backend
         backend = CLIBackend(

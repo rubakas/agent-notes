@@ -62,20 +62,10 @@ def _find_dist_source(symlink: Path, scope: str) -> Optional[Path]:
     
     # Scripts
     def _get_bin_home():
-        try:
-            import agent_notes.doctor as doctor_mod
-            return getattr(doctor_mod, 'BIN_HOME', None)
-        except (ImportError, AttributeError):
-            pass
         from ..config import BIN_HOME
         return BIN_HOME
         
     def _get_dist_scripts_dir():
-        try:
-            import agent_notes.doctor as doctor_mod
-            return getattr(doctor_mod, 'DIST_SCRIPTS_DIR', None)
-        except (ImportError, AttributeError):
-            pass
         from ..config import DIST_SCRIPTS_DIR
         return DIST_SCRIPTS_DIR
         
@@ -90,11 +80,6 @@ def _find_dist_source(symlink: Path, scope: str) -> Optional[Path]:
     
     # Universal skills
     def _get_dist_skills_dir():
-        try:
-            import agent_notes.doctor as doctor_mod
-            return getattr(doctor_mod, 'DIST_SKILLS_DIR', None)
-        except (ImportError, AttributeError):
-            pass
         from ..config import DIST_SKILLS_DIR
         return DIST_SKILLS_DIR
         
@@ -276,13 +261,8 @@ def _count_skills(backend, scope: str) -> tuple:
     """Count (installed, expected) skills for a CLI backend. Excludes broken symlinks."""
     from .. import installer
     
-    # Helper to get DIST_SKILLS_DIR - check if the doctor module has a patched version
+    # Helper to get DIST_SKILLS_DIR
     def _get_dist_skills_dir():
-        try:
-            import agent_notes.doctor as doctor_mod
-            return getattr(doctor_mod, 'DIST_SKILLS_DIR', None)
-        except (ImportError, AttributeError):
-            pass
         from ..config import DIST_SKILLS_DIR
         return DIST_SKILLS_DIR
     
@@ -303,22 +283,12 @@ def _count_skills(backend, scope: str) -> tuple:
 
 def _count_scripts() -> tuple:
     """Count (installed, expected) scripts in ~/.local/bin/."""
-    # Helper functions to get patched config values
+    # Helper functions to get config values
     def _get_bin_home():
-        try:
-            import agent_notes.doctor as doctor_mod
-            return getattr(doctor_mod, 'BIN_HOME', None)
-        except (ImportError, AttributeError):
-            pass
         from ..config import BIN_HOME
         return BIN_HOME
         
     def _get_dist_scripts_dir():
-        try:
-            import agent_notes.doctor as doctor_mod
-            return getattr(doctor_mod, 'DIST_SCRIPTS_DIR', None)
-        except (ImportError, AttributeError):
-            pass
         from ..config import DIST_SCRIPTS_DIR
         return DIST_SCRIPTS_DIR
     
@@ -336,11 +306,6 @@ def _count_rules(backend, scope: str) -> tuple:
     
     # Helper to get DIST_RULES_DIR
     def _get_dist_rules_dir():
-        try:
-            import agent_notes.doctor as doctor_mod
-            return getattr(doctor_mod, 'DIST_RULES_DIR', None)
-        except (ImportError, AttributeError):
-            pass
         from ..config import DIST_RULES_DIR
         return DIST_RULES_DIR
     
@@ -659,8 +624,11 @@ def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
     # Handle bulk operations
     if needs_install:
         print(f"  {Color.GREEN}RUNNING{Color.NC} install to install missing components...")
-        from ..install import install
-        install()
+        # Invocation is deferred to the caller (commands layer) — services must
+        # not reach into the commands/top-level namespace. The caller checks
+        # for action.action == "INSTALL" in fix_actions and dispatches install().
+        # We flag it here by attaching a marker on the actions list.
+        fix_actions.append(FixAction("_TRIGGER_INSTALL", "-", "run install"))
     
     if needs_build:
         print(f"  {Color.CYAN}NOTICE{Color.NC}   Build stale issues detected.")
