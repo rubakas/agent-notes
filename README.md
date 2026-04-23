@@ -32,13 +32,14 @@ agent-notes <command> [options]
 
 | Command | Description |
 |---------|-------------|
-| `install` | Interactive installer wizard (CLI, scope, skills selection) |
-| `install --local [--copy]` | Direct install to current project (no wizard) |
+| `install [--local] [--copy]` | Interactive wizard or direct install |
 | `uninstall [--local]` | Remove installed components |
 | `update` | Pull latest, rebuild, reinstall |
 | `doctor [--local] [--fix]` | Check installation health |
 | `info` | Show status and component counts |
-| `list [agents\|skills\|rules\|all]` | List installed components |
+| `list [clis\|models\|roles\|agents\|skills\|rules\|all]` | List engine components or installed |
+| `set role <role> <model> [--cli <cli>]` | Change model for a role (Phase 10+) |
+| `regenerate [--cli <cli>]` | Rebuild files from state.json (Phase 10+) |
 | `validate` | Lint source configuration files |
 | `memory [list\|size\|show\|reset\|export\|import] [name]` | Manage agent memory |
 
@@ -157,31 +158,136 @@ You (human)
                            +-- DevOps (Sonnet 4)        infrastructure
 ```
 
-## Architecture
+## Architecture: YAML-Driven Extensibility
 
-**Single source of truth:** `agent_notes/data/` → `build` → `agent_notes/dist/` → `install`
+Agent-notes is a **hub** that coordinates three independent registries:
 
-1. **Source** — YAML metadata + Markdown prompts
+### Three Registries
+
+1. **CLIs** (`agent_notes/data/cli/*.yaml`)
+   - Define which AI development tools to configure
+   - Specify where files go, supported providers, frontmatter format
+   - Example: `claude.yaml`, `opencode.yaml`, `cursor.yaml` (add your own)
+
+2. **Models** (`agent_notes/data/models/*.yaml`)
+   - Define AI models and their provider aliases
+   - Each model has provider-specific IDs (anthropic, openai, openrouter, etc.)
+   - Example: `claude-opus-4-7.yaml`, `kimi-k2.yaml` (add your own)
+
+3. **Roles** (`agent_notes/data/roles/*.yaml`)
+   - Define abstract agent responsibilities (not concrete models)
+   - Agents declare which role they play; installer maps roles → models per CLI
+   - Example: `orchestrator.yaml`, `worker.yaml`, `specialist.yaml` (add your own)
+
+### Installation Flow
+
+```
+Agent declares role
+  ↓
+Wizard step 2: Select model per role per CLI
+  ↓
+State.json records choice: {orchestrator: claude-opus-4-7, worker: kimi-k2}
+  ↓
+Build engine resolves:  agent.role → state.role_models[role] → model.aliases[cli.provider]
+  ↓
+Generate agent files with correct frontmatter and model ID
+```
+
+**Zero Python changes needed to add:**
+- New CLI: drop `data/cli/cursor.yaml` (+ frontmatter template if format differs)
+- New model: drop `data/models/gpt-5.yaml` with aliases for supported providers
+- New role: drop `data/roles/specialist.yaml` + assign agents to it
+
+### Single Source of Truth
+
+`agent_notes/data/` → `build` → `agent_notes/dist/` → `install`
+
+1. **Source** — YAML metadata + Markdown prompts (edit here)
 2. **Build** — Generate platform-specific configs
 3. **Dist** — Built artifacts ready for installation  
 4. **Install** — Deploy via symlinks or copy
+
+## Extending agent-notes
+
+Want to add a new CLI, model, or role? It's just YAML:
+
+| Task | Guide | What to create |
+|------|-------|-----------------|
+| **Add a new CLI** (e.g., Cursor) | [docs/ADD_CLI.md](docs/ADD_CLI.md) | `data/cli/cursor.yaml` + optional `data/templates/frontmatter/cursor.py` |
+| **Add a new model** (e.g., Kimi) | [docs/ADD_MODEL.md](docs/ADD_MODEL.md) | `data/models/kimi-k2.yaml` with provider aliases |
+| **Add a new role** (e.g., Specialist) | [docs/ADD_ROLE.md](docs/ADD_ROLE.md) | `data/roles/specialist.yaml` + assign agents |
+
+### Quick examples
+
+**See all CLIs, models, and roles:**
+```bash
+agent-notes list clis       # Shows: Claude Code, OpenCode, GitHub Copilot, Cursor (if added)
+agent-notes list models     # Shows: Claude Opus/Sonnet/Haiku, Kimi K2, GPT-5, etc. + compatibility
+agent-notes list roles      # Shows: Orchestrator, Worker, Scout, Reasoner, Specialist (if added)
+agent-notes list agents     # Shows: which agents use which roles
+```
+
+**Verify a new CLI/model/role:**
+```bash
+# After adding a CLI:
+agent-notes install
+# → Wizard step 1 shows your new CLI ✓
+
+# After adding a model:
+agent-notes list models
+# → New model listed with compatible CLIs ✓
+
+# After adding a role and assigning agents:
+agent-notes list agents
+# → Agents using new role appear ✓
+```
+
+**Post-install updates (Phase 10+):**
+```bash
+agent-notes set role orchestrator kimi-k2 --cli opencode
+# Changes model for orchestrator role on OpenCode, regenerates agents
+
+agent-notes regenerate --cli claude
+# Rebuilds all Claude Code agents from current state.json
+```
+
+For detailed walkthroughs, see the per-task guides linked above.
 
 ## Project Structure
 
 ```
 agent-notes/
 ├── bin/agent-notes          # CLI wrapper (entry point)
+├── docs/
+│   ├── ADD_CLI.md           # Guide: add a new CLI backend
+│   ├── ADD_MODEL.md         # Guide: add a new AI model
+│   ├── ADD_ROLE.md          # Guide: add a new agent role
+│   ├── CLI_CAPABILITIES.md  # Source of truth for per-CLI features
+│   └── ENGINE_PLAN.md       # Refactor phases and design details
 ├── agent_notes/             # Python implementation
 │   ├── __init__.py, cli.py  # Core modules
 │   ├── VERSION              # Package version
 │   ├── data/                # Single source of truth
+│   │   ├── cli/             # CLI descriptors
+│   │   │   ├── claude.yaml, opencode.yaml, copilot.yaml
+│   │   │   └── cursor.yaml  # (add your own)
+│   │   ├── models/          # Model descriptors
+│   │   │   ├── claude-opus-4-7.yaml, claude-sonnet-4.yaml, ...
+│   │   │   └── kimi-k2.yaml # (add your own)
+│   │   ├── roles/           # Role descriptors
+│   │   │   ├── orchestrator.yaml, worker.yaml, scout.yaml, reasoner.yaml
+│   │   │   └── specialist.yaml # (add your own)
+│   │   ├── templates/frontmatter/
+│   │   │   ├── claude.py, opencode.py
+│   │   │   └── cursor.py    # (add if format differs from Claude/OpenCode)
 │   │   ├── agents/
-│   │   │   ├── agents.yaml  # Agent metadata
+│   │   │   ├── agents.yaml  # Agent metadata + role declarations
 │   │   │   └── *.md         # Agent prompt files
 │   │   ├── skills/          # Skill directories
 │   │   ├── rules/           # Code quality rules
-│   │   └── global.md        # Global instructions
-│   └── dist/                # Built artifacts
+│   │   ├── globals/         # Global config templates
+│   │   └── commands/, scripts/
+│   └── dist/                # Built artifacts (auto-generated, do not edit)
 │       ├── claude/, opencode/
 │       ├── rules/
 │       └── skills/
