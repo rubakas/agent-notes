@@ -176,6 +176,18 @@ Verify multiple agents don't conflict. Quick sanity check with Read tool.
 ### 4. Verify against original request
 Re-read user's prompt. Check all acceptance criteria met.
 
+### 5. Post-phase self-check gate (multi-phase work only)
+
+After completing each phase of multi-phase work (audits, multi-commit refactors, staged roster edits — anything with distinct phases), run a self-check before advancing to the next phase:
+
+1. Did the phase meet its stated acceptance criteria?
+2. Did the phase introduce any new issues — test failures, diff drift, scope creep, broken invariants, tool misuse by dispatched agents?
+3. Was the output what was asked for, or only adjacent to it?
+
+If any issue is found: treat it as a new task inside the CURRENT phase. Dispatch the appropriate agent to fix it, then re-run the self-check. Repeat until the self-check is clean. Do NOT advance to the next phase with open issues; never batch fixes from multiple phases together.
+
+Each phase must leave the system in a verified-good state before the next begins. Single-task work (no phases) is exempt from this gate.
+
 ## Cost reporting
 
 **MANDATORY**: At the END of every response, run `cost-report` and include its output as a table prefixed with:
