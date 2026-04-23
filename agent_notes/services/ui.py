@@ -138,14 +138,31 @@ def _checkbox_select(title: str, options: List[Tuple[str, str]], defaults: Set[s
     if not _can_interactive():
         return selected
 
+    # Number of lines the previous render occupied — used to move up and clear
+    # before redrawing. Zero on first render.
+    prev_lines = 0
+
     def render():
-        sys.stdout.write(f"\r{title} (↑↓ navigate, space toggle, enter confirm)\n\n")
+        nonlocal prev_lines
+        # Erase previous frame: move up prev_lines, then clear each line (K)
+        # as we write over it. Using "\r\033[K" per line guarantees any tail
+        # residue (e.g. when a new label is shorter than the old one) is wiped.
+        if prev_lines:
+            sys.stdout.write(f"\033[{prev_lines}A")
+        lines = []
+        # Title may contain embedded newlines — count them.
+        header = f"{title} (↑↓ navigate, space toggle, enter confirm)"
+        lines.extend(header.split("\n"))
+        lines.append("")  # blank separator
         for i, (label, value) in enumerate(options):
             check = "✓" if value in selected else " "
             pointer = "›" if i == cursor else " "
-            sys.stdout.write(f"  {pointer} [{check}] {label}\n")
-        sys.stdout.write(f"\n")
+            lines.append(f"  {pointer} [{check}] {label}")
+        lines.append("")  # trailing blank
+        for line in lines:
+            sys.stdout.write(f"\r\033[K{line}\n")
         sys.stdout.flush()
+        prev_lines = len(lines)
 
     render()
 
@@ -167,8 +184,6 @@ def _checkbox_select(title: str, options: List[Tuple[str, str]], defaults: Set[s
         elif key == 'escape':
             return selected
 
-        lines_to_clear = len(options) + 3
-        sys.stdout.write(f"\033[{lines_to_clear}A")
         render()
 
     return selected
@@ -178,7 +193,7 @@ def _radio_select(title: str, options: List[Tuple[str, str]], default: int = 0):
     """Interactive single-choice selector.
 
     Args:
-        title: Header text
+        title: Header text (may contain \\n for multi-line titles)
         options: List of (label, value) tuples
         default: Index of default selection
 
@@ -190,14 +205,25 @@ def _radio_select(title: str, options: List[Tuple[str, str]], default: int = 0):
     if not _can_interactive():
         return options[default][1]
 
+    prev_lines = 0
+
     def render():
-        sys.stdout.write(f"\r{title} (↑↓ navigate, enter confirm)\n\n")
+        nonlocal prev_lines
+        if prev_lines:
+            sys.stdout.write(f"\033[{prev_lines}A")
+        lines = []
+        header = f"{title} (↑↓ navigate, enter confirm)"
+        lines.extend(header.split("\n"))
+        lines.append("")
         for i, (label, value) in enumerate(options):
             dot = "●" if i == cursor else "○"
             pointer = "›" if i == cursor else " "
-            sys.stdout.write(f"  {pointer} {dot} {label}\n")
-        sys.stdout.write(f"\n")
+            lines.append(f"  {pointer} {dot} {label}")
+        lines.append("")
+        for line in lines:
+            sys.stdout.write(f"\r\033[K{line}\n")
         sys.stdout.flush()
+        prev_lines = len(lines)
 
     render()
 
@@ -213,8 +239,6 @@ def _radio_select(title: str, options: List[Tuple[str, str]], default: int = 0):
         elif key == 'escape':
             return options[cursor][1]
 
-        lines_to_clear = len(options) + 3
-        sys.stdout.write(f"\033[{lines_to_clear}A")
         render()
 
 
