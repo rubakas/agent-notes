@@ -29,3 +29,10 @@ venv/
 # Project
 agent_notes/dist/
 memory-backup/
+
+# Local CLI install (agent-notes manages its own dotfolders)
+.claude/
+.opencode/
+
+# Spurious artifacts (e.g. from accidentally stringified MagicMock paths)
+MagicMock/
