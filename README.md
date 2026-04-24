@@ -2,7 +2,7 @@
 
 AI agent configuration manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [OpenCode](https://github.com/opencode-ai/opencode).
 
-Configures a Lead agent (Opus) that orchestrates a team of 13 specialized subagents across three model tiers — so Opus plans, Sonnet executes, and Haiku explores.
+Configures a Lead agent (Opus) that orchestrates a team of 18 specialized subagents across three model tiers — so Opus plans, Sonnet executes, and Haiku explores.
 
 ## Quick Start
 
@@ -20,7 +20,7 @@ Update anytime with `cd ~/agent-notes && git pull && agent-notes update`.
 | Component | Description |
 |-----------|-------------|
 | **Skills** | 31 on-demand knowledge modules (Rails, Docker, Git, Kamal) |
-| **Agents** | 14 specialized AI subagents with hierarchical model strategy |
+| **Agents** | 18 specialized AI subagents with hierarchical model strategy |
 | **Rules** | Global instructions, code quality, and safety guardrails |
 | **Config** | Global instructions for Claude Code, OpenCode, and GitHub Copilot |
 
@@ -87,7 +87,7 @@ agent-notes install
 #     Scope:    Global (~/.claude, ~/.config/opencode)
 #     Mode:     Symlink
 #     Skills:   Rails (22), Docker (4), Kamal (1), Git (1)
-#     Agents:   13 (Claude Code) + 13 (OpenCode)
+#     Agents:   18 (Claude Code) + 19 (OpenCode)
 #     Config:   CLAUDE.md, AGENTS.md
 #     Rules:    2
 #   Proceed? [Y/n]: Y
