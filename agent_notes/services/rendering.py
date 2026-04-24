@@ -120,6 +120,10 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
         
         prompt_content = prompt_file.read_text()
         
+        # Expand shared-content include directives (<!-- include: NAME -->)
+        # No-op if shared/ directory is absent.
+        prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared")
+        
         # Generate for each backend that supports agents
         for backend in registry.all():
             if not backend.supports("agents"):

@@ -109,6 +109,57 @@ class TestGenerateAgentFiles:
         assert 'color: blue' in opencode_content  # Color must be emitted in OpenCode frontmatter
         assert '## Memory' not in opencode_content  # Should strip memory section
     
+    def test_expand_includes_wired_into_build(self, tmp_path, monkeypatch, sample_agents_yaml):
+        """Build pipeline should expand <!-- include: NAME --> directives via shared/ dir."""
+        from agent_notes.cli_backend import CLIBackend, CLIRegistry
+        from pathlib import Path
+        
+        source_agents_dir = tmp_path / "source" / "agents"
+        source_agents_dir.mkdir(parents=True)
+        shared_dir = source_agents_dir / "shared"
+        shared_dir.mkdir()
+        (shared_dir / "greeting.md").write_text("Hello from shared content.")
+        
+        # Agent prompt uses the include directive
+        agent_content = """You are a test agent.
+
+## Instructions
+
+<!-- include: greeting -->
+
+Use that greeting.
+"""
+        (source_agents_dir / "test-agent.md").write_text(agent_content)
+        
+        dist_dir = tmp_path / "dist"
+        monkeypatch.setattr('agent_notes.config.AGENTS_DIR', source_agents_dir)
+        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_dir)
+        
+        claude = CLIBackend(
+            name="claude", label="Claude Code",
+            global_home=Path("~/.claude").expanduser(), local_dir=".claude",
+            layout={"agents": "agents/"}, features={"agents": True, "frontmatter": "claude"},
+            global_template=None
+        )
+        registry = CLIRegistry([claude])
+        
+        def mock_dist_source_for(backend, component):
+            if component == "agents":
+                return dist_dir / backend.name / "agents"
+            return None
+        
+        with patch('agent_notes.cli_backend.load_registry', return_value=registry):
+            with patch('agent_notes.installer.dist_source_for', side_effect=mock_dist_source_for):
+                config_data = yaml.safe_load(sample_agents_yaml)
+                # Use a subset that matches our source file
+                agents_config = {'test-agent': config_data['agents']['test-agent']}
+                build.generate_agent_files(agents_config, config_data['tiers'])
+        
+        claude_file = dist_dir / 'claude' / 'agents' / 'test-agent.md'
+        output = claude_file.read_text()
+        assert "Hello from shared content." in output
+        assert "<!-- include: greeting -->" not in output
+    
     def test_warns_on_missing_source_file(self, tmp_path, monkeypatch, capsys):
         """Should warn when source file is missing."""
         source_agents_dir = tmp_path / "source" / "agents"
