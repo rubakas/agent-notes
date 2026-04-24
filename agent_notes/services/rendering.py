@@ -3,8 +3,53 @@
 import yaml
 import shutil
 import importlib
+import re
 from pathlib import Path
 from typing import Dict, Any, Optional
+
+
+def expand_includes(text: str, shared_dir: Path) -> str:
+    """Expand include directives in text by substituting shared content.
+    
+    Scans for lines matching `<!-- include: NAME -->` (where NAME is [a-z0-9_-]+)
+    and replaces each entire line with the contents of `shared_dir/NAME.md`.
+    
+    Args:
+        text: Input text that may contain include directives
+        shared_dir: Path to directory containing shared .md files
+    
+    Returns:
+        Text with include directives expanded to their content
+    
+    Raises:
+        ValueError: If an include directive references a file that doesn't exist
+    
+    Notes:
+        - If shared_dir doesn't exist, returns text unchanged (backward compatibility)
+        - Include directives must be on their own line (may have surrounding whitespace)
+        - Included files cannot contain other include directives (non-recursive)
+        - Trailing newlines are stripped from included content to avoid double blanks
+        - Include directives inside code fences are still processed (v1 simplicity)
+    """
+    if not shared_dir.exists():
+        return text
+    
+    # Pattern matches <!-- include: NAME --> on its own line with optional whitespace
+    # NAME must be [a-z0-9_-]+
+    pattern = r'^\s*<!--\s*include:\s*([a-z0-9_-]+)\s*-->\s*$'
+    
+    def replace_include(match):
+        include_name = match.group(1)
+        include_file = shared_dir / f"{include_name}.md"
+        
+        if not include_file.exists():
+            raise ValueError(f"Unknown include: {include_name} (file not found: {include_file})")
+        
+        content = include_file.read_text()
+        # Strip trailing newline to avoid double blanks
+        return content.rstrip('\n')
+    
+    return re.sub(pattern, replace_include, text, flags=re.MULTILINE)
 
 
 def _load_frontmatter_template(template_name):
