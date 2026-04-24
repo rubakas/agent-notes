@@ -106,6 +106,7 @@ class TestGenerateAgentFiles:
         assert 'model: github-copilot/claude-sonnet-4' in opencode_content
         assert 'edit: allow' in opencode_content
         assert 'bash: allow' in opencode_content
+        assert 'color: blue' in opencode_content  # Color must be emitted in OpenCode frontmatter
         assert '## Memory' not in opencode_content  # Should strip memory section
     
     def test_warns_on_missing_source_file(self, tmp_path, monkeypatch, capsys):

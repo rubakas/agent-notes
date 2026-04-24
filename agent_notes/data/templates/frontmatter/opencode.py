@@ -46,6 +46,10 @@ def render(ctx: dict) -> str:
                     else:
                         frontmatter.append(f'    {key}: {value}')
     
+    # Emit color if defined (OpenCode supports the `color` field)
+    if 'color' in agent_config:
+        frontmatter.append(f'color: {agent_config["color"]}')
+    
     frontmatter.append('---')
     
     return '\n'.join(frontmatter)
