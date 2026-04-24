@@ -159,7 +159,7 @@ agents:
     description: "Profiles application performance including response times, memory usage, query efficiency, and bundle size. Read-only analysis. Triggers: slow, performance, profile, memory, bundle size, response time, bottleneck."
     role: worker
     mode: subagent
-    color: magenta
+    color: purple
     effort: medium
     claude:
       disallowedTools: "Write, Edit"
@@ -180,7 +180,7 @@ agents:
     description: "Reviews API design for consistency, versioning, error handling, and backward compatibility. Read-only analysis. Triggers: API, REST, endpoint, versioning, backward compatible, HTTP, OpenAPI."
     role: scout
     mode: subagent
-    color: teal
+    color: cyan
     effort: medium
     claude:
       disallowedTools: "Write, Edit"
@@ -199,7 +199,7 @@ agents:
     description: "Writes and updates documentation including READMEs, API docs, architecture notes, and inline comments. Triggers: documentation, README, docs, changelog, API docs, comment, explain."
     role: scout
     mode: subagent
-    color: white
+    color: yellow
     effort: low
     claude:
       tools: "Read, Write, Edit, Grep, Glob"
@@ -217,7 +217,7 @@ agents:
     description: "Manages infrastructure configs including Docker, CI/CD pipelines, deployment, and environment setup. Triggers: Docker, CI, CD, pipeline, deploy, Kubernetes, infrastructure, GitHub Actions."
     role: worker
     mode: subagent
-    color: gray
+    color: blue
     effort: medium
     claude:
       tools: "Read, Write, Edit, Bash, Grep, Glob"
@@ -327,7 +327,7 @@ agents:
     description: "Implements and reviews third-party integrations: OAuth flows, webhooks, API clients, SSO, payment providers. Handles auth tokens, retries, idempotency, signature verification. Triggers: integration, OAuth, webhook, API client, SSO, SAML, OIDC, third-party, Stripe, payment, signature."
     role: worker
     mode: subagent
-    color: teal
+    color: cyan
     effort: medium
     claude:
       tools: "Read, Write, Edit, Bash, Grep, Glob, WebFetch"
