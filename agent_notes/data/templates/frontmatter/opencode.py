@@ -3,6 +3,35 @@
 from typing import Dict, Any
 
 
+# OpenCode requires `color` to be a 6-digit hex string (^#[0-9a-fA-F]{6}$)
+# or one of a small set of theme names. agents.yaml uses Claude's named colors
+# (which is the documented Claude Code standard), so we translate them here
+# when emitting OpenCode frontmatter. Hex values are Tailwind-style mid-tones.
+_CLAUDE_COLOR_TO_HEX = {
+    'red':    '#ef4444',
+    'blue':   '#3b82f6',
+    'green':  '#22c55e',
+    'yellow': '#eab308',
+    'purple': '#a855f7',
+    'orange': '#f97316',
+    'pink':   '#ec4899',
+    'cyan':   '#06b6d4',
+}
+
+
+def _to_opencode_color(value: str) -> str:
+    """Translate a color value to an OpenCode-acceptable form.
+    
+    Already-hex values pass through unchanged. Known Claude color names
+    are mapped to their hex equivalents. Unknown values fall back to the
+    raw string so OpenCode-native theme names (primary/secondary/etc.)
+    still work if anyone uses them.
+    """
+    if value.startswith('#'):
+        return value
+    return _CLAUDE_COLOR_TO_HEX.get(value, value)
+
+
 def render(ctx: dict) -> str:
     """Render YAML frontmatter for an OpenCode agent.
     
@@ -46,9 +75,10 @@ def render(ctx: dict) -> str:
                     else:
                         frontmatter.append(f'    {key}: {value}')
     
-    # Emit color if defined (OpenCode supports the `color` field)
+    # Emit color if defined. OpenCode requires hex format; translate from
+    # Claude's named colors (the source-of-truth format in agents.yaml).
     if 'color' in agent_config:
-        frontmatter.append(f'color: {agent_config["color"]}')
+        frontmatter.append(f'color: {_to_opencode_color(agent_config["color"])}')
     
     frontmatter.append('---')
     
