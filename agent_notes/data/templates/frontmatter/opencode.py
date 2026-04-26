@@ -67,8 +67,8 @@ def render(ctx: dict) -> str:
                         frontmatter.append(f'    {key}: {value}')
     
     if 'color' in agent_config:
-        color = agent_config['color']
-        frontmatter.append(f'color: {_COLOR_TO_HEX.get(color, color)}')
+        color = _COLOR_TO_HEX.get(agent_config['color'], agent_config['color'])
+        frontmatter.append(f"color: '{color}'")
     
     frontmatter.append('---')
     
