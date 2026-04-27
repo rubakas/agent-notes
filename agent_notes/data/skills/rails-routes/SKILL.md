@@ -1,6 +1,7 @@
 ---
 name: rails-routes
 description: "Rails routing: RESTful resources, actions as resources, nested routes, and constraints"
+group: rails
 ---
 
 # Routes

@@ -196,6 +196,13 @@ def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = N
         import agent_notes.installer as installer_mod
         installer_mod._install_universal_skills(copy_mode, registry)
 
+    # SessionStart hook for Claude Code only
+    try:
+        claude_backend = registry.get("claude")
+        _install_session_hook(claude_backend, scope)
+    except KeyError:
+        pass
+
 
 def _install_universal_skills(copy_mode: bool, registry: CLIRegistry) -> None:
     """Mirror skills to ~/.agents/skills/ for backwards compatibility."""
@@ -234,6 +241,13 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
         import agent_notes.installer as installer_mod
         installer_mod._uninstall_universal_skills()
 
+    # Remove SessionStart hook for Claude Code only
+    try:
+        claude_backend = registry.get("claude")
+        _uninstall_session_hook(claude_backend, scope)
+    except KeyError:
+        pass
+
 
 def _uninstall_universal_skills() -> None:
     
@@ -242,6 +256,50 @@ def _uninstall_universal_skills() -> None:
         print(f"Removing universal skills from {target} ...")
         remove_all_symlinks_in_dir(target)
         remove_dir_if_empty(target)
+
+
+def _session_hook_paths(backend, scope: str):
+    """Return (settings_path, context_file, hook_command) for the given scope."""
+    home = backend.global_home if scope == "global" else Path(backend.local_dir)
+    if scope == "global":
+        settings_path = home / "settings.json"
+        context_file = home / "agent-notes-context.md"
+        hook_command = "cat ~/.claude/agent-notes-context.md 2>/dev/null || true"
+    else:
+        settings_path = home / "settings.json"
+        context_file = home / "agent-notes-context.md"
+        hook_command = "cat .claude/agent-notes-context.md 2>/dev/null || true"
+    return settings_path, context_file, hook_command
+
+
+def _install_session_hook(backend, scope: str) -> None:
+    """Install the SessionStart hook and write the context file for Claude Code."""
+    from .settings_writer import install_hook
+    from .session_context import write_context
+    from .. import config
+
+    settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
+
+    # Gather installed agent names from dist directory
+    agents: list[str] = []
+    agents_dist = _get_dist_dir() / backend.name / backend.layout.get("agents", "agents")
+    if agents_dist.exists():
+        agents = sorted(p.stem for p in agents_dist.glob("*.md"))
+
+    version = config.get_version()
+    print(f"Installing Claude Code SessionStart hook ...")
+    write_context(context_file, agents, version)
+    install_hook(settings_path, "SessionStart", hook_command)
+
+
+def _uninstall_session_hook(backend, scope: str) -> None:
+    """Remove the SessionStart hook and context file for Claude Code."""
+    from .settings_writer import remove_hook
+
+    settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
+    print(f"Removing Claude Code SessionStart hook ...")
+    context_file.unlink(missing_ok=True)
+    remove_hook(settings_path, "SessionStart", hook_command)
 
 
 def install_scripts_global() -> None:

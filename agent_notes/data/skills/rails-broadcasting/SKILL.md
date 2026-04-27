@@ -1,6 +1,7 @@
 ---
 name: rails-broadcasting
 description: "Turbo Streams broadcasting: real-time updates, morphing, targeting, and Action Cable"
+group: rails
 ---
 
 # Broadcasting (Turbo Streams)

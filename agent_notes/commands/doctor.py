@@ -41,6 +41,28 @@ from ..services.fs import (
     files_differ
 )
 
+def _check_session_hook(scope: str, issues: list) -> None:
+    """Check that the Claude Code SessionStart hook is registered in settings.json."""
+    from ..services.settings_writer import has_hook
+    from ..services.installer import _session_hook_paths
+    from ..domain.diagnostics import Issue
+
+    try:
+        from ..cli_backend import load_registry
+        registry = load_registry()
+        claude_backend = registry.get("claude")
+    except KeyError:
+        return
+
+    settings_path, _context_file, hook_command = _session_hook_paths(claude_backend, scope)
+    if not has_hook(settings_path, "SessionStart", hook_command):
+        issues.append(Issue(
+            "missing_hook",
+            str(settings_path),
+            "SessionStart hook not found — run: agent-notes install to re-add the hook",
+        ))
+
+
 def diagnose(scope: str, fix: bool = False) -> bool:
     """Run all diagnostic checks and optionally apply fixes."""
     from .. import install_state
@@ -60,7 +82,10 @@ def diagnose(scope: str, fix: bool = False) -> bool:
     # Build freshness check (scope-independent) - call through shim for test compatibility
     from .. import doctor as _shim
     _shim.check_build_freshness(issues, fix_actions)
-    
+
+    # SessionStart hook check (Claude Code only)
+    _check_session_hook(scope, issues)
+
     # Print role→model assignments
     state = install_state.load_current_state()
     if state is not None:

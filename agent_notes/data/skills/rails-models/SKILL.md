@@ -1,6 +1,7 @@
 ---
 name: rails-models
 description: "Rails models: structure template, associations, callbacks, scopes, and validations"
+group: rails
 ---
 
 # Models

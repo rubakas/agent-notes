@@ -1,6 +1,7 @@
 ---
 name: rails-mailers
 description: "Rails Action Mailer: templates, layouts, attachments, previews, and testing"
+group: rails
 ---
 
 # Mailers Guide

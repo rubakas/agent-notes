@@ -1,6 +1,7 @@
 ---
 name: rails-kamal
 description: "Kamal deployment: zero-downtime Docker deploys, accessories, secrets, and configuration"
+group: kamal
 ---
 
 # Kamal
