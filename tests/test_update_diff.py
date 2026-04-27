@@ -2,6 +2,9 @@
 import pytest
 from agent_notes.update_diff import diff_states, diff_scope_states, render_diff_report, filter_diff, ComponentDiff, StateDiff
 from agent_notes.state import State, ScopeState, BackendState, InstalledItem
+from agent_notes.config import get_version
+
+VERSION = get_version()
 
 
 def create_backend_state(agents=None, skills=None, rules=None, commands=None, config=None, settings=None, role_models=None):
@@ -62,7 +65,7 @@ class TestDiffStates:
         diff = diff_states(None, new_state)
         
         assert diff.old_version is None
-        assert diff.new_version == "1.3.0"
+        assert diff.new_version == VERSION
         assert diff.old_commit is None
         assert diff.new_commit == "abc123"
         assert diff.added_backends == ["claude"]
@@ -95,8 +98,8 @@ class TestDiffStates:
         
         diff = diff_states(state, state)
         
-        assert diff.old_version == "1.3.0"
-        assert diff.new_version == "1.3.0"
+        assert diff.old_version == VERSION
+        assert diff.new_version == VERSION
         assert diff.old_commit == "abc123"
         assert diff.new_commit == "abc123"
         assert diff.added_backends == []
@@ -359,7 +362,7 @@ class TestFilterDiff:
         """Should keep only agent components when filtering."""
         diff = StateDiff(
             old_version="1.0.0",
-            new_version="1.3.0",
+            new_version=VERSION,
             old_commit="abc",
             new_commit="def",
             added_backends=[],
@@ -381,7 +384,7 @@ class TestFilterDiff:
         """Should return unchanged diff when only=None."""
         diff = StateDiff(
             old_version="1.0.0",
-            new_version="1.3.0",
+            new_version=VERSION,
             old_commit="abc", 
             new_commit="def",
             added_backends=[],
@@ -405,7 +408,7 @@ class TestRenderDiffReport:
         """Should render properly when no changes."""
         diff = StateDiff(
             old_version="1.0.0",
-            new_version="1.3.0",
+            new_version=VERSION,
             old_commit="abc123",
             new_commit="abc123",
             added_backends=[],
@@ -422,7 +425,7 @@ class TestRenderDiffReport:
         """Should render changes properly."""
         diff = StateDiff(
             old_version="1.0.0",
-            new_version="1.3.0",
+            new_version=VERSION,
             old_commit="abc123", 
             new_commit="def456",
             added_backends=["opencode"],
@@ -445,7 +448,7 @@ class TestRenderDiffReport:
         """Should render without color codes."""
         diff = StateDiff(
             old_version="1.0.0",
-            new_version="1.3.0",
+            new_version=VERSION,
             old_commit="abc123",
             new_commit="def456", 
             added_backends=[],
@@ -465,7 +468,7 @@ class TestRenderDiffReport:
         """Should render initial install scenario properly.""" 
         diff = StateDiff(
             old_version=None,
-            new_version="1.3.0",
+            new_version=VERSION,
             old_commit=None,
             new_commit="abc123",
             added_backends=["claude"],
@@ -490,7 +493,7 @@ class TestStateDiffMethods:
         """Should count total changes correctly."""
         diff = StateDiff(
             old_version="1.0.0",
-            new_version="1.3.0",
+            new_version=VERSION,
             old_commit="abc",
             new_commit="def",
             added_backends=[],
