@@ -59,7 +59,7 @@ def copy_skills() -> list[Path]:
 def copy_scripts() -> list[Path]:
     """Copy script files to dist/scripts/."""
     from ..config import SCRIPTS_DIR, DIST_SCRIPTS_DIR
-    
+
     if not SCRIPTS_DIR.exists():
         return []
     if DIST_SCRIPTS_DIR.exists():
@@ -72,6 +72,24 @@ def copy_scripts() -> list[Path]:
             shutil.copy2(script, dest)
             dest.chmod(0o755)
             copied.append(dest)
+    return copied
+
+
+def copy_commands() -> list[Path]:
+    """Copy command files from data/commands/ to dist/claude/commands/."""
+    from ..config import DATA_DIR, DIST_DIR
+    src = DATA_DIR / "commands"
+    if not src.exists():
+        return []
+    dest = DIST_DIR / "claude" / "commands"
+    if dest.exists():
+        shutil.rmtree(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    copied = []
+    for f in src.glob("*.md"):
+        out = dest / f.name
+        shutil.copy2(f, out)
+        copied.append(out)
     return copied
 
 
@@ -114,8 +132,12 @@ def build() -> None:
     print("Copying scripts...")
     script_files = copy_scripts()
 
+    # Copy commands
+    print("Copying commands...")
+    command_files = copy_commands()
+
     # Report results
-    all_files = agent_files + global_files + skill_files + script_files
+    all_files = agent_files + global_files + skill_files + script_files + command_files
     print(f"\nGenerated {len(all_files)} files:")
     
     total_lines = 0
