@@ -62,7 +62,7 @@ class TestDiffStates:
         diff = diff_states(None, new_state)
         
         assert diff.old_version is None
-        assert diff.new_version == "1.0.2"
+        assert diff.new_version == "1.1.0"
         assert diff.old_commit is None
         assert diff.new_commit == "abc123"
         assert diff.added_backends == ["claude"]
@@ -95,8 +95,8 @@ class TestDiffStates:
         
         diff = diff_states(state, state)
         
-        assert diff.old_version == "1.0.2"
-        assert diff.new_version == "1.0.2"
+        assert diff.old_version == "1.1.0"
+        assert diff.new_version == "1.1.0"
         assert diff.old_commit == "abc123"
         assert diff.new_commit == "abc123"
         assert diff.added_backends == []
