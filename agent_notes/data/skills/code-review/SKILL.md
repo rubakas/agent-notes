@@ -1,41 +1,49 @@
 ---
 name: code-review
-description: "Systematic code review: correctness, safety, clarity, consistency"
+description: "Systematic code review: correctness, safety, performance, clarity, consistency"
 group: process
 ---
 
 # Code Review
 
-When reviewing code, work through these four lenses in order. Report findings
-grouped by lens, ranked by severity (blocking → suggestion).
+Work through these five lenses in order. Report findings grouped by lens, ranked by severity within each group.
 
 ## Lens 1 — Correctness
 
 - Does the logic match the stated intent?
-- Are edge cases handled (empty input, nil/None, off-by-one, concurrent access)?
-- Are error paths handled and surfaced correctly?
-- Do the tests cover the behavior, not just the happy path?
+- Are edge cases handled: empty input, nil/None, off-by-one, concurrent access, zero/negative values?
+- Are error paths handled and surfaced to callers correctly?
+- Do the tests cover behavior, not just the happy path?
+- Is there new code with no tests at all? That is a blocking issue.
 
 ## Lens 2 — Safety
 
 - Is user input validated at the system boundary?
-- Are secrets, credentials, or PII handled safely (no logging, no exposure)?
-- Are SQL queries parameterized?
+- Are secrets, credentials, or PII handled safely — not logged, not exposed in responses?
+- Are SQL queries parameterized, not interpolated?
 - Are file paths sanitized before use?
-- Does the change affect authentication or authorization logic?
+- Does this change affect authentication or authorization logic? If yes, flag for deeper scrutiny.
 
-## Lens 3 — Clarity
+## Lens 3 — Performance
 
-- Are names accurate? Does the name describe what the thing does, not how?
-- Is control flow easy to follow? (Guard clauses over deep nesting.)
-- Are comments present only where the "why" is non-obvious?
+- Are there N+1 queries — loading a record, then querying for each related record in a loop?
+- Are expensive operations (network calls, disk I/O, serialization) inside hot loops?
+- Are large collections being loaded into memory when streaming or pagination would suffice?
+- Is the change reversible if it causes a production performance regression?
+
+## Lens 4 — Clarity
+
+- Are names accurate — do they describe what, not how?
+- Is control flow easy to follow? Guard clauses beat deep nesting.
+- Are comments present only where the why is non-obvious? No comments that restate what the code already says.
 - Would a new team member understand this without asking?
 
-## Lens 4 — Consistency
+## Lens 5 — Consistency
 
-- Does this match the patterns already in the codebase?
-- Does it follow project naming conventions (checked against existing files)?
-- Does it introduce new abstractions or dependencies that already exist elsewhere?
+- Does this match the existing patterns in the codebase?
+- Does it follow project naming conventions?
+- Does it introduce a new abstraction or dependency that already exists elsewhere?
+- Are the tests written in the same style as existing tests?
 
 ## Output format
 
@@ -44,9 +52,13 @@ BLOCKING
 - [file:line] [finding] — [why it matters]
 
 SUGGESTIONS
-- [file:line] [finding] — [optional: alternative]
+- [file:line] [finding] — [alternative if applicable]
 
 APPROVED (if no blocking issues)
 ```
 
 A BLOCKING finding must be resolved before merge. A SUGGESTION is optional.
+
+## Scope discipline
+
+Do not flag cosmetic changes unless they create real ambiguity. A review that lists 20 nits trains authors to ignore reviews entirely.

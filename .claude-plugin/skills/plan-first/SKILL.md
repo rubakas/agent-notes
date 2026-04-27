@@ -1,6 +1,6 @@
 ---
 name: plan-first
-description: "Plan before coding: decompose, map dependencies, define acceptance criteria"
+description: "Plan before coding: read first, decompose, map dependencies, flag risks"
 group: process
 ---
 
@@ -10,31 +10,60 @@ Before writing any code, produce a written plan the user can review.
 
 ## When to apply
 
-Use this skill when the task involves more than one file, has unclear scope,
-or when the user hasn't specified an implementation approach.
+Any task touching more than one file, with unclear scope, or where multiple approaches exist. For trivial single-file changes you already understand fully — skip the plan, just do it.
 
 ## Process
 
-1. **Restate the goal** — one sentence. What does "done" look like?
-2. **Decompose** — list every discrete subtask needed. Include hidden work
-   (tests, migrations, type changes) the user didn't mention.
-3. **Map dependencies** — which subtasks must happen before others?
-   Mark parallel groups explicitly.
-4. **Flag ambiguities** — list anything that needs a decision before work starts.
-   Ask one clarifying question if critical information is missing.
-5. **Present the plan** — show it to the user before touching any file.
-   Wait for approval or correction.
+### 1. Read first
+
+Before planning, read the relevant existing code. Look for:
+- Existing patterns you should follow
+- Similar features already implemented — don't reinvent
+- Constraints that rule out certain approaches
+
+### 2. Restate the goal
+
+One sentence. What does "done" look like from the user's perspective?
+
+### 3. Decompose
+
+List every discrete subtask. Include hidden work the user didn't mention:
+- Tests
+- Migrations or schema changes
+- Type definitions
+- Config or environment changes
+- Cleanup of code being replaced
+
+### 4. Map dependencies
+
+Which subtasks must happen before others? Mark parallel groups explicitly. Flag tasks that require a user decision before you can proceed.
+
+### 5. Flag risks
+
+List anything that could block the plan:
+- Missing information or ambiguities
+- Assumptions that need verification
+- Changes that could break existing behavior
+
+### 6. Present and wait
+
+Show the plan. Do not touch any file until the user approves or corrects it. If the scope is too large, propose splitting into phases.
 
 ## Output format
 
 ```
 Plan:
-1. [subtask] — [what changes, which files] (parallel group A)
-2. [subtask] — [what changes, which files] (parallel group A)
-3. [subtask] — [what changes, which files] (after group A)
+1. [subtask] — [files affected] (parallel group A)
+2. [subtask] — [files affected] (parallel group A)
+3. [subtask] — [files affected] (after group A)
 
-Questions before starting:
-- [ambiguity 1]
+Risks / questions:
+- [item needing decision or verification]
 ```
 
-Do not begin implementation until the user approves the plan.
+## Anti-patterns
+
+- Planning without reading the codebase first
+- Breaking tasks into steps so small they have no independent value
+- Starting implementation before the plan is approved
+- Writing a plan that only restates what the user said

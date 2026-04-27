@@ -1,48 +1,57 @@
 ---
 name: brainstorming
-description: "Explore multiple approaches before committing — surface tradeoffs, then decide"
+description: "Explore multiple approaches before committing — read context, surface tradeoffs, then decide"
 group: process
 ---
 
 # Brainstorming
 
-Use this skill when the problem has multiple valid solutions and the choice has
-long-term consequences (API design, data model, architecture decision).
+Use when the problem has multiple valid solutions and the choice has long-term consequences: API design, data model, architecture, technology selection.
 
 ## Process
 
-### 1. Generate options (diverge)
+### 1. Read the context first
 
-Produce at least three distinct approaches. For each:
-- Name it (one noun phrase).
-- Describe it in two sentences max.
-- List the main advantage.
-- List the main risk or cost.
+Before generating options, read:
+- Existing patterns in the codebase — there may already be an established approach to follow.
+- Similar features already implemented — don't invent something the codebase already knows how to do.
+- Any stated constraints in tickets, comments, or configuration.
 
-Do not evaluate yet. Generate first.
+### 2. Generate options (diverge)
 
-### 2. Apply constraints (filter)
+Produce at least three meaningfully distinct approaches. For each:
+- **Name** — one noun phrase.
+- **Summary** — two sentences max.
+- **Main advantage** — what it does best.
+- **Main cost or risk** — what you're giving up.
 
-Filter options against the project's real constraints:
+Do not evaluate yet. Generate first. If one option is clearly dominant, still generate alternatives — the exercise surfaces the tradeoffs you'd otherwise miss.
+
+If a key technical assumption is unproven, include a **spike option**: a throwaway implementation to test the risky assumption before committing to a direction.
+
+### 3. Apply constraints (filter)
+
+Filter against the project's real constraints:
 - Performance requirements
-- Team familiarity
-- Existing patterns in the codebase
-- Timeline / scope
+- Team familiarity and maintainability
+- Existing patterns and dependencies in the codebase
+- Timeline and scope
 
-Eliminate options that violate hard constraints. Do not eliminate options just because
-they're unfamiliar.
+Remove options that violate hard constraints. Do not remove options just because they're unfamiliar or non-obvious.
 
-### 3. Recommend (converge)
+### 4. Recommend (converge)
 
 Pick one option. State:
 - Which option you recommend.
-- Why it wins over the alternatives.
-- What you're trading away (be honest about the downside).
+- Why it wins against the specific alternatives — not in the abstract.
+- What you are explicitly trading away — be honest, not diplomatic.
 
-Present the recommendation to the user. Do not begin implementation until they agree.
+Present the recommendation. Do not begin implementation until the user agrees.
 
-## Anti-patterns to avoid
+## Anti-patterns
 
-- Generating only one option dressed up as brainstorming.
+- Generating one real option and two obvious strawmen to make it look like a comparison.
 - Recommending the first option you thought of.
-- Listing tradeoffs without actually comparing them.
+- Listing tradeoffs without actually comparing them against each other.
+- Skipping the codebase read and inventing patterns from scratch.
+- Framing a spike as a commitment — spikes are exploratory, not production code.

@@ -6,10 +6,11 @@ from agent_notes.config import SKILLS_DIR
 
 PROCESS_SKILLS = [
     "plan-first",
-    "test-driven",
+    "tdd",
     "debugging-protocol",
     "brainstorming",
     "code-review",
+    "refactoring-protocol",
 ]
 
 
@@ -23,8 +24,12 @@ class TestProcessSkillsExist:
         skill = self.registry.get("plan-first")
         assert skill is not None
 
-    def test_test_driven_exists(self):
-        skill = self.registry.get("test-driven")
+    def test_tdd_exists(self):
+        skill = self.registry.get("tdd")
+        assert skill is not None
+
+    def test_refactoring_protocol_exists(self):
+        skill = self.registry.get("refactoring-protocol")
         assert skill is not None
 
     def test_debugging_protocol_exists(self):
@@ -69,7 +74,7 @@ class TestProcessSkillsDescription:
 
 
 class TestByGroupContainsAllProcessSkills:
-    """by_group()['process'] must contain all 5 process skills."""
+    """by_group()['process'] must contain all process skills."""
 
     def setup_method(self):
         self.registry = load_skill_registry(SKILLS_DIR)
@@ -78,7 +83,7 @@ class TestByGroupContainsAllProcessSkills:
         groups = self.registry.by_group()
         assert "process" in groups
 
-    def test_process_group_contains_all_five_skills(self):
+    def test_process_group_contains_all_skills(self):
         groups = self.registry.by_group()
         process_names = {s.name for s in groups["process"]}
         for skill_name in PROCESS_SKILLS:
