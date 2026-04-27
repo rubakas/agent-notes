@@ -1,6 +1,7 @@
 ---
 name: rails-concerns
 description: "Rails concerns: model and controller concern patterns, shared behavior, and testing"
+group: rails
 ---
 
 # Concerns

@@ -1,6 +1,7 @@
 ---
 name: rails-lib
 description: "Custom libraries, Rails extensions, and lib/ directory organization"
+group: rails
 ---
 
 # Lib Guide

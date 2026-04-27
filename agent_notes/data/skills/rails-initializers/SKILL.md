@@ -1,6 +1,7 @@
 ---
 name: rails-initializers
 description: "Rails configuration initializers: extensions, CORS, filtering, and custom config"
+group: rails
 ---
 
 # Initializers Guide

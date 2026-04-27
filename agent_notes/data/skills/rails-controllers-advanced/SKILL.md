@@ -1,6 +1,7 @@
 ---
 name: rails-controllers-advanced
 description: "Rails controllers advanced: error handling, filters, streaming, API patterns, security, and testing"
+group: rails
 ---
 
 # Controllers (Advanced)

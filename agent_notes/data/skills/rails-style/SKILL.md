@@ -1,6 +1,7 @@
 ---
 name: rails-style
 description: "Rails code style: conditionals, method ordering, bang methods, visibility, and naming conventions"
+group: rails
 ---
 
 # Code Style Guide

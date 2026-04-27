@@ -1,6 +1,7 @@
 ---
 name: rails-javascript
 description: "Rails frontend: Stimulus controllers, Turbo patterns, Importmap, and view transitions"
+group: rails
 ---
 
 # JavaScript & Stimulus

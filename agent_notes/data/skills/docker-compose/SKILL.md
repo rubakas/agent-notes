@@ -1,6 +1,7 @@
 ---
 name: docker-compose
 description: "Docker Compose: file structure, health checks, depends_on, and common service patterns"
+group: docker
 ---
 
 # Docker Compose Patterns

@@ -1,6 +1,7 @@
 ---
 name: rails-view-components-advanced
 description: "ViewComponent advanced: best practices, organization, lifecycle, and common patterns"
+group: rails
 ---
 
 # ViewComponent (Advanced)

@@ -1,6 +1,7 @@
 ---
 name: rails-migrations
 description: "Rails database migrations: tables, columns, indexes, foreign keys, and best practices"
+group: rails
 ---
 
 # Migrations Guide
