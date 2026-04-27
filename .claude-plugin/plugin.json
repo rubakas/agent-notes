@@ -1,6 +1,6 @@
 {
   "name": "agent-notes",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Multi-agent team with cost-optimized model routing. 18 specialized agents (lead/coder/reviewer/explorer/etc), 5 process discipline skills, and structured lead-delegate-review workflow for Claude Code.",
   "author": "Eugene Naumov",
   "hooks": {
