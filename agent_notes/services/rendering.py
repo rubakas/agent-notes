@@ -103,6 +103,18 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     from ..config import AGENTS_DIR, DIST_DIR
     
     generated_files = []
+
+    from ..services.user_config import load_user_config, resolve_agent_role, resolve_role_model, get_patch, merge_configs
+
+    user_config = load_user_config()
+    # Merge project-level config if provided
+    if project_path is not None:
+        project_config_file = Path(project_path) / ".claude" / "agent-notes.yaml"
+        if project_config_file.exists():
+            from ..services.user_config import load_user_config as _load
+            project_config = _load(project_config_file)
+            user_config = merge_configs(user_config, project_config)
+
     registry = load_registry()
     model_registry = None  # Lazy load only if needed
     scope_state = None
@@ -163,7 +175,7 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
             #      any model's class, with a compatible provider for this backend
             #   3. Legacy tier fallback: agent_config['tier'] -> tiers[tier][backend.name]
             model_str = None
-            agent_role = agent_config.get('role')
+            agent_role = resolve_agent_role(agent_name, agent_config.get('role'), user_config)
             
             if (scope_state is not None and 
                 agent_role is not None and 
@@ -186,6 +198,12 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
                 except KeyError:
                     pass  # fall through to class/tier fallback
             
+            # User config override: explicit model for this role+backend
+            if model_str is None:
+                user_model = resolve_role_model(agent_role, backend.name, user_config)
+                if user_model:
+                    model_str = user_model
+
             # Step 2: role.typical_class fallback — the "works from shipped YAMLs
             # with zero state" path. Loads the role and picks any model whose
             # class matches role.typical_class and which has an alias for one
@@ -244,7 +262,12 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
             
             # Apply post-processing transformation (e.g., strip memory section)
             content = template.post_process(prompt_content, ctx)
-            
+
+            # Apply user patch if present
+            patch = get_patch(agent_name, user_config)
+            if patch:
+                content = content.rstrip() + "\n\n" + patch.strip()
+
             # Combine and write
             full_content = f"{frontmatter}\n\n{content}"
             
