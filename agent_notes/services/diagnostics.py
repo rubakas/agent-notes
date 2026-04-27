@@ -248,6 +248,31 @@ def check_build_freshness(issues: List[Issue], fix_actions: List[FixAction]):
                 issues.append(Issue("build_stale", str(gen), f"{src} is newer than generated file"))
                 fix_actions.append(FixAction("BUILD", str(gen), "regenerate from source"))
 
+    # Check plugin agents are up-to-date with dist agents
+    from ..config import ROOT, DIST_DIR
+    plugin_agents_dir = ROOT / ".claude-plugin" / "agents"
+    dist_claude_agents = DIST_DIR / "claude" / "agents"
+    if plugin_agents_dir.exists() and dist_claude_agents.exists():
+        for dist_file in dist_claude_agents.glob("*.md"):
+            plugin_file = plugin_agents_dir / dist_file.name
+            if plugin_file.exists() and dist_file.stat().st_mtime > plugin_file.stat().st_mtime:
+                issues.append(Issue("build_stale", str(plugin_file),
+                                    "dist agent is newer than plugin agent — run scripts/build-plugin.sh"))
+                fix_actions.append(FixAction("BUILD", ".claude-plugin/agents/", "run scripts/build-plugin.sh"))
+                break  # one warning is enough
+
+    # Check user config freshness against dist agents
+    from ..services.user_config import config_path
+    user_cfg = config_path()
+    if user_cfg.exists() and dist_claude_agents.exists():
+        cfg_time = user_cfg.stat().st_mtime
+        for dist_file in dist_claude_agents.glob("*.md"):
+            if cfg_time > dist_file.stat().st_mtime:
+                issues.append(Issue("build_stale", str(user_cfg),
+                                    "user config is newer than dist agents — run: agent-notes build"))
+                fix_actions.append(FixAction("BUILD", "dist/", "regenerate from source"))
+                break
+
 def _cli_base_dir(backend, scope: str) -> Path:
     """Get base directory for a CLI backend."""
     from ..cli_backend import CLIBackend
