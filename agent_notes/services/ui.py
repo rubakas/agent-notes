@@ -1,6 +1,7 @@
 """Terminal UI primitives."""
 
 import sys
+import shutil
 from pathlib import Path
 from typing import List, Tuple, Set
 
@@ -13,8 +14,9 @@ except ImportError:
 
 # Export for backward compatibility
 __all__ = ['Color', 'ok', 'warn', 'fail', 'error', 'info', 'issue', 'linked', 'removed', 'skipped',
-           '_safe_input', '_can_interactive', '_read_key', '_checkbox_select', '_radio_select', 
-           '_checkbox_select_fallback', '_radio_select_fallback', '_HAS_TTY']
+           '_safe_input', '_can_interactive', '_read_key', '_checkbox_select', '_radio_select',
+           '_checkbox_select_fallback', '_radio_select_fallback', '_HAS_TTY',
+           '_clear_screen', '_render_step_header', '_render_nav_footer', '_terminal_width']
 
 
 # --- Colors ---
@@ -80,6 +82,47 @@ def skipped(path: str, reason: str = "not a symlink — remove manually") -> Non
     print(f"  {Color.YELLOW}SKIP{Color.NC}     {path} ({reason})")
 
 
+def _terminal_width() -> int:
+    return shutil.get_terminal_size((80, 24)).columns
+
+
+def _clear_screen() -> None:
+    """Clear terminal. No-op when stdout is not a TTY (CI, pipes, tests)."""
+    if sys.stdout.isatty():
+        sys.stdout.write('\033[2J\033[H')
+        sys.stdout.flush()
+
+
+def _render_step_header(step: int, total: int, version: str = '') -> None:
+    """Print the wizard top bar: app name on left, step counter on right."""
+    width = _terminal_width()
+    left_plain = f"  AgentNotes{f' v{version}' if version else ''}"
+    right_plain = f"Step {step} of {total}  "
+    padding = max(1, width - len(left_plain) - len(right_plain))
+    left_col = f"  {Color.BOLD}AgentNotes{Color.NC}{f' {Color.CYAN}v{version}{Color.NC}' if version else ''}"
+    right_col = f"{Color.DIM}Step {step} of {total}{Color.NC}  "
+    sys.stdout.write(f"{left_col}{' ' * padding}{right_col}\n")
+    sys.stdout.write(f"{Color.DIM}{'─' * width}{Color.NC}\n\n")
+    sys.stdout.flush()
+
+
+def _render_nav_footer(mode: str = 'checkbox') -> None:
+    """Print the bottom separator + key hint line."""
+    width = _terminal_width()
+    sys.stdout.write(f"\n{Color.DIM}{'─' * width}{Color.NC}\n")
+    if mode == 'checkbox':
+        hints = (f"  {Color.DIM}↑↓{Color.NC} navigate"
+                 f"   {Color.DIM}space{Color.NC} toggle"
+                 f"   {Color.DIM}enter{Color.NC} confirm"
+                 f"   {Color.DIM}q{Color.NC} quit")
+    else:
+        hints = (f"  {Color.DIM}↑↓{Color.NC} navigate"
+                 f"   {Color.DIM}enter{Color.NC} confirm"
+                 f"   {Color.DIM}q{Color.NC} quit")
+    sys.stdout.write(hints + "\n")
+    sys.stdout.flush()
+
+
 # --- TUI primitives ---
 def _safe_input(prompt: str, default: str = "") -> str:
     """Safe input that handles EOF and interrupts."""
@@ -118,13 +161,17 @@ def _read_key():
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
-def _checkbox_select(title: str, options: List[Tuple[str, str]], defaults: Set[str] = None) -> Set[str]:
+def _checkbox_select(title: str, options: List[Tuple[str, str]], defaults: Set[str] = None,
+                     step: int = 0, total: int = 0, version: str = '') -> Set[str]:
     """Interactive checkbox selector.
 
     Args:
         title: Header text
         options: List of (label, value) tuples
         defaults: Set of values that are pre-selected
+        step: Wizard step number (0 = legacy in-place mode)
+        total: Total wizard steps
+        version: App version string
 
     Returns:
         Set of selected values
@@ -138,64 +185,103 @@ def _checkbox_select(title: str, options: List[Tuple[str, str]], defaults: Set[s
     if not _can_interactive():
         return selected
 
-    # Number of lines the previous render occupied — used to move up and clear
-    # before redrawing. Zero on first render.
-    prev_lines = 0
-
-    def render():
-        nonlocal prev_lines
-        # Erase previous frame: move up prev_lines, then clear each line (K)
-        # as we write over it. Using "\r\033[K" per line guarantees any tail
-        # residue (e.g. when a new label is shorter than the old one) is wiped.
-        if prev_lines:
-            sys.stdout.write(f"\033[{prev_lines}A")
-        lines = []
-        # Title may contain embedded newlines — count them.
-        header = f"{title} (↑↓ navigate, space toggle, enter confirm)"
-        lines.extend(header.split("\n"))
-        lines.append("")  # blank separator
-        for i, (label, value) in enumerate(options):
-            check = "✓" if value in selected else " "
-            pointer = "›" if i == cursor else " "
-            lines.append(f"  {pointer} [{check}] {label}")
-        lines.append("")  # trailing blank
-        for line in lines:
-            sys.stdout.write(f"\r\033[K{line}\n")
-        sys.stdout.flush()
-        prev_lines = len(lines)
-
-    render()
-
-    while True:
-        key = _read_key()
-
-        if key == 'up':
-            cursor = (cursor - 1) % len(options)
-        elif key == 'down':
-            cursor = (cursor + 1) % len(options)
-        elif key == 'space':
-            value = options[cursor][1]
-            if value in selected:
-                selected.discard(value)
-            else:
-                selected.add(value)
-        elif key == 'enter':
-            return selected
-        elif key == 'escape':
-            return selected
+    if step > 0:
+        def render():
+            _clear_screen()
+            _render_step_header(step, total, version)
+            sys.stdout.write(f"  {title}\n\n")
+            for i, (label, value) in enumerate(options):
+                check = "✓" if value in selected else " "
+                pointer = "›" if i == cursor else " "
+                sys.stdout.write(f"  {pointer} [{check}] {label}\n")
+            _render_nav_footer('checkbox')
+            sys.stdout.flush()
 
         render()
+
+        while True:
+            key = _read_key()
+
+            if key == 'up':
+                cursor = (cursor - 1) % len(options)
+            elif key == 'down':
+                cursor = (cursor + 1) % len(options)
+            elif key == 'space':
+                value = options[cursor][1]
+                if value in selected:
+                    selected.discard(value)
+                else:
+                    selected.add(value)
+            elif key == 'enter':
+                return selected
+            elif key == 'escape':
+                return selected
+            elif key in ('q', 'Q'):
+                print("\nInstallation cancelled.")
+                sys.exit(0)
+
+            render()
+    else:
+        # Legacy in-place mode
+        prev_lines = 0
+
+        def render():
+            nonlocal prev_lines
+            if prev_lines:
+                sys.stdout.write(f"\033[{prev_lines}A")
+            lines = []
+            header = f"{title} (↑↓ navigate, space toggle, enter confirm)"
+            lines.extend(header.split("\n"))
+            lines.append("")  # blank separator
+            for i, (label, value) in enumerate(options):
+                check = "✓" if value in selected else " "
+                pointer = "›" if i == cursor else " "
+                lines.append(f"  {pointer} [{check}] {label}")
+            lines.append("")  # trailing blank
+            for line in lines:
+                sys.stdout.write(f"\r\033[K{line}\n")
+            sys.stdout.flush()
+            prev_lines = len(lines)
+
+        render()
+
+        while True:
+            key = _read_key()
+
+            if key == 'up':
+                cursor = (cursor - 1) % len(options)
+            elif key == 'down':
+                cursor = (cursor + 1) % len(options)
+            elif key == 'space':
+                value = options[cursor][1]
+                if value in selected:
+                    selected.discard(value)
+                else:
+                    selected.add(value)
+            elif key == 'enter':
+                return selected
+            elif key == 'escape':
+                return selected
+            elif key in ('q', 'Q'):
+                print("\nInstallation cancelled.")
+                sys.exit(0)
+
+            render()
 
     return selected
 
 
-def _radio_select(title: str, options: List[Tuple[str, str]], default: int = 0):
+def _radio_select(title: str, options: List[Tuple[str, str]], default: int = 0,
+                  step: int = 0, total: int = 0, version: str = ''):
     """Interactive single-choice selector.
 
     Args:
         title: Header text (may contain \\n for multi-line titles)
         options: List of (label, value) tuples
         default: Index of default selection
+        step: Wizard step number (0 = legacy in-place mode)
+        total: Total wizard steps
+        version: App version string
 
     Returns:
         Selected value
@@ -205,47 +291,86 @@ def _radio_select(title: str, options: List[Tuple[str, str]], default: int = 0):
     if not _can_interactive():
         return options[default][1]
 
-    prev_lines = 0
-
-    def render():
-        nonlocal prev_lines
-        if prev_lines:
-            sys.stdout.write(f"\033[{prev_lines}A")
-        lines = []
-        header = f"{title} (↑↓ navigate, enter confirm)"
-        lines.extend(header.split("\n"))
-        lines.append("")
-        for i, (label, value) in enumerate(options):
-            dot = "●" if i == cursor else "○"
-            pointer = "›" if i == cursor else " "
-            lines.append(f"  {pointer} {dot} {label}")
-        lines.append("")
-        for line in lines:
-            sys.stdout.write(f"\r\033[K{line}\n")
-        sys.stdout.flush()
-        prev_lines = len(lines)
-
-    render()
-
-    while True:
-        key = _read_key()
-
-        if key == 'up':
-            cursor = (cursor - 1) % len(options)
-        elif key == 'down':
-            cursor = (cursor + 1) % len(options)
-        elif key == 'enter':
-            return options[cursor][1]
-        elif key == 'escape':
-            return options[cursor][1]
+    if step > 0:
+        def render():
+            _clear_screen()
+            _render_step_header(step, total, version)
+            sys.stdout.write(f"  {title}\n\n")
+            for i, (label, value) in enumerate(options):
+                dot = "●" if i == cursor else "○"
+                pointer = "›" if i == cursor else " "
+                sys.stdout.write(f"  {pointer} {dot} {label}\n")
+            _render_nav_footer('radio')
+            sys.stdout.flush()
 
         render()
 
+        while True:
+            key = _read_key()
 
-def _checkbox_select_fallback(title: str, options: List[Tuple[str, str]], defaults: Set[str] = None) -> Set[str]:
+            if key == 'up':
+                cursor = (cursor - 1) % len(options)
+            elif key == 'down':
+                cursor = (cursor + 1) % len(options)
+            elif key == 'enter':
+                return options[cursor][1]
+            elif key == 'escape':
+                return options[cursor][1]
+            elif key in ('q', 'Q'):
+                print("\nInstallation cancelled.")
+                sys.exit(0)
+
+            render()
+    else:
+        # Legacy in-place mode
+        prev_lines = 0
+
+        def render():
+            nonlocal prev_lines
+            if prev_lines:
+                sys.stdout.write(f"\033[{prev_lines}A")
+            lines = []
+            header = f"{title} (↑↓ navigate, enter confirm)"
+            lines.extend(header.split("\n"))
+            lines.append("")
+            for i, (label, value) in enumerate(options):
+                dot = "●" if i == cursor else "○"
+                pointer = "›" if i == cursor else " "
+                lines.append(f"  {pointer} {dot} {label}")
+            lines.append("")
+            for line in lines:
+                sys.stdout.write(f"\r\033[K{line}\n")
+            sys.stdout.flush()
+            prev_lines = len(lines)
+
+        render()
+
+        while True:
+            key = _read_key()
+
+            if key == 'up':
+                cursor = (cursor - 1) % len(options)
+            elif key == 'down':
+                cursor = (cursor + 1) % len(options)
+            elif key == 'enter':
+                return options[cursor][1]
+            elif key == 'escape':
+                return options[cursor][1]
+            elif key in ('q', 'Q'):
+                print("\nInstallation cancelled.")
+                sys.exit(0)
+
+            render()
+
+
+def _checkbox_select_fallback(title: str, options: List[Tuple[str, str]], defaults: Set[str] = None,
+                              step: int = 0, total: int = 0, version: str = '') -> Set[str]:
     """Fallback checkbox using numbered input."""
     if defaults is None:
         defaults = {v for _, v in options}
+
+    if step > 0:
+        print(f"\n  {Color.BOLD}AgentNotes{Color.NC}{f' {Color.CYAN}v{version}{Color.NC}' if version else ''}  —  Step {step} of {total}\n")
 
     print(f"{title}\n")
     for i, (label, value) in enumerate(options, 1):
@@ -272,8 +397,12 @@ def _checkbox_select_fallback(title: str, options: List[Tuple[str, str]], defaul
     return selected
 
 
-def _radio_select_fallback(title: str, options: List[Tuple[str, str]], default: int = 0):
+def _radio_select_fallback(title: str, options: List[Tuple[str, str]], default: int = 0,
+                           step: int = 0, total: int = 0, version: str = ''):
     """Fallback radio using numbered input."""
+    if step > 0:
+        print(f"\n  {Color.BOLD}AgentNotes{Color.NC}{f' {Color.CYAN}v{version}{Color.NC}' if version else ''}  —  Step {step} of {total}\n")
+
     print(f"{title}\n")
     for i, (label, value) in enumerate(options, 1):
         marker = "*" if i - 1 == default else " "

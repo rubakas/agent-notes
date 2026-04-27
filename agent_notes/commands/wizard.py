@@ -9,7 +9,18 @@ from ._install_helpers import (
     count_agents, count_global, count_skills
 )
 from ..services.fs import place_file, place_dir_contents
+from ..services.ui import Color as _Color
 
+# Maps role color names (from roles/*.yaml) to ANSI Color attributes.
+_ROLE_COLOR_MAP = {
+    'purple': _Color.MAGENTA,
+    'red':    _Color.RED,
+    'cyan':   _Color.CYAN,
+    'blue':   _Color.BLUE,
+    'green':  _Color.GREEN,
+    'yellow': _Color.YELLOW,
+    'orange': _Color.YELLOW,
+}
 
 
 def _get_skill_groups() -> Dict[str, List[str]]:
@@ -85,7 +96,7 @@ def _count_rules() -> int:
             return len(list(parent_module.DIST_RULES_DIR.glob("*.md")))
 
 
-def _select_cli() -> Set[str]:
+def _select_cli(step: int = 0, total: int = 0, version: str = '') -> Set[str]:
     """Step 1: CLI selection."""
     from ..cli_backend import load_registry
     registry = load_registry()
@@ -94,47 +105,47 @@ def _select_cli() -> Set[str]:
     options = []
     for backend in sorted(registry.all(), key=lambda b: b.name):
         options.append((backend.label, backend.name))
-    
+
     # Safe defaults - all available backends that support agents
     safe_defaults = {b.name for b in registry.all() if b.supports("agents")}
-    
+
     from .. import wizard as _shim
-    
+
     if _shim._can_interactive():
-        result = _shim._checkbox_select("Which CLI do you use?", options, defaults=safe_defaults)
+        result = _shim._checkbox_select("Which CLI do you use?", options, defaults=safe_defaults,
+                                        step=step, total=total, version=version)
     else:
-        result = _shim._checkbox_select_fallback("Which CLI do you use?", options, defaults=safe_defaults)
+        result = _shim._checkbox_select_fallback("Which CLI do you use?", options, defaults=safe_defaults,
+                                                 step=step, total=total, version=version)
 
     labels = [label for label, val in options if val in result]
     print(f"  {_shim.Color.GREEN}✓{_shim.Color.NC} CLI: {', '.join(labels) if labels else 'None'}")
     return result
 
 
-def _select_models_per_role(clis: Set[str]) -> Dict[str, Dict[str, str]]:
+def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, version: str = '') -> Dict[str, Dict[str, str]]:
     """For each CLI that supports agents, ask user to pick a model per role.
-    
+
     Returns: {cli_name: {role_name: model_id}}. Config-only CLIs are skipped (no entry).
     """
     from ..cli_backend import load_registry
     from ..model_registry import load_model_registry
     from ..role_registry import load_role_registry
     from .. import wizard as _shim
-    
+
     registry = load_registry()
     models = load_model_registry().all()
     roles = load_role_registry().all()
-    
+
     # Sort roles by name for deterministic UI (registry already returns sorted)
     roles_sorted = sorted(roles, key=lambda r: r.name)
-    
+
     result = {}
     for backend_name in sorted(clis):
         backend = registry.get(backend_name)
         if backend is None or not backend.supports("agents"):
             continue
-        
-        print(f"\n{_shim.Color.CYAN}Models for {backend.label}{_shim.Color.NC}\n")
-        
+
         # Compatible models = those with at least one alias in backend.accepted_providers
         compatible = [m for m in models if backend.first_alias_for(m.aliases) is not None]
         if not compatible:
@@ -148,7 +159,7 @@ def _select_models_per_role(clis: Set[str]) -> Dict[str, Dict[str, str]]:
                 f"this CLI will rely on legacy tier resolution."
             )
             continue
-        
+
         cli_role_models = {}
         for role in roles_sorted:
             # Default: newest model (by registry order; iterate reversed so e.g.
@@ -159,65 +170,74 @@ def _select_models_per_role(clis: Set[str]) -> Dict[str, Dict[str, str]]:
                 compatible[0],
             )
             default_idx = compatible.index(default_model)
-            
+
             # Build options: "Claude Opus 4.7 (via anthropic)" style
             options = []
             for m in compatible:
                 prov_alias = backend.first_alias_for(m.aliases)
                 provider = prov_alias[0] if prov_alias else "?"
                 options.append((f"{m.label} (via {provider})", m.id))
-            
-            title = f"{role.label} — {role.description}\n  typical class: {role.typical_class}"
+
+            role_color = _ROLE_COLOR_MAP.get(role.color, '')
+            role_label_colored = f"{role_color}{role.label}{_shim.Color.NC}" if role_color else role.label
+            title = (f"{_shim.Color.DIM}[{backend.label}]{_shim.Color.NC}  "
+                     f"{role_label_colored} — {role.description}\n  typical class: {role.typical_class}")
             if _shim._can_interactive():
-                picked = _shim._radio_select(title, options, default=default_idx)
+                picked = _shim._radio_select(title, options, default=default_idx,
+                                             step=step, total=total, version=version)
             else:
-                picked = _shim._radio_select_fallback(title, options, default=default_idx)
+                picked = _shim._radio_select_fallback(title, options, default=default_idx,
+                                                      step=step, total=total, version=version)
             cli_role_models[role.name] = picked
-            
+
             picked_label = next(label for label, mid in options if mid == picked)
-            print(f"  {_shim.Color.GREEN}✓{_shim.Color.NC} {role.label}: {picked_label}")
-        
+            print(f"  {_shim.Color.GREEN}✓{_shim.Color.NC} {role_label_colored}: {picked_label}")
+
         result[backend_name] = cli_role_models
     return result
 
 
-def _select_scope() -> str:
+def _select_scope(step: int = 0, total: int = 0, version: str = '') -> str:
     """Step 3: Install scope."""
     from .. import wizard as _shim
-    
+
     options = [
         ("Global (~/.claude, ~/.config/opencode)", "global"),
         ("Local (current project)", "local"),
     ]
     if _shim._can_interactive():
-        result = _shim._radio_select("Where to install?", options, default=0)
+        result = _shim._radio_select("Where to install?", options, default=0,
+                                     step=step, total=total, version=version)
     else:
-        result = _shim._radio_select_fallback("Where to install?", options, default=0)
+        result = _shim._radio_select_fallback("Where to install?", options, default=0,
+                                              step=step, total=total, version=version)
 
     label = "Global" if result == "global" else "Local"
     print(f"  {_shim.Color.GREEN}✓{_shim.Color.NC} Scope: {label}")
     return result
 
 
-def _select_mode() -> bool:
+def _select_mode(step: int = 0, total: int = 0, version: str = '') -> bool:
     """Step 4: Install mode."""
     from .. import wizard as _shim
-    
+
     options = [
         ("Symlink (auto-updates when source changes)", "symlink"),
         ("Copy (standalone, allows local customization)", "copy"),
     ]
     if _shim._can_interactive():
-        result = _shim._radio_select("How to install?", options, default=0)
+        result = _shim._radio_select("How to install?", options, default=0,
+                                     step=step, total=total, version=version)
     else:
-        result = _shim._radio_select_fallback("How to install?", options, default=0)
+        result = _shim._radio_select_fallback("How to install?", options, default=0,
+                                              step=step, total=total, version=version)
 
     label = "Symlink" if result == "symlink" else "Copy"
     print(f"  {_shim.Color.GREEN}✓{_shim.Color.NC} Mode: {label}")
     return result == "copy"
 
 
-def _select_skills() -> List[str]:
+def _select_skills(step: int = 0, total: int = 0, version: str = '') -> List[str]:
     """Step 5: Skill selection."""
     from .. import wizard as _shim
     skill_groups = _shim._get_skill_groups()
@@ -242,9 +262,11 @@ def _select_skills() -> List[str]:
     all_group_names = {name for name in skill_groups.keys()}
 
     if _shim._can_interactive():
-        selected_groups = _shim._checkbox_select("Which skills to include?", options, defaults=all_group_names)
+        selected_groups = _shim._checkbox_select("Which skills to include?", options, defaults=all_group_names,
+                                                  step=step, total=total, version=version)
     else:
-        selected_groups = _shim._checkbox_select_fallback("Which skills to include?", options, defaults=all_group_names)
+        selected_groups = _shim._checkbox_select_fallback("Which skills to include?", options, defaults=all_group_names,
+                                                          step=step, total=total, version=version)
 
     selected_skills = []
     skill_summary_parts = []
@@ -258,9 +280,12 @@ def _select_skills() -> List[str]:
     return selected_skills
 
 
-def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]]) -> bool:
+def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], version: str = '') -> bool:
     """Step 6: Confirmation."""
+    from ..services.ui import _clear_screen, _render_step_header
     from .. import wizard as _shim
+    _clear_screen()
+    _render_step_header(6, 6, version)
     skill_groups = _shim._get_skill_groups()
 
     print("\nReady to install:\n")
@@ -437,44 +462,48 @@ def interactive_install() -> None:
     """Run the interactive install wizard."""
     # Welcome
     from .. import wizard as _shim
+    from ..services.ui import _clear_screen
     version = _shim.get_version()
     from ..cli_backend import load_registry
     registry = load_registry()
-    
+
     # Get total agent count across all backends that support agents
     total_agents = 0
     for backend in registry.all():
         if backend.supports("agents"):
             total_agents += _shim.count_agents(backend)
-    
+
     n_skills = _shim.count_skills()
     n_rules = _shim._count_rules()
 
-    print(f"\n  AgentNotes {_shim.Color.CYAN}v{version}{_shim.Color.NC}")
-    print(f"  AI agent configuration manager for Claude Code and OpenCode.\n")
+    TOTAL_STEPS = 6
+
+    _clear_screen()
+    print(f"\n  {_shim.Color.BOLD}AgentNotes{_shim.Color.NC} {_shim.Color.CYAN}v{version}{_shim.Color.NC}")
+    print(f"  {_shim.Color.DIM}AI agent configuration manager for Claude Code and OpenCode.{_shim.Color.NC}\n")
     print(f"  Includes {total_agents} agents, {n_skills} skills, and {n_rules} rules.\n")
 
     # Step 1: CLI selection
-    clis = _shim._select_cli()
+    clis = _shim._select_cli(step=1, total=TOTAL_STEPS, version=version)
 
     if not clis:
         print("No CLI selected. Installation cancelled.")
         return
 
     # Step 2: Model selection per role (for CLIs that support agents)
-    role_models = _shim._select_models_per_role(clis)
+    role_models = _shim._select_models_per_role(clis, step=2, total=TOTAL_STEPS, version=version)
 
     # Step 3: Install scope
-    scope = _shim._select_scope()
+    scope = _shim._select_scope(step=3, total=TOTAL_STEPS, version=version)
 
     # Step 4: Install mode (always shown)
-    copy_mode = _shim._select_mode()
+    copy_mode = _shim._select_mode(step=4, total=TOTAL_STEPS, version=version)
 
     # Step 5: Skill selection
-    selected_skills = _shim._select_skills()
+    selected_skills = _shim._select_skills(step=5, total=TOTAL_STEPS, version=version)
 
     # Step 6: Confirmation
-    if not _shim._confirm_install(clis, scope, copy_mode, selected_skills, role_models):
+    if not _shim._confirm_install(clis, scope, copy_mode, selected_skills, role_models, version=version):
         print("Installation cancelled.")
         return
 

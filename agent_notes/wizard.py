@@ -12,7 +12,8 @@ from agent_notes.commands.wizard import (  # noqa: F401
 # Re-export UI functions that tests patch
 from agent_notes.services.ui import (  # noqa: F401
     _HAS_TTY, _safe_input, _can_interactive, _read_key,
-    _checkbox_select, _radio_select, _checkbox_select_fallback, _radio_select_fallback
+    _checkbox_select, _radio_select, _checkbox_select_fallback, _radio_select_fallback,
+    _clear_screen, _render_step_header, _render_nav_footer, _terminal_width,
 )
 
 # Re-export filesystem functions that tests patch
