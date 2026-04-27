@@ -106,7 +106,7 @@ class TestGenerateAgentFiles:
         assert 'model: github-copilot/claude-sonnet-4' in opencode_content
         assert 'edit: allow' in opencode_content
         assert 'bash: allow' in opencode_content
-        assert 'color: #3b82f6' in opencode_content  # 'blue' translated to hex per OpenCode spec
+        assert "color: '#3b82f6'" in opencode_content  # 'blue' translated to quoted hex per OpenCode spec
         assert '## Memory' not in opencode_content  # Should strip memory section
     
     def test_expand_includes_wired_into_build(self, tmp_path, monkeypatch, sample_agents_yaml):
