@@ -65,7 +65,7 @@ class TestFindDistSource:
         agent_file.write_text("agent content")
 
         # Mock DIST_DIR for installer
-        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_base)
+        monkeypatch.setattr('agent_notes.config.DIST_DIR', dist_base)
         
         # Create mock registry
         claude = CLIBackend(
@@ -108,7 +108,7 @@ class TestFindDistSource:
         agents_config.write_text("agents config")
 
         # Mock DIST_DIR for installer
-        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_base)
+        monkeypatch.setattr('agent_notes.config.DIST_DIR', dist_base)
         
         # Create mock registry with config files
         claude = CLIBackend(
@@ -163,7 +163,7 @@ class TestFindDistSource:
         rule_file.write_text("rule content")
 
         # Mock DIST_RULES_DIR for installer (rules are universal, not per-backend)
-        monkeypatch.setattr('agent_notes.installer.DIST_RULES_DIR', dist_rules)
+        monkeypatch.setattr('agent_notes.config.DIST_RULES_DIR', dist_rules)
         
         # Create mock registry 
         claude = CLIBackend(
@@ -579,7 +579,7 @@ class TestCheckBrokenSymlinks:
         source_file.write_text("agent content")
         
         # Mock DIST_DIR for installer
-        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_base)
+        monkeypatch.setattr('agent_notes.config.DIST_DIR', dist_base)
 
         # Create state
         state = State(
@@ -1118,7 +1118,7 @@ class TestDoctorFunction:
             with patch('agent_notes.doctor_checks.check_broken', mock_check('broken')):
                 with patch('agent_notes.doctor_checks.check_drift', mock_check('drift')):
                     with patch('agent_notes.doctor_checks.check_stale', mock_check('stale')):
-                        with patch('agent_notes.doctor.check_build_freshness', mock_check('build')):
+                        with patch('agent_notes.commands.doctor.check_build_freshness', mock_check('build')):
                             # Patch exit to avoid SystemExit during tests
                             with patch('agent_notes.doctor.exit'):
                                 doctor.doctor(local=False, fix=False)
@@ -1219,7 +1219,7 @@ class TestCountFunctions:
         (dist_agents / "agent3.md").write_text("a3")
 
         # Mock paths in installer module (which doctor uses)
-        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_base)
+        monkeypatch.setattr('agent_notes.config.DIST_DIR', dist_base)
 
         # Create backend
         backend = CLIBackend(

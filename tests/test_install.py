@@ -605,7 +605,7 @@ class TestCountFunctions:
         (agents_dir / "not_agent.txt").write_text("not an agent")
         
         # Mock the DIST_DIR in installer module
-        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_base)
+        monkeypatch.setattr('agent_notes.config.DIST_DIR', dist_base)
         
         # Create backend
         backend = CLIBackend(
@@ -634,7 +634,7 @@ class TestCountFunctions:
         (agents_dir / "agent2.md").write_text("agent2")
         
         # Mock the DIST_DIR in installer module
-        monkeypatch.setattr('agent_notes.installer.DIST_DIR', dist_base)
+        monkeypatch.setattr('agent_notes.config.DIST_DIR', dist_base)
         
         # Create backend
         backend = CLIBackend(

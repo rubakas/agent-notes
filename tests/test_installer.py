@@ -88,26 +88,26 @@ class TestDistSourceFor:
         claude_agents = dist_dir / "claude" / "agents"
         claude_agents.mkdir(parents=True)
         
-        monkeypatch.setattr(installer, "DIST_DIR", dist_dir)
-        
+        monkeypatch.setattr("agent_notes.config.DIST_DIR", dist_dir)
+
         result = installer.dist_source_for(mock_claude_backend, "agents")
         assert result == claude_agents
-    
+
     def test_agents_component_missing(self, mock_claude_backend, tmp_path, monkeypatch):
         """Should return None when agents directory doesn't exist."""
         dist_dir = tmp_path / "dist"
-        monkeypatch.setattr(installer, "DIST_DIR", dist_dir)
-        
+        monkeypatch.setattr("agent_notes.config.DIST_DIR", dist_dir)
+
         result = installer.dist_source_for(mock_claude_backend, "agents")
         assert result is None
-    
+
     def test_config_component(self, mock_claude_backend, tmp_path, monkeypatch):
         """Should return dist/claude directory for config component."""
         dist_dir = tmp_path / "dist"
         claude_dir = dist_dir / "claude"
         claude_dir.mkdir(parents=True)
-        
-        monkeypatch.setattr(installer, "DIST_DIR", dist_dir)
+
+        monkeypatch.setattr("agent_notes.config.DIST_DIR", dist_dir)
         
         result = installer.dist_source_for(mock_claude_backend, "config")
         assert result == claude_dir
@@ -117,8 +117,8 @@ class TestDistSourceFor:
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir(parents=True)
         
-        monkeypatch.setattr(installer, "DIST_SKILLS_DIR", skills_dir)
-        
+        monkeypatch.setattr("agent_notes.config.DIST_SKILLS_DIR", skills_dir)
+
         result = installer.dist_source_for(mock_claude_backend, "skills")
         assert result == skills_dir
     
@@ -127,8 +127,8 @@ class TestDistSourceFor:
         rules_dir = tmp_path / "rules"
         rules_dir.mkdir(parents=True)
         
-        monkeypatch.setattr(installer, "DIST_RULES_DIR", rules_dir)
-        
+        monkeypatch.setattr("agent_notes.config.DIST_RULES_DIR", rules_dir)
+
         result = installer.dist_source_for(mock_claude_backend, "rules")
         assert result == rules_dir
     
@@ -138,8 +138,8 @@ class TestDistSourceFor:
         claude_commands = dist_dir / "claude" / "commands"
         claude_commands.mkdir(parents=True)
         
-        monkeypatch.setattr(installer, "DIST_DIR", dist_dir)
-        
+        monkeypatch.setattr("agent_notes.config.DIST_DIR", dist_dir)
+
         result = installer.dist_source_for(mock_claude_backend, "commands")
         assert result == claude_commands
     
@@ -219,8 +219,8 @@ class TestInstallComponentForBackend:
         agents_src.mkdir(parents=True)
         (agents_src / "agent1.md").write_text("agent1")
         
-        monkeypatch.setattr(installer, "DIST_DIR", dist_dir)
-        
+        monkeypatch.setattr("agent_notes.config.DIST_DIR", dist_dir)
+
         installer.install_component_for_backend(mock_claude_backend, "agents", "global", False)
         
         expected_dst = mock_claude_backend.global_home / "agents"
@@ -238,8 +238,8 @@ class TestInstallComponentForBackend:
         config_file = claude_dir / "CLAUDE.md"
         config_file.write_text("config")
         
-        monkeypatch.setattr(installer, "DIST_DIR", dist_dir)
-        
+        monkeypatch.setattr("agent_notes.config.DIST_DIR", dist_dir)
+
         installer.install_component_for_backend(mock_claude_backend, "config", "global", False)
         
         expected_dst = mock_claude_backend.global_home / "CLAUDE.md"
@@ -255,8 +255,8 @@ class TestInstallComponentForBackend:
         skill1_dir.mkdir(parents=True)
         (skill1_dir / "SKILL.md").write_text("skill1")
         
-        monkeypatch.setattr(installer, "DIST_SKILLS_DIR", skills_dir)
-        
+        monkeypatch.setattr("agent_notes.config.DIST_SKILLS_DIR", skills_dir)
+
         installer.install_component_for_backend(mock_claude_backend, "skills", "global", False)
         
         expected_dst = mock_claude_backend.global_home / "skills" / "skill1"
@@ -270,8 +270,8 @@ class TestInstallComponentForBackend:
     def test_no_op_when_no_source(self, mock_claude_backend, tmp_path, monkeypatch):
         """Should be no-op when source doesn't exist."""
         dist_dir = tmp_path / "dist"  # Empty dist dir
-        monkeypatch.setattr(installer, "DIST_DIR", dist_dir)
-        
+        monkeypatch.setattr("agent_notes.config.DIST_DIR", dist_dir)
+
         # This should not raise an error
         installer.install_component_for_backend(mock_claude_backend, "agents", "global", False)
 
@@ -295,7 +295,7 @@ class TestUninstallComponentForBackend:
         target_dir = tmp_path / "agents"
         target_dir.mkdir(exist_ok=True)
         
-        with patch('agent_notes.installer.target_dir_for', return_value=target_dir):
+        with patch('agent_notes.services.installer.target_dir_for', return_value=target_dir):
             installer.uninstall_component_for_backend(mock_claude_backend, "agents", "global")
         
         mock_remove_symlinks.assert_called_once_with(target_dir)
@@ -311,8 +311,8 @@ class TestInstallUninstallAll:
     """Test install_all and uninstall_all functions."""
     
     @patch('agent_notes.services.installer.install_scripts_global')
-    @patch('agent_notes.installer.install_component_for_backend')
-    @patch('agent_notes.installer._install_universal_skills')
+    @patch('agent_notes.services.installer.install_component_for_backend')
+    @patch('agent_notes.services.installer._install_universal_skills')
     def test_install_all_global(self, mock_universal, mock_component, mock_scripts, mock_claude_backend):
         """Should install scripts and all components for all backends."""
         registry = CLIRegistry([mock_claude_backend])
@@ -326,8 +326,8 @@ class TestInstallUninstallAll:
         assert mock_component.call_count == expected_calls
     
     @patch('agent_notes.services.installer.install_scripts_global')
-    @patch('agent_notes.installer.install_component_for_backend')
-    @patch('agent_notes.installer._install_universal_skills')
+    @patch('agent_notes.services.installer.install_component_for_backend')
+    @patch('agent_notes.services.installer._install_universal_skills')
     def test_install_all_local(self, mock_universal, mock_component, mock_scripts, mock_claude_backend):
         """Should not install scripts or universal skills for local scope."""
         registry = CLIRegistry([mock_claude_backend])
@@ -341,8 +341,8 @@ class TestInstallUninstallAll:
         assert mock_component.call_count == expected_calls
     
     @patch('agent_notes.services.installer.uninstall_scripts_global')
-    @patch('agent_notes.installer.uninstall_component_for_backend')
-    @patch('agent_notes.installer._uninstall_universal_skills')
+    @patch('agent_notes.services.installer.uninstall_component_for_backend')
+    @patch('agent_notes.services.installer._uninstall_universal_skills')
     def test_uninstall_all_global(self, mock_universal, mock_component, mock_scripts, mock_claude_backend):
         """Should uninstall scripts and all components for all backends."""
         registry = CLIRegistry([mock_claude_backend])

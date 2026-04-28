@@ -138,7 +138,7 @@ class TestGetSkillGroups:
 
     def test_no_skills_dir(self, monkeypatch):
         fake_skills_dir = Path("/nonexistent")
-        monkeypatch.setattr(wizard, 'DIST_SKILLS_DIR', fake_skills_dir)
+        monkeypatch.setattr('agent_notes.config.DIST_SKILLS_DIR', fake_skills_dir)
         monkeypatch.setenv('_WIZARD_TEST_MODE', '1')
         result = wizard._get_skill_groups()
         assert result == {}
@@ -153,9 +153,9 @@ class TestGetSkillGroups:
                      "docker-dockerfile", "rails-kamal", "git"]:
             (skills_dir / skill).mkdir()
 
-        monkeypatch.setattr(wizard, 'DIST_SKILLS_DIR', skills_dir)
+        monkeypatch.setattr('agent_notes.config.DIST_SKILLS_DIR', skills_dir)
         monkeypatch.setenv('_WIZARD_TEST_MODE', '1')
-        
+
         result = wizard._get_skill_groups()
 
         expected = {
@@ -171,9 +171,9 @@ class TestGetSkillGroups:
     def test_empty_skills_dir(self, tmp_path, monkeypatch):
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
-        monkeypatch.setattr(wizard, 'DIST_SKILLS_DIR', skills_dir)
+        monkeypatch.setattr('agent_notes.config.DIST_SKILLS_DIR', skills_dir)
         monkeypatch.setenv('_WIZARD_TEST_MODE', '1')
-        
+
         result = wizard._get_skill_groups()
         assert result == {}
 
@@ -182,7 +182,7 @@ class TestGetSkillGroups:
         skills_dir.mkdir()
         (skills_dir / "rails-models.txt").write_text("content")
         (skills_dir / "docker-compose.md").write_text("content")
-        monkeypatch.setattr(wizard, 'DIST_SKILLS_DIR', skills_dir)
+        monkeypatch.setattr('agent_notes.config.DIST_SKILLS_DIR', skills_dir)
         monkeypatch.setenv('_WIZARD_TEST_MODE', '1')
         result = wizard._get_skill_groups()
         assert result == {}
@@ -193,7 +193,7 @@ class TestCountRules:
 
     def test_no_rules_dir(self, monkeypatch):
         fake_rules_dir = Path("/nonexistent")
-        monkeypatch.setattr(wizard, 'DIST_RULES_DIR', fake_rules_dir)
+        monkeypatch.setattr('agent_notes.config.DIST_RULES_DIR', fake_rules_dir)
         monkeypatch.setenv('_WIZARD_TEST_MODE', '1')
         result = wizard._count_rules()
         assert result == 0
@@ -205,7 +205,7 @@ class TestCountRules:
         (rules_dir / "rule2.md").write_text("content")
         (rules_dir / "readme.txt").write_text("content")
         (rules_dir / "config.json").write_text("{}")
-        monkeypatch.setattr(wizard, 'DIST_RULES_DIR', rules_dir)
+        monkeypatch.setattr('agent_notes.config.DIST_RULES_DIR', rules_dir)
         monkeypatch.setenv('_WIZARD_TEST_MODE', '1')
         result = wizard._count_rules()
         assert result == 2
@@ -213,7 +213,7 @@ class TestCountRules:
     def test_empty_rules_dir(self, tmp_path, monkeypatch):
         rules_dir = tmp_path / "rules"
         rules_dir.mkdir()
-        monkeypatch.setattr(wizard, 'DIST_RULES_DIR', rules_dir)
+        monkeypatch.setattr('agent_notes.config.DIST_RULES_DIR', rules_dir)
         monkeypatch.setenv('_WIZARD_TEST_MODE', '1')
         result = wizard._count_rules()
         assert result == 0
