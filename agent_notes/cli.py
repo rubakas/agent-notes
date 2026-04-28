@@ -299,20 +299,20 @@ def main():
     
     # Route to modules
     if args.command == "build":
-        from .build import build
+        from .commands.build import build
         build()
     elif args.command == "install":
         if args.local or args.copy:
-            from .install import install
+            from .commands.install import install
             install(local=args.local, copy=args.copy, reconfigure=args.reconfigure)
         else:
-            from .wizard import interactive_install
+            from .commands.wizard import interactive_install
             interactive_install()
     elif args.command == "uninstall":
-        from .install import uninstall
+        from .commands.install import uninstall
         uninstall(local=args.local)
     elif args.command == "update":
-        from .update import update
+        from .commands.update import update
         update(
             dry_run=args.dry_run,
             yes=args.yes,
@@ -321,26 +321,26 @@ def main():
             skip_pull=args.skip_pull,
         )
     elif args.command == "doctor":
-        from .doctor import doctor
+        from .commands.doctor import doctor
         doctor(local=args.local, fix=args.fix)
     elif args.command == "info":
-        from .install import show_info
+        from .commands.info import show_info
         show_info()
     elif args.command == "list":
-        from .list import list_components
+        from .commands.list import list_components
         list_components(args.filter)
     elif args.command == "validate":
-        from .validate import validate
+        from .commands.validate import validate
         validate()
     elif args.command == "set":
         if args.entity == "role":
-            from .set_role import set_role
+            from .commands.set_role import set_role
             set_role(args.role_name, args.model_id, cli=args.cli, scope=args.scope, local=args.local)
     elif args.command == "regenerate":
-        from .regenerate import regenerate
+        from .commands.regenerate import regenerate
         regenerate(scope=args.scope, cli=args.cli, local=args.local)
     elif args.command == "memory":
-        from .memory import memory
+        from .commands.memory import memory
         memory(args.action, args.name)
 
 if __name__ == "__main__":

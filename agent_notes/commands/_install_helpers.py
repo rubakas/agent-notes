@@ -37,88 +37,75 @@ def _install_skills_to(targets: List[Path], dist_skills_dir: Path, copy_mode: bo
 
 def install_skills_global(copy_mode: bool = False) -> None:
     """Install skills globally."""
-    from .. import install as _shim
-    from .. import config
-    targets = [config.CLAUDE_HOME / "skills", config.OPENCODE_HOME / "skills", config.AGENTS_HOME / "skills"]
-    _install_skills_to(targets, _shim.DIST_SKILLS_DIR, copy_mode)
+    targets = [CLAUDE_HOME / "skills", OPENCODE_HOME / "skills", AGENTS_HOME / "skills"]
+    _install_skills_to(targets, DIST_SKILLS_DIR, copy_mode)
 
 
 def install_skills_local(copy_mode: bool = False) -> None:
     """Install skills locally."""
-    import agent_notes.install as _shim
     targets = [Path(".claude/skills"), Path(".opencode/skills")]
-    _install_skills_to(targets, _shim.DIST_SKILLS_DIR, copy_mode)
+    _install_skills_to(targets, DIST_SKILLS_DIR, copy_mode)
 
 
 def install_agents_global(copy_mode: bool = False) -> None:
     """Install agents globally."""
-    from .. import install as _shim
-    from .. import config
-    
     print("Installing Claude Code agents to ~/.claude/agents/ ...")
-    place_dir_contents(_shim.DIST_CLAUDE_DIR / "agents", config.CLAUDE_HOME / "agents", "*.md", copy_mode)
+    place_dir_contents(DIST_CLAUDE_DIR / "agents", CLAUDE_HOME / "agents", "*.md", copy_mode)
 
     print("Installing OpenCode agents to ~/.config/opencode/agents/ ...")
-    place_dir_contents(_shim.DIST_OPENCODE_DIR / "agents", config.OPENCODE_HOME / "agents", "*.md", copy_mode)
+    place_dir_contents(DIST_OPENCODE_DIR / "agents", OPENCODE_HOME / "agents", "*.md", copy_mode)
 
 
 def install_agents_local(copy_mode: bool = False) -> None:
     """Install agents locally."""
-    from .. import install as _shim
-    
     print("Installing Claude Code agents to .claude/agents/ ...")
-    place_dir_contents(_shim.DIST_CLAUDE_DIR / "agents", Path(".claude/agents"), "*.md", copy_mode)
+    place_dir_contents(DIST_CLAUDE_DIR / "agents", Path(".claude/agents"), "*.md", copy_mode)
 
     print("Installing OpenCode agents to .opencode/agents/ ...")
-    place_dir_contents(_shim.DIST_OPENCODE_DIR / "agents", Path(".opencode/agents"), "*.md", copy_mode)
+    place_dir_contents(DIST_OPENCODE_DIR / "agents", Path(".opencode/agents"), "*.md", copy_mode)
 
 
 def install_rules_global(copy_mode: bool = False) -> None:
     """Install global config and rules."""
-    from .. import install as _shim
-    from .. import config
-    
     print("Installing global config ...")
 
     # CLAUDE.md → ~/.claude/CLAUDE.md
-    claude_global = _shim.DIST_CLAUDE_DIR / "CLAUDE.md"
+    claude_global = DIST_CLAUDE_DIR / "CLAUDE.md"
     if claude_global.exists():
-        place_file(claude_global, config.CLAUDE_HOME / "CLAUDE.md", copy_mode)
+        place_file(claude_global, CLAUDE_HOME / "CLAUDE.md", copy_mode)
 
     # AGENTS.md → ~/.config/opencode/AGENTS.md
-    agents_global = _shim.DIST_OPENCODE_DIR / "AGENTS.md"
+    agents_global = DIST_OPENCODE_DIR / "AGENTS.md"
     if agents_global.exists():
-        place_file(agents_global, config.OPENCODE_HOME / "AGENTS.md", copy_mode)
+        place_file(agents_global, OPENCODE_HOME / "AGENTS.md", copy_mode)
 
     # Rules → ~/.claude/rules/
-    if _shim.DIST_RULES_DIR.exists():
-        place_dir_contents(_shim.DIST_RULES_DIR, config.CLAUDE_HOME / "rules", "*.md", copy_mode)
+    if DIST_RULES_DIR.exists():
+        place_dir_contents(DIST_RULES_DIR, CLAUDE_HOME / "rules", "*.md", copy_mode)
 
     # Copilot → ~/.github/copilot-instructions.md
-    copilot_global = _shim.DIST_GITHUB_DIR / "copilot-instructions.md"
+    copilot_global = DIST_GITHUB_DIR / "copilot-instructions.md"
     if copilot_global.exists():
-        place_file(copilot_global, config.GITHUB_HOME / "copilot-instructions.md", copy_mode)
+        place_file(copilot_global, GITHUB_HOME / "copilot-instructions.md", copy_mode)
 
 
 def install_rules_local(copy_mode: bool = False) -> None:
     """Install local config and rules."""
-    from .. import install as _shim
-    
     print("Installing project rules ...")
 
     # CLAUDE.md → ./CLAUDE.md
-    claude_global = _shim.DIST_CLAUDE_DIR / "CLAUDE.md"
+    claude_global = DIST_CLAUDE_DIR / "CLAUDE.md"
     if claude_global.exists():
         place_file(claude_global, Path("./CLAUDE.md"), copy_mode)
 
     # AGENTS.md → ./AGENTS.md
-    agents_global = _shim.DIST_OPENCODE_DIR / "AGENTS.md"
+    agents_global = DIST_OPENCODE_DIR / "AGENTS.md"
     if agents_global.exists():
         place_file(agents_global, Path("./AGENTS.md"), copy_mode)
 
     # Rules → .claude/rules/
-    if _shim.DIST_RULES_DIR.exists():
-        place_dir_contents(_shim.DIST_RULES_DIR, Path(".claude/rules"), "*.md", copy_mode)
+    if DIST_RULES_DIR.exists():
+        place_dir_contents(DIST_RULES_DIR, Path(".claude/rules"), "*.md", copy_mode)
 
 
 def uninstall_scripts_global() -> None:
@@ -203,18 +190,16 @@ def count_scripts() -> int:
 
 def count_skills() -> int:
     """Count skill directories."""
-    from .. import install as _shim
-    dist_skills_dir = _shim.DIST_SKILLS_DIR
-    if not dist_skills_dir.exists():
+    if not DIST_SKILLS_DIR.exists():
         return 0
-    return len([d for d in dist_skills_dir.iterdir() if d.is_dir()])
+    return len([d for d in DIST_SKILLS_DIR.iterdir() if d.is_dir()])
 
 
 def count_agents(backend) -> int:
     """Count agent *.md files in backend's dist directory. Returns 0 if backend
     doesn't support agents."""
-    from .. import installer
-    from ..cli_backend import CLIBackend
+    from ..services import installer
+    from ..domain.cli_backend import CLIBackend
     if not backend.supports("agents"):
         return 0
     src = installer.dist_source_for(backend, "agents")
@@ -225,23 +210,20 @@ def count_agents(backend) -> int:
 
 def count_global() -> int:
     """Count global config files."""
-    from .. import install as _shim
-    
     count = 0
-    
+
     # Check each potential global config file (maintaining backward compatibility)
-    if (_shim.DIST_CLAUDE_DIR / "CLAUDE.md").exists():
+    if (DIST_CLAUDE_DIR / "CLAUDE.md").exists():
         count += 1
-    if (_shim.DIST_OPENCODE_DIR / "AGENTS.md").exists():
+    if (DIST_OPENCODE_DIR / "AGENTS.md").exists():
         count += 1
-    if (_shim.DIST_GITHUB_DIR / "copilot-instructions.md").exists():
+    if (DIST_GITHUB_DIR / "copilot-instructions.md").exists():
         count += 1
-    
+
     # Count rules files
-    dist_rules_dir = _shim.DIST_RULES_DIR
-    if dist_rules_dir.exists():
-        count += len(list(dist_rules_dir.glob("*.md")))
-    
+    if DIST_RULES_DIR.exists():
+        count += len(list(DIST_RULES_DIR.glob("*.md")))
+
     return count
 
 

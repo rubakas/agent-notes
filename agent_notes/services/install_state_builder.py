@@ -61,15 +61,15 @@ def build_install_state(
     state.source_commit = git_head_short(repo_root)
     
     # Import here to avoid circular import
-    from ..cli_backend import load_registry
+    from ..registries.cli_registry import load_registry
     from ..config import PKG_DIR, DIST_SKILLS_DIR, DIST_RULES_DIR
-    
+
     # Build scope-specific install
     try:
         registry = load_registry()
     except Exception:
         # Fallback to empty registry if CLI backend loading fails
-        from ..cli_backend import CLIRegistry
+        from ..registries.cli_registry import CLIRegistry
         registry = CLIRegistry([])
     
     timestamp = now_iso()

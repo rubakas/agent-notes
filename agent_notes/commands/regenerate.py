@@ -20,7 +20,7 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
     from ..state import get_scope
     from ..config import DATA_DIR
     from .build import generate_agent_files
-    from ..cli_backend import load_registry
+    from ..registries.cli_registry import load_registry
     from .. import install_state
     from ..config import PKG_DIR
     import yaml
@@ -86,9 +86,7 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
         
         # Generate agents 
         if backend.supports("agents"):
-            # Import from shim for test compatibility
-            from .. import build as build_shim
-            files = build_shim.generate_agent_files(
+            files = generate_agent_files(
                 agents_config,
                 {},  # empty tiers - state-driven only
                 state=current_state,
@@ -106,7 +104,7 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
                 print(f"  ✓ agents regenerated")
         
         # Regenerate other components as needed
-        from .. import installer
+        from ..services import installer
         
         # Regenerate rules for backends that support them
         if backend.supports("rules"):
