@@ -204,17 +204,14 @@ def _select_scope(clis: Set[str] = None, step: int = 0, total: int = 0, version:
     from ..registries.cli_registry import load_registry
 
     registry = load_registry()
-    if clis:
-        global_paths = [str(b.global_home) for b in registry.all() if b.name in clis]
-        local_paths = [str(Path.cwd() / b.local_dir) for b in registry.all() if b.name in clis]
-    else:
-        global_paths = [str(b.global_home) for b in registry.all()]
-        local_paths = [str(Path.cwd() / b.local_dir) for b in registry.all()]
+    selected_backends = [b for b in registry.all() if (not clis or b.name in clis)]
 
-    global_dim = f"  {Color.DIM}" + ",  ".join(global_paths) + Color.NC if global_paths else ""
-    global_label = f"Global{global_dim}"
-    local_dim = f"  {Color.DIM}" + ",  ".join(local_paths) + Color.NC if local_paths else ""
-    local_label = f"Local{local_dim}"
+    def _path_lines(backends, path_fn) -> str:
+        parts = [f"\n      {Color.DIM}{b.label}  →  {path_fn(b)}{Color.NC}" for b in backends]
+        return "".join(parts)
+
+    global_label = "Global" + _path_lines(selected_backends, lambda b: str(b.global_home))
+    local_label = "Local" + _path_lines(selected_backends, lambda b: str(Path.cwd() / b.local_dir))
 
     options = [
         (global_label, "global"),
