@@ -303,7 +303,7 @@ def _select_skills(step: int = 0, total: int = 0, version: str = '') -> List[str
 
 def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], skill_groups: Dict, registry) -> None:
     """Print the install summary table (CLI, scope, mode, models, skills, agents, config/rules)."""
-    from .. import installer as _installer
+    from ..services.installer import config_filename_for as _cfg_filename
 
     selected_backends = [b for b in registry.all() if b.name in clis]
 
@@ -370,7 +370,7 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
         print(f"  Agents    {' + '.join(agent_parts)}")
 
     # Config + Rules
-    config_files = [_installer.config_filename_for(b) for b in selected_backends if _installer.config_filename_for(b)]
+    config_files = [_cfg_filename(b) for b in selected_backends if _cfg_filename(b)]
     if config_files:
         print(f"  Config    {', '.join(config_files)}")
     rules_count = _count_rules()
@@ -643,11 +643,11 @@ def interactive_install() -> None:
 
     # Install commands (slash commands like /plan, /review, /debug, /brainstorm)
     from ..registries.cli_registry import load_registry as _load_registry
-    from .. import installer as _installer
+    from ..services.installer import install_component_for_backend as _install_component
     _registry = _load_registry()
     for _backend in _registry.all():
         if _backend.name in clis:
-            _installer.install_component_for_backend(_backend, "commands", scope, copy_mode)
+            _install_component(_backend, "commands", scope, copy_mode)
 
     # Install SessionStart hook + context file (Claude Code only)
     from ..services.installer import _install_session_hook
@@ -662,11 +662,11 @@ def interactive_install() -> None:
     print(f"{Color.GREEN}Done.{Color.NC} Restart Claude Code / OpenCode to pick up changes.")
 
     # Write state.json
-    from .. import install_state
+    from ..services.install_state_builder import build_install_state
     from ..domain.state import MemoryConfig
     project_path = Path.cwd() if scope == "local" else None
     try:
-        st = install_state.build_install_state(
+        st = build_install_state(
             mode="copy" if copy_mode else "symlink",
             scope=scope,
             repo_root=PKG_DIR.parent,
