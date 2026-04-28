@@ -206,10 +206,10 @@ def _select_scope(clis: Set[str] = None, step: int = 0, total: int = 0, version:
     registry = load_registry()
     if clis:
         global_paths = [str(b.global_home) for b in registry.all() if b.name in clis]
-        local_paths = [b.local_dir for b in registry.all() if b.name in clis]
+        local_paths = [str(Path.cwd() / b.local_dir) for b in registry.all() if b.name in clis]
     else:
         global_paths = [str(b.global_home) for b in registry.all()]
-        local_paths = [b.local_dir for b in registry.all()]
+        local_paths = [str(Path.cwd() / b.local_dir) for b in registry.all()]
 
     global_dim = f"  {Color.DIM}" + ",  ".join(global_paths) + Color.NC if global_paths else ""
     global_label = f"Global{global_dim}"
@@ -437,10 +437,16 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
         project_name = _detect_project_name()
         candidates = _detect_obsidian_vaults()
         if candidates:
-            print(f"  {Color.DIM}Detected vaults (notes go into agent-notes/{project_name}/ inside):{Color.NC}")
+            _hint_suffix = f"agent-notes/{project_name}" if project_name != "agent-notes" else "agent-notes"
+            print(f"  {Color.DIM}Detected vaults (notes go into {_hint_suffix}/ inside):{Color.NC}")
             for c in candidates[:3]:
-                print(f"    {c}/agent-notes/{project_name}")
-        default_path = str(candidates[0] / "agent-notes" / project_name) if candidates else str(Path.home() / "Documents" / "Obsidian Vault" / "agent-notes" / project_name)
+                print(f"    {c}/{_hint_suffix}")
+        _mem_base = candidates[0] if candidates else Path.home() / "Documents" / "Obsidian Vault"
+        _mem_full = _mem_base / "agent-notes" / project_name
+        # Avoid agent-notes/agent-notes when project name matches parent folder
+        if _mem_full.parent.name == _mem_full.name:
+            _mem_full = _mem_full.parent
+        default_path = str(_mem_full)
         raw = _safe_input(f"  Memory folder path [{default_path}]: ", default_path)
         path = raw.strip() or default_path
 
@@ -546,6 +552,15 @@ def install_config_filtered(clis: Set[str], scope: str, copy_mode: bool = False)
 
 def interactive_install() -> None:
     """Run the interactive install wizard."""
+    try:
+        _interactive_install()
+    except KeyboardInterrupt:
+        from ..config import Color
+        print(f"\n\n  {Color.YELLOW}Cancelled.{Color.NC}")
+
+
+def _interactive_install() -> None:
+    """Inner implementation — called by interactive_install() with KeyboardInterrupt guard."""
     from ..services.ui import _clear_screen
     version = get_version()
     from ..registries.cli_registry import load_registry
