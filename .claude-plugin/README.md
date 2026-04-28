@@ -9,8 +9,7 @@ Multi-agent development team with cost-optimized model routing for Claude Code.
 - Sonnet — coder, reviewer, security-auditor, devops, integrations, refactorer, and more
 - Haiku — explorer, analyst, api-reviewer, tech-writer (fast read-only work)
 
-**6 process discipline skills** (available as `/skill` immediately after install):
-- `plan-first` — decompose and plan before coding
+**5 process discipline skills** (available as `/skill` immediately after install):
 - `tdd` — RED-GREEN-REFACTOR methodology with strict anti-patterns
 - `debugging-protocol` — 4-phase systematic debugging: instrument → evidence → hypothesis → fix
 - `brainstorming` — explore multiple approaches before committing
@@ -29,7 +28,7 @@ resolves these aliases to the current best model in each class — no plugin upd
 ## Full install (recommended)
 
 The plugin delivers agents, skills, and session context. For domain skills
-(Rails, Docker, Git), slash commands (/plan /review /debug /brainstorm), and
+(Rails, Docker, Git), slash commands (/review /debug /brainstorm), and
 the interactive setup wizard:
 
 ```bash
@@ -42,9 +41,9 @@ agent-notes install
 | Feature | Plugin | Full install |
 |---|---|---|
 | 18 specialized agents | ✓ | ✓ |
-| Process skills (6) | ✓ | ✓ |
+| Process skills (5) | ✓ | ✓ |
 | Session context hook | ✓ | ✓ |
 | Domain skills (Rails, Docker, Git) | — | ✓ |
-| Slash commands (/plan /review /debug) | — | ✓ |
+| Slash commands (/review /debug /brainstorm) | — | ✓ |
 | User config overrides | — | ✓ |
 | Doctor / health checks | — | ✓ |
