@@ -30,17 +30,23 @@ class _Color:
 if not sys.stdout.isatty():
     _Color.disable()
 
+# Set to True to suppress per-file LINKED/COPIED/SKIP output (e.g. during wizard)
+silent_file_ops = False
+
 
 def _info(msg: str) -> None:
-    print(f"  {_Color.GREEN}✓{_Color.NC} {msg}")
+    if not silent_file_ops:
+        print(f"  {_Color.GREEN}✓{_Color.NC} {msg}")
 
 
 def _skipped(path: str, reason: str = "not a symlink — remove manually") -> None:
-    print(f"  {_Color.YELLOW}SKIP{_Color.NC}     {path} ({reason})")
+    if not silent_file_ops:
+        print(f"  {_Color.YELLOW}SKIP{_Color.NC}     {path} ({reason})")
 
 
 def _linked(path: str) -> None:
-    print(f"  {_Color.GREEN}LINKED{_Color.NC}  {path}")
+    if not silent_file_ops:
+        print(f"  {_Color.GREEN}LINKED{_Color.NC}  {path}")
 
 
 def _removed(path: str) -> None:
