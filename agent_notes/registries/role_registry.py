@@ -7,7 +7,7 @@ from functools import lru_cache
 
 from ..config import DATA_DIR
 from ..domain.role import Role
-from ._base import load_yaml_file
+from ._base import load_yaml_file, require_fields
 
 
 class RoleRegistry:
@@ -43,10 +43,10 @@ def load_role_registry(roles_dir: Optional[Path] = None) -> RoleRegistry:
                 raise ValueError(f"Invalid YAML in {yaml_file.name}: {str(e).split(': ', 1)[1]}")
             raise
         
-        # Validate required fields with backward-compatible error messages
-        for field_name in ["name", "label", "description", "typical_class"]:
-            if field_name not in data:
-                raise ValueError(f"Missing field '{field_name}' in {yaml_file.name}")
+        require_fields(
+            data, ["name", "label", "description", "typical_class"], yaml_file,
+            msg_template="Missing field '{field}' in {filename}",
+        )
         
         roles.append(Role(
             name=data["name"],

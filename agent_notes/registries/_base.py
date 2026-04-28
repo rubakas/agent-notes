@@ -15,11 +15,20 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
         raise ValueError(f"Failed to read {path}: {e}")
 
 
-def require_fields(data: dict, required: list[str], source: Path) -> None:
-    """Validate that required top-level fields are present; raise ValueError on miss."""
+def require_fields(
+    data: dict,
+    required: list[str],
+    source: Path,
+    msg_template: str = "Missing required field '{field}' in {path}",
+) -> None:
+    """Validate that required top-level fields are present; raise ValueError on miss.
+
+    msg_template supports {field}, {filename} (basename), and {path} (full path).
+    """
     for f in required:
         if f not in data:
-            raise ValueError(f"Missing required field '{f}' in {source}")
+            msg = msg_template.format(field=f, filename=source.name, path=source)
+            raise ValueError(msg)
 
 
 def load_yaml_dir(dir_path: Path, required_fields: list[str] | None = None) -> list[tuple[Path, dict]]:

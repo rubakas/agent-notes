@@ -8,7 +8,7 @@ from functools import lru_cache
 
 from ..config import DATA_DIR
 from ..domain.model import Model
-from ._base import load_yaml_file
+from ._base import load_yaml_file, require_fields
 
 
 class ModelRegistry:
@@ -61,10 +61,10 @@ def load_model_registry(models_dir: Optional[Path] = None) -> ModelRegistry:
                 raise ValueError(f"Invalid YAML in {yaml_file.name}: {str(e).split(': ', 1)[1]}")
             raise
         
-        # Validate required fields with backward-compatible error messages
-        for field_name in ["id", "label", "family", "class", "aliases"]:
-            if field_name not in data:
-                raise ValueError(f"Missing field '{field_name}' in {yaml_file.name}")
+        require_fields(
+            data, ["id", "label", "family", "class", "aliases"], yaml_file,
+            msg_template="Missing field '{field}' in {filename}",
+        )
         
         models.append(Model(
             id=data["id"],
