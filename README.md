@@ -7,13 +7,12 @@ Configures a Lead agent (Opus) that orchestrates a team of 18 specialized subage
 ## Quick Start
 
 ```bash
-git clone https://github.com/rubakas/agent-notes.git ~/agent-notes
-ln -sf ~/agent-notes/bin/agent-notes /usr/local/bin/agent-notes
+pip install agent-notes
 agent-notes install    # interactive wizard guides you through setup
 agent-notes doctor
 ```
 
-Update anytime with `agent-notes update` (pulls latest, shows diff, reinstalls).
+Update anytime with `pip install --upgrade agent-notes && agent-notes install`.
 
 ## What's Included
 
@@ -251,22 +250,22 @@ agent-notes/
 
 ## Install Methods
 
-### Git clone + wrapper (recommended)
-
-```bash
-git clone https://github.com/rubakas/agent-notes.git ~/agent-notes
-ln -sf ~/agent-notes/bin/agent-notes /usr/local/bin/agent-notes
-agent-notes install
-```
-
-After cloning, `agent-notes install` launches the interactive wizard to configure your setup.
-
-### Pip install (future)
+### Pip install (recommended)
 
 ```bash
 pip install agent-notes
 agent-notes install
 ```
+
+### Git clone (for development or customization)
+
+```bash
+git clone https://github.com/rubakas/agent-notes.git ~/agent-notes
+cd ~/agent-notes && pip install -e .
+agent-notes install
+```
+
+Cloning lets you edit source files in `agent_notes/data/` and rebuild with `agent-notes build`.
 
 ## Project-Level Overrides
 
