@@ -1,0 +1,25 @@
+name: claude
+label: Claude Code
+global_home: ~/.claude
+local_dir: .claude
+layout:
+  agents: agents/
+  skills: skills/
+  rules: rules/
+  commands: commands/
+  config: CLAUDE.md
+  memory: agent-memory/
+  settings: settings.json
+features:
+  agents: true
+  skills: true
+  rules: true
+  commands: true
+  memory: true
+  frontmatter: claude
+  config_style: inline
+  settings_template: false
+  supports_symlink: true
+global_template: global-claude.md
+exclude_flag: claude_exclude
+accepted_providers: [anthropic, bedrock, vertex]

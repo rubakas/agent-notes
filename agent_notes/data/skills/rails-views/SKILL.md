@@ -1,6 +1,7 @@
 ---
 name: rails-views
 description: "Rails views: templates, partials, layouts, caching, and forms"
+group: rails
 ---
 
 # Views Guide

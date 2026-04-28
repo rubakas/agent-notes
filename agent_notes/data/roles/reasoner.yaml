@@ -1,0 +1,5 @@
+name: reasoner
+label: Reasoner
+description: Deep debugging and architecture analysis. Low volume, max reasoning needed.
+typical_class: opus
+color: red

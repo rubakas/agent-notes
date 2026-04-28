@@ -1,6 +1,7 @@
 ---
 name: rails-controllers
 description: "Rails controllers: structure template, concerns, parameter handling, and response patterns"
+group: rails
 ---
 
 # Controllers

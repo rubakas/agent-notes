@@ -1,6 +1,7 @@
 ---
 name: docker-dockerfile-languages
 description: "Dockerfile language patterns: Node.js, Python, Ruby builds, dev/prod targets, and CI/CD integration"
+group: docker
 ---
 
 # Dockerfile Language Patterns

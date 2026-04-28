@@ -1,6 +1,7 @@
 ---
 name: git
 description: "Git workflow: analyzing changes, chunking commits, conventional commit messages"
+group: git
 ---
 
 # Git Workflow

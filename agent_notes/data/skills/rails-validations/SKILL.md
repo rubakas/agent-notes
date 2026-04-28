@@ -1,6 +1,7 @@
 ---
 name: rails-validations
 description: "Rails model validations: built-in, custom, and conditional validation patterns"
+group: rails
 ---
 
 # Validations Guide

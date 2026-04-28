@@ -1,6 +1,7 @@
 ---
 name: rails-testing-models
 description: "Rails testing: model tests for associations, validations, scopes, callbacks, and methods"
+group: rails
 ---
 
 # Tests Guide

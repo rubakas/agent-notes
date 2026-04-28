@@ -1,0 +1,22 @@
+name: opencode
+label: OpenCode
+global_home: ~/.config/opencode
+local_dir: .opencode
+layout:
+  agents: agents/
+  skills: skills/
+  config: AGENTS.md
+features:
+  agents: true
+  skills: true
+  rules: false
+  commands: false
+  memory: false
+  frontmatter: opencode
+  config_style: inline
+  settings_template: false
+  supports_symlink: true
+global_template: global-opencode.md
+exclude_flag: opencode_exclude
+strip_memory_section: true
+accepted_providers: [github-copilot, anthropic, openrouter, openai, google, moonshot]

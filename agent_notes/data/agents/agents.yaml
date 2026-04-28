@@ -3,11 +3,12 @@
 
 agents:
   lead:
-    description: "Orchestrates complex multi-step tasks by planning, delegating to specialized agents, and reviewing results. Use for work requiring coordination across multiple agents."
-    tier: opus
+    description: "Orchestrates complex multi-step tasks by planning, delegating to specialized agents, and reviewing results. Use for work requiring coordination across multiple agents. Triggers: plan, orchestrate, coordinate, delegate, complex, multi-step."
+    role: orchestrator
     mode: primary
     color: purple
     effort: high
+    claude_exclude: true
     claude:
       tools: "Agent(coder, reviewer, security-auditor, test-writer, test-runner, system-auditor, database-specialist, performance-profiler, api-reviewer, tech-writer, devops, explorer), Read, Grep, Glob, Bash"
       memory: user
@@ -17,8 +18,8 @@ agents:
         bash: allow
 
   coder:
-    description: "Implements features, fixes bugs, and refactors code. The hands-on builder that writes and edits files."
-    tier: sonnet
+    description: "Implements features, fixes bugs, and refactors code. The hands-on builder that writes and edits files. Triggers: implement, build, fix, write code, edit, refactor, add feature."
+    role: worker
     mode: subagent
     color: blue
     effort: medium
@@ -31,8 +32,8 @@ agents:
         bash: allow
 
   reviewer:
-    description: "Reviews code for quality, readability, correctness, and adherence to project conventions. Read-only analysis with structured output."
-    tier: sonnet
+    description: "Reviews code for quality, readability, correctness, and adherence to project conventions. Read-only analysis with structured output. Triggers: review, code review, quality, readability, feedback."
+    role: worker
     mode: subagent
     color: yellow
     effort: medium
@@ -51,8 +52,8 @@ agents:
           "npx prettier*": allow
 
   security-auditor:
-    description: "Audits code for security vulnerabilities including auth bypass, injection, XSS, secrets exposure, and insecure defaults."
-    tier: sonnet
+    description: "Audits code for security vulnerabilities including auth bypass, injection, XSS, secrets exposure, and insecure defaults. Triggers: security, audit, vulnerability, auth, injection, XSS, secrets, CVE."
+    role: worker
     mode: subagent
     color: red
     effort: medium
@@ -71,8 +72,8 @@ agents:
           "git log*": allow
 
   explorer:
-    description: "Fast read-only codebase exploration for file discovery, pattern search, and architecture understanding."
-    tier: haiku
+    description: "Fast read-only codebase exploration for file discovery, pattern search, and architecture understanding. Triggers: find, search, locate, explore, where is, how does, show me."
+    role: scout
     mode: subagent
     color: blue
     effort: low
@@ -89,8 +90,8 @@ agents:
           "wc *": allow
 
   test-writer:
-    description: "Writes tests for any framework. Reads source code first, detects test framework, follows project conventions."
-    tier: sonnet
+    description: "Writes tests for any framework. Reads source code first, detects test framework, follows project conventions. Triggers: write test, add test, coverage, spec, unit test, integration test."
+    role: worker
     mode: subagent
     color: green
     effort: medium
@@ -103,8 +104,8 @@ agents:
         bash: allow
 
   test-runner:
-    description: "Diagnoses and fixes failing tests. Runs tests, parses errors, identifies root cause, applies minimal fix."
-    tier: sonnet
+    description: "Diagnoses and fixes failing tests. Runs tests, parses errors, identifies root cause, applies minimal fix. Triggers: failing test, fix test, test failure, flaky, diagnose test."
+    role: worker
     mode: subagent
     color: green
     effort: medium
@@ -117,8 +118,8 @@ agents:
         bash: allow
 
   system-auditor:
-    description: "Audits codebase health for duplication, dead code, coupling, and convention violations."
-    tier: sonnet
+    description: "Audits codebase health for duplication, dead code, coupling, and convention violations. Triggers: health, duplication, dead code, coupling, complexity, tech debt."
+    role: worker
     mode: subagent
     color: orange
     effort: medium
@@ -136,8 +137,8 @@ agents:
           "git log*": allow
 
   database-specialist:
-    description: "Analyzes database schema design, query performance, indexes, and migrations. Read-only analysis with structured output."
-    tier: sonnet
+    description: "Analyzes database schema design, query performance, indexes, and migrations. Read-only analysis with structured output. Triggers: schema, migration, index, query, slow query, N+1, database design."
+    role: worker
     mode: subagent
     color: cyan
     effort: medium
@@ -155,10 +156,10 @@ agents:
           "git log*": allow
 
   performance-profiler:
-    description: "Profiles application performance including response times, memory usage, query efficiency, and bundle size. Read-only analysis."
-    tier: sonnet
+    description: "Profiles application performance including response times, memory usage, query efficiency, and bundle size. Read-only analysis. Triggers: slow, performance, profile, memory, bundle size, response time, bottleneck."
+    role: worker
     mode: subagent
-    color: magenta
+    color: purple
     effort: medium
     claude:
       disallowedTools: "Write, Edit"
@@ -176,10 +177,10 @@ agents:
           "du *": allow
 
   api-reviewer:
-    description: "Reviews API design for consistency, versioning, error handling, and backward compatibility. Read-only analysis."
-    tier: haiku
+    description: "Reviews API design for consistency, versioning, error handling, and backward compatibility. Read-only analysis. Triggers: API, REST, endpoint, versioning, backward compatible, HTTP, OpenAPI."
+    role: scout
     mode: subagent
-    color: teal
+    color: cyan
     effort: medium
     claude:
       disallowedTools: "Write, Edit"
@@ -195,10 +196,10 @@ agents:
           "git log*": allow
 
   tech-writer:
-    description: "Writes and updates documentation including READMEs, API docs, architecture notes, and inline comments."
-    tier: haiku
+    description: "Writes and updates documentation including READMEs, API docs, architecture notes, and inline comments. Triggers: documentation, README, docs, changelog, API docs, comment, explain."
+    role: scout
     mode: subagent
-    color: white
+    color: yellow
     effort: low
     claude:
       tools: "Read, Write, Edit, Grep, Glob"
@@ -213,10 +214,10 @@ agents:
           "find *": allow
 
   devops:
-    description: "Manages infrastructure configs including Docker, CI/CD pipelines, deployment, and environment setup."
-    tier: sonnet
+    description: "Manages infrastructure configs including Docker, CI/CD pipelines, deployment, and environment setup. Triggers: Docker, CI, CD, pipeline, deploy, Kubernetes, infrastructure, GitHub Actions."
+    role: worker
     mode: subagent
-    color: gray
+    color: blue
     effort: medium
     claude:
       tools: "Read, Write, Edit, Bash, Grep, Glob"
@@ -240,14 +241,112 @@ agents:
           "ls *": allow
           "env": allow
 
-# Model tier mappings
-tiers:
-  opus:
-    claude: opus
-    opencode: "github-copilot/claude-opus-4.6"
-  sonnet:
-    claude: sonnet
-    opencode: "github-copilot/claude-sonnet-4"
-  haiku:
-    claude: haiku
-    opencode: "github-copilot/claude-haiku-4.5"
+  analyst:
+    description: "Translates vague requests into concrete requirements, user stories, acceptance criteria, and edge cases. Identifies missing information. Read-only. Triggers: requirements, user story, acceptance criteria, clarify, scope, analyze request."
+    role: scout
+    mode: subagent
+    color: cyan
+    effort: low
+    claude:
+      tools: "Read, Grep, Glob, WebFetch"
+      disallowedTools: "Write, Edit, Bash"
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "grep *": allow
+          "find *": allow
+          "wc *": allow
+          "git log*": allow
+
+  architect:
+    description: "Proposes system architecture, module boundaries, data flow, and domain models. Framework-agnostic design analysis. Read-only. Triggers: architecture, design, domain model, boundaries, structure, refactor plan, system design."
+    role: reasoner
+    mode: subagent
+    color: purple
+    effort: high
+    claude:
+      tools: "Read, Grep, Glob, WebFetch"
+      disallowedTools: "Write, Edit, Bash"
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "grep *": allow
+          "find *": allow
+          "git log*": allow
+
+  devil:
+    description: "Devil's advocate. Challenges plans, architectural proposals, and requirements before implementation. Surfaces hidden assumptions, risks, scope creep, and over-engineering. Read-only. Triggers: challenge, devil, critique, poke holes, second opinion, what could go wrong, stress test."
+    role: worker
+    mode: subagent
+    color: red
+    effort: medium
+    claude:
+      tools: "Read, Grep, Glob, WebFetch"
+      disallowedTools: "Write, Edit, Bash"
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "grep *": allow
+          "git log*": allow
+
+  debugger:
+    description: "Investigates bugs. Reproduces, isolates the failure, identifies root cause. Does not apply fixes — hands off to coder. Read-only on source. Triggers: bug, broken, error, crash, regression, flaky, root cause, why does, investigate."
+    role: reasoner
+    mode: subagent
+    color: orange
+    effort: high
+    claude:
+      tools: "Read, Grep, Glob, Bash, WebFetch"
+      disallowedTools: "Write, Edit"
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "grep *": allow
+          "find *": allow
+          "git log*": allow
+          "git bisect*": allow
+          "git blame*": allow
+          "git show*": allow
+          "git diff*": allow
+          "tail *": allow
+          "head *": allow
+          "pytest*": allow
+          "rspec*": allow
+          "npm test*": allow
+          "cat *": allow
+
+  integrations:
+    description: "Implements and reviews third-party integrations: OAuth flows, webhooks, API clients, SSO, payment providers. Handles auth tokens, retries, idempotency, signature verification. Triggers: integration, OAuth, webhook, API client, SSO, SAML, OIDC, third-party, Stripe, payment, signature."
+    role: worker
+    mode: subagent
+    color: cyan
+    effort: medium
+    claude:
+      tools: "Read, Write, Edit, Bash, Grep, Glob, WebFetch"
+      memory: user
+    opencode:
+      permission:
+        edit: allow
+        bash: allow
+
+  refactorer:
+    description: "Refactors code without changing behavior. Extracts methods, reduces duplication, improves naming, fixes code smells. Requires tests to exist or writes them first. Triggers: refactor, cleanup, rename, extract, DRY, duplication, code smell, tidy up, simplify."
+    role: worker
+    mode: subagent
+    color: blue
+    effort: medium
+    claude:
+      tools: "Read, Write, Edit, Bash, Grep, Glob"
+      memory: user
+    opencode:
+      permission:
+        edit: allow
+        bash: allow
