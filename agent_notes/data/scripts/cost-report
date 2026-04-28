@@ -16,7 +16,21 @@ PRICING = {{PRICING}}
 DB = Path.home() / ".local/share/opencode/opencode.db"
 
 SQL = """
-WITH cs AS (SELECT id FROM session WHERE parent_id IS NULL ORDER BY time_updated DESC LIMIT 1)
+WITH cs AS (SELECT id FROM session WHERE parent_id IS NULL ORDER BY time_created DESC LIMIT 1),
+conv_start AS (
+  SELECT COALESCE(
+    (SELECT json_extract(m2.data,'$.time.created')
+     FROM message m1 JOIN message m2 ON m1.session_id=m2.session_id
+     WHERE m1.session_id=(SELECT id FROM cs)
+       AND json_extract(m2.data,'$.time.created') > json_extract(m1.data,'$.time.created')
+       AND json_extract(m2.data,'$.time.created') - json_extract(m1.data,'$.time.created') > 1800000
+       AND NOT EXISTS (
+         SELECT 1 FROM message mx WHERE mx.session_id=m1.session_id
+           AND json_extract(mx.data,'$.time.created') > json_extract(m1.data,'$.time.created')
+           AND json_extract(mx.data,'$.time.created') < json_extract(m2.data,'$.time.created'))
+     ORDER BY json_extract(m1.data,'$.time.created') DESC LIMIT 1),
+    0) AS start_ts
+)
 SELECT
   COALESCE(json_extract(m.data,'$.agent'), 'lead') AS agent,
   (SELECT json_extract(m2.data,'$.modelID') FROM message m2
@@ -34,8 +48,11 @@ SELECT
 FROM session s
 JOIN message m ON m.session_id = s.id
 CROSS JOIN cs
+CROSS JOIN conv_start
 WHERE (s.parent_id = cs.id OR s.id = cs.id)
   AND json_extract(m.data,'$.role') = 'assistant'
+  AND json_extract(m.data,'$.time.created') >= conv_start.start_ts
+  AND (s.time_created >= conv_start.start_ts OR s.id = (SELECT id FROM cs))
 GROUP BY s.id
 """
 
