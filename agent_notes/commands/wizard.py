@@ -680,15 +680,18 @@ def interactive_install() -> None:
     except Exception as e:
         print(f"{Color.YELLOW}Warning: failed to write state.json: {e}{Color.NC}")
 
-    # Post-install summary
-    print("")
-    skill_groups = _get_skill_groups()
-    from ..registries.cli_registry import load_registry as _lr
-    _render_install_summary(set(clis), scope, copy_mode, selected_skills, role_models, skill_groups, _lr())
-    if memory_backend == "obsidian":
-        memory_label = f"Obsidian ({memory_path})" if memory_path else "Obsidian"
-    elif memory_backend == "none":
-        memory_label = "Disabled"
-    else:
-        memory_label = "Local markdown"
-    print(f"  Memory    {memory_label}")
+    # Initialize memory vault / directory on disk
+    if memory_backend != "none":
+        from ..config import memory_dir_for_backend
+        from ..services.memory_backend import obsidian_init, local_init
+        _mem_path = memory_dir_for_backend(memory_backend, memory_path)
+        try:
+            if memory_backend == "obsidian":
+                obsidian_init(_mem_path)
+                memory_label = f"Obsidian  →  {_mem_path}"
+            else:
+                local_init(_mem_path)
+                memory_label = f"Local markdown  →  {_mem_path}"
+        except Exception as e:
+            memory_label = f"(init failed: {e})"
+        print(f"  {Color.GREEN}✓{Color.NC} Memory    {memory_label}")
