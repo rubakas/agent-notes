@@ -6,9 +6,9 @@ aliases:
   anthropic:      haiku
   github-copilot: github-copilot/claude-haiku-4.5
 pricing:
-  input:  0.80
-  output: 4.00
-  cache:  0.08
+  input:  1.00
+  output: 5.00
+  cache:  0.10
 capabilities:
   vision: true
   long_context: false

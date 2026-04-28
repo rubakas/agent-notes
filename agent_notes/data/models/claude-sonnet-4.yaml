@@ -2,8 +2,9 @@ id: claude-sonnet-4
 label: Claude Sonnet 4
 family: claude
 class: sonnet
+deprecated: true
 aliases:
-  anthropic:      sonnet
+  anthropic:      claude-sonnet-4-20250514
   github-copilot: github-copilot/claude-sonnet-4
 pricing:
   input:  3.00

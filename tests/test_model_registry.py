@@ -206,13 +206,14 @@ class TestLoadModelRegistry:
         """Test loading the default registry returns 4 models."""
         registry = load_model_registry()
         
-        # Should have 4 claude models
-        assert len(registry.all()) == 4
+        # Should have 5 claude models
+        assert len(registry.all()) == 5
         ids = registry.ids()
         assert "claude-haiku-4-5" in ids
         assert "claude-opus-4-6" in ids
         assert "claude-opus-4-7" in ids
         assert "claude-sonnet-4" in ids
+        assert "claude-sonnet-4-6" in ids
     
     def test_get_specific_models(self):
         """Test getting specific models from default registry."""
@@ -226,11 +227,17 @@ class TestLoadModelRegistry:
         assert opus.aliases["anthropic"] == "opus"
         assert opus.aliases["github-copilot"] == "github-copilot/claude-opus-4.7"
         
-        # Test claude-sonnet-4
+        # Test claude-sonnet-4 (deprecated, full ID alias)
         sonnet = registry.get("claude-sonnet-4")
         assert sonnet.label == "Claude Sonnet 4"
         assert sonnet.model_class == "sonnet"
-        assert sonnet.aliases["anthropic"] == "sonnet"
+        assert sonnet.aliases["anthropic"] == "claude-sonnet-4-20250514"
+
+        # Test claude-sonnet-4-6 (current sonnet)
+        sonnet46 = registry.get("claude-sonnet-4-6")
+        assert sonnet46.label == "Claude Sonnet 4.6"
+        assert sonnet46.model_class == "sonnet"
+        assert sonnet46.aliases["anthropic"] == "sonnet"
     
     def test_get_unknown_model_raises_error(self):
         """Test that getting unknown model raises KeyError."""
@@ -250,10 +257,12 @@ class TestLoadModelRegistry:
         assert "claude-opus-4-6" in opus_ids
         assert "claude-opus-4-7" in opus_ids
         
-        # Test sonnet models  
+        # Test sonnet models (claude-sonnet-4 deprecated + claude-sonnet-4-6 current)
         sonnet_models = registry.by_class("sonnet")
-        assert len(sonnet_models) == 1
-        assert sonnet_models[0].id == "claude-sonnet-4"
+        assert len(sonnet_models) == 2
+        sonnet_ids = [m.id for m in sonnet_models]
+        assert "claude-sonnet-4" in sonnet_ids
+        assert "claude-sonnet-4-6" in sonnet_ids
         
         # Test haiku models
         haiku_models = registry.by_class("haiku")
@@ -265,7 +274,7 @@ class TestLoadModelRegistry:
         registry = load_model_registry()
         
         anthropic_models = registry.compatible_with_providers(["anthropic"])
-        assert len(anthropic_models) == 4
+        assert len(anthropic_models) == 5
         
         # All claude models should be compatible
         for model in anthropic_models:
@@ -276,7 +285,7 @@ class TestLoadModelRegistry:
         registry = load_model_registry()
         
         copilot_models = registry.compatible_with_providers(["github-copilot"])
-        assert len(copilot_models) == 4
+        assert len(copilot_models) == 5
         
         # All claude models should be compatible
         for model in copilot_models:
