@@ -343,7 +343,7 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
             for role_name, model_id in sorted(role_models[backend.name].items()):
                 role = role_map.get(role_name)
                 role_label = role.label if role else role_name
-                role_color = COLOR_MAP.get(role.color, "") if role and role.color else ""
+                role_color = _ROLE_COLOR_MAP.get(role.color, "") if role and role.color else ""
                 colored_role = f"{role_color}{role_label}{Color.NC}" if role_color else role_label
                 try:
                     model = models_registry.get(model_id)
