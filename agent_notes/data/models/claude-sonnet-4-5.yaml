@@ -1,0 +1,16 @@
+id: claude-sonnet-4-5
+label: Claude Sonnet 4.5
+family: claude
+class: sonnet
+deprecated: true
+aliases:
+  anthropic:      claude-sonnet-4-5
+  github-copilot: github-copilot/claude-sonnet-4.5
+pricing:
+  input:  3.00
+  output: 15.00
+  cache:  0.30
+capabilities:
+  vision: true
+  long_context: false
+  tool_use: true

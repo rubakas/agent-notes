@@ -1,0 +1,5 @@
+name: scout
+label: Scout
+description: Fast file discovery, pattern search. High volume, low reasoning.
+typical_class: haiku
+color: cyan

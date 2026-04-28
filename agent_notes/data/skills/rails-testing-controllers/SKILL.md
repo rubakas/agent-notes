@@ -1,6 +1,7 @@
 ---
 name: rails-testing-controllers
 description: "Rails testing: controller tests, system tests, and integration tests"
+group: rails
 ---
 
 # Testing Controllers & Integration

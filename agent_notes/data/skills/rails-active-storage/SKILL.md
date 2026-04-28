@@ -1,6 +1,7 @@
 ---
 name: rails-active-storage
 description: "Active Storage file uploads: attachments, variants, validations, and cloud storage config"
+group: rails
 ---
 
 # Active Storage

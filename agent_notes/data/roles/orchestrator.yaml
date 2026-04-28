@@ -1,0 +1,5 @@
+name: orchestrator
+label: Orchestrator
+description: Plans and delegates complex multi-step tasks. Low volume, high reasoning needed.
+typical_class: opus
+color: purple

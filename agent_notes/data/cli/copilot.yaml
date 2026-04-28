@@ -1,0 +1,18 @@
+name: copilot
+label: GitHub Copilot
+global_home: ~/.github
+local_dir: .github
+layout:
+  config: copilot-instructions.md
+features:
+  agents: false
+  skills: false
+  rules: false
+  commands: false
+  memory: false
+  frontmatter: null
+  config_style: inline
+  settings_template: false
+  supports_symlink: true
+global_template: global-copilot.md
+accepted_providers: [github-copilot]

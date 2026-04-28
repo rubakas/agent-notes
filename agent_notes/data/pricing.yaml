@@ -1,0 +1,33 @@
+baseline:
+  label: Claude Opus 4.7
+  price:
+    in: 5.00
+    out: 25.00
+    cache: 0.50
+
+providers:
+  - name: Anthropic
+    models:
+      - name: Claude Haiku 4.5
+        match: "*haiku*"
+        price: {in: 1.00, out: 5.00, cache: 0.10}
+        updated_at: "2026-04"
+      - name: Claude Sonnet
+        match: "*sonnet*"
+        price: {in: 3.00, out: 15.00, cache: 0.30}
+        updated_at: "2026-04"
+      - name: Claude Opus 4.7 / 4.6 / 4.5
+        match: ["*opus-4.7*", "*opus-4.6*", "*opus-4.5*"]
+        price: {in: 5.00, out: 25.00, cache: 0.50}
+        updated_at: "2026-04"
+      - name: Claude Opus (legacy)
+        match: ["*opus-4.1*", "*opus*"]
+        price: {in: 15.00, out: 75.00, cache: 1.50}
+        updated_at: "2026-04"
+
+  - name: OpenAI
+    models:
+      - name: GPT-4 / o-series
+        match: ["gpt-*", "o1*", "o3*", "o4*"]
+        price: {in: 2.50, out: 10.00, cache: 0.50}
+        updated_at: "2026-04"

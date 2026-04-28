@@ -1,6 +1,7 @@
 ---
 name: rails-jobs
 description: "Rails Active Job: background processing, error handling, recurring jobs, and testing"
+group: rails
 ---
 
 # Jobs Guide

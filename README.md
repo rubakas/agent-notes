@@ -2,7 +2,7 @@
 
 AI agent configuration manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [OpenCode](https://github.com/opencode-ai/opencode).
 
-Configures a Lead agent (Opus) that orchestrates a team of 13 specialized subagents across three model tiers — so Opus plans, Sonnet executes, and Haiku explores.
+Configures a Lead agent (Opus) that orchestrates a team of 18 specialized subagents across three model tiers — so Opus plans and reasons, Sonnet executes, and Haiku explores.
 
 ## Quick Start
 
@@ -13,14 +13,14 @@ agent-notes install    # interactive wizard guides you through setup
 agent-notes doctor
 ```
 
-Update anytime with `cd ~/agent-notes && git pull && agent-notes update`.
+Update anytime with `agent-notes update` (pulls latest, shows diff, reinstalls).
 
 ## What's Included
 
 | Component | Description |
 |-----------|-------------|
-| **Skills** | 31 on-demand knowledge modules (Rails, Docker, Git, Kamal) |
-| **Agents** | 14 specialized AI subagents with hierarchical model strategy |
+| **Skills** | 36 on-demand knowledge modules (Rails, Docker, Git, Kamal, Process) |
+| **Agents** | 18 specialized AI subagents with hierarchical model strategy |
 | **Rules** | Global instructions, code quality, and safety guardrails |
 | **Config** | Global instructions for Claude Code, OpenCode, and GitHub Copilot |
 
@@ -32,13 +32,14 @@ agent-notes <command> [options]
 
 | Command | Description |
 |---------|-------------|
-| `install` | Interactive installer wizard (CLI, scope, skills selection) |
-| `install --local [--copy]` | Direct install to current project (no wizard) |
+| `install [--local] [--copy]` | Interactive wizard or direct install |
 | `uninstall [--local]` | Remove installed components |
 | `update` | Pull latest, rebuild, reinstall |
 | `doctor [--local] [--fix]` | Check installation health |
 | `info` | Show status and component counts |
-| `list [agents\|skills\|rules\|all]` | List installed components |
+| `list [clis\|models\|roles\|agents\|skills\|rules\|all]` | List engine components or installed |
+| `set role <role> <model> [--cli <cli>]` | Change model for a role (Phase 10+) |
+| `regenerate [--cli <cli>]` | Rebuild files from state.json (Phase 10+) |
 | `validate` | Lint source configuration files |
 | `memory [list\|size\|show\|reset\|export\|import] [name]` | Manage agent memory |
 
@@ -75,18 +76,19 @@ agent-notes install
 #   Choice [1]:                      ← press enter for symlink
 #
 #   Which skills to include?
-#     1) [*] Rails — models, controllers, views, routes, testing (22 skills)
+#     1) [*] Rails — models, controllers, views, routes, testing (24 skills)
 #     2) [*] Docker — Dockerfile, Compose patterns (4 skills)
 #     3) [*] Kamal — deployment with Kamal (1 skill)
 #     4) [*] Git — commit workflow, conventional commits (1 skill)
+#     5) [*] Process — TDD, refactoring, debugging, planning (6 skills)
 #   Choice:                          ← press enter for all
 #
 #   Ready to install:
 #     CLI:      Claude Code + OpenCode
 #     Scope:    Global (~/.claude, ~/.config/opencode)
 #     Mode:     Symlink
-#     Skills:   Rails (22), Docker (4), Kamal (1), Git (1)
-#     Agents:   13 (Claude Code) + 13 (OpenCode)
+#     Skills:   Rails (24), Docker (4), Kamal (1), Git (1), Process (6)
+#     Agents:   18 (Claude Code) + 19 (OpenCode)
 #     Config:   CLAUDE.md, AGENTS.md
 #     Rules:    2
 #   Proceed? [Y/n]: Y
@@ -100,19 +102,22 @@ agent-notes doctor --fix
 
 # Manage agent memory
 agent-notes memory list
-agent-notes memory show coder
-agent-notes memory reset reviewer
+agent-notes memory vault          # show current backend and path
+agent-notes memory index          # regenerate Index.md
+agent-notes memory add "Pattern title" "Body text" --type pattern --agent coder
 ```
 
 ## Agent Team
 
-Specialized subagents with hierarchical model strategy: **Opus 4.6 decides, Sonnet 4 executes, Haiku 4.5 explores.**
+Specialized subagents with hierarchical model strategy: **Opus 4.7 decides, Sonnet 4 executes, Haiku 4.5 explores.**
 
 ### Agent roster
 
 | Agent | Model | Role |
 |-------|-------|------|
-| **lead** | Opus 4.6 | Plans, delegates, reviews. The only Opus agent. |
+| **lead** | Opus 4.7 | Plans, delegates, reviews. Orchestrator. |
+| **architect** | Opus 4.7 | System architecture, module boundaries, domain models. Read-only. |
+| **debugger** | Opus 4.7 | Bug investigation: reproduces, isolates, identifies root cause. Read-only. |
 | **coder** | Sonnet 4 | Implements features, fixes bugs, edits files. |
 | **reviewer** | Sonnet 4 | Code quality review. Read-only. |
 | **security-auditor** | Sonnet 4 | Security vulnerability analysis. Read-only. |
@@ -121,9 +126,13 @@ Specialized subagents with hierarchical model strategy: **Opus 4.6 decides, Sonn
 | **system-auditor** | Sonnet 4 | Codebase health: duplication, N+1, coupling. Read-only. |
 | **database-specialist** | Sonnet 4 | Schema design, indexes, query performance, migrations. Read-only. |
 | **performance-profiler** | Sonnet 4 | Response times, memory, caching, bundle size. Read-only. |
+| **devops** | Sonnet 4 | Docker, CI/CD, deployment configs. |
+| **devil** | Sonnet 4 | Challenges plans to surface hidden risks. Read-only. |
+| **integrations** | Sonnet 4 | Third-party integrations: OAuth, webhooks, payments. |
+| **refactorer** | Sonnet 4 | Improves code structure without changing behavior. |
+| **analyst** | Haiku 4.5 | Requirements analysis: surfaces missing or contradictory requirements. Read-only. |
 | **api-reviewer** | Haiku 4.5 | API design, versioning, error handling, backward compatibility. Read-only. |
 | **tech-writer** | Haiku 4.5 | Documentation: READMEs, API docs, changelogs. |
-| **devops** | Sonnet 4 | Docker, CI/CD, deployment configs. |
 | **explorer** | Haiku 4.5 | Fast file discovery and pattern search. Read-only. |
 
 ### 4-phase lead workflow
@@ -142,46 +151,84 @@ You (human)
   |
   +-- Simple task ------> Main session (direct work)
   |
-  +-- Complex task -----> Lead (Opus 4.6)
-                           +-- Explorer (Haiku 4.5)     quick lookups
-                           +-- Coder (Sonnet 4)         implementation
-                           +-- Reviewer (Sonnet 4)      code review
-                            +-- Test Writer (Sonnet 4)   tests
-                            +-- Test Runner (Sonnet 4)   fix tests
-                           +-- Security (Sonnet 4)      security audit
-                           +-- Auditor (Sonnet 4)       codebase health
-                           +-- DB Specialist (Sonnet 4) schema & queries
-                           +-- Perf Profiler (Sonnet 4) performance
-                           +-- API Reviewer (Haiku 4.5) API design
-                           +-- Tech Writer (Haiku 4.5)  documentation
-                           +-- DevOps (Sonnet 4)        infrastructure
+  +-- Complex task -----> Lead (Opus 4.7)
+                           +-- Explorer (Haiku 4.5)          quick lookups
+                           +-- Analyst (Haiku 4.5)           requirements analysis
+                           +-- Architect (Opus 4.7)          system design
+                           +-- Coder (Sonnet 4)              implementation
+                           +-- Refactorer (Sonnet 4)         code restructuring
+                           +-- Reviewer (Sonnet 4)           code review
+                           +-- Security (Sonnet 4)           security audit
+                           +-- Devil (Sonnet 4)              risk challenge
+                           +-- Debugger (Opus 4.7)           bug investigation
+                           +-- Test Writer (Sonnet 4)        tests
+                           +-- Test Runner (Sonnet 4)        fix tests
+                           +-- Auditor (Sonnet 4)            codebase health
+                           +-- DB Specialist (Sonnet 4)      schema & queries
+                           +-- Perf Profiler (Sonnet 4)      performance
+                           +-- API Reviewer (Haiku 4.5)      API design
+                           +-- Integrations (Sonnet 4)       third-party APIs
+                           +-- Tech Writer (Haiku 4.5)       documentation
+                           +-- DevOps (Sonnet 4)             infrastructure
 ```
 
-## Architecture
+## Architecture: YAML-Driven Extensibility
 
-**Single source of truth:** `agent_notes/data/` → `build` → `agent_notes/dist/` → `install`
+Agent-notes is a **4-layer bounded-context engine** (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full details):
 
-1. **Source** — YAML metadata + Markdown prompts
-2. **Build** — Generate platform-specific configs
-3. **Dist** — Built artifacts ready for installation  
-4. **Install** — Deploy via symlinks or copy
+| Layer | Purpose | Example |
+|-------|---------|---------|
+| **Domain** | Pure dataclasses (Agent, Model, Role, State) | `agent_notes/domain/` |
+| **Registries** | YAML loaders from `data/` → domain types | `agent_notes/registries/` |
+| **Services** | Technical concerns (I/O, rendering, state, install) | `agent_notes/services/` |
+| **Commands** | CLI orchestrators (install, doctor, list, etc.) | `agent_notes/commands/` |
+
+**Single source of truth:** `agent_notes/data/` holds all extensible content (CLI, model, role, agent, skill, rule YAMLs).
+
+**Zero Python changes to add:**
+- New CLI: drop `data/cli/cursor.yaml` 
+- New model: drop `data/models/gpt-5.yaml`
+- New role: drop `data/roles/specialist.yaml`
+
+See [docs/ADD_CLI.md](docs/ADD_CLI.md), [docs/ADD_MODEL.md](docs/ADD_MODEL.md), [docs/ADD_ROLE.md](docs/ADD_ROLE.md) for guides.
+
+
 
 ## Project Structure
 
 ```
 agent-notes/
 ├── bin/agent-notes          # CLI wrapper (entry point)
+├── docs/
+│   ├── ADD_CLI.md           # Guide: add a new CLI backend
+│   ├── ADD_MODEL.md         # Guide: add a new AI model
+│   ├── ADD_ROLE.md          # Guide: add a new agent role
+│   ├── CLI_CAPABILITIES.md  # Source of truth for per-CLI features
+│   └── ENGINE_PLAN.md       # Refactor phases and design details
 ├── agent_notes/             # Python implementation
 │   ├── __init__.py, cli.py  # Core modules
 │   ├── VERSION              # Package version
 │   ├── data/                # Single source of truth
+│   │   ├── cli/             # CLI descriptors
+│   │   │   ├── claude.yaml, opencode.yaml, copilot.yaml
+│   │   │   └── cursor.yaml  # (add your own)
+│   │   ├── models/          # Model descriptors
+│   │   │   ├── claude-opus-4-7.yaml, claude-sonnet-4.yaml, ...
+│   │   │   └── kimi-k2.yaml # (add your own)
+│   │   ├── roles/           # Role descriptors
+│   │   │   ├── orchestrator.yaml, worker.yaml, scout.yaml, reasoner.yaml
+│   │   │   └── specialist.yaml # (add your own)
+│   │   ├── templates/frontmatter/
+│   │   │   ├── claude.py, opencode.py
+│   │   │   └── cursor.py    # (add if format differs from Claude/OpenCode)
 │   │   ├── agents/
-│   │   │   ├── agents.yaml  # Agent metadata
+│   │   │   ├── agents.yaml  # Agent metadata + role declarations
 │   │   │   └── *.md         # Agent prompt files
 │   │   ├── skills/          # Skill directories
 │   │   ├── rules/           # Code quality rules
-│   │   └── global.md        # Global instructions
-│   └── dist/                # Built artifacts
+│   │   ├── globals/         # Global config templates
+│   │   └── commands/, scripts/
+│   └── dist/                # Built artifacts (auto-generated, do not edit)
 │       ├── claude/, opencode/
 │       ├── rules/
 │       └── skills/
@@ -226,17 +273,20 @@ On-demand knowledge modules loaded mid-conversation.
 
 ### Available skills
 
-**Rails:**
-`rails-models`, `rails-controllers`, `rails-routes`, `rails-concerns`, `rails-views`, `rails-views-advanced`, `rails-view-components`, `rails-view-components-advanced`, `rails-helpers`, `rails-javascript`, `rails-jobs`, `rails-mailers`, `rails-broadcasting`, `rails-migrations`, `rails-active-storage`, `rails-validations`, `rails-testing-controllers`, `rails-testing-models`, `rails-testing-system`, `rails-style`, `rails-controllers-advanced`, `rails-models-advanced`, `rails-initializers`, `rails-lib`
+**Rails (24):**
+`rails-models`, `rails-models-advanced`, `rails-controllers`, `rails-controllers-advanced`, `rails-routes`, `rails-concerns`, `rails-views`, `rails-views-advanced`, `rails-view-components`, `rails-view-components-advanced`, `rails-helpers`, `rails-javascript`, `rails-jobs`, `rails-mailers`, `rails-broadcasting`, `rails-migrations`, `rails-active-storage`, `rails-validations`, `rails-testing-controllers`, `rails-testing-models`, `rails-testing-system`, `rails-style`, `rails-initializers`, `rails-lib`
 
-**Docker:**
+**Docker (4):**
 `docker-dockerfile`, `docker-dockerfile-languages`, `docker-compose`, `docker-compose-advanced`
 
-**Kamal:**
+**Kamal (1):**
 `rails-kamal`
 
-**Git:**
+**Git (1):**
 `git` — git workflow, commit chunking, conventional commit messages
+
+**Process (6):**
+`tdd`, `refactoring-protocol`, `debugging-protocol`, `plan-first`, `code-review`, `brainstorming`
 
 ### Usage
 
@@ -245,6 +295,137 @@ On-demand knowledge modules loaded mid-conversation.
 Use the rails-models skill to help with this association
 Load the docker-compose skill for multi-service setup
 ```
+
+## Agent Memory
+
+Agents can accumulate knowledge across sessions — patterns they discovered, decisions they made, mistakes to avoid. Three backends are available, chosen during `agent-notes install`.
+
+### Backends
+
+| Backend | Storage | Best for |
+|---------|---------|----------|
+| **Local** | `~/.claude/agent-memory/<agent>/` — plain markdown per agent | Simple setup, no extra tools |
+| **Obsidian** | Category vault with YAML frontmatter and `[[wikilinks]]` | Visual browsing, backlinks, Dataview queries |
+| **None** | Disabled — no files written | Stateless or shared machines |
+
+### Obsidian vault setup
+
+**Step 1 — Pick Obsidian during install**
+
+```bash
+agent-notes install
+# ...
+# Step 6/7: Memory backend
+#   How should agents store memory?
+#     1) * Local markdown files (~/.claude/agent-memory/)
+#     2)   Obsidian vault
+#     3)   None
+#   Choice [1]: 2
+#
+#   Detected Obsidian vaults:
+#     ~/Documents/Obsidian/Main
+#   Vault path [~/Documents/Obsidian/Main]: ← press enter or type your path
+#   ✓ Memory: Obsidian (~/Documents/Obsidian/Main)
+```
+
+The wizard auto-detects existing vaults (directories containing `.obsidian/`) in `~/Documents`, `~/Desktop`, and `~`. You can also point to any directory — it doesn't need to be an existing vault.
+
+**Step 2 — Initialise the vault**
+
+```bash
+agent-notes memory init
+# Obsidian vault initialised at ~/Documents/Obsidian/Main
+#   Folders: Patterns, Decisions, Mistakes, Context, Sessions
+#   Index:   ~/Documents/Obsidian/Main/Index.md
+```
+
+Then open Obsidian → "Open folder as vault" → select the same path.
+
+**Vault structure:**
+
+```
+~/your-vault/
+├── Index.md          ← entry point; auto-regenerated after every write
+├── Patterns/         ← reusable solutions and techniques
+├── Decisions/        ← architectural choices and rationale
+├── Mistakes/         ← recurring errors to avoid
+├── Context/          ← per-project background
+└── Sessions/         ← raw session extracts
+```
+
+**Step 3 — Let agents use it**
+
+The installed `CLAUDE.md` already points agents to your vault. At the start of a session Claude reads `Index.md`; at the end it can save insights:
+
+```
+Save this to memory as a pattern: always use _prefix: true with Rails enums
+```
+
+Or use the CLI directly:
+
+```bash
+agent-notes memory add "Rails enum prefix" \
+  "Always use _prefix: true to avoid method name collisions" \
+  --type pattern --agent coder --tags rails,models
+```
+
+**Regenerate the index** after adding files manually in Obsidian:
+
+```bash
+agent-notes memory index
+```
+
+### Switching backends
+
+```bash
+# See current backend
+agent-notes memory vault
+
+# Switch via reconfigure
+agent-notes install --reconfigure
+```
+
+### Memory commands
+
+```bash
+agent-notes memory init                    # create folder structure and Index.md
+agent-notes memory list                    # list all notes (by category or agent)
+agent-notes memory vault                   # show backend, path, and init status
+agent-notes memory index                   # regenerate Index.md
+agent-notes memory add "Title" "Body"      # add a note (default type: context)
+  --type pattern|decision|mistake|context|session
+  --agent <name>
+  --project <name>
+  --tags tag1,tag2
+agent-notes memory show <agent>            # show one agent's notes (local backend)
+agent-notes memory reset [agent]           # clear memory (confirmation required)
+agent-notes memory export                  # back up to memory-backup/
+agent-notes memory import                  # restore from memory-backup/
+```
+
+### Note format (Obsidian backend)
+
+Every note agent-notes writes has YAML frontmatter for filtering and Dataview queries:
+
+```markdown
+---
+date: 2026-04-28
+type: pattern
+agent: coder
+project: rubakas
+tags: [rails, models]
+---
+
+# Rails Enum Prefix
+
+Always use `_prefix: true` with Rails enums to avoid method name collisions with
+existing model methods.
+
+## Links
+- [[2026-04-28-switched-to-jsonb-for-settings]]
+```
+
+Files are named `YYYY-MM-DD-<slug>.md` and placed in the matching category folder. They're plain markdown — edit them freely in Obsidian.
 
 ## Development
 
@@ -258,6 +439,14 @@ Load the docker-compose skill for multi-service setup
 ```bash
 python3 -m pytest tests/
 ```
+
+Tests are organized in three directories:
+
+| Directory | What it tests |
+|-----------|---------------|
+| `tests/functional/` | Unit tests: registries, build commands, CLI parsing |
+| `tests/integration/` | Real build output: dist structure, agent frontmatter, pricing embedding |
+| `tests/plugins/` | Artifact validation: every skill and agent file checked for correct metadata |
 
 ### Building
 
