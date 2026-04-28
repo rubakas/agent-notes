@@ -321,7 +321,7 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
         for gname, gskills in skill_groups.items():
             cnt = sum(1 for s in selected_skills if s in gskills)
             if cnt:
-                parts.append(f"{gname} ({cnt})")
+                parts.append(f"{gname.capitalize()} ({cnt})")
         ungrouped = sum(1 for s in selected_skills if s not in all_grouped)
         if ungrouped:
             parts.append(f"Other ({ungrouped})")
