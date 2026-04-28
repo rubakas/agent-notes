@@ -104,8 +104,14 @@ def copy_commands() -> list[Path]:
 
 
 def count_lines(file_path: Path) -> int:
-    """Count lines in a file."""
+    """Count lines in a file or all files within a directory."""
     try:
+        if file_path.is_dir():
+            return sum(
+                len(f.read_text().splitlines())
+                for f in file_path.rglob("*")
+                if f.is_file()
+            )
         return len(file_path.read_text().splitlines())
     except Exception:
         return 0
