@@ -97,8 +97,8 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     If state is None, behaves exactly as before (uses tiers dict).
     If state is provided, tries state-driven resolution first, falls back to tiers on miss.
     """
-    from ..cli_backend import load_registry
-    from ..model_registry import load_model_registry
+    from ..registries.cli_registry import load_registry
+    from ..registries.model_registry import load_model_registry
     from .. import state as state_module
     from ..config import AGENTS_DIR, DIST_DIR
     
@@ -272,7 +272,7 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
             full_content = f"{frontmatter}\n\n{content}"
             
             # Write to backend's agents directory
-            from .. import installer
+            from ..services import installer
             agents_dir = installer.dist_source_for(backend, "agents")
             if agents_dir is None:
                 agents_dir = DIST_DIR / backend.name / "agents"

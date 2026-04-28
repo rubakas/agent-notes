@@ -1,8 +1,8 @@
 """Tests that all 4 registries load correctly from their source files."""
 import pytest
 
-from agent_notes.model_registry import load_model_registry
-from agent_notes.role_registry import load_role_registry
+from agent_notes.registries.model_registry import load_model_registry
+from agent_notes.registries.role_registry import load_role_registry
 from agent_notes.registries.skill_registry import load_skill_registry
 from agent_notes.registries.agent_registry import load_agent_registry
 

@@ -14,183 +14,186 @@ from ..services.validation import (
 
 def validate() -> None:
     """Lint all agent-notes configs."""
-    from .. import validate as parent_module
-    
+    from ..config import (
+        Color, ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR,
+        DIST_RULES_DIR, find_skill_dirs
+    )
+
     errors: List[ValidationError] = []
     warnings: List[ValidationWarning] = []
     names: Set[str] = set()
     skill_names: Set[str] = set()
-    
+
     # Validate Claude agents
     print("Validating Claude Code agents (dist/claude/agents/*.md) ...")
-    
-    claude_agents_dir = parent_module.DIST_CLAUDE_DIR / "agents"
+
+    claude_agents_dir = DIST_CLAUDE_DIR / "agents"
     if claude_agents_dir.exists():
         for f in claude_agents_dir.glob("*.md"):
             local_name = f.stem
             lines = line_count(f)
             label = f"dist/claude/agents/{local_name}.md ({lines} lines)"
-            
+
             # Frontmatter exists
             if not has_frontmatter(f):
                 errors.append(ValidationError(label, "missing frontmatter"))
                 continue
-            
+
             # Required fields
             for field in ["name", "description", "model"]:
                 if not has_field(f, field):
                     errors.append(ValidationError(label, f"missing required field: {field}"))
-            
+
             # Name matches filename
             fm_name = get_field(f, "name")
             if fm_name and fm_name != local_name:
                 errors.append(ValidationError(label, f"name '{fm_name}' does not match filename '{local_name}'"))
-            
+
             # Line count
             if lines > 250:
                 errors.append(ValidationError(label, "exceeds 250 line limit"))
             elif lines > 80:
                 warnings.append(ValidationWarning(label, "over 80 lines (consider trimming)"))
             else:
-                print(f"  {parent_module.Color.GREEN}OK{parent_module.Color.NC}    {label}")
-            
+                print(f"  {Color.GREEN}OK{Color.NC}    {label}")
+
             if fm_name:
                 names.add(f"agent:{fm_name}")
-    
+
     # Validate OpenCode agents
     print("")
     print("Validating OpenCode agents (dist/opencode/agents/*.md) ...")
-    
-    opencode_agents_dir = parent_module.DIST_OPENCODE_DIR / "agents"
+
+    opencode_agents_dir = DIST_OPENCODE_DIR / "agents"
     if opencode_agents_dir.exists():
         for f in opencode_agents_dir.glob("*.md"):
             local_name = f.stem
             lines = line_count(f)
             label = f"dist/opencode/agents/{local_name}.md ({lines} lines)"
-            
+
             if not has_frontmatter(f):
                 errors.append(ValidationError(label, "missing frontmatter"))
                 continue
-            
+
             for field in ["description", "mode", "model"]:
                 if not has_field(f, field):
                     errors.append(ValidationError(label, f"missing required field: {field}"))
-            
+
             if lines > 250:
                 errors.append(ValidationError(label, "exceeds 250 line limit"))
             elif lines > 80:
                 warnings.append(ValidationWarning(label, "over 80 lines (consider trimming)"))
             else:
-                print(f"  {parent_module.Color.GREEN}OK{parent_module.Color.NC}    {label}")
-    
+                print(f"  {Color.GREEN}OK{Color.NC}    {label}")
+
     # Validate Skills
     print("")
     print("Validating skills (*/SKILL.md) ...")
-    
+
     skill_name_regex = re.compile(r'^[a-z0-9]+(-[a-z0-9]+)*$')
-    
-    for skill_path in parent_module.find_skill_dirs():
+
+    for skill_path in find_skill_dirs():
         skill_name = skill_path.name
         f = skill_path / "SKILL.md"
         if not f.exists():
             continue
-            
+
         lines = line_count(f)
         label = f"{skill_name}/SKILL.md ({lines} lines)"
-        
+
         if not has_frontmatter(f):
             errors.append(ValidationError(label, "missing frontmatter"))
             continue
-        
+
         for field in ["name", "description"]:
             if not has_field(f, field):
                 errors.append(ValidationError(label, f"missing required field: {field}"))
-        
+
         # Name matches directory
         fm_name = get_field(f, "name")
         if fm_name and fm_name != skill_name:
             errors.append(ValidationError(label, f"name '{fm_name}' does not match directory '{skill_name}'"))
-        
+
         # Name format (OpenCode requirement)
         if fm_name and not skill_name_regex.match(fm_name):
             errors.append(ValidationError(label, f"name '{fm_name}' does not match required pattern (lowercase alphanumeric + hyphens)"))
-        
-        print(f"  {parent_module.Color.GREEN}OK{parent_module.Color.NC}    {label}")
-        
+
+        print(f"  {Color.GREEN}OK{Color.NC}    {label}")
+
         if fm_name:
             skill_names.add(f"skill:{fm_name}")
-    
+
     # Check for duplicate names
     print("")
     print("Checking for duplicates ...")
-    
+
     all_names = names | skill_names
     seen = set()
     for name in all_names:
         if name in seen:
             errors.append(ValidationError("Duplicate name", name))
         seen.add(name)
-    
+
     if all_names and not any("Duplicate name" in err.file_path for err in errors):
-        print(f"  {parent_module.Color.GREEN}OK{parent_module.Color.NC}    No duplicate names ({len(all_names)} total)")
-    
+        print(f"  {Color.GREEN}OK{Color.NC}    No duplicate names ({len(all_names)} total)")
+
     # Global config files
     print("")
     print("Checking global config files ...")
-    
+
     required_global = [
-        parent_module.DIST_CLAUDE_DIR / "CLAUDE.md",
-        parent_module.DIST_OPENCODE_DIR / "AGENTS.md",
-        parent_module.DIST_GITHUB_DIR / "copilot-instructions.md",
-        parent_module.DIST_RULES_DIR / "code-quality.md",
-        parent_module.DIST_RULES_DIR / "safety.md"
+        DIST_CLAUDE_DIR / "CLAUDE.md",
+        DIST_OPENCODE_DIR / "AGENTS.md",
+        DIST_GITHUB_DIR / "copilot-instructions.md",
+        DIST_RULES_DIR / "code-quality.md",
+        DIST_RULES_DIR / "safety.md"
     ]
-    
+
     for file_path in required_global:
-        rel_path = file_path.relative_to(parent_module.ROOT)
+        rel_path = file_path.relative_to(ROOT)
         if file_path.exists():
-            print(f"  {parent_module.Color.GREEN}OK{parent_module.Color.NC}    {rel_path}")
+            print(f"  {Color.GREEN}OK{Color.NC}    {rel_path}")
         else:
             errors.append(ValidationError(str(rel_path), "file not found"))
-    
+
     # Unclosed code blocks
     print("")
     print("Checking for unclosed code blocks ...")
-    
+
     codeblock_ok = True
-    for md_file in parent_module.ROOT.rglob("*.md"):
+    for md_file in ROOT.rglob("*.md"):
         # Skip .git and node_modules
         if ".git" in str(md_file) or "node_modules" in str(md_file):
             continue
-        
+
         if not check_unclosed_code_blocks(md_file):
-            rel_path = md_file.relative_to(parent_module.ROOT)
+            rel_path = md_file.relative_to(ROOT)
             try:
                 fence_count = md_file.read_text().count('```')
                 errors.append(ValidationError(str(rel_path), f"unclosed code block ({fence_count} fence markers)"))
                 codeblock_ok = False
             except (FileNotFoundError, OSError):
                 pass
-    
+
     if codeblock_ok:
-        print(f"  {parent_module.Color.GREEN}OK{parent_module.Color.NC}    Code blocks valid")
-    
+        print(f"  {Color.GREEN}OK{Color.NC}    Code blocks valid")
+
     # Print all errors and warnings
     for error in errors:
-        print(f"  {parent_module.Color.RED}FAIL{parent_module.Color.NC}  {error.file_path} — {error.message}")
-    
+        print(f"  {Color.RED}FAIL{Color.NC}  {error.file_path} — {error.message}")
+
     for warning in warnings:
-        print(f"  {parent_module.Color.YELLOW}WARN{parent_module.Color.NC}  {warning.file_path} — {warning.message}")
-    
+        print(f"  {Color.YELLOW}WARN{Color.NC}  {warning.file_path} — {warning.message}")
+
     # Summary
     print("")
     print("===============================")
     if errors:
-        print(f"{parent_module.Color.RED}{len(errors)} error(s){parent_module.Color.NC}, {len(warnings)} warning(s)")
+        print(f"{Color.RED}{len(errors)} error(s){Color.NC}, {len(warnings)} warning(s)")
         exit(1)
     elif warnings:
-        print(f"{parent_module.Color.GREEN}0 errors{parent_module.Color.NC}, {parent_module.Color.YELLOW}{len(warnings)} warning(s){parent_module.Color.NC}")
+        print(f"{Color.GREEN}0 errors{Color.NC}, {Color.YELLOW}{len(warnings)} warning(s){Color.NC}")
         exit(0)
     else:
-        print(f"{parent_module.Color.GREEN}All checks passed.{parent_module.Color.NC}")
+        print(f"{Color.GREEN}All checks passed.{Color.NC}")
         exit(0)

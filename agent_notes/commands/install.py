@@ -23,7 +23,7 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False) 
         print(f"Found existing {scope} installation at {state_file()}")
         print(f"  Installed: {existing.installed_at}")
         cli_labels = []
-        from ..cli_backend import load_registry
+        from ..registries.cli_registry import load_registry
         registry = load_registry()
         for cli_name in existing.clis.keys():
             try:
@@ -67,8 +67,8 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False) 
     # Build first
     print("Building from source...")
     try:
-        from agent_notes import install as _shim  # lazy shim import
-        _shim.build()
+        from ..commands.build import build
+        build()
     except Exception as e:
         print(f"{Color.RED}Build failed: {e}{Color.NC}")
         return
@@ -77,7 +77,7 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False) 
     print(f"Installing ({'local' if local else 'global'}, {'copy' if copy else 'symlink'}) ...")
     print("")
 
-    from .. import installer
+    from ..services import installer
     scope = "local" if local else "global"
     copy_mode = copy
     installer.install_all(scope, copy_mode)

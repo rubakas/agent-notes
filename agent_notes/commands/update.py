@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Optional
 
 from ..config import ROOT, Color, get_version, PKG_DIR
-from .. import install_state, update_diff
+from .. import install_state
+from ..services import diff as update_diff
 
 
 def _run_git(args, cwd) -> subprocess.CompletedProcess:
@@ -61,9 +62,7 @@ def update(
     - since: if set, compare against this git sha rather than current state.json (advanced)
     - skip_pull: skip the git pull (useful when user already pulled)
     """
-    from .. import update as parent_module
-    
-    repo = parent_module.ROOT
+    repo = ROOT
     print("Updating agent-notes...")
     print("")
 
@@ -71,7 +70,7 @@ def update(
     if not skip_pull:
         git_dir = repo / ".git"
         if not git_dir.exists():
-            print(f"{parent_module.Color.RED}Error:{parent_module.Color.NC} Not a git repository. Update requires a git-based install.")
+            print(f"{Color.RED}Error:{Color.NC} Not a git repository. Update requires a git-based install.")
             return
         before = _git_head(repo)
         try:
@@ -87,8 +86,8 @@ def update(
     # Step 2: rebuild dist/
     print("Rebuilding...")
     try:
-        from .. import update as parent_module
-        parent_module.run_build()
+        from ..commands.build import build as run_build
+        run_build()
     except Exception as e:
         print(f"{Color.RED}Build failed: {e}{Color.NC}")
         return
@@ -125,7 +124,7 @@ def update(
     new_state = install_state.build_install_state(
         mode=mode,
         scope=scope,
-        repo_root=parent_module.PKG_DIR.parent,
+        repo_root=PKG_DIR.parent,
         project_path=project_path,
     )
 
@@ -164,7 +163,7 @@ def update(
 
     # Step 7: reinstall (use existing install flow — it also writes new state.json)
     # Use the determined scope and mode from the analysis above
-    import agent_notes.install as install_shim
+    from ..commands.install import install
     local = (scope == "local")
     copy = (mode == "copy")
-    install_shim.install(local=local, copy=copy)
+    install(local=local, copy=copy)

@@ -4,8 +4,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from .cli_backend import CLIRegistry, CLIBackend
-from . import installer
+from .registries.cli_registry import CLIRegistry
+from .domain.cli_backend import CLIBackend
+from .services import installer
 from .state import State, ScopeState, sha256_of
 from .config import BIN_HOME, AGENTS_HOME, DIST_SCRIPTS_DIR, DIST_SKILLS_DIR
 

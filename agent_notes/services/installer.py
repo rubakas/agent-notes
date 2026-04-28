@@ -5,7 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from ..cli_backend import CLIBackend, CLIRegistry, load_registry
+from ..domain.cli_backend import CLIBackend
+from ..registries.cli_registry import CLIRegistry, load_registry
 from .. import config
 from .fs import (
     place_file, place_dir_contents,

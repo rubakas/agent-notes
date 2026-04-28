@@ -11,7 +11,7 @@ def uninstall(local: bool = False) -> None:
     print(f"Uninstalling ({'local' if local else 'global'}) ...")
     print("")
 
-    from .. import installer
+    from ..services import installer
     scope = "local" if local else "global"
     installer.uninstall_all(scope)
 

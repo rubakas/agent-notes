@@ -19,9 +19,9 @@ def set_role(role_name: str, model_id: str, cli: Optional[str] = None, scope: Op
     """
     from .. import state as state_mod
     from ..state import get_scope, set_scope
-    from ..role_registry import load_role_registry
-    from ..model_registry import load_model_registry
-    from ..cli_backend import load_registry
+    from ..registries.role_registry import load_role_registry
+    from ..registries.model_registry import load_model_registry
+    from ..registries.cli_registry import load_registry
     from .. import install_state
     
     # Load state.json

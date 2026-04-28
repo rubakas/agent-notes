@@ -48,7 +48,7 @@ def _check_session_hook(scope: str, issues: list) -> None:
     from ..domain.diagnostics import Issue
 
     try:
-        from ..cli_backend import load_registry
+        from ..registries.cli_registry import load_registry
         registry = load_registry()
         claude_backend = registry.get("claude")
     except KeyError:
@@ -99,8 +99,8 @@ def diagnose(scope: str, fix: bool = False) -> bool:
         # Services layer flagged that an install is needed — invoke it here
         # (commands layer), avoiding a services→commands dependency.
         if any(a.action == "_TRIGGER_INSTALL" for a in fix_actions):
-            from .. import install as _install_shim
-            _install_shim.install()
+            from ..commands.install import install
+            install()
         return result
     else:
         return False  # Issues found but not fixed

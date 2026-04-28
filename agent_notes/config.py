@@ -92,7 +92,7 @@ def _lazy_backend_attr(backend_name: str, attr_func):
     """
     def get_attr():
         try:
-            from .cli_backend import default_registry
+            from .registries.cli_registry import default_registry
             backend = default_registry().get(backend_name)
             return attr_func(backend)
         except (ImportError, KeyError):
