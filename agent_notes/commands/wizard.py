@@ -298,81 +298,76 @@ def _select_skills(step: int = 0, total: int = 0, version: str = '') -> List[str
     return selected_skills
 
 
-def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], skill_groups: Dict, registry) -> None:
-    """Print the install summary table (CLI, scope, mode, models, skills, agents, config/rules)."""
+def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], skill_groups: Dict, registry, memory_backend: str = '', memory_path: str = '') -> None:
+    """Print the confirmation summary in per-CLI format with role colors."""
     from ..services.installer import config_filename_for as _cfg_filename
+    from ..registries.model_registry import load_model_registry
+    from ..registries.role_registry import load_role_registry
 
     selected_backends = [b for b in registry.all() if b.name in clis]
+    models_registry = load_model_registry()
+    role_registry = load_role_registry()
+    role_map = {r.name: r for r in role_registry.all()}
 
-    print("\nReady to install:\n")
+    # ── Shared section ────────────────────────────────────────────────────────
+    print("")
+    scope_label = "Global" if scope == "global" else "Local"
+    print(f"  {Color.DIM}Scope{Color.NC}     {scope_label}")
+    print(f"  {Color.DIM}Mode{Color.NC}      {'Copy' if copy_mode else 'Symlink'}")
+    if memory_backend and memory_backend != "none":
+        if memory_backend == "obsidian":
+            mem_label = f"Obsidian  →  {memory_path}" if memory_path else "Obsidian"
+        else:
+            mem_label = "Local markdown"
+        print(f"  {Color.DIM}Memory{Color.NC}    {mem_label}")
 
-    # CLI
-    selected_labels = [b.label for b in selected_backends]
-    print(f"  CLI       {', '.join(selected_labels) if selected_labels else '(none)'}")
+    # ── Per-CLI sections ──────────────────────────────────────────────────────
+    rules_count = _count_rules()
+    all_grouped = {s for gs in skill_groups.values() for s in gs}
 
-    # Scope + paths
-    if scope == "global":
-        paths = [str(b.global_home) for b in selected_backends]
-        scope_desc = "Global  →  " + ",  ".join(paths) if paths else "Global"
-    else:
-        paths = [b.local_dir for b in selected_backends]
-        scope_desc = "Local  →  " + ",  ".join(paths) if paths else "Local"
-    print(f"  Scope     {scope_desc}")
+    for backend in selected_backends:
+        print(f"\n  {Color.CYAN}{backend.label}{Color.NC}")
 
-    # Mode
-    print(f"  Mode      {'Copy' if copy_mode else 'Symlink'}")
-
-    # Models (role label → model alias)
-    if role_models:
-        from ..registries.model_registry import load_model_registry
-        from ..registries.role_registry import load_role_registry
-        models_registry = load_model_registry()
-        role_registry = load_role_registry()
-        role_label_map = {r.name: r.label for r in role_registry.all()}
-        print(f"\n  Models")
-        for backend_name in sorted(role_models.keys()):
-            backend = registry.get(backend_name)
-            print(f"    {backend.label}:")
-            for role_name, model_id in sorted(role_models[backend_name].items()):
-                role_label = role_label_map.get(role_name, role_name)
+        # Agent roles
+        if backend.name in role_models and role_models[backend.name]:
+            print(f"    {Color.DIM}Agent roles:{Color.NC}")
+            for role_name, model_id in sorted(role_models[backend.name].items()):
+                role = role_map.get(role_name)
+                role_label = role.label if role else role_name
+                role_color = COLOR_MAP.get(role.color, "") if role and role.color else ""
+                colored_role = f"{role_color}{role_label}{Color.NC}" if role_color else role_label
                 try:
                     model = models_registry.get(model_id)
                     prov_alias = backend.first_alias_for(model.aliases)
                     alias = prov_alias[1] if prov_alias else model_id
-                    print(f"      {role_label:<16} {alias}")
                 except KeyError:
-                    print(f"      {role_label:<16} {model_id}")
-        print("")
+                    alias = model_id
+                print(f"      {colored_role:<28} {Color.DIM}{alias}{Color.NC}")
 
-    # Skills
-    if selected_skills:
-        skill_counts = {}
-        for group_name, group_skills in skill_groups.items():
-            count = sum(1 for skill in selected_skills if skill in group_skills)
-            if count > 0:
-                skill_counts[group_name] = count
-        skill_desc = ", ".join(f"{n.capitalize()} ({c})" for n, c in skill_counts.items()) if skill_counts else "None"
-    else:
-        skill_desc = "None"
-    print(f"  Skills    {skill_desc}")
+        # Agents count
+        if backend.supports("agents"):
+            n_agents = count_agents(backend)
+            print(f"    {Color.DIM}Agents:{Color.NC}      {n_agents}")
 
-    # Agents
-    agent_parts = []
-    for backend in selected_backends:
-        if not backend.supports("agents"):
-            continue
-        count = count_agents(backend)
-        agent_parts.append(f"{count} ({backend.label})")
-    if agent_parts:
-        print(f"  Agents    {' + '.join(agent_parts)}")
+        # Skills (shared across CLIs — show once per backend that supports them)
+        if backend.supports("skills") and selected_skills:
+            parts = []
+            for gname, gskills in skill_groups.items():
+                cnt = sum(1 for s in selected_skills if s in gskills)
+                if cnt:
+                    parts.append(f"{gname} ({cnt})")
+            ungrouped = sum(1 for s in selected_skills if s not in all_grouped)
+            if ungrouped:
+                parts.append(f"Other ({ungrouped})")
+            print(f"    {Color.DIM}Skills:{Color.NC}      {', '.join(parts) if parts else 'none'}")
 
-    # Config + Rules
-    config_files = [_cfg_filename(b) for b in selected_backends if _cfg_filename(b)]
-    if config_files:
-        print(f"  Config    {', '.join(config_files)}")
-    rules_count = _count_rules()
-    if rules_count:
-        print(f"  Rules     {rules_count} files")
+        # Config + Rules
+        cfg = _cfg_filename(backend)
+        if cfg:
+            cfg_desc = cfg
+            if rules_count:
+                cfg_desc += f" + {rules_count} rules"
+            print(f"    {Color.DIM}Config:{Color.NC}      {cfg_desc}")
 
     print("")
 
@@ -461,17 +456,8 @@ def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skill
     skill_groups = _get_skill_groups()
     registry = load_registry()
 
-    _render_install_summary(clis, scope, copy_mode, selected_skills, role_models, skill_groups, registry)
-
-    # Show memory config in summary
-    if memory_backend == "obsidian":
-        memory_label = f"Obsidian ({memory_path})" if memory_path else "Obsidian (~~/agent-memory)"
-    elif memory_backend == "none":
-        memory_label = "Disabled"
-    else:
-        memory_label = "Local markdown"
-    print(f"  Memory    {memory_label}")
-    print("")
+    _render_install_summary(clis, scope, copy_mode, selected_skills, role_models, skill_groups, registry,
+                            memory_backend=memory_backend, memory_path=memory_path)
 
     choice = _safe_input("Proceed? [Y/n]: ", "Y").lower()
     return choice != "n"
