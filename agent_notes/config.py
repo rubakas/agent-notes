@@ -47,7 +47,15 @@ def memory_dir_for_backend(backend: str, custom_path: str = "") -> Optional[Path
     if custom_path:
         return Path(custom_path).expanduser()
     if backend == "obsidian":
-        return Path.home() / "agent-memory"
+        import subprocess
+        project = "global"
+        try:
+            r = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, timeout=3)
+            if r.returncode == 0:
+                project = Path(r.stdout.strip()).name
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        return Path.home() / "Documents" / "Obsidian Vault" / "agent-notes" / project
     return MEMORY_DIR  # local default: ~/.claude/agent-memory
 
 def get_version() -> str:

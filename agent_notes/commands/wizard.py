@@ -380,6 +380,21 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     print("")
 
 
+def _detect_project_name() -> str:
+    """Return git repo name, or cwd name as fallback."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=3,
+        )
+        if result.returncode == 0:
+            return Path(result.stdout.strip()).name
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return Path.cwd().name
+
+
 def _detect_obsidian_vaults() -> List[Path]:
     """Scan common locations for Obsidian vaults (dirs containing .obsidian/)."""
     candidates = []
@@ -419,12 +434,13 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
     path = ""
 
     if backend == "obsidian":
+        project_name = _detect_project_name()
         candidates = _detect_obsidian_vaults()
         if candidates:
-            print(f"  {Color.DIM}Detected vaults (enter a subfolder path, e.g. vault/agent-memory):{Color.NC}")
+            print(f"  {Color.DIM}Detected vaults (notes go into agent-notes/{project_name}/ inside):{Color.NC}")
             for c in candidates[:3]:
-                print(f"    {c}/agent-memory")
-        default_path = str(candidates[0] / "agent-memory") if candidates else str(Path.home() / "Documents" / "Obsidian Vault" / "agent-memory")
+                print(f"    {c}/agent-notes/{project_name}")
+        default_path = str(candidates[0] / "agent-notes" / project_name) if candidates else str(Path.home() / "Documents" / "Obsidian Vault" / "agent-notes" / project_name)
         raw = _safe_input(f"  Memory folder path [{default_path}]: ", default_path)
         path = raw.strip() or default_path
 
