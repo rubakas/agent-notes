@@ -11,13 +11,13 @@ OBSIDIAN_CATEGORIES = ["Patterns", "Decisions", "Mistakes", "Context", "Sessions
 
 
 def _slug(title: str) -> str:
-    title = re.sub(r"^\d{4}-\d{2}-\d{2}[T\s]\d{2}[:\-]\d{2}[:\-]\d{2}\s*", "", title)
+    title = re.sub(r"^\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\s*", "", title)
     title = re.sub(r"^\d{4}-\d{2}-\d{2}\s*", "", title)
     return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60]
 
 
 def _now() -> str:
-    return datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    return datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
 
 def _today() -> str:
