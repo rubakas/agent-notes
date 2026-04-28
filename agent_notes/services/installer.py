@@ -12,34 +12,6 @@ from .fs import (
     remove_symlink, remove_all_symlinks_in_dir, remove_dir_if_empty,
 )
 
-# Helper to get DIST_DIR - check if the main installer module has a patched version
-def _get_dist_dir():
-    try:
-        import agent_notes.installer as installer_mod
-        return getattr(installer_mod, 'DIST_DIR', config.DIST_DIR)
-    except (ImportError, AttributeError):
-        return config.DIST_DIR
-
-def _get_dist_rules_dir():
-    try:
-        import agent_notes.installer as installer_mod
-        return getattr(installer_mod, 'DIST_RULES_DIR', config.DIST_RULES_DIR)
-    except (ImportError, AttributeError):
-        return config.DIST_RULES_DIR
-
-def _get_dist_skills_dir():
-    try:
-        import agent_notes.installer as installer_mod
-        return getattr(installer_mod, 'DIST_SKILLS_DIR', config.DIST_SKILLS_DIR)
-    except (ImportError, AttributeError):
-        return config.DIST_SKILLS_DIR
-
-def _get_agents_home():
-    try:
-        import agent_notes.installer as installer_mod
-        return getattr(installer_mod, 'AGENTS_HOME', config.AGENTS_HOME)
-    except (ImportError, AttributeError):
-        return config.AGENTS_HOME
 # Re-import the atomic helpers from install (they stay in install.py):
 # We intentionally avoid circular import by lazy-importing inside functions.
 
@@ -54,21 +26,21 @@ def dist_source_for(backend: CLIBackend, component: str) -> Optional[Path]:
     itself is named per backend.layout["config"]).
     """
     if component == "agents":
-        p = _get_dist_dir() / backend.name / "agents"
+        p = config.DIST_DIR / backend.name / "agents"
         return p if p.exists() else None
     if component == "config":
         # The config FILE lives directly under DIST_DIR / backend.name / <filename>
         # Caller resolves the filename via backend.layout["config"].
-        p = _get_dist_dir() / backend.name
+        p = config.DIST_DIR / backend.name
         return p if p.exists() else None
     if component == "rules":
-        dist_rules_dir = _get_dist_rules_dir()
+        dist_rules_dir = config.DIST_RULES_DIR
         return dist_rules_dir if dist_rules_dir.exists() else None
     if component == "skills":
-        dist_skills_dir = _get_dist_skills_dir()
+        dist_skills_dir = config.DIST_SKILLS_DIR
         return dist_skills_dir if dist_skills_dir.exists() else None
     if component == "commands":
-        p = _get_dist_dir() / backend.name / "commands"
+        p = config.DIST_DIR / backend.name / "commands"
         return p if p.exists() else None
     return None
 
@@ -110,18 +82,15 @@ def install_component_for_backend(
     copy_mode: bool,
 ) -> None:
     """Install one component for one backend. No-op if unsupported or no source."""
-    # Import installer to get potentially-mocked functions
-    import agent_notes.installer as installer_mod
-    
-    src = installer_mod.dist_source_for(backend, component)
+    src = dist_source_for(backend, component)
     if src is None:
         return
-    dst = installer_mod.target_dir_for(backend, component, scope)
+    dst = target_dir_for(backend, component, scope)
     if dst is None:
         return
 
     if component == "config":
-        filename = installer_mod.config_filename_for(backend)
+        filename = config_filename_for(backend)
         if not filename:
             return
         src_file = src / filename
@@ -154,15 +123,12 @@ def uninstall_component_for_backend(
     scope: str
 ) -> None:
     """Uninstall one component for one backend."""
-    # Import installer to get potentially-mocked functions
-    import agent_notes.installer as installer_mod
-    
-    dst = installer_mod.target_dir_for(backend, component, scope)
+    dst = target_dir_for(backend, component, scope)
     if dst is None or not dst.exists():
         return
-    
+
     if component == "config":
-        filename = installer_mod.config_filename_for(backend)
+        filename = config_filename_for(backend)
         if filename:
             config_file = dst / filename
             print(f"Removing {backend.label} config from {dst} ...")
@@ -185,16 +151,12 @@ def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = N
     
     for backend in registry.all():
         for component in COMPONENT_TYPES:
-            # Import installer to get the potentially-mocked version
-            import agent_notes.installer as installer_mod
-            installer_mod.install_component_for_backend(backend, component, scope, copy_mode)
-    
+            install_component_for_backend(backend, component, scope, copy_mode)
+
     # Universal skills mirror: keep existing behavior — also install skills
     # to ~/.agents/skills/ for any backend that supports skills, only for global scope.
     if scope == "global":
-        # Import installer to get the potentially-mocked version
-        import agent_notes.installer as installer_mod
-        installer_mod._install_universal_skills(copy_mode, registry)
+        _install_universal_skills(copy_mode, registry)
 
     # SessionStart hook for Claude Code only
     try:
@@ -207,12 +169,12 @@ def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = N
 def _install_universal_skills(copy_mode: bool, registry: CLIRegistry) -> None:
     """Mirror skills to ~/.agents/skills/ for backwards compatibility."""
     
-    dist_skills_dir = _get_dist_skills_dir()
+    dist_skills_dir = config.DIST_SKILLS_DIR
     if not dist_skills_dir.exists():
-        return []
-    
-    config.info(f"Installing universal skills...")
-    target = _get_agents_home() / "skills"
+        return
+
+    print(f"Installing universal skills ...")
+    target = config.AGENTS_HOME / "skills"
     target.mkdir(parents=True, exist_ok=True)
     skill_dirs = [d for d in dist_skills_dir.iterdir() if d.is_dir()]
     if not skill_dirs:
@@ -232,14 +194,10 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
     
     for backend in registry.all():
         for component in COMPONENT_TYPES:
-            # Import installer to get the potentially-mocked version  
-            import agent_notes.installer as installer_mod
-            installer_mod.uninstall_component_for_backend(backend, component, scope)
-    
+            uninstall_component_for_backend(backend, component, scope)
+
     if scope == "global":
-        # Import installer to get the potentially-mocked version
-        import agent_notes.installer as installer_mod
-        installer_mod._uninstall_universal_skills()
+        _uninstall_universal_skills()
 
     # Remove SessionStart hook for Claude Code only
     try:
@@ -250,8 +208,8 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
 
 
 def _uninstall_universal_skills() -> None:
-    
-    target = _get_agents_home() / "skills"
+
+    target = config.AGENTS_HOME / "skills"
     if target.exists() and any(target.iterdir()):
         print(f"Removing universal skills from {target} ...")
         remove_all_symlinks_in_dir(target)
@@ -282,7 +240,7 @@ def _install_session_hook(backend, scope: str) -> None:
 
     # Gather installed agent names from dist directory
     agents: list[str] = []
-    agents_dist = _get_dist_dir() / backend.name / backend.layout.get("agents", "agents")
+    agents_dist = config.DIST_DIR / backend.name / backend.layout.get("agents", "agents")
     if agents_dist.exists():
         agents = sorted(p.stem for p in agents_dist.glob("*.md"))
 
@@ -306,7 +264,7 @@ def install_scripts_global() -> None:
     """Install scripts to ~/.local/bin/."""
     from .fs import place_file
     
-    dist_scripts_dir = _get_dist_dir() / "scripts"
+    dist_scripts_dir = config.DIST_DIR / "scripts"
     bin_home = Path.home() / ".local" / "bin"
     
     if not dist_scripts_dir.exists():
@@ -323,7 +281,7 @@ def uninstall_scripts_global() -> None:
     """Uninstall scripts from ~/.local/bin/."""
     from .fs import remove_symlink
     
-    dist_scripts_dir = _get_dist_dir() / "scripts"
+    dist_scripts_dir = config.DIST_DIR / "scripts"
     bin_home = Path.home() / ".local" / "bin"
     
     if not dist_scripts_dir.exists():
