@@ -1,69 +1,157 @@
-#!/bin/bash
-BOLD='\033[1m'; DIM='\033[2m'; YELLOW='\033[0;33m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
+#!/usr/bin/env python3
+"""Session cost report — prices sourced from agent_notes/data/pricing.yaml."""
+import sqlite3
+from fnmatch import fnmatch
+from pathlib import Path
 
-sqlite3 -header -column ~/.local/share/opencode/opencode.db "
-WITH cs AS (SELECT id FROM session WHERE parent_id IS NULL ORDER BY time_updated DESC LIMIT 1),
-costs(pat, inp, out, cch) AS (VALUES
-  ('%haiku%',    1.00,  5.00, 0.10),
-  ('%sonnet%',   3.00, 15.00, 0.30),
-  ('%opus-4.7%', 5.00, 25.00, 0.50),
-  ('%opus-4.6%', 5.00, 25.00, 0.50),
-  ('%opus-4.5%', 5.00, 25.00, 0.50),
-  ('%opus-4.1%',15.00, 75.00, 1.50),
-  ('%opus%',    15.00, 75.00, 1.50),
-  ('%gpt-%',     2.50, 10.00, 0.50),
-  ('%o1%',       2.50, 10.00, 0.50),
-  ('%o3%',       2.50, 10.00, 0.50),
-  ('%o4%',       2.50, 10.00, 0.50)
-),
-stats AS (
-  SELECT COALESCE(json_extract(m.data,'$.agent'),'lead') as agent,
-    (SELECT json_extract(m2.data,'$.modelID') FROM message m2 WHERE m2.session_id=s.id AND json_extract(m2.data,'$.role')='assistant' ORDER BY json_extract(m2.data,'$.time.completed') DESC LIMIT 1) as model,
-    SUM(json_extract(m.data,'$.tokens.input')) as inp,
-    SUM(json_extract(m.data,'$.tokens.output')) as outp,
-    SUM(json_extract(m.data,'$.tokens.cache.read')) as cache,
-    ROUND((MAX(json_extract(m.data,'$.time.completed'))-MIN(json_extract(m.data,'$.time.created')))/1000.0,1) as sec
-  FROM session s JOIN message m ON m.session_id=s.id CROSS JOIN cs
-  WHERE (s.parent_id=cs.id OR s.id=cs.id) AND json_extract(m.data,'$.role')='assistant' GROUP BY s.id
-),
-rated AS (
-  SELECT agent, model, inp, outp, cache, sec,
-    COALESCE((SELECT c.inp FROM costs c WHERE model LIKE c.pat LIMIT 1), 3.00) as r_inp,
-    COALESCE((SELECT c.out FROM costs c WHERE model LIKE c.pat LIMIT 1), 15.00) as r_out,
-    COALESCE((SELECT c.cch FROM costs c WHERE model LIKE c.pat LIMIT 1), 0.30) as r_cch
-  FROM stats
-)
-SELECT agent||'('||model||')' as 'agent(model)',
-  inp||'/'||outp||'/'||cache as 'in/out/cache',
-  sec||'s' as time,
-  '\$'||ROUND((inp*r_inp + outp*r_out + cache*r_cch)/1e6, 4) as actual,
-  '\$'||ROUND((inp*5.0 + outp*25.0 + cache*0.50)/1e6, 4) as 'vs Opus 4.7'
-FROM rated
-UNION ALL
-SELECT 'TOTAL (saved '||ROUND((1.0-SUM(inp*r_inp+outp*r_out+cache*r_cch)/SUM(inp*5.0+outp*25.0+cache*0.50))*100,0)||'%)',
-  SUM(inp)||'/'||SUM(outp)||'/'||SUM(cache),
-  MAX(sec)||'s parallel / '||CAST(CAST(SUM(sec) AS INT) AS TEXT)||'s sequential',
-  '\$'||ROUND(SUM(inp*r_inp+outp*r_out+cache*r_cch)/1e6, 4),
-  '\$'||ROUND(SUM(inp*5.0+outp*25.0+cache*0.50)/1e6, 4)
-FROM rated" | awk -v BOLD="$BOLD" -v DIM="$DIM" -v YELLOW="$YELLOW" -v GREEN="$GREEN" -v CYAN="$CYAN" -v NC="$NC" '
-NR == 1 { print BOLD $0 NC; next }
-NR == 2 { print DIM $0 NC; next }
-/^TOTAL/ {
-  # Extract actual cost from 4th last space-delimited token
-  split($0, parts, /\$/)
-  actual = parts[2]+0
-  if (actual > 5) col = YELLOW
-  else col = GREEN
-  print col BOLD $0 NC NC
-  next
-}
-{
-  # Color agent name by model tier
-  if ($0 ~ /opus/) col = YELLOW
-  else if ($0 ~ /sonnet/) col = CYAN
-  else col = DIM
-  # Print first "word" (agent+model) in color, rest normal
-  match($0, /^[^ ]+/)
-  print col substr($0,1,RLENGTH) NC substr($0,RLENGTH+1)
-}
-'
+BOLD = "\033[1m"
+DIM = "\033[2m"
+YELLOW = "\033[0;33m"
+GREEN = "\033[0;32m"
+CYAN = "\033[0;36m"
+NC = "\033[0m"
+
+PRICING = {{PRICING}}
+
+DB = Path.home() / ".local/share/opencode/opencode.db"
+
+SQL = """
+WITH cs AS (SELECT id FROM session WHERE parent_id IS NULL ORDER BY time_updated DESC LIMIT 1)
+SELECT
+  COALESCE(json_extract(m.data,'$.agent'), 'lead') AS agent,
+  (SELECT json_extract(m2.data,'$.modelID') FROM message m2
+   WHERE m2.session_id = s.id AND json_extract(m2.data,'$.role') = 'assistant'
+   ORDER BY json_extract(m2.data,'$.time.completed') DESC LIMIT 1) AS model,
+  SUM(json_extract(m.data,'$.tokens.input'))       AS inp,
+  SUM(json_extract(m.data,'$.tokens.output'))      AS outp,
+  SUM(json_extract(m.data,'$.tokens.cache.read'))  AS cache,
+  ROUND((MAX(json_extract(m.data,'$.time.completed'))
+       - MIN(json_extract(m.data,'$.time.created'))) / 1000.0, 1) AS sec
+FROM session s
+JOIN message m ON m.session_id = s.id
+CROSS JOIN cs
+WHERE (s.parent_id = cs.id OR s.id = cs.id)
+  AND json_extract(m.data,'$.role') = 'assistant'
+GROUP BY s.id
+"""
+
+
+def _build_price_table() -> list[tuple[list[str], dict]]:
+    rows = []
+    for provider in PRICING.get("providers", []):
+        for model in provider.get("models", []):
+            patterns = model["match"] if isinstance(model["match"], list) else [model["match"]]
+            rows.append((patterns, model["price"]))
+    return rows
+
+
+_PRICE_TABLE = _build_price_table()
+_BASELINE = PRICING["baseline"]["price"]
+_BASELINE_LABEL = PRICING["baseline"]["label"]
+
+
+def get_price(model_id: str) -> dict:
+    for patterns, price in _PRICE_TABLE:
+        if any(fnmatch(model_id, p) for p in patterns):
+            return price
+    return {"in": 3.00, "out": 15.00, "cache": 0.30}
+
+
+def calculate_cost(model_id: str, inp: int, outp: int, cache: int) -> float:
+    p = get_price(model_id)
+    return (inp * p["in"] + outp * p["out"] + cache * p["cache"]) / 1_000_000
+
+
+def baseline_cost(inp: int, outp: int, cache: int) -> float:
+    p = _BASELINE
+    return (inp * p["in"] + outp * p["out"] + cache * p["cache"]) / 1_000_000
+
+
+def tier_color(model_id: str) -> str:
+    if "opus" in model_id:
+        return YELLOW
+    if "sonnet" in model_id:
+        return CYAN
+    return DIM
+
+
+def fmt_tokens(inp, outp, cache) -> str:
+    return f"{inp}/{outp}/{cache}"
+
+
+def fmt_cost(c: float) -> str:
+    return f"${c:.4f}"
+
+
+def main() -> None:
+    if not DB.exists():
+        print(f"Database not found: {DB}")
+        return
+
+    rows = sqlite3.connect(DB).execute(SQL).fetchall()
+    if not rows:
+        print("No sessions found.")
+        return
+
+    records = [
+        (agent, model or "unknown", inp or 0, outp or 0, cache or 0, sec or 0)
+        for agent, model, inp, outp, cache, sec in rows
+    ]
+
+    costs = [
+        (agent, model, inp, outp, cache, sec,
+         calculate_cost(model, inp, outp, cache),
+         baseline_cost(inp, outp, cache))
+        for agent, model, inp, outp, cache, sec in records
+    ]
+
+    agent_col_w = max(len(f"{a}({m})") for a, m, *_ in costs) + 2
+    tok_col_w   = max(len(fmt_tokens(i, o, c)) for _, _, i, o, c, *_ in costs) + 2
+    W = (agent_col_w, tok_col_w, 10, 12, 12)
+
+    header = (
+        f"{'agent(model)':<{W[0]}}"
+        f" {'in/out/cache':<{W[1]}}"
+        f" {'time':<{W[2]}}"
+        f" {'actual':<{W[3]}}"
+        f" {f'vs {_BASELINE_LABEL}':<{W[4]}}"
+    )
+    print(BOLD + header + NC)
+    print(DIM + "-" * len(header) + NC)
+
+    total_inp = total_outp = total_cache = 0
+    total_actual = total_vs = max_sec = total_sec = 0.0
+
+    for agent, model, inp, outp, cache, sec, actual, vs in costs:
+        label = f"{agent}({model})"
+        time_str = f"{sec}s"
+        col = tier_color(model)
+        print(
+            col + f"{label:<{W[0]}}" + NC
+            + f" {fmt_tokens(inp, outp, cache):<{W[1]}}"
+            + f" {time_str:<{W[2]}}"
+            + f" {fmt_cost(actual):<{W[3]}}"
+            + f" {fmt_cost(vs):<{W[4]}}"
+        )
+        total_inp += inp; total_outp += outp; total_cache += cache
+        total_actual += actual; total_vs += vs
+        max_sec = max(max_sec, sec)
+        total_sec += sec
+
+    saved_pct = round((1 - total_actual / total_vs) * 100) if total_vs else 0
+    total_label = f"TOTAL (saved {saved_pct}%)"
+    total_time = f"{max_sec}s / {int(total_sec)}s seq"
+    col = GREEN if total_actual <= 5 else YELLOW
+    print(
+        col + BOLD
+        + f"{total_label:<{W[0]}}"
+        + f" {fmt_tokens(total_inp, total_outp, total_cache):<{W[1]}}"
+        + f" {total_time:<{W[2]}}"
+        + f" {fmt_cost(total_actual):<{W[3]}}"
+        + f" {fmt_cost(total_vs):<{W[4]}}"
+        + NC
+    )
+
+
+if __name__ == "__main__":
+    main()

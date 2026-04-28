@@ -57,19 +57,29 @@ def copy_skills() -> list[Path]:
 
 
 def copy_scripts() -> list[Path]:
-    """Copy script files to dist/scripts/."""
-    from ..config import SCRIPTS_DIR, DIST_SCRIPTS_DIR
+    """Copy script files to dist/scripts/, embedding pricing data from pricing.yaml."""
+    import json
+    from ..config import SCRIPTS_DIR, DIST_SCRIPTS_DIR, DATA_DIR
 
     if not SCRIPTS_DIR.exists():
         return []
     if DIST_SCRIPTS_DIR.exists():
         shutil.rmtree(DIST_SCRIPTS_DIR)
     DIST_SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    pricing_path = DATA_DIR / "pricing.yaml"
+    pricing_json = "null"
+    if pricing_path.exists():
+        pricing_json = json.dumps(yaml.safe_load(pricing_path.read_text()), indent=2)
+
     copied = []
     for script in SCRIPTS_DIR.iterdir():
         if script.is_file():
+            content = script.read_text()
+            if "{{PRICING}}" in content:
+                content = content.replace("{{PRICING}}", pricing_json)
             dest = DIST_SCRIPTS_DIR / script.name
-            shutil.copy2(script, dest)
+            dest.write_text(content)
             dest.chmod(0o755)
             copied.append(dest)
     return copied
