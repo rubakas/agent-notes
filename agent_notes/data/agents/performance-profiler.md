@@ -41,4 +41,10 @@ End with a summary: total findings count by impact level, top 3 quick wins, and 
 
 ## Memory
 
-Update your agent memory with project-specific performance context: known bottlenecks, caching strategy, infrastructure constraints.
+When you discover project-specific patterns, decisions, or conventions worth preserving, save them with:
+
+```bash
+agent-notes memory add "<title>" "<body>" [type] [agent]
+```
+
+Types: `pattern`, `decision`, `mistake`, `context`. Agent: your agent name (e.g. `coder`). The CLI routes to the configured backend (Obsidian, local files, etc.) automatically — do not write files directly.

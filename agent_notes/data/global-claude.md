@@ -12,7 +12,7 @@ Stop and think. Do NOT touch any tool until you complete this analysis internall
 
 - What is the user actually asking for? Restate it in your own words.
 - Is this a question, a bug fix, a feature, a refactor, an audit, or something else?
-- Is anything ambiguous? If yes, ask ONE clarifying question and stop. Do not guess.
+- Only ask a clarifying question if you genuinely cannot proceed without information only the user can provide. If you can make a reasonable assumption, state it in the plan and proceed.
 - What does "done" look like? Define the acceptance criteria before you start.
 
 ### 2. Assess scope
@@ -179,87 +179,6 @@ For every agent result, make an explicit decision: **APPROVE** or **REJECT**.
 
 Only after all checks pass and all agents are APPROVED, present the final result to the user.
 
-## Cost reporting
-
-**MANDATORY**: You MUST run the cost report query below and include the results at the END of every response to the user. No exceptions. Whether you delegated to agents or did the work yourself, always end with the cost table.
-
-Run this query silently (do not show the SQL) and include the results table in your response:
-
-```bash
-sqlite3 -header -column ~/.local/share/opencode/opencode.db "
-WITH cs AS (SELECT id FROM session WHERE parent_id IS NULL ORDER BY time_created DESC LIMIT 1),
-conv_start AS (
-  SELECT COALESCE(
-    (SELECT json_extract(m2.data,'$.time.created')
-     FROM message m1 JOIN message m2 ON m1.session_id=m2.session_id
-     WHERE m1.session_id=(SELECT id FROM cs)
-       AND json_extract(m2.data,'$.time.created') > json_extract(m1.data,'$.time.created')
-       AND json_extract(m2.data,'$.time.created') - json_extract(m1.data,'$.time.created') > 1800000
-       AND NOT EXISTS (
-         SELECT 1 FROM message mx WHERE mx.session_id=m1.session_id
-           AND json_extract(mx.data,'$.time.created') > json_extract(m1.data,'$.time.created')
-           AND json_extract(mx.data,'$.time.created') < json_extract(m2.data,'$.time.created'))
-     ORDER BY json_extract(m1.data,'$.time.created') DESC LIMIT 1),
-    0) as start_ts
-),
-stats AS (
-  SELECT COALESCE(json_extract(m.data,'$.agent'),'lead') as agent,
-    (SELECT json_extract(m2.data,'$.modelID') FROM message m2 WHERE m2.session_id=s.id AND json_extract(m2.data,'$.role')='assistant' ORDER BY json_extract(m2.data,'$.time.completed') DESC LIMIT 1) as model,
-    SUM(json_extract(m.data,'$.tokens.input')) as inp, SUM(json_extract(m.data,'$.tokens.output')) as outp,
-    SUM(json_extract(m.data,'$.tokens.cache.read')) as cache,
-    ROUND(SUM(CASE WHEN json_extract(m.data,'$.time.completed') IS NOT NULL AND json_extract(m.data,'$.time.created') IS NOT NULL THEN (json_extract(m.data,'$.time.completed')-json_extract(m.data,'$.time.created'))/1000.0 ELSE 0 END),1) as sec
-  FROM session s JOIN message m ON m.session_id=s.id CROSS JOIN cs CROSS JOIN conv_start
-  WHERE (s.parent_id=cs.id OR s.id=cs.id) AND json_extract(m.data,'$.role')='assistant'
-    AND json_extract(m.data,'$.time.created') >= conv_start.start_ts
-    AND (s.time_created >= conv_start.start_ts OR s.id=(SELECT id FROM cs))
-  GROUP BY s.id)
-SELECT agent||'('||model||')' as 'agent(model)',
-  inp||'/'||outp||'/'||cache as 'in/out/cache',
-  sec||'s' as time,
-  '\$'||ROUND(CASE
-    WHEN model LIKE '%haiku%' THEN inp*1.00/1e6+outp*5.0/1e6+cache*0.10/1e6
-    WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
-    WHEN model LIKE '%opus-4.7%' OR model LIKE '%opus-4.6%' OR model LIKE '%opus-4.5%' THEN inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6
-    WHEN model LIKE '%opus%' THEN inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6
-    WHEN model LIKE 'gpt-%' OR model LIKE 'o1%' OR model LIKE 'o3%' OR model LIKE 'o4%' THEN inp*2.50/1e6+outp*10.0/1e6+cache*0.50/1e6
-    ELSE inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6 END,4) as actual,
-  '\$'||ROUND(inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6,4) as 'vs Opus 4.7'
-FROM stats
-UNION ALL
-SELECT 'TOTAL (saved '||ROUND((1.0-SUM(CASE
-    WHEN model LIKE '%haiku%' THEN inp*1.00/1e6+outp*5.0/1e6+cache*0.10/1e6
-    WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
-    WHEN model LIKE '%opus-4.7%' OR model LIKE '%opus-4.6%' OR model LIKE '%opus-4.5%' THEN inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6
-    WHEN model LIKE '%opus%' THEN inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6
-    WHEN model LIKE 'gpt-%' OR model LIKE 'o1%' OR model LIKE 'o3%' OR model LIKE 'o4%' THEN inp*2.50/1e6+outp*10.0/1e6+cache*0.50/1e6
-    ELSE inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6 END)/SUM(inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6))*100,0)||'%)',
-  SUM(inp)||'/'||SUM(outp)||'/'||SUM(cache),
-  MAX(sec)||'s parallel / '||CAST(CAST(SUM(sec) AS INT) AS TEXT)||'s sequential',
-  '\$'||ROUND(SUM(CASE
-    WHEN model LIKE '%haiku%' THEN inp*1.00/1e6+outp*5.0/1e6+cache*0.10/1e6
-    WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
-    WHEN model LIKE '%opus-4.7%' OR model LIKE '%opus-4.6%' OR model LIKE '%opus-4.5%' THEN inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6
-    WHEN model LIKE '%opus%' THEN inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6
-    WHEN model LIKE 'gpt-%' OR model LIKE 'o1%' OR model LIKE 'o3%' OR model LIKE 'o4%' THEN inp*2.50/1e6+outp*10.0/1e6+cache*0.50/1e6
-    ELSE inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6 END),4),
-  '\$'||ROUND(SUM(inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6),4)
-FROM stats" 2>/dev/null || echo "DB not available"
-```
-
-Present the query output as a table. Always prefix the table with the label:
-
-**Session cost** (cumulative for the entire conversation, not just the last request):
-
-Column descriptions:
-- `agent(model)` — agent name and model used
-- `in/out/cache` — input, output, and cache-read tokens
-- `time` — wall-clock time for that agent
-- `actual` — estimated cost based on the model's pricing
-- `vs Opus 4.7` — what the same tokens would cost on Opus 4.7 (baseline for savings calculation)
-- TOTAL row — aggregate cost, savings % vs all-Opus, and parallel vs sequential wall time
-
----
-
 ## Coding philosophy
 
 - Read existing code before writing new code. Match project patterns.
@@ -272,7 +191,7 @@ Column descriptions:
 - Investigate before answering. Never speculate about code you haven't read.
 - No over-engineering: no extra features, abstractions, or configs beyond scope.
 - No comments or docs on code you didn't change.
-- When the task is unclear, ask one clarifying question instead of guessing.
+- When the task is genuinely unclear and you cannot make a reasonable assumption, ask one clarifying question instead of guessing.
 
 ## Safety
 
