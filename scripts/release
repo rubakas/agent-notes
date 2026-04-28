@@ -182,20 +182,38 @@ git push origin develop
 git push origin "v$new_version"
 ok "All branches and tags pushed"
 
-# Create GitHub release
+# Build Python package
+info "Building Python package..."
+rm -rf dist_pkg/
+if ! pipx run build --outdir dist_pkg/ > /dev/null 2>&1; then
+  error "Python package build failed. Run 'pipx run build --outdir dist_pkg/' to see details."
+fi
+ok "Package built: $(ls dist_pkg/)"
+
+# Create GitHub release with wheel attached
 info "Creating GitHub release..."
 if release_url=$(gh release create "v$new_version" \
   --title "Release $new_version" \
   --generate-notes \
-  --target main); then
+  --target main \
+  dist_pkg/*.whl dist_pkg/*.tar.gz); then
   ok "GitHub release created"
 else
   warn "GitHub release creation failed. Create manually at: https://github.com/rubakas/agent-notes/releases/new"
 fi
 
+# Publish to PyPI
+info "Publishing to PyPI..."
+if pipx run twine upload dist_pkg/*; then
+  ok "Published to PyPI"
+else
+  warn "PyPI upload failed. Run 'pipx run twine upload dist_pkg/*' manually."
+  warn "Ensure TWINE_USERNAME=__token__ and TWINE_PASSWORD=<pypi-token> are set."
+fi
+
 # Print summary
 echo
-info "🎉 Release $new_version completed successfully!"
+info "Release $new_version completed successfully!"
 echo
 echo "Summary:"
 echo "  Previous version: $current_version"
