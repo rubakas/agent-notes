@@ -380,16 +380,73 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     print("")
 
 
-def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], version: str = '') -> bool:
-    """Step 6: Confirmation."""
+def _detect_obsidian_vaults() -> List[Path]:
+    """Scan common locations for Obsidian vaults (dirs containing .obsidian/)."""
+    candidates = []
+    search_roots = [Path.home() / "Documents", Path.home() / "Desktop", Path.home()]
+    for root in search_roots:
+        if not root.exists():
+            continue
+        for d in root.iterdir():
+            if d.is_dir() and (d / ".obsidian").exists():
+                candidates.append(d)
+    return candidates[:5]
+
+
+def _select_memory(step: int, total: int, version: str = '') -> tuple:
+    """Step N: choose memory backend. Returns (backend, path)."""
+    from ..config import Color
+
+    options = [
+        ("Local markdown files  (~/.claude/agent-memory/)", "local"),
+        ("Obsidian vault", "obsidian"),
+        ("None  (disable memory)", "none"),
+    ]
+
+    if _can_interactive():
+        backend = _radio_select("How should agents store memory?", options, default=0,
+                                step=step, total=total, version=version)
+    else:
+        backend = _radio_select_fallback("How should agents store memory?", options, default=0,
+                                         step=step, total=total, version=version)
+
+    path = ""
+
+    if backend == "obsidian":
+        candidates = _detect_obsidian_vaults()
+        if candidates:
+            print(f"  {Color.DIM}Detected Obsidian vaults:{Color.NC}")
+            for c in candidates[:3]:
+                print(f"    {c}")
+        default_path = str(candidates[0]) if candidates else str(Path.home() / "agent-memory")
+        raw = _safe_input(f"  Vault path [{default_path}]: ", default_path)
+        path = raw.strip() or default_path
+
+    label = {"local": "Local markdown", "obsidian": f"Obsidian ({path})", "none": "Disabled"}[backend]
+    print(f"  {Color.GREEN}✓{Color.NC} Memory: {label}")
+    return backend, path
+
+
+def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], version: str = '', memory_backend: str = 'local', memory_path: str = '') -> bool:
+    """Step 7: Confirmation."""
     from ..services.ui import _clear_screen, _render_step_header
     from ..registries.cli_registry import load_registry
     _clear_screen()
-    _render_step_header(6, 6, version)
+    _render_step_header(7, 7, version)
     skill_groups = _get_skill_groups()
     registry = load_registry()
 
     _render_install_summary(clis, scope, copy_mode, selected_skills, role_models, skill_groups, registry)
+
+    # Show memory config in summary
+    if memory_backend == "obsidian":
+        memory_label = f"Obsidian ({memory_path})" if memory_path else "Obsidian (~~/agent-memory)"
+    elif memory_backend == "none":
+        memory_label = "Disabled"
+    else:
+        memory_label = "Local markdown"
+    print(f"  Memory    {memory_label}")
+    print("")
 
     choice = _safe_input("Proceed? [Y/n]: ", "Y").lower()
     return choice != "n"
@@ -486,7 +543,7 @@ def interactive_install() -> None:
     n_skills = count_skills()
     n_rules = _count_rules()
 
-    TOTAL_STEPS = 6
+    TOTAL_STEPS = 7
 
     _clear_screen()
     print(f"\n  {Color.BOLD}AgentNotes{Color.NC} {Color.CYAN}v{version}{Color.NC}")
@@ -512,8 +569,12 @@ def interactive_install() -> None:
     # Step 5: Skill selection
     selected_skills = _select_skills(step=5, total=TOTAL_STEPS, version=version)
 
-    # Step 6: Confirmation
-    if not _confirm_install(clis, scope, copy_mode, selected_skills, role_models, version=version):
+    # Step 6: Memory backend
+    memory_backend, memory_path = _select_memory(step=6, total=TOTAL_STEPS, version=version)
+
+    # Step 7: Confirmation
+    if not _confirm_install(clis, scope, copy_mode, selected_skills, role_models, version=version,
+                            memory_backend=memory_backend, memory_path=memory_path):
         print("Installation cancelled.")
         return
 
@@ -580,6 +641,7 @@ def interactive_install() -> None:
 
     # Write state.json
     from .. import install_state
+    from ..domain.state import MemoryConfig
     project_path = Path.cwd() if scope == "local" else None
     try:
         st = install_state.build_install_state(
@@ -590,6 +652,7 @@ def interactive_install() -> None:
             role_models=role_models,
             selected_clis=set(clis),
         )
+        st.memory = MemoryConfig(backend=memory_backend, path=memory_path)
         install_state.record_install_state(st)
     except Exception as e:
         print(f"{Color.YELLOW}Warning: failed to write state.json: {e}{Color.NC}")

@@ -6,6 +6,12 @@ from typing import Optional
 
 
 @dataclass
+class MemoryConfig:
+    backend: str = "local"   # "obsidian" | "local" | "none"
+    path: str = ""           # vault root (obsidian) or memory dir (local). empty = use default
+
+
+@dataclass
 class InstalledItem:
     sha: str
     target: str
@@ -37,3 +43,4 @@ class State:
     source_commit: str = ""
     global_install: Optional[ScopeState] = None         # JSON key is "global"
     local_installs: dict[str, ScopeState] = field(default_factory=dict)  # JSON key is "local"
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
