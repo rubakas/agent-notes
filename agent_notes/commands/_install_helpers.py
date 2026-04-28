@@ -23,18 +23,10 @@ def install_scripts_global() -> None:
     _service_impl()
 
 
-def install_skills_global(copy_mode: bool = False) -> None:
-    """Install skills globally."""
-    # Import from shim to enable DIST_SKILLS_DIR patching, but read HOME dirs from config
-    from .. import install as _shim
-    from .. import config
-    
-    dist_skills_dir = _shim.DIST_SKILLS_DIR
+def _install_skills_to(targets: List[Path], dist_skills_dir: Path, copy_mode: bool) -> None:
+    """Install skills from dist_skills_dir to each directory in targets."""
     if not dist_skills_dir.exists():
         return
-    
-    # Read HOME directories from config at call time to pick up test patches
-    targets = [config.CLAUDE_HOME / "skills", config.OPENCODE_HOME / "skills", config.AGENTS_HOME / "skills"]
     for target_dir in targets:
         print(f"Installing skills to {target_dir} ...")
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -43,19 +35,19 @@ def install_skills_global(copy_mode: bool = False) -> None:
                 place_file(skill_dir, target_dir / skill_dir.name, copy_mode)
 
 
+def install_skills_global(copy_mode: bool = False) -> None:
+    """Install skills globally."""
+    from .. import install as _shim
+    from .. import config
+    targets = [config.CLAUDE_HOME / "skills", config.OPENCODE_HOME / "skills", config.AGENTS_HOME / "skills"]
+    _install_skills_to(targets, _shim.DIST_SKILLS_DIR, copy_mode)
+
+
 def install_skills_local(copy_mode: bool = False) -> None:
     """Install skills locally."""
     import agent_notes.install as _shim
-    
-    if not _shim.DIST_SKILLS_DIR.exists():
-        return
     targets = [Path(".claude/skills"), Path(".opencode/skills")]
-    for target_dir in targets:
-        print(f"Installing skills to {target_dir} ...")
-        target_dir.mkdir(parents=True, exist_ok=True)
-        for skill_dir in sorted(_shim.DIST_SKILLS_DIR.iterdir()):
-            if skill_dir.is_dir():
-                _shim.place_file(skill_dir, target_dir / skill_dir.name, copy_mode)
+    _install_skills_to(targets, _shim.DIST_SKILLS_DIR, copy_mode)
 
 
 def install_agents_global(copy_mode: bool = False) -> None:
@@ -135,72 +127,73 @@ def uninstall_scripts_global() -> None:
     _service_impl()
 
 
-def uninstall_skills_global() -> None:
-    """Uninstall skills globally."""
-    from .. import install as _shim
-    from .. import config
-    
-    targets = [config.CLAUDE_HOME / "skills", config.OPENCODE_HOME / "skills", config.AGENTS_HOME / "skills"]
+def _uninstall_skills_from(targets: List[Path]) -> None:
+    """Remove skills from each directory in targets."""
     for target_dir in targets:
         if target_dir.exists():
             print(f"Removing skills from {target_dir} ...")
             remove_all_symlinks_in_dir(target_dir)
             remove_dir_if_empty(target_dir)
+
+
+def uninstall_skills_global() -> None:
+    """Uninstall skills globally."""
+    from .. import config
+    targets = [config.CLAUDE_HOME / "skills", config.OPENCODE_HOME / "skills", config.AGENTS_HOME / "skills"]
+    _uninstall_skills_from(targets)
 
 
 def uninstall_skills_local() -> None:
     """Uninstall skills locally."""
-    targets = [Path(".claude/skills"), Path(".opencode/skills")]
-    for target_dir in targets:
-        if target_dir.exists():
-            print(f"Removing skills from {target_dir} ...")
-            remove_all_symlinks_in_dir(target_dir)
-            remove_dir_if_empty(target_dir)
+    _uninstall_skills_from([Path(".claude/skills"), Path(".opencode/skills")])
 
 
-def uninstall_agents_global() -> None:
-    """Uninstall agents globally."""
-    from .. import install as _shim
-    from .. import config
-    
-    for label, agents_dir in [("Claude Code", config.CLAUDE_HOME / "agents"), ("OpenCode", config.OPENCODE_HOME / "agents")]:
-        print(f"Removing {label} agents from {agents_dir} ...")
-        remove_all_symlinks_in_dir(agents_dir)
-        remove_dir_if_empty(agents_dir)
-
-
-def uninstall_agents_local() -> None:
-    """Uninstall agents locally."""
-    for agents_dir in [Path(".claude/agents"), Path(".opencode/agents")]:
+def _uninstall_agents_from(dirs: List[Path]) -> None:
+    """Remove agent symlinks from each directory in dirs."""
+    for agents_dir in dirs:
         print(f"Removing agents from {agents_dir} ...")
         remove_all_symlinks_in_dir(agents_dir)
         remove_dir_if_empty(agents_dir)
 
 
-def uninstall_rules_global() -> None:
-    """Uninstall global config and rules."""
-    from .. import install as _shim
+def uninstall_agents_global() -> None:
+    """Uninstall agents globally."""
     from .. import config
-    
-    print("Removing global config ...")
-    remove_symlink(config.CLAUDE_HOME / "CLAUDE.md")
-    remove_symlink(config.OPENCODE_HOME / "AGENTS.md")
-    remove_symlink(config.GITHUB_HOME / "copilot-instructions.md")
-    rules_dir = config.CLAUDE_HOME / "rules"
+    _uninstall_agents_from([config.CLAUDE_HOME / "agents", config.OPENCODE_HOME / "agents"])
+
+
+def uninstall_agents_local() -> None:
+    """Uninstall agents locally."""
+    _uninstall_agents_from([Path(".claude/agents"), Path(".opencode/agents")])
+
+
+def _uninstall_rules_from(config_symlinks: List[Path], rules_dir: Path, label: str) -> None:
+    """Remove config symlinks and rules directory."""
+    print(label)
+    for symlink in config_symlinks:
+        remove_symlink(symlink)
     if rules_dir.exists():
         remove_all_symlinks_in_dir(rules_dir)
         remove_dir_if_empty(rules_dir)
+
+
+def uninstall_rules_global() -> None:
+    """Uninstall global config and rules."""
+    from .. import config
+    _uninstall_rules_from(
+        [config.CLAUDE_HOME / "CLAUDE.md", config.OPENCODE_HOME / "AGENTS.md", config.GITHUB_HOME / "copilot-instructions.md"],
+        config.CLAUDE_HOME / "rules",
+        "Removing global config ...",
+    )
 
 
 def uninstall_rules_local() -> None:
     """Uninstall local config and rules."""
-    print("Removing project rules ...")
-    remove_symlink(Path("./CLAUDE.md"))
-    remove_symlink(Path("./AGENTS.md"))
-    rules_dir = Path(".claude/rules")
-    if rules_dir.exists():
-        remove_all_symlinks_in_dir(rules_dir)
-        remove_dir_if_empty(rules_dir)
+    _uninstall_rules_from(
+        [Path("./CLAUDE.md"), Path("./AGENTS.md")],
+        Path(".claude/rules"),
+        "Removing project rules ...",
+    )
 
 
 def count_scripts() -> int:

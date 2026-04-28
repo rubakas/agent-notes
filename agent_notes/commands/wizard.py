@@ -25,19 +25,19 @@ _ROLE_COLOR_MAP = {
 
 def _get_skill_groups() -> Dict[str, List[str]]:
     """Get skill names grouped by technology."""
-    from .. import wizard as parent_module
-    
+    from ..config import DIST_SKILLS_DIR
+
     # For testing, allow bypassing the registry
     import os
     if os.environ.get('_WIZARD_TEST_MODE'):
-        if not parent_module.DIST_SKILLS_DIR.exists():
+        if not DIST_SKILLS_DIR.exists():
             return {}
-        all_skills = [d.name for d in parent_module.DIST_SKILLS_DIR.iterdir() if d.is_dir()]
+        all_skills = [d.name for d in DIST_SKILLS_DIR.iterdir() if d.is_dir()]
     else:
         try:
             from ..registries import default_skill_registry
             registry = default_skill_registry()
-            
+
             # If the registry has per-skill grouping (skill.group field), use it.
             # If every skill falls into "uncategorized" (the default), fall through
             # to the hardcoded prefix-based grouping below so the wizard still
@@ -58,10 +58,9 @@ def _get_skill_groups() -> Dict[str, List[str]]:
                 all_skills = [skill.name for skill in registry.all()]
         except Exception:
             # Fallback to old behavior if registry fails
-            from .. import wizard as _shim
-            if not _shim.DIST_SKILLS_DIR.exists():
+            if not DIST_SKILLS_DIR.exists():
                 return {}
-            all_skills = [d.name for d in _shim.DIST_SKILLS_DIR.iterdir() if d.is_dir()]
+            all_skills = [d.name for d in DIST_SKILLS_DIR.iterdir() if d.is_dir()]
     
     # Hardcoded grouping for backward compatibility
     groups = {
@@ -76,14 +75,14 @@ def _get_skill_groups() -> Dict[str, List[str]]:
 
 def _count_rules() -> int:
     """Count rule files."""
-    from .. import wizard as parent_module
-    
+    from ..config import DIST_RULES_DIR
+
     # For testing, allow bypassing the registry
     import os
     if os.environ.get('_WIZARD_TEST_MODE'):
-        if not parent_module.DIST_RULES_DIR.exists():
+        if not DIST_RULES_DIR.exists():
             return 0
-        return len(list(parent_module.DIST_RULES_DIR.glob("*.md")))
+        return len(list(DIST_RULES_DIR.glob("*.md")))
     else:
         try:
             from ..registries import default_rule_registry
@@ -91,9 +90,9 @@ def _count_rules() -> int:
             return len(registry.all())
         except Exception:
             # Fallback to old behavior if registry fails
-            if not parent_module.DIST_RULES_DIR.exists():
+            if not DIST_RULES_DIR.exists():
                 return 0
-            return len(list(parent_module.DIST_RULES_DIR.glob("*.md")))
+            return len(list(DIST_RULES_DIR.glob("*.md")))
 
 
 def _select_cli(step: int = 0, total: int = 0, version: str = '') -> Set[str]:
@@ -306,20 +305,14 @@ def _select_skills(step: int = 0, total: int = 0, version: str = '') -> List[str
     return selected_skills
 
 
-def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], version: str = '') -> bool:
-    """Step 6: Confirmation."""
-    from ..services.ui import _clear_screen, _render_step_header
+def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], skill_groups: Dict, registry) -> None:
+    """Print the install summary table (CLI, scope, mode, models, skills, agents, config/rules)."""
+    from .. import installer as _installer
     from .. import wizard as _shim
-    _clear_screen()
-    _render_step_header(6, 6, version)
-    skill_groups = _shim._get_skill_groups()
+
+    selected_backends = [b for b in registry.all() if b.name in clis]
 
     print("\nReady to install:\n")
-
-    from ..cli_backend import load_registry
-    from .. import installer as _installer
-    registry = load_registry()
-    selected_backends = [b for b in registry.all() if b.name in clis]
 
     # CLI
     selected_labels = [b.label for b in selected_backends]
@@ -390,7 +383,20 @@ def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skill
         print(f"  Rules     {rules_count} files")
 
     print("")
+
+
+def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], version: str = '') -> bool:
+    """Step 6: Confirmation."""
+    from ..services.ui import _clear_screen, _render_step_header
     from .. import wizard as _shim
+    from ..cli_backend import load_registry
+    _clear_screen()
+    _render_step_header(6, 6, version)
+    skill_groups = _shim._get_skill_groups()
+    registry = load_registry()
+
+    _render_install_summary(clis, scope, copy_mode, selected_skills, role_models, skill_groups, registry)
+
     choice = _shim._safe_input("Proceed? [Y/n]: ", "Y").lower()
     return choice != "n"
 
