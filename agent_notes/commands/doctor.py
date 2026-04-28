@@ -79,9 +79,8 @@ def diagnose(scope: str, fix: bool = False) -> bool:
     check_missing_files(scope, issues, fix_actions)
     check_content_drift(scope, issues, fix_actions)
     
-    # Build freshness check (scope-independent) - call through shim for test compatibility
-    from .. import doctor as _shim
-    _shim.check_build_freshness(issues, fix_actions)
+    # Build freshness check (scope-independent)
+    check_build_freshness(issues, fix_actions)
 
     # SessionStart hook check (Claude Code only)
     _check_session_hook(scope, issues)
