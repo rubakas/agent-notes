@@ -206,13 +206,16 @@ class TestLoadModelRegistry:
         """Test loading the default registry returns 4 models."""
         registry = load_model_registry()
         
-        # Should have 5 claude models
-        assert len(registry.all()) == 5
+        # Should have 8 claude models (current + legacy)
+        assert len(registry.all()) == 8
         ids = registry.ids()
         assert "claude-haiku-4-5" in ids
+        assert "claude-opus-4-1" in ids
+        assert "claude-opus-4-5" in ids
         assert "claude-opus-4-6" in ids
         assert "claude-opus-4-7" in ids
         assert "claude-sonnet-4" in ids
+        assert "claude-sonnet-4-5" in ids
         assert "claude-sonnet-4-6" in ids
     
     def test_get_specific_models(self):
@@ -252,16 +255,19 @@ class TestLoadModelRegistry:
         
         # Test opus models
         opus_models = registry.by_class("opus")
-        assert len(opus_models) == 2
+        assert len(opus_models) == 4
         opus_ids = [m.id for m in opus_models]
+        assert "claude-opus-4-1" in opus_ids
+        assert "claude-opus-4-5" in opus_ids
         assert "claude-opus-4-6" in opus_ids
         assert "claude-opus-4-7" in opus_ids
-        
-        # Test sonnet models (claude-sonnet-4 deprecated + claude-sonnet-4-6 current)
+
+        # Test sonnet models
         sonnet_models = registry.by_class("sonnet")
-        assert len(sonnet_models) == 2
+        assert len(sonnet_models) == 3
         sonnet_ids = [m.id for m in sonnet_models]
         assert "claude-sonnet-4" in sonnet_ids
+        assert "claude-sonnet-4-5" in sonnet_ids
         assert "claude-sonnet-4-6" in sonnet_ids
         
         # Test haiku models
@@ -274,7 +280,7 @@ class TestLoadModelRegistry:
         registry = load_model_registry()
         
         anthropic_models = registry.compatible_with_providers(["anthropic"])
-        assert len(anthropic_models) == 5
+        assert len(anthropic_models) == 8
         
         # All claude models should be compatible
         for model in anthropic_models:
@@ -285,7 +291,7 @@ class TestLoadModelRegistry:
         registry = load_model_registry()
         
         copilot_models = registry.compatible_with_providers(["github-copilot"])
-        assert len(copilot_models) == 5
+        assert len(copilot_models) == 8
         
         # All claude models should be compatible
         for model in copilot_models:
