@@ -23,12 +23,37 @@ def do_vault() -> None:
     backend, path = _load_memory_config()
     if backend == "none":
         print("Memory backend: disabled (none)")
-    elif backend == "obsidian":
+        return
+    if backend == "obsidian":
         print(f"Memory backend: obsidian")
         print(f"Vault path:     {path}")
     else:
         print(f"Memory backend: local")
         print(f"Memory path:    {path}")
+    initialized = path is not None and path.exists()
+    print(f"Initialized:    {'yes' if initialized else 'no — run: agent-notes memory init'}")
+
+
+def do_init() -> None:
+    """Initialize the memory vault — create folder structure and Index.md."""
+    backend, path = _load_memory_config()
+    if backend == "none":
+        print("Memory is disabled. Re-run `agent-notes install` and choose a memory backend.")
+        return
+    if path is None:
+        print("Memory path not configured.")
+        return
+    if backend == "obsidian":
+        from ..services.memory_backend import obsidian_init, OBSIDIAN_CATEGORIES
+        obsidian_init(path)
+        print(f"{Color.GREEN}Obsidian vault initialised at {path}{Color.NC}")
+        print(f"  Folders: {', '.join(OBSIDIAN_CATEGORIES)}")
+        print(f"  Index:   {path / 'Index.md'}")
+        print(f"\nOpen the folder as a vault in Obsidian to start browsing.")
+    else:
+        from ..services.memory_backend import local_init
+        local_init(path)
+        print(f"{Color.GREEN}Memory directory initialised at {path}{Color.NC}")
 
 
 def do_index() -> None:
@@ -343,6 +368,7 @@ def show_help() -> None:
 Manage agent memory.
 
 Commands:
+  init             Create folder structure and Index.md
   list             List all agent memories with sizes (default)
   vault            Show current backend and memory path
   index            Regenerate Index.md for the current backend
@@ -369,6 +395,8 @@ def memory(action: str = "list", name: Optional[str] = None, extra: Optional[lis
     """Manage agent memory."""
     if action == "list":
         do_list()
+    elif action == "init":
+        do_init()
     elif action == "vault":
         do_vault()
     elif action == "index":
