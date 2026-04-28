@@ -180,7 +180,7 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
 
             role_color = _ROLE_COLOR_MAP.get(role.color, '')
             role_label_colored = f"{role_color}{role.label}{_shim.Color.NC}" if role_color else role.label
-            title = (f"{_shim.Color.DIM}[{backend.label}]{_shim.Color.NC}  "
+            title = (f"{_shim.Color.YELLOW}[{backend.label}]{_shim.Color.NC}  "
                      f"{role_label_colored} — {role.description}\n  typical class: {role.typical_class}")
             if _shim._can_interactive():
                 picked = _shim._radio_select(title, options, default=default_idx,
@@ -245,35 +245,44 @@ def _select_skills(step: int = 0, total: int = 0, version: str = '') -> List[str
     if not skill_groups:
         return []
 
+    # Process skills are always included — separate them from tech skill groups.
+    process_skills = skill_groups.get("process", [])
+    tech_groups = {k: v for k, v in skill_groups.items() if k != "process"}
+
     descriptions = {
-        "Rails": "models, controllers, views, routes, testing",
-        "Docker": "Dockerfile, Compose patterns",
-        "Kamal": "deployment with Kamal",
-        "Git": "commit workflow, conventional commits",
+        "rails": "models, controllers, views, routes, testing",
+        "docker": "Dockerfile, Compose patterns",
+        "kamal": "deployment with Kamal",
+        "git": "commit workflow, conventional commits",
     }
 
-    options = []
-    for group_name, skills in skill_groups.items():
-        desc = descriptions.get(group_name, group_name.lower())
-        count = len(skills)
-        label = f"{group_name} — {desc} ({count} {'skill' if count == 1 else 'skills'})"
-        options.append((label, group_name))
+    selected_skills = list(process_skills)
 
-    all_group_names = {name for name in skill_groups.keys()}
+    if tech_groups:
+        options = []
+        for group_name, skills in tech_groups.items():
+            desc = descriptions.get(group_name, group_name.lower())
+            count = len(skills)
+            label = f"{group_name.capitalize()} — {desc} ({count} {'skill' if count == 1 else 'skills'})"
+            options.append((label, group_name))
 
-    if _shim._can_interactive():
-        selected_groups = _shim._checkbox_select("Which skills to include?", options, defaults=all_group_names,
-                                                  step=step, total=total, version=version)
+        all_group_names = set(tech_groups.keys())
+
+        title = "Which domain skills to include?\n  (process skills are always included)"
+        if _shim._can_interactive():
+            selected_groups = _shim._checkbox_select(title, options, defaults=all_group_names,
+                                                     step=step, total=total, version=version)
+        else:
+            selected_groups = _shim._checkbox_select_fallback(title, options, defaults=all_group_names,
+                                                              step=step, total=total, version=version)
+
+        skill_summary_parts = [f"process ({len(process_skills)})"] if process_skills else []
+        for group_name, skills in tech_groups.items():
+            if group_name in selected_groups:
+                selected_skills.extend(skills)
+                skill_summary_parts.append(f"{group_name.capitalize()} ({len(skills)})")
     else:
-        selected_groups = _shim._checkbox_select_fallback("Which skills to include?", options, defaults=all_group_names,
-                                                          step=step, total=total, version=version)
-
-    selected_skills = []
-    skill_summary_parts = []
-    for group_name, skills in skill_groups.items():
-        if group_name in selected_groups:
-            selected_skills.extend(skills)
-            skill_summary_parts.append(f"{group_name} ({len(skills)})")
+        skill_summary_parts = [f"process ({len(process_skills)})"] if process_skills else []
 
     summary = ", ".join(skill_summary_parts) if skill_summary_parts else "None"
     print(f"  {_shim.Color.GREEN}✓{_shim.Color.NC} Skills: {summary}")
