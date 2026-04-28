@@ -11,3 +11,22 @@ for f in agent_notes/dist/claude/agents/*.md; do
   fi
 done
 echo "Plugin agents rebuilt."
+
+for skill_dir in .claude-plugin/skills/*/; do
+  skill=$(basename "$skill_dir")
+  src="agent_notes/dist/skills/$skill/SKILL.md"
+  if [ -f "$src" ]; then
+    cp "$src" ".claude-plugin/skills/$skill/SKILL.md"
+  fi
+done
+echo "Plugin skills synced."
+
+VERSION=$(cat agent_notes/VERSION)
+python3 - <<EOF
+import json, pathlib
+p = pathlib.Path('.claude-plugin/plugin.json')
+m = json.loads(p.read_text())
+m['version'] = '${VERSION}'
+p.write_text(json.dumps(m, indent=2) + '\n')
+EOF
+echo "Plugin version set to ${VERSION}."
