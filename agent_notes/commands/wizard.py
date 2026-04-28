@@ -180,8 +180,11 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
 
             role_color = _ROLE_COLOR_MAP.get(role.color, '')
             role_label_colored = f"{role_color}{role.label}{_shim.Color.NC}" if role_color else role.label
-            title = (f"{_shim.Color.YELLOW}[{backend.label}]{_shim.Color.NC}  "
-                     f"{role_label_colored} — {role.description}\n  typical class: {role.typical_class}")
+            title = (
+                f"{_shim.Color.DIM}CLI{_shim.Color.NC}          {_shim.Color.YELLOW}{backend.label}{_shim.Color.NC}\n"
+                f"  {_shim.Color.DIM}Role{_shim.Color.NC}         {role_label_colored}\n"
+                f"  {_shim.Color.DIM}Description{_shim.Color.NC}  {role.description}"
+            )
             if _shim._can_interactive():
                 picked = _shim._radio_select(title, options, default=default_idx,
                                              step=step, total=total, version=version)
@@ -197,13 +200,27 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
     return result
 
 
-def _select_scope(step: int = 0, total: int = 0, version: str = '') -> str:
+def _select_scope(clis: Set[str] = None, step: int = 0, total: int = 0, version: str = '') -> str:
     """Step 3: Install scope."""
     from .. import wizard as _shim
+    from ..cli_backend import load_registry
+
+    registry = load_registry()
+    if clis:
+        global_paths = [str(b.global_home) for b in registry.all() if b.name in clis]
+        local_paths = [b.local_dir for b in registry.all() if b.name in clis]
+    else:
+        global_paths = [str(b.global_home) for b in registry.all()]
+        local_paths = [b.local_dir for b in registry.all()]
+
+    global_detail = "\n    ".join(global_paths)
+    global_label = f"Global\n    {global_detail}" if global_paths else "Global"
+    local_detail = "\n    ".join(local_paths)
+    local_label = f"Local\n    {local_detail}" if local_paths else "Local"
 
     options = [
-        ("Global (~/.claude, ~/.config/opencode)", "global"),
-        ("Local (current project)", "local"),
+        (global_label, "global"),
+        (local_label, "local"),
     ]
     if _shim._can_interactive():
         result = _shim._radio_select("Where to install?", options, default=0,
@@ -299,41 +316,48 @@ def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skill
 
     print("\nReady to install:\n")
 
-    # CLI
     from ..cli_backend import load_registry
+    from .. import installer as _installer
     registry = load_registry()
-    selected_labels = [b.label for b in registry.all() if b.name in clis]
-    cli_desc = " + ".join(selected_labels) if selected_labels else "(none)"
-    print(f"  CLI:      {cli_desc}")
+    selected_backends = [b for b in registry.all() if b.name in clis]
 
-    # Models (show role→model assignments if any)
+    # CLI
+    selected_labels = [b.label for b in selected_backends]
+    print(f"  CLI       {', '.join(selected_labels) if selected_labels else '(none)'}")
+
+    # Scope + paths
+    if scope == "global":
+        paths = [str(b.global_home) for b in selected_backends]
+        scope_desc = "Global  →  " + ",  ".join(paths) if paths else "Global"
+    else:
+        paths = [b.local_dir for b in selected_backends]
+        scope_desc = "Local  →  " + ",  ".join(paths) if paths else "Local"
+    print(f"  Scope     {scope_desc}")
+
+    # Mode
+    print(f"  Mode      {'Copy' if copy_mode else 'Symlink'}")
+
+    # Models (role label → model alias)
     if role_models:
         from ..model_registry import load_model_registry
+        from ..role_registry import load_role_registry
         models_registry = load_model_registry()
-        print(f"\n  Models:")
+        role_registry = load_role_registry()
+        role_label_map = {r.name: r.label for r in role_registry.all()}
+        print(f"\n  Models")
         for backend_name in sorted(role_models.keys()):
             backend = registry.get(backend_name)
             print(f"    {backend.label}:")
             for role_name, model_id in sorted(role_models[backend_name].items()):
+                role_label = role_label_map.get(role_name, role_name)
                 try:
                     model = models_registry.get(model_id)
                     prov_alias = backend.first_alias_for(model.aliases)
-                    provider = prov_alias[0] if prov_alias else "?"
-                    print(f"      {role_name}: {model_id} (via {provider})")
+                    alias = prov_alias[1] if prov_alias else model_id
+                    print(f"      {role_label:<16} {alias}")
                 except KeyError:
-                    print(f"      {role_name}: {model_id}")
+                    print(f"      {role_label:<16} {model_id}")
         print("")
-
-    # Scope
-    if scope == "global":
-        scope_desc = "Global (~/.claude, ~/.config/opencode)"
-    else:
-        scope_desc = "Local (current project)"
-    print(f"  Scope:    {scope_desc}")
-
-    # Mode
-    mode_desc = "Copy" if copy_mode else "Symlink"
-    print(f"  Mode:     {mode_desc}")
 
     # Skills
     if selected_skills:
@@ -342,44 +366,28 @@ def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skill
             count = sum(1 for skill in selected_skills if skill in group_skills)
             if count > 0:
                 skill_counts[group_name] = count
-
-        if skill_counts:
-            skill_desc = ", ".join(f"{name} ({count})" for name, count in skill_counts.items())
-        else:
-            skill_desc = "None"
+        skill_desc = ", ".join(f"{n.capitalize()} ({c})" for n, c in skill_counts.items()) if skill_counts else "None"
     else:
         skill_desc = "None"
-    print(f"  Skills:   {skill_desc}")
+    print(f"  Skills    {skill_desc}")
 
     # Agents
-    from ..cli_backend import load_registry
-    registry = load_registry()
     agent_parts = []
-    for backend in registry.all():
-        if backend.name not in clis or not backend.supports("agents"):
+    for backend in selected_backends:
+        if not backend.supports("agents"):
             continue
-        count = _shim.count_agents(backend)  # from install.py
+        count = _shim.count_agents(backend)
         agent_parts.append(f"{count} ({backend.label})")
     if agent_parts:
-        print(f"  Agents:   {' + '.join(agent_parts)}")
+        print(f"  Agents    {' + '.join(agent_parts)}")
 
-    # Config
-    from ..cli_backend import load_registry
-    from .. import installer
-    registry = load_registry()
-    config_files = []
-    for backend in registry.all():
-        if backend.name not in clis:
-            continue
-        config_file = installer.config_filename_for(backend)
-        if config_file:
-            config_files.append(config_file)
-    config_desc = ", ".join(config_files) if config_files else "None"
-    print(f"  Config:   {config_desc}")
-
-    # Rules
+    # Config + Rules
+    config_files = [_installer.config_filename_for(b) for b in selected_backends if _installer.config_filename_for(b)]
+    if config_files:
+        print(f"  Config    {', '.join(config_files)}")
     rules_count = _count_rules()
-    print(f"  Rules:    {rules_count}")
+    if rules_count:
+        print(f"  Rules     {rules_count} files")
 
     print("")
     from .. import wizard as _shim
@@ -503,7 +511,7 @@ def interactive_install() -> None:
     role_models = _shim._select_models_per_role(clis, step=2, total=TOTAL_STEPS, version=version)
 
     # Step 3: Install scope
-    scope = _shim._select_scope(step=3, total=TOTAL_STEPS, version=version)
+    scope = _shim._select_scope(clis=clis, step=3, total=TOTAL_STEPS, version=version)
 
     # Step 4: Install mode (always shown)
     copy_mode = _shim._select_mode(step=4, total=TOTAL_STEPS, version=version)

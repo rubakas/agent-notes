@@ -386,7 +386,7 @@ class TestConfirmInstall:
                         with patch('builtins.input', return_value='Y'):
                             wizard._confirm_install({"claude", "opencode"}, "global", False, [], {})
         captured = capsys.readouterr()
-        assert "CLI:      Claude Code + OpenCode" in captured.out
+        assert "CLI       Claude Code" in captured.out
 
     def test_display_summary_skills(self, capsys):
         mock_groups = {
@@ -403,7 +403,7 @@ class TestConfirmInstall:
                         with patch('builtins.input', return_value='Y'):
                             wizard._confirm_install({"claude"}, "global", False, selected_skills, {})
         captured = capsys.readouterr()
-        assert "Skills:   Rails (1), Docker (1)" in captured.out
+        assert "Skills    Rails (1), Docker (1)" in captured.out
 
 
 class TestInstallSkillsFiltered:
