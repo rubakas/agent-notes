@@ -19,7 +19,7 @@ Update anytime with `agent-notes update` (pulls latest, shows diff, reinstalls).
 
 | Component | Description |
 |-----------|-------------|
-| **Skills** | 36 on-demand knowledge modules (Rails, Docker, Git, Kamal, Process) |
+| **Skills** | 35 on-demand knowledge modules (Rails, Docker, Git, Kamal, Process) |
 | **Agents** | 18 specialized AI subagents with hierarchical model strategy |
 | **Rules** | Global instructions, code quality, and safety guardrails |
 | **Config** | Global instructions for Claude Code, OpenCode, and GitHub Copilot |
@@ -65,6 +65,17 @@ agent-notes install
 #   Enter numbers to toggle (comma-separated), or press enter for defaults.
 #   Choice:                          ← press enter to keep both
 #
+#   Step 2/7: Configure model roles
+#   Which models should each role use?  (claude)
+#
+#     orchestrator  [claude-opus-4-7]    Plans, delegates, synthesizes
+#     reasoner      [claude-opus-4-7]    Complex reasoning, architecture
+#     worker        [claude-sonnet-4-6]  Implements, writes, edits
+#     scout         [claude-haiku-4-5]   Fast search and exploration
+#
+#   Enter role=model pairs to change, or press enter to keep defaults.
+#   Choice:                          ← press enter to keep defaults
+#
 #   Where to install?
 #     1) * Global (~/.claude, ~/.config/opencode)
 #     2)   Local (current project)
@@ -80,14 +91,14 @@ agent-notes install
 #     2) [*] Docker — Dockerfile, Compose patterns (4 skills)
 #     3) [*] Kamal — deployment with Kamal (1 skill)
 #     4) [*] Git — commit workflow, conventional commits (1 skill)
-#     5) [*] Process — TDD, refactoring, debugging, planning (6 skills)
+#     5) [*] Process — TDD, refactoring, debugging, planning (5 skills)
 #   Choice:                          ← press enter for all
 #
 #   Ready to install:
 #     CLI:      Claude Code + OpenCode
 #     Scope:    Global (~/.claude, ~/.config/opencode)
 #     Mode:     Symlink
-#     Skills:   Rails (24), Docker (4), Kamal (1), Git (1), Process (6)
+#     Skills:   Rails (24), Docker (4), Kamal (1), Git (1), Process (5)
 #     Agents:   18 (Claude Code) + 19 (OpenCode)
 #     Config:   CLAUDE.md, AGENTS.md
 #     Rules:    2
@@ -104,7 +115,9 @@ agent-notes doctor --fix
 agent-notes memory list
 agent-notes memory vault          # show current backend and path
 agent-notes memory index          # regenerate Index.md
-agent-notes memory add "Pattern title" "Body text" --type pattern --agent coder
+agent-notes memory add "Rails enum prefix" \
+  "Always use _prefix: true to avoid method name collisions" \
+  pattern coder
 ```
 
 ## Agent Team
@@ -211,10 +224,10 @@ agent-notes/
 │   ├── data/                # Single source of truth
 │   │   ├── cli/             # CLI descriptors
 │   │   │   ├── claude.yaml, opencode.yaml, copilot.yaml
-│   │   │   └── cursor.yaml  # (add your own)
+│   │   │   └── gemini.yaml  # (add your own)
 │   │   ├── models/          # Model descriptors
 │   │   │   ├── claude-opus-4-7.yaml, claude-sonnet-4.yaml, ...
-│   │   │   └── kimi-k2.yaml # (add your own)
+│   │   │   └── gpt-4o.yaml  # (add your own)
 │   │   ├── roles/           # Role descriptors
 │   │   │   ├── orchestrator.yaml, worker.yaml, scout.yaml, reasoner.yaml
 │   │   │   └── specialist.yaml # (add your own)
@@ -285,8 +298,8 @@ On-demand knowledge modules loaded mid-conversation.
 **Git (1):**
 `git` — git workflow, commit chunking, conventional commit messages
 
-**Process (6):**
-`tdd`, `refactoring-protocol`, `debugging-protocol`, `plan-first`, `code-review`, `brainstorming`
+**Process (5):**
+`tdd`, `refactoring-protocol`, `debugging-protocol`, `code-review`, `brainstorming`
 
 ### Usage
 
@@ -392,11 +405,7 @@ agent-notes memory init                    # create folder structure and Index.m
 agent-notes memory list                    # list all notes (by category or agent)
 agent-notes memory vault                   # show backend, path, and init status
 agent-notes memory index                   # regenerate Index.md
-agent-notes memory add "Title" "Body"      # add a note (default type: context)
-  --type pattern|decision|mistake|context|session
-  --agent <name>
-  --project <name>
-  --tags tag1,tag2
+agent-notes memory add <title> <body> [type] [agent] [project]   # type: pattern|decision|mistake|context|session
 agent-notes memory show <agent>            # show one agent's notes (local backend)
 agent-notes memory reset [agent]           # clear memory (confirmation required)
 agent-notes memory export                  # back up to memory-backup/
