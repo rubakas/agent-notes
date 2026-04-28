@@ -387,9 +387,15 @@ def _detect_obsidian_vaults() -> List[Path]:
     for root in search_roots:
         if not root.exists():
             continue
-        for d in root.iterdir():
-            if d.is_dir() and (d / ".obsidian").exists():
-                candidates.append(d)
+        try:
+            for d in root.iterdir():
+                try:
+                    if d.is_dir() and (d / ".obsidian").exists():
+                        candidates.append(d)
+                except (PermissionError, OSError):
+                    continue
+        except (PermissionError, OSError):
+            continue
     return candidates[:5]
 
 
