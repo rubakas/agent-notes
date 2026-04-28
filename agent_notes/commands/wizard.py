@@ -108,8 +108,8 @@ def _select_cli(step: int = 0, total: int = 0, version: str = '') -> Set[str]:
     for backend in sorted(registry.all(), key=lambda b: b.name):
         options.append((backend.label, backend.name))
 
-    # Safe defaults - all available backends that support agents
-    safe_defaults = {b.name for b in registry.all() if b.supports("agents")}
+    # Default to Claude Code only
+    safe_defaults = {"claude"}
 
     if _can_interactive():
         result = _checkbox_select("Which CLI do you use?", options, defaults=safe_defaults,
@@ -211,10 +211,10 @@ def _select_scope(clis: Set[str] = None, step: int = 0, total: int = 0, version:
         global_paths = [str(b.global_home) for b in registry.all()]
         local_paths = [b.local_dir for b in registry.all()]
 
-    global_detail = "\n    ".join(global_paths)
-    global_label = f"Global\n    {global_detail}" if global_paths else "Global"
-    local_detail = "\n    ".join(local_paths)
-    local_label = f"Local\n    {local_detail}" if local_paths else "Local"
+    global_dim = f"  {Color.DIM}" + ",  ".join(global_paths) + Color.NC if global_paths else ""
+    global_label = f"Global{global_dim}"
+    local_dim = f"  {Color.DIM}" + ",  ".join(local_paths) + Color.NC if local_paths else ""
+    local_label = f"Local{local_dim}"
 
     options = [
         (global_label, "global"),
@@ -480,7 +480,6 @@ def install_skills_filtered(skill_names: List[str], targets: List[Path], copy_mo
         return
 
     for target_dir in targets:
-        print(f"Installing skills to {target_dir} ...")
         target_dir.mkdir(parents=True, exist_ok=True)
 
         for skill_name in sorted(skill_names):
@@ -510,7 +509,6 @@ def install_agents_filtered(clis: Set[str], scope: str, copy_mode: bool = False)
         if not files:
             continue
 
-        print(f"Installing {backend.label} agents to {dst} ...")
 
         place_dir_contents(src, dst, "*.md", copy_mode)
 
@@ -521,9 +519,6 @@ def install_config_filtered(clis: Set[str], scope: str, copy_mode: bool = False)
     from ..registries.cli_registry import load_registry
 
     registry = load_registry()
-
-    header = "Installing global config ..." if scope == "global" else "Installing project rules ..."
-    print(header)
 
     for backend in registry.all():
         if backend.name not in clis:
@@ -609,47 +604,69 @@ def interactive_install() -> None:
         return
 
     # Execute installation
-    print(f"\nInstalling ({scope}, {'copy' if copy_mode else 'symlink'}) ...")
-    print("")
+    print(f"\nInstalling ({scope}, {'copy' if copy_mode else 'symlink'}) ...\n")
 
-    # Install shared scripts (global scope only). These are CLI-agnostic —
-    # they live under ~/.local/bin/ and serve any AI CLI (e.g. cost-report).
+    from ..registries.cli_registry import load_registry as _load_registry
+    from ..services import installer as _installer
+    _registry = _load_registry()
+
+    # Scripts (global only)
     if scope == "global":
         from ..services.installer import install_scripts_global
         install_scripts_global()
 
-    # Install skills
+    # Skills
     if selected_skills:
-        from ..registries.cli_registry import load_registry
-        from ..services import installer
-        registry = load_registry()
         targets = []
-        for backend in registry.all():
-            if backend.name in clis and backend.supports("skills"):
-                target = installer.target_dir_for(backend, "skills", scope)
-                if target is not None:
-                    targets.append(target)
-        # Plus the universal ~/.agents/skills if global scope (current behavior)
+        for _b in _registry.all():
+            if _b.name in clis and _b.supports("skills"):
+                _t = _installer.target_dir_for(_b, "skills", scope)
+                if _t is not None:
+                    targets.append(_t)
         if scope == "global":
             targets.append(AGENTS_HOME / "skills")
-
         install_skills_filtered(selected_skills, targets, copy_mode)
+        _skill_groups = _get_skill_groups()
+        _group_parts = []
+        for _gn, _gs in _skill_groups.items():
+            _cnt = sum(1 for s in selected_skills if s in _gs)
+            if _cnt:
+                _group_parts.append(f"{_gn} ({_cnt})")
+        _all_grouped = {s for gs in _skill_groups.values() for s in gs}
+        _ungrouped = sum(1 for s in selected_skills if s not in _all_grouped)
+        if _ungrouped:
+            _group_parts.append(f"Other ({_ungrouped})")
+        print(f"  {Color.GREEN}✓{Color.NC} Skills     {', '.join(_group_parts) if _group_parts else str(len(selected_skills)) + ' skills'}")
 
-    # Install agents
+    # Agents
     install_agents_filtered(clis, scope, copy_mode)
+    _agent_parts = []
+    for _b in _registry.all():
+        if _b.name in clis and _b.supports("agents"):
+            _cnt = count_agents(_b)
+            if _cnt:
+                _agent_parts.append(f"{_b.label} ({_cnt})")
+    if _agent_parts:
+        print(f"  {Color.GREEN}✓{Color.NC} Agents     {', '.join(_agent_parts)}")
 
-    # Install config
+    # Config + Rules
     install_config_filtered(clis, scope, copy_mode)
+    _rules_n = _count_rules()
+    _cfg_files = [_installer.config_filename_for(_b) for _b in _registry.all() if _b.name in clis and _installer.config_filename_for(_b)]
+    _cfg_desc = ", ".join(_cfg_files) if _cfg_files else "config"
+    _cfg_desc += f" + {_rules_n} rules" if _rules_n else ""
+    print(f"  {Color.GREEN}✓{Color.NC} Config     {_cfg_desc}")
 
-    # Install commands (slash commands like /plan, /review, /debug, /brainstorm)
-    from ..registries.cli_registry import load_registry as _load_registry
+    # Commands
     from ..services.installer import install_component_for_backend as _install_component
-    _registry = _load_registry()
     for _backend in _registry.all():
         if _backend.name in clis:
             _install_component(_backend, "commands", scope, copy_mode)
+    _cmd_names = [f.stem for f in (PKG_DIR / "dist" / "commands").glob("*.md")] if (PKG_DIR / "dist" / "commands").exists() else []
+    if _cmd_names:
+        print(f"  {Color.GREEN}✓{Color.NC} Commands   {', '.join(sorted(_cmd_names))}")
 
-    # Install SessionStart hook + context file (Claude Code only)
+    # SessionStart hook (Claude Code only)
     from ..services.installer import _install_session_hook
     try:
         _claude = _registry.get("claude")
@@ -658,8 +675,7 @@ def interactive_install() -> None:
     except (KeyError, Exception):
         pass
 
-    print("")
-    print(f"{Color.GREEN}Done.{Color.NC} Restart Claude Code / OpenCode to pick up changes.")
+    print(f"\n{Color.GREEN}Done.{Color.NC} Restart Claude Code / OpenCode to pick up changes.")
 
     # Write state.json
     from ..services.install_state_builder import build_install_state
