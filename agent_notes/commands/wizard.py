@@ -314,16 +314,25 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     scope_label = "Global" if scope == "global" else "Local"
     print(f"  {Color.DIM}Scope{Color.NC}     {scope_label}")
     print(f"  {Color.DIM}Mode{Color.NC}      {'Copy' if copy_mode else 'Symlink'}")
+
+    if selected_skills:
+        all_grouped = {s for gs in skill_groups.values() for s in gs}
+        parts = []
+        for gname, gskills in skill_groups.items():
+            cnt = sum(1 for s in selected_skills if s in gskills)
+            if cnt:
+                parts.append(f"{gname} ({cnt})")
+        ungrouped = sum(1 for s in selected_skills if s not in all_grouped)
+        if ungrouped:
+            parts.append(f"Other ({ungrouped})")
+        print(f"  {Color.DIM}Skills{Color.NC}    {', '.join(parts) if parts else 'none'}")
+
     if memory_backend and memory_backend != "none":
-        if memory_backend == "obsidian":
-            mem_label = f"Obsidian  →  {memory_path}" if memory_path else "Obsidian"
-        else:
-            mem_label = "Local markdown"
+        mem_label = (f"Obsidian  →  {memory_path}" if memory_path else "Obsidian") if memory_backend == "obsidian" else "Local markdown"
         print(f"  {Color.DIM}Memory{Color.NC}    {mem_label}")
 
     # ── Per-CLI sections ──────────────────────────────────────────────────────
     rules_count = _count_rules()
-    all_grouped = {s for gs in skill_groups.values() for s in gs}
 
     for backend in selected_backends:
         print(f"\n  {Color.CYAN}{backend.label}{Color.NC}")
@@ -348,18 +357,6 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
         if backend.supports("agents"):
             n_agents = count_agents(backend)
             print(f"    {Color.DIM}Agents:{Color.NC}      {n_agents}")
-
-        # Skills (shared across CLIs — show once per backend that supports them)
-        if backend.supports("skills") and selected_skills:
-            parts = []
-            for gname, gskills in skill_groups.items():
-                cnt = sum(1 for s in selected_skills if s in gskills)
-                if cnt:
-                    parts.append(f"{gname} ({cnt})")
-            ungrouped = sum(1 for s in selected_skills if s not in all_grouped)
-            if ungrouped:
-                parts.append(f"Other ({ungrouped})")
-            print(f"    {Color.DIM}Skills:{Color.NC}      {', '.join(parts) if parts else 'none'}")
 
         # Config + Rules
         cfg = _cfg_filename(backend)
