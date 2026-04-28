@@ -421,11 +421,11 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
     if backend == "obsidian":
         candidates = _detect_obsidian_vaults()
         if candidates:
-            print(f"  {Color.DIM}Detected Obsidian vaults:{Color.NC}")
+            print(f"  {Color.DIM}Detected vaults (enter a subfolder path, e.g. vault/agent-memory):{Color.NC}")
             for c in candidates[:3]:
-                print(f"    {c}")
-        default_path = str(candidates[0]) if candidates else str(Path.home() / "agent-memory")
-        raw = _safe_input(f"  Vault path [{default_path}]: ", default_path)
+                print(f"    {c}/agent-memory")
+        default_path = str(candidates[0] / "agent-memory") if candidates else str(Path.home() / "agent-memory")
+        raw = _safe_input(f"  Memory folder path [{default_path}]: ", default_path)
         path = raw.strip() or default_path
 
     label = {"local": "Local markdown", "obsidian": f"Obsidian ({path})", "none": "Disabled"}[backend]
