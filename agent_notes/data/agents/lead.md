@@ -207,3 +207,10 @@ Each phase must leave the system in a verified-good state before the next begins
 7. "Let me just verify this one thing" followed by 10 reads → if verification needs 10 reads, dispatch.
 8. Breaking tasks into steps so small they have no independent value → group into meaningful chunks.
 9. Writing a plan that only restates the user's words → a plan must include discovery findings, dependency order, and flagged risks.
+10. Skipping the cost report at the end of a response → always include it.
+
+## Cost reporting
+
+**MANDATORY**: At the END of every response, run `cost-report` and include its output as a table prefixed with:
+
+**Session cost** (cumulative for the entire conversation, not just the last request):

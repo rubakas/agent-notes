@@ -63,24 +63,39 @@ def test_rules_has_markdown_files(built_dist):
 
 # --- Scripts ---
 
-def test_cost_report_script_exists(built_dist):
+def test_cost_report_shim_exists(built_dist):
     assert (built_dist / "scripts" / "cost-report").exists()
 
 
-def test_cost_report_is_executable(built_dist):
+def test_cost_report_shim_is_executable(built_dist):
     import stat
     script = built_dist / "scripts" / "cost-report"
-    mode = script.stat().st_mode
-    assert mode & stat.S_IXUSR
+    assert script.stat().st_mode & stat.S_IXUSR
 
 
-def test_cost_report_contains_pricing_json(built_dist):
-    content = (built_dist / "scripts" / "cost-report").read_text()
+def test_cost_report_claude_exists(built_dist):
+    assert (built_dist / "scripts" / "cost-report-claude").exists()
+
+
+def test_cost_report_opencode_exists(built_dist):
+    assert (built_dist / "scripts" / "cost-report-opencode").exists()
+
+
+@pytest.mark.parametrize("script", ["cost-report-claude", "cost-report-opencode"])
+def test_cost_report_scripts_are_executable(built_dist, script):
+    import stat
+    assert (built_dist / "scripts" / script).stat().st_mode & stat.S_IXUSR
+
+
+@pytest.mark.parametrize("script", ["cost-report-claude", "cost-report-opencode"])
+def test_cost_report_scripts_contain_pricing_json(built_dist, script):
+    content = (built_dist / "scripts" / script).read_text()
     assert '"providers"' in content
 
 
-def test_cost_report_has_no_placeholder(built_dist):
-    content = (built_dist / "scripts" / "cost-report").read_text()
+@pytest.mark.parametrize("script", ["cost-report-claude", "cost-report-opencode"])
+def test_cost_report_scripts_have_no_placeholder(built_dist, script):
+    content = (built_dist / "scripts" / script).read_text()
     assert "{{PRICING}}" not in content
 
 
