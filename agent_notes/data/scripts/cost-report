@@ -77,10 +77,9 @@ def tier_color(model_id: str) -> str:
 
 def fmt_num(n: int) -> str:
     if n >= 1_000_000:
-        v = n / 1_000_000
-        return f"{v:.1f}m" if v < 100 else f"{round(v)}m"
+        return f"{n / 1_000_000:.2f}m"
     if n >= 1_000:
-        return f"{n // 1_000}k"
+        return f"{n / 1_000:.2f}k"
     return str(n)
 
 
