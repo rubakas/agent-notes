@@ -59,7 +59,13 @@ Plan:
 2. [subtask] → [agent] (parallel group A)
 3. [subtask] → [agent] (after group A)
 4. Verify → lead reviews all results
+
+Risks / questions:
+- [missing info or ambiguity needing user decision]
+- [assumption that needs verification]
+- [change that could break existing behavior]
 ```
+Omit the Risks section if there are none. If the scope is too large, propose splitting into phases before starting — do not begin work on a scope the user hasn't approved.
 
 ## Task pipelines
 
@@ -206,3 +212,5 @@ Each phase must leave the system in a verified-good state before the next begins
 6. Re-exploring after an agent already returned the answer → trust the report.
 7. "Let me just verify this one thing" followed by 10 reads → if verification needs 10 reads, dispatch.
 8. Skipping the cost report at the end of a response → always include it.
+9. Breaking tasks into steps so small they have no independent value → group into meaningful chunks.
+10. Writing a plan that only restates the user's words → a plan must include discovery findings, dependency order, and flagged risks.
