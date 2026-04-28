@@ -102,8 +102,9 @@ agent-notes doctor --fix
 
 # Manage agent memory
 agent-notes memory list
-agent-notes memory show coder
-agent-notes memory reset reviewer
+agent-notes memory vault          # show current backend and path
+agent-notes memory index          # regenerate Index.md
+agent-notes memory add "Pattern title" "Body text" --type pattern --agent coder
 ```
 
 ## Agent Team
@@ -294,6 +295,129 @@ On-demand knowledge modules loaded mid-conversation.
 Use the rails-models skill to help with this association
 Load the docker-compose skill for multi-service setup
 ```
+
+## Agent Memory
+
+Agents can accumulate knowledge across sessions — patterns they discovered, decisions they made, mistakes to avoid. Three backends are available, chosen during `agent-notes install`.
+
+### Backends
+
+| Backend | Storage | Best for |
+|---------|---------|----------|
+| **Local** | `~/.claude/agent-memory/<agent>/` — plain markdown per agent | Simple setup, no extra tools |
+| **Obsidian** | Category vault with YAML frontmatter and `[[wikilinks]]` | Visual browsing, backlinks, Dataview queries |
+| **None** | Disabled — no files written | Stateless or shared machines |
+
+### Obsidian vault setup
+
+**Step 1 — Pick Obsidian during install**
+
+```bash
+agent-notes install
+# ...
+# Step 6/7: Memory backend
+#   How should agents store memory?
+#     1) * Local markdown files (~/.claude/agent-memory/)
+#     2)   Obsidian vault
+#     3)   None
+#   Choice [1]: 2
+#
+#   Detected Obsidian vaults:
+#     ~/Documents/Obsidian/Main
+#   Vault path [~/Documents/Obsidian/Main]: ← press enter or type your path
+#   ✓ Memory: Obsidian (~/Documents/Obsidian/Main)
+```
+
+The wizard auto-detects existing vaults (directories containing `.obsidian/`) in `~/Documents`, `~/Desktop`, and `~`. You can also point to any directory — it doesn't need to be an existing vault.
+
+**Step 2 — Open the vault in Obsidian**
+
+Open Obsidian → "Open folder as vault" → select the path you chose. The vault is ready — agent-notes creates the folder structure on first use.
+
+**Vault structure:**
+
+```
+~/your-vault/
+├── Index.md          ← entry point; auto-regenerated after every write
+├── Patterns/         ← reusable solutions and techniques
+├── Decisions/        ← architectural choices and rationale
+├── Mistakes/         ← recurring errors to avoid
+├── Context/          ← per-project background
+└── Sessions/         ← raw session extracts
+```
+
+**Step 3 — Let agents use it**
+
+The installed `CLAUDE.md` already points agents to your vault. At the start of a session Claude reads `Index.md`; at the end it can save insights:
+
+```
+Save this to memory as a pattern: always use _prefix: true with Rails enums
+```
+
+Or use the CLI directly:
+
+```bash
+agent-notes memory add "Rails enum prefix" \
+  "Always use _prefix: true to avoid method name collisions" \
+  --type pattern --agent coder --tags rails,models
+```
+
+**Regenerate the index** after adding files manually in Obsidian:
+
+```bash
+agent-notes memory index
+```
+
+### Switching backends
+
+```bash
+# See current backend
+agent-notes memory vault
+
+# Switch via reconfigure
+agent-notes install --reconfigure
+```
+
+### Memory commands
+
+```bash
+agent-notes memory list                    # list all notes (by category or agent)
+agent-notes memory vault                   # show backend and path
+agent-notes memory index                   # regenerate Index.md
+agent-notes memory add "Title" "Body"      # add a note (default type: context)
+  --type pattern|decision|mistake|context|session
+  --agent <name>
+  --project <name>
+  --tags tag1,tag2
+agent-notes memory show <agent>            # show one agent's notes (local backend)
+agent-notes memory reset [agent]           # clear memory (confirmation required)
+agent-notes memory export                  # back up to memory-backup/
+agent-notes memory import                  # restore from memory-backup/
+```
+
+### Note format (Obsidian backend)
+
+Every note agent-notes writes has YAML frontmatter for filtering and Dataview queries:
+
+```markdown
+---
+date: 2026-04-28
+type: pattern
+agent: coder
+project: rubakas
+tags: [rails, models]
+---
+
+# Rails Enum Prefix
+
+Always use `_prefix: true` with Rails enums to avoid method name collisions with
+existing model methods.
+
+## Links
+- [[2026-04-28-switched-to-jsonb-for-settings]]
+```
+
+Files are named `YYYY-MM-DD-<slug>.md` and placed in the matching category folder. They're plain markdown — edit them freely in Obsidian.
 
 ## Development
 
