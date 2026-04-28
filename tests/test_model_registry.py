@@ -223,7 +223,7 @@ class TestLoadModelRegistry:
         assert opus.label == "Claude Opus 4.7"
         assert opus.family == "claude"
         assert opus.model_class == "opus"
-        assert opus.aliases["anthropic"] == "claude-opus-4-7"
+        assert opus.aliases["anthropic"] == "opus"
         assert opus.aliases["github-copilot"] == "github-copilot/claude-opus-4.7"
         
         # Test claude-sonnet-4
@@ -296,7 +296,7 @@ class TestLoadModelRegistry:
         
         # Should prefer first in list
         result = opus.resolve_for_providers(["openrouter", "anthropic"])
-        assert result == ("anthropic", "claude-opus-4-7")
+        assert result == ("anthropic", "opus")
         
         result = opus.resolve_for_providers(["github-copilot", "anthropic"])
         assert result == ("github-copilot", "github-copilot/claude-opus-4.7")

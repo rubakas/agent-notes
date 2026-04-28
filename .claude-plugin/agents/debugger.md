@@ -1,7 +1,7 @@
 ---
 name: debugger
 description: Investigates bugs. Reproduces, isolates the failure, identifies root cause. Does not apply fixes — hands off to coder. Read-only on source. Triggers: bug, broken, error, crash, regression, flaky, root cause, why does, investigate.
-model: claude-opus-4-7
+model: opus
 tools: Read, Grep, Glob, Bash, WebFetch
 disallowedTools: Write, Edit
 color: orange
