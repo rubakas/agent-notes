@@ -36,3 +36,7 @@ memory-backup/
 
 # Spurious artifacts (e.g. from accidentally stringified MagicMock paths)
 MagicMock/
+
+# Credentials
+.pypirc
+scripts/.pypirc
