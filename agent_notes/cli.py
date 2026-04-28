@@ -282,9 +282,10 @@ def main():
     # memory
     p_memory = subparsers.add_parser("memory", help="Manage agent memory")
     p_memory.add_argument("action", nargs="?", default="list",
-        choices=["list", "size", "show", "reset", "export", "import"],
+        choices=["list", "vault", "index", "add", "size", "show", "reset", "export", "import"],
         help="Memory action")
-    p_memory.add_argument("name", nargs="?", help="Agent name (for show/reset)")
+    p_memory.add_argument("name", nargs="?", help="Agent name / note title (for show/reset/add)")
+    p_memory.add_argument("extra", nargs="*", help="Additional args (for add: body [type] [agent] [project])")
     
     args = parser.parse_args()
     
@@ -341,7 +342,7 @@ def main():
         regenerate(scope=args.scope, cli=args.cli, local=args.local)
     elif args.command == "memory":
         from .commands.memory import memory
-        memory(args.action, args.name)
+        memory(args.action, args.name, getattr(args, "extra", None))
 
 if __name__ == "__main__":
     main()

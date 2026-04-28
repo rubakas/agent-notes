@@ -39,6 +39,17 @@ AGENTS_HOME = Path.home() / ".agents"
 MEMORY_DIR = Path.home() / ".claude" / "agent-memory"  # Keep claude-specific for backward compatibility
 BACKUP_DIR = Path.home() / ".agent-notes" / "memory-backup"
 
+
+def memory_dir_for_backend(backend: str, custom_path: str = "") -> Optional[Path]:
+    """Return the root memory directory for the given backend and optional custom path."""
+    if backend == "none":
+        return None
+    if custom_path:
+        return Path(custom_path).expanduser()
+    if backend == "obsidian":
+        return Path.home() / "agent-memory"
+    return MEMORY_DIR  # local default: ~/.claude/agent-memory
+
 def get_version() -> str:
     """Read version from VERSION file."""
     try:
