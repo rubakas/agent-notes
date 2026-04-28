@@ -25,8 +25,12 @@ SELECT
   SUM(json_extract(m.data,'$.tokens.input'))       AS inp,
   SUM(json_extract(m.data,'$.tokens.output'))      AS outp,
   SUM(json_extract(m.data,'$.tokens.cache.read'))  AS cache,
-  ROUND((MAX(json_extract(m.data,'$.time.completed'))
-       - MIN(json_extract(m.data,'$.time.created'))) / 1000.0, 1) AS sec
+  ROUND(SUM(
+    CASE WHEN json_extract(m.data,'$.time.completed') IS NOT NULL
+              AND json_extract(m.data,'$.time.created') IS NOT NULL
+    THEN (json_extract(m.data,'$.time.completed') - json_extract(m.data,'$.time.created')) / 1000.0
+    ELSE 0 END
+  ), 1) AS sec
 FROM session s
 JOIN message m ON m.session_id = s.id
 CROSS JOIN cs
