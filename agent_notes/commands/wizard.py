@@ -548,6 +548,23 @@ def interactive_install() -> None:
     # Install config
     _shim.install_config_filtered(clis, scope, copy_mode)
 
+    # Install commands (slash commands like /plan, /review, /debug, /brainstorm)
+    from ..cli_backend import load_registry as _load_registry
+    from .. import installer as _installer
+    _registry = _load_registry()
+    for _backend in _registry.all():
+        if _backend.name in clis:
+            _installer.install_component_for_backend(_backend, "commands", scope, copy_mode)
+
+    # Install SessionStart hook + context file (Claude Code only)
+    from ..services.installer import _install_session_hook
+    try:
+        _claude = _registry.get("claude")
+        if _claude.name in clis:
+            _install_session_hook(_claude, scope)
+    except (KeyError, Exception):
+        pass
+
     print("")
     print(f"{_shim.Color.GREEN}Done.{_shim.Color.NC} Restart Claude Code / OpenCode to pick up changes.")
     
