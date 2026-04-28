@@ -618,6 +618,9 @@ def _interactive_install() -> None:
     # Execute installation
     print(f"\nInstalling ({scope}, {'copy' if copy_mode else 'symlink'}) ...\n")
 
+    from ..services import fs as _fs
+    _fs.silent_file_ops = True
+
     from ..registries.cli_registry import load_registry as _load_registry
     from ..services import installer as _installer
     _registry = _load_registry()
@@ -687,7 +690,7 @@ def _interactive_install() -> None:
     except (KeyError, Exception):
         pass
 
-    print(f"\n{Color.GREEN}Done.{Color.NC} Restart Claude Code / OpenCode to pick up changes.")
+    _fs.silent_file_ops = False
 
     # Write state.json
     from ..services.install_state_builder import build_install_state
@@ -723,3 +726,5 @@ def _interactive_install() -> None:
         except Exception as e:
             memory_label = f"(init failed: {e})"
         print(f"  {Color.GREEN}✓{Color.NC} Memory    {memory_label}")
+
+    print(f"\n{Color.GREEN}Done.{Color.NC} Restart Claude Code / OpenCode to pick up changes.")
