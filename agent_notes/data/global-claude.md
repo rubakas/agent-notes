@@ -193,7 +193,7 @@ stats AS (
     (SELECT json_extract(m2.data,'$.modelID') FROM message m2 WHERE m2.session_id=s.id AND json_extract(m2.data,'$.role')='assistant' ORDER BY json_extract(m2.data,'$.time.completed') DESC LIMIT 1) as model,
     SUM(json_extract(m.data,'$.tokens.input')) as inp, SUM(json_extract(m.data,'$.tokens.output')) as outp,
     SUM(json_extract(m.data,'$.tokens.cache.read')) as cache,
-    ROUND((MAX(json_extract(m.data,'$.time.completed'))-MIN(json_extract(m.data,'$.time.created')))/1000.0,1) as sec
+    ROUND(SUM(CASE WHEN json_extract(m.data,'$.time.completed') IS NOT NULL AND json_extract(m.data,'$.time.created') IS NOT NULL THEN (json_extract(m.data,'$.time.completed')-json_extract(m.data,'$.time.created'))/1000.0 ELSE 0 END),1) as sec
   FROM session s JOIN message m ON m.session_id=s.id CROSS JOIN cs
   WHERE (s.parent_id=cs.id OR s.id=cs.id) AND json_extract(m.data,'$.role')='assistant' GROUP BY s.id)
 SELECT agent||'('||model||')' as 'agent(model)',
