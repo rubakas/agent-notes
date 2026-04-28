@@ -663,6 +663,7 @@ def interactive_install() -> None:
 
     # Write state.json
     from ..services.install_state_builder import build_install_state
+    from ..services.state_store import record_install_state
     from ..domain.state import MemoryConfig
     project_path = Path.cwd() if scope == "local" else None
     try:
@@ -675,6 +676,19 @@ def interactive_install() -> None:
             selected_clis=set(clis),
         )
         st.memory = MemoryConfig(backend=memory_backend, path=memory_path)
-        install_state.record_install_state(st)
+        record_install_state(st)
     except Exception as e:
         print(f"{Color.YELLOW}Warning: failed to write state.json: {e}{Color.NC}")
+
+    # Post-install summary
+    print("")
+    skill_groups = _get_skill_groups()
+    from ..registries.cli_registry import load_registry as _lr
+    _render_install_summary(set(clis), scope, copy_mode, selected_skills, role_models, skill_groups, _lr())
+    if memory_backend == "obsidian":
+        memory_label = f"Obsidian ({memory_path})" if memory_path else "Obsidian"
+    elif memory_backend == "none":
+        memory_label = "Disabled"
+    else:
+        memory_label = "Local markdown"
+    print(f"  Memory    {memory_label}")
