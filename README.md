@@ -2,7 +2,7 @@
 
 AI agent configuration manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [OpenCode](https://github.com/opencode-ai/opencode).
 
-Configures a Lead agent (Opus) that orchestrates a team of 18 specialized subagents across three model tiers — so Opus plans, Sonnet executes, and Haiku explores.
+Configures a Lead agent (Opus) that orchestrates a team of 18 specialized subagents across three model tiers — so Opus plans and reasons, Sonnet executes, and Haiku explores.
 
 ## Quick Start
 
@@ -13,13 +13,13 @@ agent-notes install    # interactive wizard guides you through setup
 agent-notes doctor
 ```
 
-Update anytime with `cd ~/agent-notes && git pull && agent-notes update`.
+Update anytime with `agent-notes update` (pulls latest, shows diff, reinstalls).
 
 ## What's Included
 
 | Component | Description |
 |-----------|-------------|
-| **Skills** | 31 on-demand knowledge modules (Rails, Docker, Git, Kamal) |
+| **Skills** | 36 on-demand knowledge modules (Rails, Docker, Git, Kamal, Process) |
 | **Agents** | 18 specialized AI subagents with hierarchical model strategy |
 | **Rules** | Global instructions, code quality, and safety guardrails |
 | **Config** | Global instructions for Claude Code, OpenCode, and GitHub Copilot |
@@ -76,17 +76,18 @@ agent-notes install
 #   Choice [1]:                      ← press enter for symlink
 #
 #   Which skills to include?
-#     1) [*] Rails — models, controllers, views, routes, testing (22 skills)
+#     1) [*] Rails — models, controllers, views, routes, testing (24 skills)
 #     2) [*] Docker — Dockerfile, Compose patterns (4 skills)
 #     3) [*] Kamal — deployment with Kamal (1 skill)
 #     4) [*] Git — commit workflow, conventional commits (1 skill)
+#     5) [*] Process — TDD, refactoring, debugging, planning (6 skills)
 #   Choice:                          ← press enter for all
 #
 #   Ready to install:
 #     CLI:      Claude Code + OpenCode
 #     Scope:    Global (~/.claude, ~/.config/opencode)
 #     Mode:     Symlink
-#     Skills:   Rails (22), Docker (4), Kamal (1), Git (1)
+#     Skills:   Rails (24), Docker (4), Kamal (1), Git (1), Process (6)
 #     Agents:   18 (Claude Code) + 19 (OpenCode)
 #     Config:   CLAUDE.md, AGENTS.md
 #     Rules:    2
@@ -113,7 +114,9 @@ Specialized subagents with hierarchical model strategy: **Opus 4.7 decides, Sonn
 
 | Agent | Model | Role |
 |-------|-------|------|
-| **lead** | Opus 4.7 | Plans, delegates, reviews. The only Opus agent. |
+| **lead** | Opus 4.7 | Plans, delegates, reviews. Orchestrator. |
+| **architect** | Opus 4.7 | System architecture, module boundaries, domain models. Read-only. |
+| **debugger** | Opus 4.7 | Bug investigation: reproduces, isolates, identifies root cause. Read-only. |
 | **coder** | Sonnet 4 | Implements features, fixes bugs, edits files. |
 | **reviewer** | Sonnet 4 | Code quality review. Read-only. |
 | **security-auditor** | Sonnet 4 | Security vulnerability analysis. Read-only. |
@@ -122,9 +125,13 @@ Specialized subagents with hierarchical model strategy: **Opus 4.7 decides, Sonn
 | **system-auditor** | Sonnet 4 | Codebase health: duplication, N+1, coupling. Read-only. |
 | **database-specialist** | Sonnet 4 | Schema design, indexes, query performance, migrations. Read-only. |
 | **performance-profiler** | Sonnet 4 | Response times, memory, caching, bundle size. Read-only. |
+| **devops** | Sonnet 4 | Docker, CI/CD, deployment configs. |
+| **devil** | Sonnet 4 | Challenges plans to surface hidden risks. Read-only. |
+| **integrations** | Sonnet 4 | Third-party integrations: OAuth, webhooks, payments. |
+| **refactorer** | Sonnet 4 | Improves code structure without changing behavior. |
+| **analyst** | Haiku 4.5 | Requirements analysis: surfaces missing or contradictory requirements. Read-only. |
 | **api-reviewer** | Haiku 4.5 | API design, versioning, error handling, backward compatibility. Read-only. |
 | **tech-writer** | Haiku 4.5 | Documentation: READMEs, API docs, changelogs. |
-| **devops** | Sonnet 4 | Docker, CI/CD, deployment configs. |
 | **explorer** | Haiku 4.5 | Fast file discovery and pattern search. Read-only. |
 
 ### 4-phase lead workflow
@@ -144,18 +151,24 @@ You (human)
   +-- Simple task ------> Main session (direct work)
   |
   +-- Complex task -----> Lead (Opus 4.7)
-                           +-- Explorer (Haiku 4.5)     quick lookups
-                           +-- Coder (Sonnet 4)         implementation
-                           +-- Reviewer (Sonnet 4)      code review
-                            +-- Test Writer (Sonnet 4)   tests
-                            +-- Test Runner (Sonnet 4)   fix tests
-                           +-- Security (Sonnet 4)      security audit
-                           +-- Auditor (Sonnet 4)       codebase health
-                           +-- DB Specialist (Sonnet 4) schema & queries
-                           +-- Perf Profiler (Sonnet 4) performance
-                           +-- API Reviewer (Haiku 4.5) API design
-                           +-- Tech Writer (Haiku 4.5)  documentation
-                           +-- DevOps (Sonnet 4)        infrastructure
+                           +-- Explorer (Haiku 4.5)          quick lookups
+                           +-- Analyst (Haiku 4.5)           requirements analysis
+                           +-- Architect (Opus 4.7)          system design
+                           +-- Coder (Sonnet 4)              implementation
+                           +-- Refactorer (Sonnet 4)         code restructuring
+                           +-- Reviewer (Sonnet 4)           code review
+                           +-- Security (Sonnet 4)           security audit
+                           +-- Devil (Sonnet 4)              risk challenge
+                           +-- Debugger (Opus 4.7)           bug investigation
+                           +-- Test Writer (Sonnet 4)        tests
+                           +-- Test Runner (Sonnet 4)        fix tests
+                           +-- Auditor (Sonnet 4)            codebase health
+                           +-- DB Specialist (Sonnet 4)      schema & queries
+                           +-- Perf Profiler (Sonnet 4)      performance
+                           +-- API Reviewer (Haiku 4.5)      API design
+                           +-- Integrations (Sonnet 4)       third-party APIs
+                           +-- Tech Writer (Haiku 4.5)       documentation
+                           +-- DevOps (Sonnet 4)             infrastructure
 ```
 
 ## Architecture: YAML-Driven Extensibility
@@ -259,17 +272,20 @@ On-demand knowledge modules loaded mid-conversation.
 
 ### Available skills
 
-**Rails:**
-`rails-models`, `rails-controllers`, `rails-routes`, `rails-concerns`, `rails-views`, `rails-views-advanced`, `rails-view-components`, `rails-view-components-advanced`, `rails-helpers`, `rails-javascript`, `rails-jobs`, `rails-mailers`, `rails-broadcasting`, `rails-migrations`, `rails-active-storage`, `rails-validations`, `rails-testing-controllers`, `rails-testing-models`, `rails-testing-system`, `rails-style`, `rails-controllers-advanced`, `rails-models-advanced`, `rails-initializers`, `rails-lib`
+**Rails (24):**
+`rails-models`, `rails-models-advanced`, `rails-controllers`, `rails-controllers-advanced`, `rails-routes`, `rails-concerns`, `rails-views`, `rails-views-advanced`, `rails-view-components`, `rails-view-components-advanced`, `rails-helpers`, `rails-javascript`, `rails-jobs`, `rails-mailers`, `rails-broadcasting`, `rails-migrations`, `rails-active-storage`, `rails-validations`, `rails-testing-controllers`, `rails-testing-models`, `rails-testing-system`, `rails-style`, `rails-initializers`, `rails-lib`
 
-**Docker:**
+**Docker (4):**
 `docker-dockerfile`, `docker-dockerfile-languages`, `docker-compose`, `docker-compose-advanced`
 
-**Kamal:**
+**Kamal (1):**
 `rails-kamal`
 
-**Git:**
+**Git (1):**
 `git` — git workflow, commit chunking, conventional commit messages
+
+**Process (6):**
+`tdd`, `refactoring-protocol`, `debugging-protocol`, `plan-first`, `code-review`, `brainstorming`
 
 ### Usage
 
@@ -291,6 +307,14 @@ Load the docker-compose skill for multi-service setup
 ```bash
 python3 -m pytest tests/
 ```
+
+Tests are organized in three directories:
+
+| Directory | What it tests |
+|-----------|---------------|
+| `tests/functional/` | Unit tests: registries, build commands, CLI parsing |
+| `tests/integration/` | Real build output: dist structure, agent frontmatter, pricing embedding |
+| `tests/plugins/` | Artifact validation: every skill and agent file checked for correct metadata |
 
 ### Building
 
