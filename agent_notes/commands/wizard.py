@@ -18,15 +18,14 @@ from ..config import (
     DIST_SKILLS_DIR, DIST_RULES_DIR, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR,
 )
 
-# Maps role color names (from roles/*.yaml) to ANSI Color attributes.
-_ROLE_COLOR_MAP = {
-    'purple': Color.MAGENTA,
-    'red':    Color.RED,
-    'cyan':   Color.CYAN,
-    'blue':   Color.BLUE,
-    'green':  Color.GREEN,
-    'yellow': Color.YELLOW,
-    'orange': Color.YELLOW,
+_ROLE_ANSI = {
+    'purple': "\033[0;35m",
+    'red':    "\033[0;31m",
+    'cyan':   "\033[0;36m",
+    'blue':   "\033[0;34m",
+    'green':  "\033[0;32m",
+    'yellow': "\033[0;33m",
+    'orange': "\033[0;33m",
 }
 
 
@@ -304,6 +303,12 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     from ..registries.model_registry import load_model_registry
     from ..registries.role_registry import load_role_registry
 
+    # Evaluate color codes at render time so they're never stale from import-time disable
+    _tty = sys.stdout.isatty()
+    _DIM  = "\033[2m"  if _tty else ""
+    _NC   = "\033[0m"  if _tty else ""
+    _CYAN = "\033[0;36m" if _tty else ""
+
     selected_backends = [b for b in registry.all() if b.name in clis]
     models_registry = load_model_registry()
     role_registry = load_role_registry()
@@ -312,8 +317,8 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     # ── Shared section ────────────────────────────────────────────────────────
     print("")
     scope_label = "Global" if scope == "global" else "Local"
-    print(f"  {Color.DIM}Scope{Color.NC}     {scope_label}")
-    print(f"  {Color.DIM}Mode{Color.NC}      {'Copy' if copy_mode else 'Symlink'}")
+    print(f"  {_DIM}Scope{_NC}     {scope_label}")
+    print(f"  {_DIM}Mode{_NC}      {'Copy' if copy_mode else 'Symlink'}")
 
     if selected_skills:
         all_grouped = {s for gs in skill_groups.values() for s in gs}
@@ -325,38 +330,40 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
         ungrouped = sum(1 for s in selected_skills if s not in all_grouped)
         if ungrouped:
             parts.append(f"Other ({ungrouped})")
-        print(f"  {Color.DIM}Skills{Color.NC}    {', '.join(parts) if parts else 'none'}")
+        print(f"  {_DIM}Skills{_NC}    {', '.join(parts) if parts else 'none'}")
 
     if memory_backend and memory_backend != "none":
         mem_label = (f"Obsidian  →  {memory_path}" if memory_path else "Obsidian") if memory_backend == "obsidian" else "Local markdown"
-        print(f"  {Color.DIM}Memory{Color.NC}    {mem_label}")
+        print(f"  {_DIM}Memory{_NC}    {mem_label}")
 
     # ── Per-CLI sections ──────────────────────────────────────────────────────
     rules_count = _count_rules()
 
     for backend in selected_backends:
-        print(f"\n  {Color.CYAN}{backend.label}{Color.NC}")
+        print(f"\n  {_CYAN}{backend.label}{_NC}")
 
         # Agent roles
         if backend.name in role_models and role_models[backend.name]:
-            print(f"    {Color.DIM}Agent roles:{Color.NC}")
+            print(f"    {_DIM}Agent roles:{_NC}")
             for role_name, model_id in sorted(role_models[backend.name].items()):
                 role = role_map.get(role_name)
                 role_label = role.label if role else role_name
-                role_color = _ROLE_COLOR_MAP.get(role.color, "") if role and role.color else ""
-                colored_role = f"{role_color}{role_label}{Color.NC}" if role_color else role_label
+                role_ansi = (_ROLE_ANSI.get(role.color, "") if role and role.color else "") if _tty else ""
+                colored_role = f"{role_ansi}{role_label}{_NC}" if role_ansi else role_label
+                # Pad using visible label length (not raw string length which includes ANSI codes)
+                padding = " " * max(0, 28 - len(role_label))
                 try:
                     model = models_registry.get(model_id)
                     prov_alias = backend.first_alias_for(model.aliases)
                     alias = prov_alias[1] if prov_alias else model_id
                 except KeyError:
                     alias = model_id
-                print(f"      {colored_role:<28} {Color.DIM}{alias}{Color.NC}")
+                print(f"      {colored_role}{padding} {_DIM}{alias}{_NC}")
 
         # Agents count
         if backend.supports("agents"):
             n_agents = count_agents(backend)
-            print(f"    {Color.DIM}Agents:{Color.NC}      {n_agents}")
+            print(f"    {_DIM}Agents:{_NC}      {n_agents}")
 
         # Config + Rules
         cfg = _cfg_filename(backend)
@@ -364,7 +371,7 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
             cfg_desc = cfg
             if rules_count:
                 cfg_desc += f" + {rules_count} rules"
-            print(f"    {Color.DIM}Config:{Color.NC}      {cfg_desc}")
+            print(f"    {_DIM}Config:{_NC}      {cfg_desc}")
 
     print("")
 
