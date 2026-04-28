@@ -189,7 +189,8 @@ Run this query silently (do not show the SQL) and include the results table in y
 sqlite3 -header -column ~/.local/share/opencode/opencode.db "
 WITH cs AS (SELECT id FROM session WHERE parent_id IS NULL ORDER BY time_updated DESC LIMIT 1),
 stats AS (
-  SELECT COALESCE(json_extract(m.data,'$.agent'),'lead') as agent, json_extract(m.data,'$.modelID') as model,
+  SELECT COALESCE(json_extract(m.data,'$.agent'),'lead') as agent,
+    (SELECT json_extract(m2.data,'$.modelID') FROM message m2 WHERE m2.session_id=s.id AND json_extract(m2.data,'$.role')='assistant' ORDER BY json_extract(m2.data,'$.time.completed') DESC LIMIT 1) as model,
     SUM(json_extract(m.data,'$.tokens.input')) as inp, SUM(json_extract(m.data,'$.tokens.output')) as outp,
     SUM(json_extract(m.data,'$.tokens.cache.read')) as cache,
     ROUND((MAX(json_extract(m.data,'$.time.completed'))-MIN(json_extract(m.data,'$.time.created')))/1000.0,1) as sec
@@ -199,32 +200,32 @@ SELECT agent||'('||model||')' as 'agent(model)',
   inp||'/'||outp||'/'||cache as 'in/out/cache',
   sec||'s' as time,
   '\$'||ROUND(CASE
-    WHEN model LIKE '%haiku%' THEN inp*0.80/1e6+outp*4.0/1e6+cache*0.08/1e6
+    WHEN model LIKE '%haiku%' THEN inp*1.00/1e6+outp*5.0/1e6+cache*0.10/1e6
     WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
     WHEN model LIKE '%opus-4.7%' OR model LIKE '%opus-4.6%' OR model LIKE '%opus-4.5%' THEN inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6
     WHEN model LIKE '%opus%' THEN inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6
     WHEN model LIKE 'gpt-%' OR model LIKE 'o1%' OR model LIKE 'o3%' OR model LIKE 'o4%' THEN inp*2.50/1e6+outp*10.0/1e6+cache*0.50/1e6
     ELSE inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6 END,4) as actual,
-  '\$'||ROUND(inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6,4) as if_opus
+  '\$'||ROUND(inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6,4) as 'vs Opus 4.7'
 FROM stats
 UNION ALL
 SELECT 'TOTAL (saved '||ROUND((1.0-SUM(CASE
-    WHEN model LIKE '%haiku%' THEN inp*0.80/1e6+outp*4.0/1e6+cache*0.08/1e6
+    WHEN model LIKE '%haiku%' THEN inp*1.00/1e6+outp*5.0/1e6+cache*0.10/1e6
     WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
     WHEN model LIKE '%opus-4.7%' OR model LIKE '%opus-4.6%' OR model LIKE '%opus-4.5%' THEN inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6
     WHEN model LIKE '%opus%' THEN inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6
     WHEN model LIKE 'gpt-%' OR model LIKE 'o1%' OR model LIKE 'o3%' OR model LIKE 'o4%' THEN inp*2.50/1e6+outp*10.0/1e6+cache*0.50/1e6
-    ELSE inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6 END)/SUM(inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6))*100,0)||'%)',
+    ELSE inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6 END)/SUM(inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6))*100,0)||'%)',
   SUM(inp)||'/'||SUM(outp)||'/'||SUM(cache),
   MAX(sec)||'s parallel / '||CAST(CAST(SUM(sec) AS INT) AS TEXT)||'s sequential',
   '\$'||ROUND(SUM(CASE
-    WHEN model LIKE '%haiku%' THEN inp*0.80/1e6+outp*4.0/1e6+cache*0.08/1e6
+    WHEN model LIKE '%haiku%' THEN inp*1.00/1e6+outp*5.0/1e6+cache*0.10/1e6
     WHEN model LIKE '%sonnet%' THEN inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6
     WHEN model LIKE '%opus-4.7%' OR model LIKE '%opus-4.6%' OR model LIKE '%opus-4.5%' THEN inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6
     WHEN model LIKE '%opus%' THEN inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6
     WHEN model LIKE 'gpt-%' OR model LIKE 'o1%' OR model LIKE 'o3%' OR model LIKE 'o4%' THEN inp*2.50/1e6+outp*10.0/1e6+cache*0.50/1e6
     ELSE inp*3.0/1e6+outp*15.0/1e6+cache*0.30/1e6 END),4),
-  '\$'||ROUND(SUM(inp*15.0/1e6+outp*75.0/1e6+cache*1.50/1e6),4)
+  '\$'||ROUND(SUM(inp*5.0/1e6+outp*25.0/1e6+cache*0.50/1e6),4)
 FROM stats"
 ```
 
@@ -237,7 +238,7 @@ Column descriptions:
 - `in/out/cache` — input, output, and cache-read tokens
 - `time` — wall-clock time for that agent
 - `actual` — estimated cost based on the model's pricing
-- `if_opus` — what the same tokens would cost on Opus (baseline for savings calculation)
+- `vs Opus 4.7` — what the same tokens would cost on Opus 4.7 (baseline for savings calculation)
 - TOTAL row — aggregate cost, savings % vs all-Opus, and parallel vs sequential wall time
 
 ---
