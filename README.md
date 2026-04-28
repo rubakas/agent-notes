@@ -330,9 +330,16 @@ agent-notes install
 
 The wizard auto-detects existing vaults (directories containing `.obsidian/`) in `~/Documents`, `~/Desktop`, and `~`. You can also point to any directory — it doesn't need to be an existing vault.
 
-**Step 2 — Open the vault in Obsidian**
+**Step 2 — Initialise the vault**
 
-Open Obsidian → "Open folder as vault" → select the path you chose. The vault is ready — agent-notes creates the folder structure on first use.
+```bash
+agent-notes memory init
+# Obsidian vault initialised at ~/Documents/Obsidian/Main
+#   Folders: Patterns, Decisions, Mistakes, Context, Sessions
+#   Index:   ~/Documents/Obsidian/Main/Index.md
+```
+
+Then open Obsidian → "Open folder as vault" → select the same path.
 
 **Vault structure:**
 
@@ -381,8 +388,9 @@ agent-notes install --reconfigure
 ### Memory commands
 
 ```bash
+agent-notes memory init                    # create folder structure and Index.md
 agent-notes memory list                    # list all notes (by category or agent)
-agent-notes memory vault                   # show backend and path
+agent-notes memory vault                   # show backend, path, and init status
 agent-notes memory index                   # regenerate Index.md
 agent-notes memory add "Title" "Body"      # add a note (default type: context)
   --type pattern|decision|mistake|context|session

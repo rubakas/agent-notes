@@ -282,7 +282,7 @@ def main():
     # memory
     p_memory = subparsers.add_parser("memory", help="Manage agent memory")
     p_memory.add_argument("action", nargs="?", default="list",
-        choices=["list", "vault", "index", "add", "size", "show", "reset", "export", "import"],
+        choices=["init", "list", "vault", "index", "add", "size", "show", "reset", "export", "import"],
         help="Memory action")
     p_memory.add_argument("name", nargs="?", help="Agent name / note title (for show/reset/add)")
     p_memory.add_argument("extra", nargs="*", help="Additional args (for add: body [type] [agent] [project])")
