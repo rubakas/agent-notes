@@ -75,8 +75,28 @@ def tier_color(model_id: str) -> str:
     return DIM
 
 
+def fmt_num(n: int) -> str:
+    if n >= 1_000_000:
+        v = n / 1_000_000
+        return f"{v:.1f}m" if v < 100 else f"{round(v)}m"
+    if n >= 1_000:
+        return f"{n // 1_000}k"
+    return str(n)
+
+
 def fmt_tokens(inp, outp, cache) -> str:
-    return f"{inp}/{outp}/{cache}"
+    return f"{fmt_num(inp)}/{fmt_num(outp)}/{fmt_num(cache)}"
+
+
+def fmt_time(sec: float) -> str:
+    s = int(round(sec))
+    if s < 60:
+        return f"{s}s"
+    m, s = divmod(s, 60)
+    if m < 60:
+        return f"{m}m {s}s" if s else f"{m}m"
+    h, m = divmod(m, 60)
+    return f"{h}h {m}m" if m else f"{h}h"
 
 
 def fmt_cost(c: float) -> str:
@@ -105,9 +125,23 @@ def main() -> None:
         for agent, model, inp, outp, cache, sec in records
     ]
 
+    _total_inp  = sum(i for _, _, i, *_ in costs)
+    _total_outp = sum(o for _, _, _, o, *_ in costs)
+    _total_cache= sum(c for _, _, _, _, c, *_ in costs)
+    _max_sec    = max(s for _, _, _, _, _, s, *_ in costs)
+    _total_sec  = sum(s for _, _, _, _, _, s, *_ in costs)
+    _total_time = f"{fmt_time(_max_sec)} / {fmt_time(_total_sec)} seq"
+
     agent_col_w = max(len(f"{a}({m})") for a, m, *_ in costs) + 2
-    tok_col_w   = max(len(fmt_tokens(i, o, c)) for _, _, i, o, c, *_ in costs) + 2
-    W = (agent_col_w, tok_col_w, 10, 12, 12)
+    tok_col_w   = max(
+        max(len(fmt_tokens(i, o, c)) for _, _, i, o, c, *_ in costs),
+        len(fmt_tokens(_total_inp, _total_outp, _total_cache))
+    ) + 2
+    time_col_w  = max(
+        max(len(fmt_time(s)) for _, _, _, _, _, s, *_ in costs),
+        len(_total_time)
+    ) + 2
+    W = (agent_col_w, tok_col_w, time_col_w, 12, 12)
 
     header = (
         f"{'agent(model)':<{W[0]}}"
@@ -124,7 +158,7 @@ def main() -> None:
 
     for agent, model, inp, outp, cache, sec, actual, vs in costs:
         label = f"{agent}({model})"
-        time_str = f"{sec}s"
+        time_str = fmt_time(sec)
         col = tier_color(model)
         print(
             col + f"{label:<{W[0]}}" + NC
@@ -140,7 +174,7 @@ def main() -> None:
 
     saved_pct = round((1 - total_actual / total_vs) * 100) if total_vs else 0
     total_label = f"TOTAL (saved {saved_pct}%)"
-    total_time = f"{max_sec}s / {int(total_sec)}s seq"
+    total_time = _total_time
     col = GREEN if total_actual <= 5 else YELLOW
     print(
         col + BOLD
