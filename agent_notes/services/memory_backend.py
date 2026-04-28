@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import re
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -11,11 +11,17 @@ OBSIDIAN_CATEGORIES = ["Patterns", "Decisions", "Mistakes", "Context", "Sessions
 
 
 def _slug(title: str) -> str:
+    title = re.sub(r"^\d{4}-\d{2}-\d{2}[T\s]\d{2}[:\-]\d{2}[:\-]\d{2}\s*", "", title)
+    title = re.sub(r"^\d{4}-\d{2}-\d{2}\s*", "", title)
     return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60]
 
 
+def _now() -> str:
+    return datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+
+
 def _today() -> str:
-    return date.today().isoformat()
+    return datetime.now().strftime("%Y-%m-%d")
 
 
 # ── Obsidian backend ───────────────────────────────────────────────────────────
@@ -51,7 +57,7 @@ def obsidian_write_note(
     folder = vault / category_map.get(note_type, "Context")
     folder.mkdir(parents=True, exist_ok=True)
 
-    filename = f"{_today()}-{_slug(title)}.md"
+    filename = f"{_now()}-{_slug(title)}.md"
     path = folder / filename
 
     frontmatter_lines = [
