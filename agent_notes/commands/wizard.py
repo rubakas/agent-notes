@@ -176,7 +176,7 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
                 provider = prov_alias[0] if prov_alias else "?"
                 options.append((f"{m.label} (via {provider})", m.id))
 
-            role_color = _ROLE_COLOR_MAP.get(role.color, '')
+            role_color = (_ROLE_ANSI.get(role.color, '') if sys.stdout.isatty() else '') if role.color else ''
             role_label_colored = f"{role_color}{role.label}{Color.NC}" if role_color else role.label
             title = (
                 f"{Color.DIM}CLI{Color.NC}          {Color.YELLOW}{backend.label}{Color.NC}\n"
