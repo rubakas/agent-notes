@@ -41,8 +41,8 @@ def test_pyproject_dynamic_version():
     assert "version" in data["project"]["dynamic"]
 
 
-def test_version_file_matches_2_2_0():
-    assert (REPO_ROOT / "agent_notes" / "VERSION").read_text().strip() == "2.2.0"
+def test_version_file_matches_2_3_0():
+    assert (REPO_ROOT / "agent_notes" / "VERSION").read_text().strip() == "2.3.0"
 
 
 def test_wheel_builds_clean(built_wheel):
