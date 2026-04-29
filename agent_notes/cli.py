@@ -286,6 +286,14 @@ def main():
         help="Memory action")
     p_memory.add_argument("name", nargs="?", help="Agent name / note title (for show/reset/add)")
     p_memory.add_argument("extra", nargs="*", help="Additional args (for add: body [type] [agent] [project])")
+
+    # config
+    p_config = subparsers.add_parser("config", help="Reconfigure role/agent/model/memory/skill assignments after install")
+    p_config.add_argument("action", nargs="?", default="wizard",
+        choices=["wizard", "show", "role-model", "role-agent"],
+        help="Config action (default: wizard)")
+    p_config.add_argument("extra", nargs="*", help="Additional positional args (role, model, agent)")
+    p_config.add_argument("--cli", help="Target CLI (claude / opencode / both)")
     
     args = parser.parse_args()
     
@@ -343,6 +351,9 @@ def main():
     elif args.command == "memory":
         from .commands.memory import memory
         memory(args.action, args.name, getattr(args, "extra", None))
+    elif args.command == "config":
+        from .commands.config import config
+        config(action=args.action, args=getattr(args, "extra", None) or [], cli_filter=args.cli)
 
 if __name__ == "__main__":
     main()
