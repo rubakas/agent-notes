@@ -57,24 +57,6 @@ def _count_skills(backend, scope: str) -> tuple:
     return installed, expected
 
 
-def _count_scripts() -> tuple:
-    """Count (installed, expected) scripts in ~/.local/bin/."""
-    # Helper functions to get config values
-    def _get_bin_home():
-        from ...config import BIN_HOME
-        return BIN_HOME
-
-    def _get_dist_scripts_dir():
-        from ...config import DIST_SCRIPTS_DIR
-        return DIST_SCRIPTS_DIR
-
-    bin_home = _get_bin_home()
-    dist_scripts_dir = _get_dist_scripts_dir()
-
-    installed = len([f for f in bin_home.iterdir() if f.is_file() and (dist_scripts_dir / f.name).exists()]) if bin_home and bin_home.exists() else 0
-    expected = len([f for f in dist_scripts_dir.iterdir() if f.is_file()]) if dist_scripts_dir and dist_scripts_dir.exists() else 0
-    return installed, expected
-
 
 def _count_rules(backend, scope: str) -> tuple:
     """Count (installed, expected) rules for a CLI backend."""
@@ -270,11 +252,6 @@ def print_summary(scope: str):
             installed, expected = _count_rules(backend, scope)
             _print_status("rules", installed, expected)
 
-        # Scripts (global only, not per-CLI)
-        if scope == "global":
-            from ...config import BIN_HOME
-            installed, expected = _count_scripts()
-            _print_status(f"scripts ({BIN_HOME})", installed, expected)
 
 
 def print_issues(issues: List[Issue]) -> bool:

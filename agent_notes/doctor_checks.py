@@ -8,7 +8,7 @@ from .registries.cli_registry import CLIRegistry
 from .domain.cli_backend import CLIBackend
 from .services import installer
 from .state import State, ScopeState, sha256_of
-from .config import BIN_HOME, AGENTS_HOME, DIST_SCRIPTS_DIR, DIST_SKILLS_DIR
+from .config import BIN_HOME, AGENTS_HOME, DIST_SKILLS_DIR
 
 
 def expected_paths_for_install(
@@ -45,12 +45,6 @@ def expected_paths_for_install(
                 for f in sorted(src.glob("*.md")):
                     expected.append((f, dst / f.name, backend.name, component))
     
-    # Scripts (global only)
-    if scope == "global" and DIST_SCRIPTS_DIR.exists():
-        for script in sorted(DIST_SCRIPTS_DIR.iterdir()):
-            if script.is_file():
-                expected.append((script, BIN_HOME / script.name, "scripts", "scripts"))
-    
     # Universal skills mirror (global only)
     if scope == "global" and DIST_SKILLS_DIR.exists():
         any_backend_has_skills = any(b.supports("skills") for b in registry.all())
@@ -76,9 +70,9 @@ def check_missing(scope, registry, issues, fix_actions, scope_state: Optional[Sc
         installed_backends = set(scope_state.clis.keys())
 
     for src, dst, backend_name, component in expected_paths_for_install(registry, scope):
-        # "scripts" / "universal" are shared (not per-CLI-backend); always expected.
+        # "universal" is shared (not per-CLI-backend); always expected.
         if (installed_backends is not None
-                and backend_name not in ("scripts", "universal")
+                and backend_name not in ("universal",)
                 and backend_name not in installed_backends):
             continue
         if not dst.exists() and not dst.is_symlink():
