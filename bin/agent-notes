@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-# agent-notes — thin wrapper that delegates to the Python CLI.
-set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-export PYTHONPATH="$PROJECT_ROOT"
-exec python3 -m agent_notes "$@"

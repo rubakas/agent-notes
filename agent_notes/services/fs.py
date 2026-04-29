@@ -133,22 +133,32 @@ def place_dir_contents(src_dir: Path, dst_dir: Path, pattern: str, copy_mode: bo
             place_file(src_file, dst_file, copy_mode)
 
 
-def remove_symlink(target: Path) -> None:
-    """Remove symlink if it exists, skip non-symlinks."""
+def remove_symlink(target: Path, copy_mode: bool = False) -> None:
+    """Remove symlink if it exists. In copy_mode, also removes plain files (managed installs)."""
     if target.is_symlink():
+        target.unlink()
+        _removed(str(target))
+    elif copy_mode and target.exists():
         target.unlink()
         _removed(str(target))
     elif target.exists():
         _skipped(str(target))
 
 
-def remove_all_symlinks_in_dir(dir_path: Path) -> None:
-    """Remove all symlinks in a directory (files and dirs)."""
+def remove_all_symlinks_in_dir(dir_path: Path, copy_mode: bool = False) -> None:
+    """Remove all symlinks in a directory. In copy_mode, also removes plain files (managed installs)."""
     if not dir_path.exists():
         return
     for item in dir_path.iterdir():
         if item.is_symlink():
             item.unlink()
+            _removed(str(item))
+        elif copy_mode and item.exists():
+            if item.is_dir():
+                import shutil
+                shutil.rmtree(item)
+            else:
+                item.unlink()
             _removed(str(item))
         elif item.exists():
             _skipped(str(item))

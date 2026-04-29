@@ -97,3 +97,22 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False) 
         install_state.record_install_state(st)
     except Exception as e:
         print(f"{Color.YELLOW}Warning: failed to write state.json: {e}{Color.NC}")
+
+
+def uninstall(local: bool = False) -> None:
+    """Remove installed components managed by agent-notes."""
+    from ..services import installer
+
+    scope = "local" if local else "global"
+    project_path = Path.cwd().resolve() if local else None
+
+    print(f"Uninstalling agent-notes ({scope}) ...")
+    installer.uninstall_all(scope)
+
+    # Remove state entry for this scope
+    try:
+        install_state.remove_install_state(scope, project_path)
+    except Exception as e:
+        print(f"{Color.YELLOW}Warning: failed to clear state.json: {e}{Color.NC}")
+
+    print(f"{Color.GREEN}Done.{Color.NC} agent-notes components removed.")

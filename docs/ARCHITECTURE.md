@@ -270,8 +270,8 @@ When a module first imports `config`, these fallback helpers ensure `CLAUDE_HOME
 Here's a 10-line walk-through of how a single command executes:
 
 ```
-1. bin/agent-notes (wrapper)
-   ↓ executes: python3 -m agent_notes
+1. agent-notes (entry point installed by pip/pipx via pyproject.toml scripts)
+   ↓ executes: agent_notes.cli:main
    ↓
 2. agent_notes/__main__.py → agent_notes.cli.main()
    ↓

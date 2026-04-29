@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List
 
 from ..config import (
-    ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR, DIST_SKILLS_DIR, DIST_SCRIPTS_DIR,
+    ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR, DIST_SKILLS_DIR,
     CLAUDE_HOME, OPENCODE_HOME, GITHUB_HOME, AGENTS_HOME, BIN_HOME,
     linked, removed, skipped, info, get_version, Color, PKG_DIR
 )
@@ -16,11 +16,6 @@ from ..services.fs import (
     remove_all_symlinks_in_dir, remove_dir_if_empty
 )
 
-
-def install_scripts_global() -> None:
-    """Install scripts to ~/.local/bin/."""
-    from ..services.installer import install_scripts_global as _service_impl
-    _service_impl()
 
 
 def _install_skills_to(targets: List[Path], dist_skills_dir: Path, copy_mode: bool) -> None:
@@ -108,11 +103,6 @@ def install_rules_local(copy_mode: bool = False) -> None:
         place_dir_contents(DIST_RULES_DIR, Path(".claude/rules"), "*.md", copy_mode)
 
 
-def uninstall_scripts_global() -> None:
-    """Uninstall scripts from ~/.local/bin/."""
-    from ..services.installer import uninstall_scripts_global as _service_impl
-    _service_impl()
-
 
 def _uninstall_skills_from(targets: List[Path]) -> None:
     """Remove skills from each directory in targets."""
@@ -182,10 +172,6 @@ def uninstall_rules_local() -> None:
         "Removing project rules ...",
     )
 
-
-def count_scripts() -> int:
-    """Count script files."""
-    return len([f for f in DIST_SCRIPTS_DIR.iterdir() if f.is_file()]) if DIST_SCRIPTS_DIR.exists() else 0
 
 
 def count_skills() -> int:
