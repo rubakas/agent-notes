@@ -133,11 +133,7 @@ explorer → lead answers
 
 {{MEMORY_INSTRUCTIONS}}
 
-## Cost reporting
-
-At the END of every response, run `cost-report` and include the output as a table prefixed with:
-
-**Session cost** (cumulative for the entire conversation):
+<!-- include: cost_reporting -->
 
 ## Phase 1: Prompt analysis (do this first, before any action)
 

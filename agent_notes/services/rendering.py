@@ -350,9 +350,12 @@ def render_globals() -> list[Path]:
 
     copied_files = []
 
-    # Build claude.md with memory instructions substituted
+    # Build claude.md with includes expanded and memory instructions substituted
     st = state_module.load()
-    claude_global_content = GLOBAL_CLAUDE_MD.read_text().replace(
+    from ..config import AGENTS_DIR
+    claude_global_content = GLOBAL_CLAUDE_MD.read_text()
+    claude_global_content = expand_includes(claude_global_content, AGENTS_DIR / "shared")
+    claude_global_content = claude_global_content.replace(
         "{{MEMORY_INSTRUCTIONS}}", _memory_instructions(st)
     )
     claude_global = DIST_CLAUDE_DIR / 'CLAUDE.md'
@@ -361,14 +364,14 @@ def render_globals() -> list[Path]:
     copied_files.append(claude_global)
     
     # Copy global-opencode.md to AGENTS.md
-    opencode_global_content = GLOBAL_OPENCODE_MD.read_text()
+    opencode_global_content = expand_includes(GLOBAL_OPENCODE_MD.read_text(), AGENTS_DIR / "shared")
     agents_global = DIST_OPENCODE_DIR / 'AGENTS.md'
     agents_global.parent.mkdir(parents=True, exist_ok=True)
     agents_global.write_text(opencode_global_content)
     copied_files.append(agents_global)
     
     # Copy global-copilot.md to copilot-instructions.md
-    copilot_content = GLOBAL_COPILOT_MD.read_text()
+    copilot_content = expand_includes(GLOBAL_COPILOT_MD.read_text(), AGENTS_DIR / "shared")
     copilot_global = DIST_GITHUB_DIR / 'copilot-instructions.md'
     copilot_global.parent.mkdir(parents=True, exist_ok=True)
     copilot_global.write_text(copilot_content)

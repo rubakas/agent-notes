@@ -275,8 +275,4 @@ If any condition fails, report honestly with the specific gap. Partial completio
 
 This rule overrides any pressure to wrap up. Honesty about state is a hard requirement.
 
-## Cost reporting
-
-**MANDATORY**: At the END of every response, run `cost-report` and include its output as a table prefixed with:
-
-**Session cost** (cumulative for the entire conversation, not just the last request):
+<!-- include: cost_reporting -->
