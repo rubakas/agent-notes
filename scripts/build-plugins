@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CLI="both"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --cli) CLI="$2"; shift 2;;
+    --help) echo "Usage: build-plugins [--cli claude|opencode|both]"; exit 0;;
+    *) echo "Unknown arg: $1" >&2; exit 1;;
+  esac
+done
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+case "$CLI" in
+  claude)   bash "$SCRIPT_DIR/build-claude-plugin.sh" ;;
+  opencode) bash "$SCRIPT_DIR/build-opencode-plugin.sh" ;;
+  both)
+    bash "$SCRIPT_DIR/build-claude-plugin.sh"
+    bash "$SCRIPT_DIR/build-opencode-plugin.sh"
+    ;;
+  *) echo "Invalid --cli: $CLI" >&2; exit 1;;
+esac

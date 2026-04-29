@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 AGENT_NOTES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+LOG_FILE="/tmp/agent-notes-release-${TIMESTAMP}.log"
+SMOKE_VENV="/tmp/agent-notes-release-test"
+DRY_RUN=false
+
+# Cleanup smoke venv on exit (success or failure)
+trap "rm -rf '$SMOKE_VENV'" EXIT
+
+# Tee all output to log file
+exec > >(tee -a "$LOG_FILE") 2>&1
 
 # Colors and helpers
 RED='\033[0;31m'
@@ -10,21 +20,45 @@ YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+phase() { echo -e "\n=== $1 ===" >&2; }
 error() { echo -e "${RED}Error: $1${NC}" >&2; exit 1; }
 ok() { echo -e "  ${GREEN}ok${NC}  $1"; }
 info() { echo -e "${BLUE}$1${NC}"; }
 warn() { echo -e "${YELLOW}$1${NC}"; }
 
+# Parse flags
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    --help|-h)
+      echo "Usage: scripts/release [--dry-run]"
+      echo ""
+      echo "Options:"
+      echo "  --dry-run   Run checks (tests, build, twine check, smoke tests) but skip"
+      echo "              upload to PyPI, git tag, and marketplace bundle."
+      echo "  --help      Show this help message."
+      exit 0
+      ;;
+    *) error "Unknown argument: $arg" ;;
+  esac
+done
+
+if $DRY_RUN; then
+  warn "DRY-RUN mode — upload, git tag, and marketplace bundle will be skipped"
+fi
+
+info "Release log: $LOG_FILE"
+
 # Helper to bump semantic version
 bump_version() {
   local version="$1"
   local bump_type="$2"
-  
+
   IFS='.' read -r -a parts <<< "$version"
   local major="${parts[0]}"
   local minor="${parts[1]}"
   local patch="${parts[2]}"
-  
+
   case "$bump_type" in
     major)
       major=$((major + 1))
@@ -42,12 +76,20 @@ bump_version() {
       error "Invalid bump type: $bump_type (must be major, minor, or patch)"
       ;;
   esac
-  
+
   echo "$major.$minor.$patch"
 }
 
-# Pre-flight checks
-info "Running pre-flight checks..."
+# ─── PHASE: PRE-FLIGHT ───────────────────────────────────────────────────────
+phase "PRE-FLIGHT"
+
+# Check required tools
+for tool in build twine; do
+  if ! python3 -c "import $tool" 2>/dev/null; then
+    error "'$tool' is not installed. Install with: pip install build twine"
+  fi
+done
+ok "build and twine are available"
 
 # Check if on develop branch
 current_branch=$(git branch --show-current)
@@ -75,12 +117,14 @@ if ! python3 -m agent_notes validate > /dev/null 2>&1; then
 fi
 ok "Validation passed"
 
-# Run tests
-info "Running tests..."
-if ! python3 -m pytest tests/ -x -q > /dev/null 2>&1; then
-  error "Tests failed. Run 'python3 -m pytest tests/' to see details."
+# ─── PHASE: TESTS ────────────────────────────────────────────────────────────
+phase "TESTS"
+
+info "Running full pytest suite..."
+if ! python3 -m pytest tests/ -x -q; then
+  error "Tests failed — aborting release."
 fi
-ok "Tests passed"
+ok "All tests passed"
 
 # Read current version
 version_file="$AGENT_NOTES_DIR/agent_notes/VERSION"
@@ -139,18 +183,73 @@ info "Updating VERSION file..."
 echo "$new_version" > "$version_file"
 ok "VERSION updated to $new_version"
 
-# Build from source and sync plugin (agents, skills, plugin.json version)
-info "Building and syncing plugin..."
-if ! bash "$AGENT_NOTES_DIR/scripts/build-plugin.sh" > /dev/null 2>&1; then
-  error "Plugin build failed. Run 'bash scripts/build-plugin.sh' to see details."
+# Build from source and sync plugins (Claude + OpenCode)
+info "Building and syncing plugins..."
+if ! bash "$AGENT_NOTES_DIR/scripts/build-plugins" > /dev/null 2>&1; then
+  error "Plugin build failed. Run 'bash scripts/build-plugins' to see details."
 fi
 ok "Build and plugin sync completed"
 
 # Commit version bump and plugin changes
 info "Committing changes..."
-git add agent_notes/VERSION .claude-plugin/agents/ .claude-plugin/skills/ .claude-plugin/plugin.json
+git add agent_notes/VERSION .claude-plugin/agents/ .claude-plugin/skills/ .claude-plugin/plugin.json .opencode-plugin/
 git commit -m "chore: bump version to $new_version"
 ok "Changes committed"
+
+# ─── PHASE: BUILD ────────────────────────────────────────────────────────────
+phase "BUILD"
+
+info "Building wheel and sdist..."
+rm -rf dist/
+python3 -m build --outdir dist/
+ok "Package built: $(ls dist/)"
+
+# ─── PHASE: TWINE CHECK ──────────────────────────────────────────────────────
+phase "TWINE CHECK"
+
+info "Checking package metadata and description rendering..."
+python3 -m twine check dist/*
+ok "twine check passed"
+
+# ─── PHASE: SMOKE TESTS ──────────────────────────────────────────────────────
+phase "SMOKE TESTS"
+
+info "Creating fresh virtualenv at $SMOKE_VENV..."
+python3 -m venv "$SMOKE_VENV"
+ok "Virtualenv created"
+
+info "Installing wheel into test venv..."
+"$SMOKE_VENV/bin/pip" install --quiet dist/*.whl
+ok "Wheel installed"
+
+info "Smoke test: agent-notes --version"
+installed_version=$("$SMOKE_VENV/bin/agent-notes" --version 2>&1)
+expected_version=$(cat "$version_file" | tr -d '[:space:]')
+if [[ "$installed_version" != *"$expected_version"* ]]; then
+  error "Version mismatch: installed='$installed_version', expected='$expected_version'"
+fi
+ok "agent-notes --version → $installed_version"
+
+info "Smoke test: cost-report --help"
+if ! "$SMOKE_VENV/bin/cost-report" --help > /dev/null 2>&1; then
+  error "cost-report --help exited non-zero"
+fi
+ok "cost-report --help → OK"
+
+# ─── DRY-RUN EXIT POINT ──────────────────────────────────────────────────────
+if $DRY_RUN; then
+  echo
+  warn "=== DRY-RUN COMPLETE — skipping upload, git tag, and marketplace bundle ==="
+  echo
+  echo "Artifacts in dist/:"
+  ls -1 dist/
+  echo
+  ok "Dry run finished successfully. Log: $LOG_FILE"
+  exit 0
+fi
+
+# ─── PHASE: MERGE & PUBLISH ──────────────────────────────────────────────────
+phase "MERGE & PUBLISH"
 
 # Merge to main
 info "Switching to main branch..."
@@ -182,21 +281,17 @@ git push origin develop
 git push origin "v$new_version"
 ok "All branches and tags pushed"
 
-# Build Python package
-info "Building Python package..."
-rm -rf dist_pkg/
-if ! pipx run build --outdir dist_pkg/ > /dev/null 2>&1; then
-  error "Python package build failed. Run 'pipx run build --outdir dist_pkg/' to see details."
-fi
-ok "Package built: $(ls dist_pkg/)"
+# Build Python package for GitHub release (already in dist/ from BUILD phase)
+ok "Package ready: $(ls dist/)"
 
 # Create GitHub release with wheel attached
 info "Creating GitHub release..."
+release_url=""
 if release_url=$(gh release create "v$new_version" \
   --title "Release $new_version" \
   --generate-notes \
   --target main \
-  dist_pkg/*.whl dist_pkg/*.tar.gz); then
+  dist/*.whl dist/*.tar.gz); then
   ok "GitHub release created"
 else
   warn "GitHub release creation failed. Create manually at: https://github.com/rubakas/agent-notes/releases/new"
@@ -204,10 +299,10 @@ fi
 
 # Publish to PyPI
 info "Publishing to PyPI..."
-if pipx run twine upload dist_pkg/*; then
+if python3 -m twine upload dist/*; then
   ok "Published to PyPI"
 else
-  warn "PyPI upload failed. Run 'pipx run twine upload dist_pkg/*' manually."
+  warn "PyPI upload failed. Run 'python3 -m twine upload dist/*' manually."
   warn "Ensure TWINE_USERNAME=__token__ and TWINE_PASSWORD=<pypi-token> are set."
 fi
 
@@ -220,6 +315,7 @@ echo "  Previous version: $current_version"
 echo "  New version:      $new_version"
 echo "  Bump type:        $bump_type"
 echo "  Tag:              v$new_version"
-echo "  Release URL:      $release_url"
+echo "  Release URL:      ${release_url:-N/A}"
+echo "  Log:              $LOG_FILE"
 echo
 ok "All done!"

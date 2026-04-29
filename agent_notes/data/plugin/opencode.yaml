@@ -1,0 +1,7 @@
+name: agent-notes-opencode-plugin
+description: agent-notes OpenCode hook plugin
+# Vendored skills shipped inside the plugin (subset of full library)
+vendored_skills: []  # for now, empty — the SessionStart hook doesn't ship skills
+# Plugin-specific config
+hook_scope:
+  - session.start
