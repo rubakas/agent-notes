@@ -615,11 +615,6 @@ def _interactive_install() -> None:
     from ..services import installer as _installer
     _registry = _load_registry()
 
-    # Scripts (global only)
-    if scope == "global":
-        from ..services.installer import install_scripts_global
-        install_scripts_global()
-
     # Skills
     if selected_skills:
         targets = []
