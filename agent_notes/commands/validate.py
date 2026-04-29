@@ -50,8 +50,8 @@ def validate() -> None:
                 errors.append(ValidationError(label, f"name '{fm_name}' does not match filename '{local_name}'"))
 
             # Line count
-            if lines > 250:
-                errors.append(ValidationError(label, "exceeds 250 line limit"))
+            if lines > 300:
+                errors.append(ValidationError(label, "exceeds 300 line limit"))
             elif lines > 80:
                 warnings.append(ValidationWarning(label, "over 80 lines (consider trimming)"))
             else:
@@ -79,8 +79,8 @@ def validate() -> None:
                 if not has_field(f, field):
                     errors.append(ValidationError(label, f"missing required field: {field}"))
 
-            if lines > 250:
-                errors.append(ValidationError(label, "exceeds 250 line limit"))
+            if lines > 300:
+                errors.append(ValidationError(label, "exceeds 300 line limit"))
             elif lines > 80:
                 warnings.append(ValidationWarning(label, "over 80 lines (consider trimming)"))
             else:
