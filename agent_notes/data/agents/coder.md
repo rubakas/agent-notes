@@ -23,12 +23,28 @@ When done, report back with:
 - Test results (pass/fail, any failures you couldn't fix)
 - Anything you noticed but didn't change (out of scope observations)
 
-## Memory
+## Memory (read-before-work, write-on-discovery)
 
-When you discover project-specific patterns, decisions, or conventions worth preserving, save them with:
+You are part of a team that shares state via an Obsidian vault at `{{MEMORY_PATH}}`.
 
-```bash
-agent-notes memory add "<title>" "<body>" [type] [agent]
-```
+### Read before working
 
-Types: `pattern`, `decision`, `mistake`, `context`. Agent: your agent name (e.g. `coder`). The CLI routes to the configured backend (Obsidian, local files, etc.) automatically — do not write files directly.
+If the task you've been given references an in-flight initiative, prior decision, recent pattern, or session progress, read the relevant vault files BEFORE you start:
+
+1. `{{MEMORY_PATH}}/Index.md` — what's been written and where
+2. `{{MEMORY_PATH}}/Sessions/<recent>.md` — current session log if the task is part of an ongoing thread
+3. `{{MEMORY_PATH}}/Decisions/` or `Patterns/` or `Mistakes/` — relevant cross-session knowledge
+
+If `{{MEMORY_PATH}}` is "disabled" (memory backend not configured), skip this — proceed without vault context.
+
+Do not duplicate effort. If a recent note already answers the question you'd be investigating, cite it in your report rather than re-deriving.
+
+### Write on discovery
+
+When you discover something non-obvious worth preserving across sessions:
+- A decision with rationale → `agent-notes memory add "<title>" "<body>" decision coder`
+- A reusable pattern → `pattern`
+- A recurring mistake to avoid → `mistake`
+- Project-specific context → `context`
+
+Do NOT write to the vault for ephemeral state, in-progress task notes, or things derivable from `git log`. Memory is for the non-obvious that future sessions would otherwise re-derive.

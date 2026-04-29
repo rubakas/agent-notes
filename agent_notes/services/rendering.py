@@ -131,11 +131,16 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
             continue
         
         prompt_content = prompt_file.read_text()
-        
+
         # Expand shared-content include directives (<!-- include: NAME -->)
         # No-op if shared/ directory is absent.
         prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared")
-        
+
+        # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
+        from .. import state as _state_module
+        _st = _state_module.load()
+        prompt_content = prompt_content.replace("{{MEMORY_PATH}}", _memory_path(_st))
+
         # Generate for each backend that supports agents
         for backend in registry.all():
             if not backend.supports("agents"):
@@ -285,17 +290,71 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     return generated_files
 
 
+def _memory_path(st) -> str:
+    """Return the vault/memory path string for {{MEMORY_PATH}} substitution in agent prompts."""
+    from ..config import memory_dir_for_backend
+
+    if st is None:
+        return "disabled"
+
+    backend = st.memory.backend
+    custom_path = st.memory.path
+
+    if backend == "none":
+        return "disabled"
+
+    resolved = memory_dir_for_backend(backend, custom_path)
+    if resolved is None:
+        return "disabled"
+
+    return str(resolved)
+
+
+def _memory_instructions(st) -> str:
+    """Return memory instructions text based on the configured backend."""
+    from ..config import memory_dir_for_backend
+
+    if st is None:
+        return (
+            "Save memories using the `agent-notes memory add` CLI.\n\n"
+            "Use: `agent-notes memory add \"<title>\" \"<body>\" [type] [agent]`\n"
+            "Types: `pattern`, `decision`, `mistake`, `context`. Agent: `lead`."
+        )
+
+    backend = st.memory.backend
+    custom_path = st.memory.path
+
+    if backend == "none":
+        return "Memory is disabled for this installation."
+
+    resolved = memory_dir_for_backend(backend, custom_path)
+    if resolved is None:
+        return "Memory is disabled for this installation."
+
+    label = "the configured Obsidian vault at" if backend == "obsidian" else "writes to"
+    return (
+        f"Save memories using the `agent-notes memory add` CLI — it {label} `{resolved}` automatically. "
+        "Do not write memory files directly.\n\n"
+        "Use: `agent-notes memory add \"<title>\" \"<body>\" [type] [agent]`\n"
+        "Types: `pattern`, `decision`, `mistake`, `context`. Agent: `lead`."
+    )
+
+
 def render_globals() -> list[Path]:
     """Copy global files to destinations."""
     from ..config import (
         GLOBAL_CLAUDE_MD, GLOBAL_OPENCODE_MD, GLOBAL_COPILOT_MD,
         DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR
     )
-    
+    from .. import state as state_module
+
     copied_files = []
-    
-    # Copy global-claude.md to CLAUDE.md
-    claude_global_content = GLOBAL_CLAUDE_MD.read_text()
+
+    # Build claude.md with memory instructions substituted
+    st = state_module.load()
+    claude_global_content = GLOBAL_CLAUDE_MD.read_text().replace(
+        "{{MEMORY_INSTRUCTIONS}}", _memory_instructions(st)
+    )
     claude_global = DIST_CLAUDE_DIR / 'CLAUDE.md'
     claude_global.parent.mkdir(parents=True, exist_ok=True)
     claude_global.write_text(claude_global_content)
