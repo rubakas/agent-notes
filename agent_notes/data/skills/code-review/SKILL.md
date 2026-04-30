@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: "Systematic code review: correctness, safety, performance, clarity, consistency"
+description: "Systematic code review: correctness, safety, performance, clarity, consistency. Use when user wants to review code, check quality, or says 'review this'."
 group: process
 ---
 

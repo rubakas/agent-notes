@@ -1,6 +1,6 @@
 ---
 name: rails-initializers
-description: "Rails configuration initializers: extensions, CORS, filtering, and custom config"
+description: "Rails configuration initializers: extensions, CORS, filtering, and custom config. Use when user is adding or editing files in config/initializers/."
 group: rails
 ---
 

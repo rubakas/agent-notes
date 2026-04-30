@@ -1,6 +1,6 @@
 ---
 name: rails-models-advanced
-description: "Rails models advanced: transactions, enums, normalization, serialization, storage, and common patterns"
+description: "Rails models advanced: transactions, enums, normalization, serialization, storage, and common patterns. Use when user needs enums, transactions, serialized attributes, or complex model patterns."
 group: rails
 ---
 

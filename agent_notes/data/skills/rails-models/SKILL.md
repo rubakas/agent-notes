@@ -1,6 +1,6 @@
 ---
 name: rails-models
-description: "Rails models: structure template, associations, callbacks, scopes, and validations"
+description: "Rails models: structure template, associations, callbacks, scopes, and validations. Use when user is writing or editing Rails ActiveRecord models."
 group: rails
 ---
 

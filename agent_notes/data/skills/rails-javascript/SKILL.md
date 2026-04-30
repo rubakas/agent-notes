@@ -1,6 +1,6 @@
 ---
 name: rails-javascript
-description: "Rails frontend: Stimulus controllers, Turbo patterns, Importmap, and view transitions"
+description: "Rails frontend: Stimulus controllers, Turbo patterns, Importmap, and view transitions. Use when user is writing Stimulus controllers, Turbo Drive behavior, or frontend JS in a Rails app."
 group: rails
 ---
 

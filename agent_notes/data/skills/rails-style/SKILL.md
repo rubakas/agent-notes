@@ -1,6 +1,6 @@
 ---
 name: rails-style
-description: "Rails code style: conditionals, method ordering, bang methods, visibility, and naming conventions"
+description: "Rails code style: conditionals, method ordering, bang methods, visibility, and naming conventions. Use when user wants to follow Rails conventions or asks about idiomatic Ruby/Rails style."
 group: rails
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: rails-view-components
-description: "ViewComponent: reusable components, slots, testing, and previews"
+description: "ViewComponent: reusable components, slots, testing, and previews. Use when user is building or editing ViewComponent classes in a Rails app."
 group: rails
 ---
 

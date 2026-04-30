@@ -1,6 +1,6 @@
 ---
 name: docker-compose-advanced
-description: "Docker Compose advanced: database services, caches, proxies, dev/prod configs, and full stack examples"
+description: "Docker Compose advanced: database services, caches, proxies, dev/prod configs, and full stack examples. Use when user needs multi-service compose setups or environment-specific overrides."
 group: docker
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: rails-mailers
-description: "Rails Action Mailer: templates, layouts, attachments, previews, and testing"
+description: "Rails Action Mailer: templates, layouts, attachments, previews, and testing. Use when user is creating or editing mailers or email templates in Rails."
 group: rails
 ---
 

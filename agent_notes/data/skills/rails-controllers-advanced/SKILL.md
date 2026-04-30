@@ -1,6 +1,6 @@
 ---
 name: rails-controllers-advanced
-description: "Rails controllers advanced: error handling, filters, streaming, API patterns, security, and testing"
+description: "Rails controllers advanced: error handling, filters, streaming, API patterns, security, and testing. Use when user needs error handling, before_action filters, API-mode controllers, or controller security."
 group: rails
 ---
 

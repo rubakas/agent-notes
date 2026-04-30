@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: "RED-GREEN-REFACTOR: write the failing test first, then make it pass, then clean up"
+description: "RED-GREEN-REFACTOR via vertical slices: one failing test, one implementation, repeat. Use when user wants TDD, test-first development, or says 'red-green-refactor'."
 group: process
 ---
 
@@ -11,6 +11,21 @@ group: process
 1. No production code before a failing test.
 2. The minimum code to pass the test — nothing more.
 3. Refactor only while tests are green.
+
+## Anti-pattern: Horizontal slicing
+
+**Do not write all tests first, then all implementation.** This is horizontal slicing — treating RED as "write all tests" and GREEN as "write all code."
+
+This produces bad tests: written in bulk against imagined behavior, testing the shape of things (data structures, function signatures) rather than user-facing behavior. Tests become insensitive to real changes.
+
+**Correct approach: vertical slices via tracer bullets.** One test → one implementation → repeat. Each test responds to what you learned from the previous cycle.
+
+```
+WRONG: RED: test1, test2, test3, test4 → GREEN: impl1, impl2, impl3, impl4
+RIGHT: RED→GREEN: test1→impl1, RED→GREEN: test2→impl2, RED→GREEN: test3→impl3
+```
+
+Because you just wrote the code, you know exactly what behavior matters and how to verify it.
 
 ## RED — write a failing test
 

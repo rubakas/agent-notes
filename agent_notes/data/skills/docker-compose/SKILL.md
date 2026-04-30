@@ -1,6 +1,6 @@
 ---
 name: docker-compose
-description: "Docker Compose: file structure, health checks, depends_on, and common service patterns"
+description: "Docker Compose: file structure, health checks, depends_on, and common service patterns. Use when user is writing or editing a docker-compose.yml."
 group: docker
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: rails-views-advanced
-description: "Rails views advanced: Turbo Streams, JSON/Jbuilder, helpers in views, conditional rendering, and best practices"
+description: "Rails views advanced: Turbo Streams, JSON/Jbuilder, helpers in views, conditional rendering, and best practices. Use when user needs Turbo Stream responses, JSON views, or advanced Rails view patterns."
 group: rails
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: rails-jobs
-description: "Rails Active Job: background processing, error handling, recurring jobs, and testing"
+description: "Rails Active Job: background processing, error handling, recurring jobs, and testing. Use when user is creating or editing background jobs in Rails."
 group: rails
 ---
 

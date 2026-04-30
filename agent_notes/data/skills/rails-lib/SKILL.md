@@ -1,6 +1,6 @@
 ---
 name: rails-lib
-description: "Custom libraries, Rails extensions, and lib/ directory organization"
+description: "Custom libraries, Rails extensions, and lib/ directory organization. Use when user is adding service objects, utilities, or custom extensions to lib/."
 group: rails
 ---
 
