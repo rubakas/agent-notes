@@ -6,14 +6,31 @@ build-backend = "setuptools.build_meta"
 name = "agent-notes"
 dynamic = ["version"]
 description = "AI agent configuration manager for Claude Code, OpenCode, and Copilot"
-authors = [{ name = "Eugene Naumov" }]
+readme = "README.md"
+authors = [{ name = "Eugene Naumov", email = "min.verkligheten@gmail.com" }]
 license = "MIT"
 requires-python = ">=3.9"
-dependencies = ["pyyaml>=6.0"]
+dependencies = ["pyyaml>=6.0", "tomli>=1.1.0; python_version < '3.11'"]
+keywords = ["claude", "claude-code", "opencode", "ai-agent", "agent", "configuration", "claude-cli", "github-copilot"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Utilities",
+    "Environment :: Console",
+]
 
 [project.urls]
 Homepage = "https://github.com/rubakas/agent-notes"
 Repository = "https://github.com/rubakas/agent-notes"
+Issues = "https://github.com/rubakas/agent-notes/issues"
+Documentation = "https://github.com/rubakas/agent-notes/tree/main/docs"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
@@ -36,3 +53,9 @@ where = ["."]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "requires_network: test needs internet — deselect from default suite",
+    "requires_clean_repo: test needs a clean working tree — deselect from default suite",
+    "requires_build: test needs python -m build (wheel build) — deselect from default suite",
+]
+addopts = "-m 'not requires_network and not requires_clean_repo and not requires_build'"

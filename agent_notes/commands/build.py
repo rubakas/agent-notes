@@ -56,34 +56,6 @@ def copy_skills() -> list[Path]:
     return copied
 
 
-def copy_scripts() -> list[Path]:
-    """Copy script files to dist/scripts/, embedding pricing data from pricing.yaml."""
-    import json
-    from ..config import SCRIPTS_DIR, DIST_SCRIPTS_DIR, DATA_DIR
-
-    if not SCRIPTS_DIR.exists():
-        return []
-    if DIST_SCRIPTS_DIR.exists():
-        shutil.rmtree(DIST_SCRIPTS_DIR)
-    DIST_SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
-
-    pricing_path = DATA_DIR / "pricing.yaml"
-    pricing_json = "null"
-    if pricing_path.exists():
-        pricing_json = json.dumps(yaml.safe_load(pricing_path.read_text()), indent=2)
-
-    copied = []
-    for script in SCRIPTS_DIR.iterdir():
-        if script.is_file():
-            content = script.read_text()
-            if "{{PRICING}}" in content:
-                content = content.replace("{{PRICING}}", pricing_json)
-            dest = DIST_SCRIPTS_DIR / script.name
-            dest.write_text(content)
-            dest.chmod(0o755)
-            copied.append(dest)
-    return copied
-
 
 def copy_commands() -> list[Path]:
     """Copy command files from data/commands/ to dist/claude/commands/."""
@@ -144,21 +116,20 @@ def build() -> None:
     print("Copying skills...")
     skill_files = copy_skills()
 
-    # Copy scripts
-    print("Copying scripts...")
-    script_files = copy_scripts()
-
     # Copy commands
     print("Copying commands...")
     command_files = copy_commands()
 
     # Report results
-    all_files = agent_files + global_files + skill_files + script_files + command_files
+    all_files = agent_files + global_files + skill_files + command_files
     print(f"\nGenerated {len(all_files)} files:")
     
     total_lines = 0
     for file_path in sorted(all_files):
-        rel_path = file_path.relative_to(ROOT)
+        try:
+            rel_path = file_path.relative_to(ROOT)
+        except ValueError:
+            rel_path = file_path  # absolute path if outside the package tree
         lines = count_lines(file_path)
         total_lines += lines
         print(f"  {rel_path} ({lines} lines)")

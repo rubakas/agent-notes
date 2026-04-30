@@ -1,6 +1,6 @@
 ---
 name: rails-testing-system
-description: "Rails testing: helper tests, mailer tests, job tests, fixtures, test helpers, and tips"
+description: "Rails testing: helper tests, mailer tests, job tests, fixtures, test helpers, and tips. Use when user is writing tests for helpers, mailers, jobs, or needs fixture/test-helper guidance."
 group: rails
 ---
 

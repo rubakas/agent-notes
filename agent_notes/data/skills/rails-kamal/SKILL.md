@@ -1,6 +1,6 @@
 ---
 name: rails-kamal
-description: "Kamal deployment: zero-downtime Docker deploys, accessories, secrets, and configuration"
+description: "Kamal deployment: zero-downtime Docker deploys, accessories, secrets, and configuration. Use when user is deploying a Rails app with Kamal or editing deploy.yml."
 group: kamal
 ---
 

@@ -36,6 +36,13 @@ def _parse_frontmatter(text: str) -> dict:
 
 AGENT_FILES = _agent_files()
 
+if not AGENT_FILES:
+    raise RuntimeError(
+        f"test_agents.py: no agent files found under {_CLAUDE_AGENTS_DIR}. "
+        f"The session-scoped built_dist fixture should have populated it. "
+        f"Run `python3 -m agent_notes build` manually if running outside pytest."
+    )
+
 
 @pytest.fixture(scope="module", autouse=True)
 def require_built_dist(built_dist):

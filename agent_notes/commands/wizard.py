@@ -160,6 +160,12 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
 
         cli_role_models = {}
         for role in roles_sorted:
+            # Claude Code controls its own lead model via `/model` — configuring
+            # the orchestrator role here would be misleading and create a stale
+            # "Configured: orchestrator=…" entry in cost-report.
+            if backend_name == "claude" and role.name == "orchestrator":
+                continue
+
             # Default: newest model (by registry order; iterate reversed so e.g.
             # claude-opus-4-7 wins over claude-opus-4-6) whose class == role.typical_class.
             # Fallback to first compatible if nothing matches.
@@ -614,11 +620,6 @@ def _interactive_install() -> None:
     from ..registries.cli_registry import load_registry as _load_registry
     from ..services import installer as _installer
     _registry = _load_registry()
-
-    # Scripts (global only)
-    if scope == "global":
-        from ..services.installer import install_scripts_global
-        install_scripts_global()
 
     # Skills
     if selected_skills:

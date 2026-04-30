@@ -1,6 +1,6 @@
 ---
 name: rails-broadcasting
-description: "Turbo Streams broadcasting: real-time updates, morphing, targeting, and Action Cable"
+description: "Turbo Streams broadcasting: real-time updates, morphing, targeting, and Action Cable. Use when user needs real-time UI updates, WebSocket broadcasting, or Turbo Stream responses."
 group: rails
 ---
 

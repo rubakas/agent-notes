@@ -5,8 +5,8 @@ from ..domain.diagnostics import Issue, FixAction  # noqa: F401
 
 # Re-export config constants that tests mock  
 from ..config import (
-    ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR, 
-    DIST_SKILLS_DIR, DIST_SCRIPTS_DIR, SCRIPTS_DIR, BIN_HOME,
+    ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR,
+    DIST_SKILLS_DIR, BIN_HOME,
     CLAUDE_HOME, OPENCODE_HOME, GITHUB_HOME, AGENTS_HOME,
     Color, info, issue, ok, warn, fail
 )
@@ -14,7 +14,7 @@ from ..config import (
 # Re-export all diagnostic functions from services
 from ..services.diagnostics import (
     check_stale_files,
-    check_broken_symlinks, 
+    check_broken_symlinks,
     check_shadowed_files,
     check_missing_files,
     check_content_drift,
@@ -27,7 +27,6 @@ from ..services.diagnostics import (
     _find_dist_source,
     _count_agents,
     _count_skills,
-    _count_scripts,
     _count_rules,
     _check_config,
     _cli_base_dir,

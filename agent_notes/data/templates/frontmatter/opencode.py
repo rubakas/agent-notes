@@ -76,29 +76,34 @@ def render(ctx: dict) -> str:
 
 
 def post_process(prompt: str, ctx: dict) -> str:
-    """Strip ## Memory section from prompt for OpenCode (doesn't support agent memory)."""
-    return _strip_memory_section(prompt)
+    """Strip OpenCode-irrelevant sections from prompt.
+
+    Strips:
+    - ## Memory* sections (OpenCode doesn't support agent memory)
+    - ## Cost reporting section (cost-report is a Claude Code CLI tool, not available in OpenCode)
+    """
+    _STRIP_PREFIXES = ("## Memory", "## Cost reporting")
+    return _strip_sections(prompt, _STRIP_PREFIXES)
 
 
-def _strip_memory_section(content: str) -> str:
-    """Strip ## Memory section from content for OpenCode format."""
+def _strip_sections(content: str, strip_prefixes: tuple) -> str:
+    """Strip ## sections whose heading starts with any of the given prefixes."""
     lines = content.split('\n')
     result_lines = []
-    in_memory_section = False
-    
+    in_stripped_section = False
+
     for line in lines:
-        if line.startswith('## Memory'):
-            in_memory_section = True
+        if any(line.startswith(prefix) for prefix in strip_prefixes):
+            in_stripped_section = True
             continue
-        elif line.startswith('## ') and in_memory_section:
-            # New section after Memory, include this line and continue
-            in_memory_section = False
+        elif line.startswith('## ') and in_stripped_section:
+            in_stripped_section = False
             result_lines.append(line)
-        elif not in_memory_section:
+        elif not in_stripped_section:
             result_lines.append(line)
-    
+
     # Remove trailing empty lines
     while result_lines and result_lines[-1].strip() == '':
         result_lines.pop()
-    
+
     return '\n'.join(result_lines)

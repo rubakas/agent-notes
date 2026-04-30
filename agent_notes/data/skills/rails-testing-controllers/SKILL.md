@@ -1,6 +1,6 @@
 ---
 name: rails-testing-controllers
-description: "Rails testing: controller tests, system tests, and integration tests"
+description: "Rails testing: controller tests, system tests, and integration tests. Use when user is writing request specs, controller tests, or system/integration tests."
 group: rails
 ---
 

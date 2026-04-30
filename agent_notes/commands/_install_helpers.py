@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List
 
 from ..config import (
-    ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR, DIST_SKILLS_DIR, DIST_SCRIPTS_DIR,
+    ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR, DIST_RULES_DIR, DIST_SKILLS_DIR,
     CLAUDE_HOME, OPENCODE_HOME, GITHUB_HOME, AGENTS_HOME, BIN_HOME,
     linked, removed, skipped, info, get_version, Color, PKG_DIR
 )
@@ -16,11 +16,6 @@ from ..services.fs import (
     remove_all_symlinks_in_dir, remove_dir_if_empty
 )
 
-
-def install_scripts_global() -> None:
-    """Install scripts to ~/.local/bin/."""
-    from ..services.installer import install_scripts_global as _service_impl
-    _service_impl()
 
 
 def _install_skills_to(targets: List[Path], dist_skills_dir: Path, copy_mode: bool) -> None:
@@ -108,11 +103,6 @@ def install_rules_local(copy_mode: bool = False) -> None:
         place_dir_contents(DIST_RULES_DIR, Path(".claude/rules"), "*.md", copy_mode)
 
 
-def uninstall_scripts_global() -> None:
-    """Uninstall scripts from ~/.local/bin/."""
-    from ..services.installer import uninstall_scripts_global as _service_impl
-    _service_impl()
-
 
 def _uninstall_skills_from(targets: List[Path]) -> None:
     """Remove skills from each directory in targets."""
@@ -183,10 +173,6 @@ def uninstall_rules_local() -> None:
     )
 
 
-def count_scripts() -> int:
-    """Count script files."""
-    return len([f for f in DIST_SCRIPTS_DIR.iterdir() if f.is_file()]) if DIST_SCRIPTS_DIR.exists() else 0
-
 
 def count_skills() -> int:
     """Count skill directories."""
@@ -196,16 +182,13 @@ def count_skills() -> int:
 
 
 def count_agents(backend) -> int:
-    """Count agent *.md files in backend's dist directory. Returns 0 if backend
+    """Count agents for backend from the canonical YAML source. Returns 0 if backend
     doesn't support agents."""
-    from ..services import installer
-    from ..domain.cli_backend import CLIBackend
     if not backend.supports("agents"):
         return 0
-    src = installer.dist_source_for(backend, "agents")
-    if src is None or not src.exists():
-        return 0
-    return len(list(src.glob("*.md")))
+    from ..registries.agent_registry import load_agent_registry
+    registry = load_agent_registry()
+    return sum(1 for a in registry.all() if not a.excluded_from(backend.name))
 
 
 def count_global() -> int:

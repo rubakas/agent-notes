@@ -1,0 +1,15 @@
+# Explicit allow-list of skills vendored into the Claude Code plugin.
+# Only skills listed here are included in .claude-plugin/skills/.
+# Add a skill name (matching data/skills/<name>/) to vendor it with the plugin.
+vendored_skills:
+  - brainstorming
+  - caveman
+  - code-review
+  - debugging-protocol
+  - grill-me
+  - grill-with-docs
+  - improve-codebase-architecture
+  - refactoring-protocol
+  - setup-project-context
+  - tdd
+  - zoom-out

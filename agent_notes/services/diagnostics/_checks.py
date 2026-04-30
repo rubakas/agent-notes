@@ -58,24 +58,6 @@ def _find_dist_source(symlink: Path, scope: str) -> Optional[Path]:
                     if candidate.exists():
                         return candidate
 
-    # Scripts
-    def _get_bin_home():
-        from ...config import BIN_HOME
-        return BIN_HOME
-
-    def _get_dist_scripts_dir():
-        from ...config import DIST_SCRIPTS_DIR
-        return DIST_SCRIPTS_DIR
-
-    bin_home = _get_bin_home()
-    dist_scripts_dir = _get_dist_scripts_dir()
-
-    if bin_home and str(symlink).startswith(str(bin_home)):
-        if dist_scripts_dir:
-            source = dist_scripts_dir / name
-            if source.exists():
-                return source
-
     # Universal skills
     def _get_dist_skills_dir():
         from ...config import DIST_SKILLS_DIR
@@ -179,7 +161,7 @@ def check_content_drift(scope: str, issues: List[Issue], fix_actions: List[FixAc
 
 def check_build_freshness(issues: List[Issue], fix_actions: List[FixAction]):
     """Check if source files are newer than generated files."""
-    from ...config import AGENTS_YAML, AGENTS_DIR, SCRIPTS_DIR, DIST_SCRIPTS_DIR
+    from ...config import AGENTS_YAML, AGENTS_DIR
     agents_yaml = AGENTS_YAML
 
     # Check agents.yaml vs generated agents
@@ -218,16 +200,6 @@ def check_build_freshness(issues: List[Issue], fix_actions: List[FixAction]):
                         issues.append(Issue("build_stale", str(gen_file),
                                           f"{src_file} is newer than generated file"))
                         fix_actions.append(FixAction("BUILD", str(gen_file), "regenerate from source"))
-
-    # Check scripts source vs dist
-    if SCRIPTS_DIR.exists() and DIST_SCRIPTS_DIR.exists():
-        for src_file in SCRIPTS_DIR.iterdir():
-            if src_file.is_file():
-                dist_file = DIST_SCRIPTS_DIR / src_file.name
-                if dist_file.exists() and src_file.stat().st_mtime > dist_file.stat().st_mtime:
-                    issues.append(Issue("build_stale", str(dist_file),
-                                      f"{src_file} is newer than generated file"))
-                    fix_actions.append(FixAction("BUILD", str(dist_file), "regenerate from source"))
 
     # Check global source files
     from ...cli_backend import load_registry

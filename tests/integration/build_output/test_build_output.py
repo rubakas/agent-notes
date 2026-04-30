@@ -61,29 +61,6 @@ def test_rules_has_markdown_files(built_dist):
     assert len(files) >= 1
 
 
-# --- Scripts ---
-
-def test_cost_report_script_exists(built_dist):
-    assert (built_dist / "scripts" / "cost-report").exists()
-
-
-def test_cost_report_is_executable(built_dist):
-    import stat
-    script = built_dist / "scripts" / "cost-report"
-    mode = script.stat().st_mode
-    assert mode & stat.S_IXUSR
-
-
-def test_cost_report_contains_pricing_json(built_dist):
-    content = (built_dist / "scripts" / "cost-report").read_text()
-    assert '"providers"' in content
-
-
-def test_cost_report_has_no_placeholder(built_dist):
-    content = (built_dist / "scripts" / "cost-report").read_text()
-    assert "{{PRICING}}" not in content
-
-
 # --- Specific agent files ---
 
 def test_coder_md_exists(built_dist):

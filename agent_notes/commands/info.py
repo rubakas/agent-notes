@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .. import install_state
 from ..config import get_version, CLAUDE_HOME, Color
-from ._install_helpers import count_scripts, count_skills, count_agents, count_global
+from ._install_helpers import count_skills, count_agents, count_global
 
 
 def show_info() -> None:
@@ -15,7 +15,6 @@ def show_info() -> None:
     print(f"agent-notes {version}")
     print("")
     print("Components:")
-    print(f"  Scripts:             {count_scripts()}")
     print(f"  Skills:              {count_skills()}")
 
     # Show agent counts per backend
@@ -28,8 +27,6 @@ def show_info() -> None:
     print(f"  Global config:       {count_global()} files")
     print("")
     print("Install targets:")
-    print("  Scripts:       ~/.local/bin/")
-
     # Show CLI install targets
     for backend in registry.all():
         print(f"  {backend.label}:  {backend.global_home}")

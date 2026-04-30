@@ -1,6 +1,6 @@
 ---
 name: rails-concerns
-description: "Rails concerns: model and controller concern patterns, shared behavior, and testing"
+description: "Rails concerns: model and controller concern patterns, shared behavior, and testing. Use when user is extracting shared logic into concerns or working with Rails concern modules."
 group: rails
 ---
 

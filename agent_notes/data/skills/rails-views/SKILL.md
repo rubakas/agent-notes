@@ -1,6 +1,6 @@
 ---
 name: rails-views
-description: "Rails views: templates, partials, layouts, caching, and forms"
+description: "Rails views: templates, partials, layouts, caching, and forms. Use when user is writing ERB templates, partials, or form helpers in Rails views."
 group: rails
 ---
 

@@ -12,16 +12,68 @@ agent-notes install    # interactive wizard guides you through setup
 agent-notes doctor
 ```
 
-Update anytime with `pip install --upgrade agent-notes && agent-notes install`.
-
 ## What's Included
 
 | Component | Description |
 |-----------|-------------|
-| **Skills** | 35 on-demand knowledge modules (Rails, Docker, Git, Kamal, Process) |
+| **Skills** | 42 on-demand knowledge modules (Rails, Docker, Git, Kamal, Process) |
 | **Agents** | 18 specialized AI subagents with hierarchical model strategy |
 | **Rules** | Global instructions, code quality, and safety guardrails |
 | **Config** | Global instructions for Claude Code, OpenCode, and GitHub Copilot |
+
+## Install Methods
+
+There are three ways to use agent-notes. Pick the one that matches your intent.
+
+### 1. Python package — PyPI (recommended)
+
+```bash
+pip install agent-notes
+# or
+pipx install agent-notes
+agent-notes install
+```
+
+Update anytime:
+
+```bash
+pip install --upgrade agent-notes && agent-notes install
+# or
+pipx upgrade agent-notes && agent-notes install
+```
+
+### 2. Python package — from local build (developers)
+
+```bash
+git clone https://github.com/rubakas/agent-notes.git
+cd agent-notes
+python -m build                    # produces dist/*.whl
+pipx install dist/*.whl            # or pip install --user dist/*.whl
+agent-notes install
+```
+
+Iteration loop: edit source → `python -m build` → `pipx reinstall dist/*.whl`. Not editable mode. Not `pip install -e .`.
+
+### 3. Plugin — limited functionality
+
+- **Claude Code**: install via the Claude Code plugin marketplace.
+- **OpenCode**: copy or symlink `.opencode-plugin/` into `~/.config/opencode/plugins/agent-notes/` and add `"plugin": ["agent-notes"]` to `opencode.json`.
+
+The plugin runs a `session.start` hook that surfaces agent-notes context to the CLI session. It does **not** include the full `agent-notes` CLI (wizard, doctor, config, memory, etc.). For those, use install method 1 or 2.
+
+### API keys
+
+Provider API keys live in `~/.agent-notes/credentials.toml` (mode 0600, never committed). Add or update via:
+
+```bash
+agent-notes config providers
+```
+
+The wizard prompts for the key with hidden input; agent-notes never logs or prints the value. To check whether a provider is configured without exposing the key:
+
+```bash
+agent-notes config provider openrouter   # prints "configured" or "no key"
+```
 
 ## CLI Reference
 
@@ -50,61 +102,13 @@ agent-notes <command> [options]
 | **OpenCode** | `~/.config/opencode/` | YAML frontmatter + Markdown prompts |
 | **GitHub Copilot** | `~/.github/` | `copilot-instructions.md` |
 
-### Examples
+### Quick usage examples
 
 ```bash
 # Interactive install (recommended)
 agent-notes install
 
-# Example wizard session:
-#
-#   Which CLI do you use?
-#     1) [*] Claude Code
-#     2) [*] OpenCode
-#   Enter numbers to toggle (comma-separated), or press enter for defaults.
-#   Choice:                          ← press enter to keep both
-#
-#   Step 2/7: Configure model roles
-#   Which models should each role use?  (claude)
-#
-#     orchestrator  [claude-opus-4-7]    Plans, delegates, synthesizes
-#     reasoner      [claude-opus-4-7]    Complex reasoning, architecture
-#     worker        [claude-sonnet-4-6]  Implements, writes, edits
-#     scout         [claude-haiku-4-5]   Fast search and exploration
-#
-#   Enter role=model pairs to change, or press enter to keep defaults.
-#   Choice:                          ← press enter to keep defaults
-#
-#   Where to install?
-#     1) * Global (~/.claude, ~/.config/opencode)
-#     2)   Local (current project)
-#   Choice [1]:                      ← press enter for global
-#
-#   How to install?
-#     1) * Symlink (auto-updates when source changes)
-#     2)   Copy (standalone, allows local customization)
-#   Choice [1]:                      ← press enter for symlink
-#
-#   Which skills to include?
-#     1) [*] Rails — models, controllers, views, routes, testing (24 skills)
-#     2) [*] Docker — Dockerfile, Compose patterns (4 skills)
-#     3) [*] Kamal — deployment with Kamal (1 skill)
-#     4) [*] Git — commit workflow, conventional commits (1 skill)
-#     5) [*] Process — TDD, refactoring, debugging, planning (5 skills)
-#   Choice:                          ← press enter for all
-#
-#   Ready to install:
-#     CLI:      Claude Code + OpenCode
-#     Scope:    Global (~/.claude, ~/.config/opencode)
-#     Mode:     Symlink
-#     Skills:   Rails (24), Docker (4), Kamal (1), Git (1), Process (5)
-#     Agents:   18 (Claude Code) + 19 (OpenCode)
-#     Config:   CLAUDE.md, AGENTS.md
-#     Rules:    2
-#   Proceed? [Y/n]: Y
-
-# Direct install (scripted, no wizard)
-agent-notes install --local
+# Direct install (scripted)
 agent-notes install --local --copy
 
 # Check health and fix issues
@@ -112,8 +116,6 @@ agent-notes doctor --fix
 
 # Manage agent memory
 agent-notes memory list
-agent-notes memory vault          # show current backend and path
-agent-notes memory index          # regenerate Index.md
 agent-notes memory add "Rails enum prefix" \
   "Always use _prefix: true to avoid method name collisions" \
   pattern coder
@@ -122,8 +124,6 @@ agent-notes memory add "Rails enum prefix" \
 ## Agent Team
 
 Specialized subagents with hierarchical model strategy: **Opus 4.7 decides, Sonnet 4 executes, Haiku 4.5 explores.**
-
-### Agent roster
 
 | Agent | Model | Role |
 |-------|-------|------|
@@ -147,162 +147,36 @@ Specialized subagents with hierarchical model strategy: **Opus 4.7 decides, Sonn
 | **tech-writer** | Haiku 4.5 | Documentation: READMEs, API docs, changelogs. |
 | **explorer** | Haiku 4.5 | Fast file discovery and pattern search. Read-only. |
 
-### 4-phase lead workflow
+## Architecture
 
-```
-1. ANALYZE — Lead reviews requirements, explores codebase
-2. EXECUTE — Delegates to specialized agents (parallel execution)
-3. REVIEW — Quality check by reviewer agents
-4. VERIFY — Final validation and integration
-```
+agent-notes is a 4-layer engine (domain / registries / services / commands). All extensible content (CLIs, models, roles, agents, skills, rules) lives in `agent_notes/data/` as YAML — adding a new CLI/model/role is a YAML drop, no Python changes. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ADD_CLI.md](docs/ADD_CLI.md), [docs/ADD_MODEL.md](docs/ADD_MODEL.md), [docs/ADD_ROLE.md](docs/ADD_ROLE.md).
 
-### Team diagram
+## Improved Claude Code workflows
 
-```
-You (human)
-  |
-  +-- Simple task ------> Main session (direct work)
-  |
-  +-- Complex task -----> Lead (Opus 4.7)
-                           +-- Explorer (Haiku 4.5)          quick lookups
-                           +-- Analyst (Haiku 4.5)           requirements analysis
-                           +-- Architect (Opus 4.7)          system design
-                           +-- Coder (Sonnet 4)              implementation
-                           +-- Refactorer (Sonnet 4)         code restructuring
-                           +-- Reviewer (Sonnet 4)           code review
-                           +-- Security (Sonnet 4)           security audit
-                           +-- Devil (Sonnet 4)              risk challenge
-                           +-- Debugger (Opus 4.7)           bug investigation
-                           +-- Test Writer (Sonnet 4)        tests
-                           +-- Test Runner (Sonnet 4)        fix tests
-                           +-- Auditor (Sonnet 4)            codebase health
-                           +-- DB Specialist (Sonnet 4)      schema & queries
-                           +-- Perf Profiler (Sonnet 4)      performance
-                           +-- API Reviewer (Haiku 4.5)      API design
-                           +-- Integrations (Sonnet 4)       third-party APIs
-                           +-- Tech Writer (Haiku 4.5)       documentation
-                           +-- DevOps (Sonnet 4)             infrastructure
-```
+Four failure modes that derail AI-assisted development, and the skills that address them. Inspired by [Matt Pocock's skills repo](https://github.com/mattpocock/skills).
 
-## Architecture: YAML-Driven Extensibility
+| Failure mode | What goes wrong | Skills that help |
+|---|---|---|
+| **Misalignment** | Claude starts building before the problem is resolved | `/grill-me`, `/grill-with-docs` |
+| **Verbosity** | Responses are bloated; context window fills with noise | `/caveman`, `/setup-project-context` |
+| **Broken code** | Claude codes without a feedback loop or evidence trail | `/tdd` (improved), `/debugging-protocol` (improved) |
+| **Ball of mud** | Architecture drifts; modules grow shallow and tangled | `/improve-codebase-architecture`, `/zoom-out` |
 
-Agent-notes is a **4-layer bounded-context engine** (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full details):
-
-| Layer | Purpose | Example |
-|-------|---------|---------|
-| **Domain** | Pure dataclasses (Agent, Model, Role, State) | `agent_notes/domain/` |
-| **Registries** | YAML loaders from `data/` → domain types | `agent_notes/registries/` |
-| **Services** | Technical concerns (I/O, rendering, state, install) | `agent_notes/services/` |
-| **Commands** | CLI orchestrators (install, doctor, list, etc.) | `agent_notes/commands/` |
-
-**Single source of truth:** `agent_notes/data/` holds all extensible content (CLI, model, role, agent, skill, rule YAMLs).
-
-**Zero Python changes to add:**
-- New CLI: drop `data/cli/cursor.yaml` 
-- New model: drop `data/models/gpt-5.yaml`
-- New role: drop `data/roles/specialist.yaml`
-
-See [docs/ADD_CLI.md](docs/ADD_CLI.md), [docs/ADD_MODEL.md](docs/ADD_MODEL.md), [docs/ADD_ROLE.md](docs/ADD_ROLE.md) for guides.
-
-
-
-## Project Structure
-
-```
-agent-notes/
-├── bin/agent-notes          # CLI wrapper (entry point)
-├── docs/
-│   ├── ADD_CLI.md           # Guide: add a new CLI backend
-│   ├── ADD_MODEL.md         # Guide: add a new AI model
-│   ├── ADD_ROLE.md          # Guide: add a new agent role
-│   ├── CLI_CAPABILITIES.md  # Source of truth for per-CLI features
-│   └── ENGINE_PLAN.md       # Refactor phases and design details
-├── agent_notes/             # Python implementation
-│   ├── __init__.py, cli.py  # Core modules
-│   ├── VERSION              # Package version
-│   ├── data/                # Single source of truth
-│   │   ├── cli/             # CLI descriptors
-│   │   │   ├── claude.yaml, opencode.yaml, copilot.yaml
-│   │   │   └── gemini.yaml  # (add your own)
-│   │   ├── models/          # Model descriptors
-│   │   │   ├── claude-opus-4-7.yaml, claude-sonnet-4.yaml, ...
-│   │   │   └── gpt-4o.yaml  # (add your own)
-│   │   ├── roles/           # Role descriptors
-│   │   │   ├── orchestrator.yaml, worker.yaml, scout.yaml, reasoner.yaml
-│   │   │   └── specialist.yaml # (add your own)
-│   │   ├── templates/frontmatter/
-│   │   │   ├── claude.py, opencode.py
-│   │   │   └── cursor.py    # (add if format differs from Claude/OpenCode)
-│   │   ├── agents/
-│   │   │   ├── agents.yaml  # Agent metadata + role declarations
-│   │   │   └── *.md         # Agent prompt files
-│   │   ├── skills/          # Skill directories
-│   │   ├── rules/           # Code quality rules
-│   │   ├── globals/         # Global config templates
-│   │   └── commands/, scripts/
-│   └── dist/                # Built artifacts (auto-generated, do not edit)
-│       ├── claude/, opencode/
-│       ├── rules/
-│       └── skills/
-├── scripts/                 # Build/utility scripts
-└── tests/                   # Test suite
-```
-
-## Install Methods
-
-### Pip install (recommended)
-
-```bash
-pip install agent-notes
-agent-notes install
-```
-
-### Git clone (for development or customization)
-
-```bash
-git clone https://github.com/rubakas/agent-notes.git ~/agent-notes
-cd ~/agent-notes && pip install -e .
-agent-notes install
-```
-
-Cloning lets you edit source files in `agent_notes/data/` and rebuild with `agent-notes build`.
-
-## Project-Level Overrides
-
-Use `--local --copy` for project-specific customizations. The wizard handles local installs too, while `--local --copy` is for scripted/CI use:
-
-```bash
-agent-notes install --local --copy
-```
-
-Then edit the copied files in `.claude/` or `.opencode/` directories.
-
-**Precedence:** Project-level configs replace global versions entirely.
+- `/grill-me` — interview the user until the problem is fully resolved before touching code
+- `/grill-with-docs` — same, but cross-references CONTEXT.md and ADRs and updates them inline
+- `/caveman` — ultra-compressed reply mode (~75% token savings) for rapid iteration
+- `/setup-project-context` — bootstraps a CONTEXT.md domain glossary (ubiquitous language)
+- `/tdd` — RED-GREEN-REFACTOR with tracer-bullet vertical slices; horizontal-slicing anti-pattern added
+- `/debugging-protocol` — Phase 1 rewritten as "build a feedback loop first" with 9 strategies
+- `/improve-codebase-architecture` — deletion test to find shallow modules; surfaces deepening opportunities
+- `/zoom-out` — quick orientation map of an unfamiliar code area
 
 ## Skills
 
-On-demand knowledge modules loaded mid-conversation.
+42 on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`.
 
-### Available skills
+### Using skills in Claude Code / OpenCode
 
-**Rails (24):**
-`rails-models`, `rails-models-advanced`, `rails-controllers`, `rails-controllers-advanced`, `rails-routes`, `rails-concerns`, `rails-views`, `rails-views-advanced`, `rails-view-components`, `rails-view-components-advanced`, `rails-helpers`, `rails-javascript`, `rails-jobs`, `rails-mailers`, `rails-broadcasting`, `rails-migrations`, `rails-active-storage`, `rails-validations`, `rails-testing-controllers`, `rails-testing-models`, `rails-testing-system`, `rails-style`, `rails-initializers`, `rails-lib`
-
-**Docker (4):**
-`docker-dockerfile`, `docker-dockerfile-languages`, `docker-compose`, `docker-compose-advanced`
-
-**Kamal (1):**
-`rails-kamal`
-
-**Git (1):**
-`git` — git workflow, commit chunking, conventional commit messages
-
-**Process (5):**
-`tdd`, `refactoring-protocol`, `debugging-protocol`, `code-review`, `brainstorming`
-
-### Usage
-
-**Claude Code / OpenCode:**
 ```
 Use the rails-models skill to help with this association
 Load the docker-compose skill for multi-service setup
@@ -310,7 +184,7 @@ Load the docker-compose skill for multi-service setup
 
 ## Agent Memory
 
-Agents can accumulate knowledge across sessions — patterns they discovered, decisions they made, mistakes to avoid. Three backends are available, chosen during `agent-notes install`.
+Agents accumulate knowledge across sessions using one of three backends, chosen during `agent-notes install`.
 
 ### Backends
 
@@ -320,82 +194,15 @@ Agents can accumulate knowledge across sessions — patterns they discovered, de
 | **Obsidian** | Category vault with YAML frontmatter and `[[wikilinks]]` | Visual browsing, backlinks, Dataview queries |
 | **None** | Disabled — no files written | Stateless or shared machines |
 
-### Obsidian vault setup
+### Obsidian setup
 
-**Step 1 — Pick Obsidian during install**
-
-```bash
-agent-notes install
-# ...
-# Step 6/7: Memory backend
-#   How should agents store memory?
-#     1) * Local markdown files (~/.claude/agent-memory/)
-#     2)   Obsidian vault
-#     3)   None
-#   Choice [1]: 2
-#
-#   Detected Obsidian vaults:
-#     ~/Documents/Obsidian/Main
-#   Vault path [~/Documents/Obsidian/Main]: ← press enter or type your path
-#   ✓ Memory: Obsidian (~/Documents/Obsidian/Main)
-```
-
-The wizard auto-detects existing vaults (directories containing `.obsidian/`) in `~/Documents`, `~/Desktop`, and `~`. You can also point to any directory — it doesn't need to be an existing vault.
-
-**Step 2 — Initialise the vault**
+Run `agent-notes install` and pick Obsidian when prompted. The wizard auto-detects existing vaults under `~/Documents`, `~/Desktop`, and `~`. To initialize the vault structure:
 
 ```bash
 agent-notes memory init
-# Obsidian vault initialised at ~/Documents/Obsidian/Main
-#   Folders: Patterns, Decisions, Mistakes, Context, Sessions
-#   Index:   ~/Documents/Obsidian/Main/Index.md
 ```
 
-Then open Obsidian → "Open folder as vault" → select the same path.
-
-**Vault structure:**
-
-```
-~/your-vault/
-├── Index.md          ← entry point; auto-regenerated after every write
-├── Patterns/         ← reusable solutions and techniques
-├── Decisions/        ← architectural choices and rationale
-├── Mistakes/         ← recurring errors to avoid
-├── Context/          ← per-project background
-└── Sessions/         ← raw session extracts
-```
-
-**Step 3 — Let agents use it**
-
-The installed `CLAUDE.md` already points agents to your vault. At the start of a session Claude reads `Index.md`; at the end it can save insights:
-
-```
-Save this to memory as a pattern: always use _prefix: true with Rails enums
-```
-
-Or use the CLI directly:
-
-```bash
-agent-notes memory add "Rails enum prefix" \
-  "Always use _prefix: true to avoid method name collisions" \
-  --type pattern --agent coder --tags rails,models
-```
-
-**Regenerate the index** after adding files manually in Obsidian:
-
-```bash
-agent-notes memory index
-```
-
-### Switching backends
-
-```bash
-# See current backend
-agent-notes memory vault
-
-# Switch via reconfigure
-agent-notes install --reconfigure
-```
+The installed `CLAUDE.md` already points agents to your vault. At the start of a session Claude reads `Index.md`; at the end it can save insights with `agent-notes memory add`.
 
 ### Memory commands
 
@@ -409,15 +216,16 @@ agent-notes memory show <agent>            # show one agent's notes (local backe
 agent-notes memory reset [agent]           # clear memory (confirmation required)
 agent-notes memory export                  # back up to memory-backup/
 agent-notes memory import                  # restore from memory-backup/
+agent-notes install --reconfigure          # switch backends
 ```
 
 ### Note format (Obsidian backend)
 
-Every note agent-notes writes has YAML frontmatter for filtering and Dataview queries:
+Every note agent-notes writes includes YAML frontmatter for filtering and Dataview queries:
 
 ```markdown
 ---
-date: 2026-04-28
+created_at: 2026-04-28T19:30:35Z
 type: pattern
 agent: coder
 project: rubakas
@@ -426,55 +234,21 @@ tags: [rails, models]
 
 # Rails Enum Prefix
 
-Always use `_prefix: true` with Rails enums to avoid method name collisions with
-existing model methods.
-
-## Links
-- [[2026-04-28-switched-to-jsonb-for-settings]]
+Always use `_prefix: true` with Rails enums to avoid method name collisions.
 ```
-
-Files are named `YYYY-MM-DD-<slug>.md` and placed in the matching category folder. They're plain markdown — edit them freely in Obsidian.
 
 ## Development
 
-### Prerequisites
-
-- Python 3.9+
-- PyYAML (`pip install pyyaml`)
-
-### Running tests
+Python 3.9+ required. Build from source and run tests:
 
 ```bash
+python -m build && pipx install dist/*.whl
 python3 -m pytest tests/
 ```
 
-Tests are organized in three directories:
+Run `agent-notes build` after editing `agent_notes/data/` files, and `agent-notes validate` before committing.
 
-| Directory | What it tests |
-|-----------|---------------|
-| `tests/functional/` | Unit tests: registries, build commands, CLI parsing |
-| `tests/integration/` | Real build output: dist structure, agent frontmatter, pricing embedding |
-| `tests/plugins/` | Artifact validation: every skill and agent file checked for correct metadata |
-
-### Building
-
-```bash
-python3 -m agent_notes build
-```
-
-### Validating
-
-```bash
-python3 -m agent_notes validate
-```
-
-### Project layout
-
-- `agent_notes/data/` — single source of truth (edit here)
-- `agent_notes/dist/` — generated output (do not edit)
-- `agent_notes/` — CLI implementation
-- `tests/` — test suite
-- `scripts/` — dev-only tools (release, etc.)
+Tests live in `tests/functional/` (unit), `tests/integration/` (build output), and `tests/plugins/` (artifact validation).
 
 ## Contributing
 
@@ -487,6 +261,8 @@ When adding new content:
 5. **Show examples** — include code samples with explanations
 6. **Stay modular** — each skill should be independently usable
 7. **Stay concise** — agent prompts under 60 lines
+
+See [docs/](docs/) for full guidelines.
 
 ## License
 

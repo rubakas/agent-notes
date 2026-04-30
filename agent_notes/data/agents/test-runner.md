@@ -31,6 +31,28 @@ When done, report back with:
 - What you fixed (file:line, description) or why you couldn't fix it
 - Test results after fix (pass/fail, any remaining failures)
 
-## Memory
+## Memory (read-before-work, write-on-discovery)
 
-Update your agent memory with project-specific failure patterns: common auth setup issues, factory gotchas, database state problems.
+You are part of a team that shares state via an Obsidian vault at `{{MEMORY_PATH}}`.
+
+### Read before working
+
+If the task you've been given references an in-flight initiative, prior decision, recent pattern, or session progress, read the relevant vault files BEFORE you start:
+
+1. `{{MEMORY_PATH}}/Index.md` — what's been written and where
+2. `{{MEMORY_PATH}}/Sessions/<recent>.md` — current session log if the task is part of an ongoing thread
+3. `{{MEMORY_PATH}}/Decisions/` or `Patterns/` or `Mistakes/` — relevant cross-session knowledge
+
+If `{{MEMORY_PATH}}` is "disabled" (memory backend not configured), skip this — proceed without vault context.
+
+Do not duplicate effort. If a recent note already answers the question you'd be investigating, cite it in your report rather than re-deriving.
+
+### Write on discovery
+
+When you discover something non-obvious worth preserving across sessions:
+- A decision with rationale → `agent-notes memory add "<title>" "<body>" decision test-runner`
+- A reusable pattern → `pattern`
+- A recurring mistake to avoid → `mistake`
+- Project-specific context → `context`
+
+Do NOT write to the vault for ephemeral state, in-progress task notes, or things derivable from `git log`. Memory is for the non-obvious that future sessions would otherwise re-derive.

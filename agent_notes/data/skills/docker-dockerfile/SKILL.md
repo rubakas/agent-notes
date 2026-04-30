@@ -1,6 +1,6 @@
 ---
 name: docker-dockerfile
-description: "Dockerfile patterns: structure, base images, multi-stage builds, layer optimization, security, and health checks"
+description: "Dockerfile patterns: structure, base images, multi-stage builds, layer optimization, security, and health checks. Use when user is writing or editing a Dockerfile."
 group: docker
 ---
 

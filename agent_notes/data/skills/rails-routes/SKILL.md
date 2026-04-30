@@ -1,6 +1,6 @@
 ---
 name: rails-routes
-description: "Rails routing: RESTful resources, actions as resources, nested routes, and constraints"
+description: "Rails routing: RESTful resources, actions as resources, nested routes, and constraints. Use when user is editing routes.rb or designing URL structure."
 group: rails
 ---
 

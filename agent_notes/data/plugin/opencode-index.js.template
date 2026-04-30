@@ -1,0 +1,22 @@
+// {{HEADER}}
+// agent-notes OpenCode plugin v{{VERSION}}
+// {{DESCRIPTION}}
+//
+// This plugin runs a SessionStart hook that surfaces agent-notes context
+// to OpenCode. The full agent/skill team is installed via the Python CLI:
+//   pip install agent-notes && agent-notes install
+
+export const AgentNotes = async ({ project, client, $, directory, worktree }) => {
+  return {
+    "session.start": async () => {
+      const vault = "{{VAULT_PATH}}";
+      if (vault === "disabled") return;
+      try {
+        // Surface the agent-notes Index.md if the vault exists
+        await $`cat ${vault}/Index.md`.nothrow();
+      } catch (err) {
+        client.app.log({ level: "debug", message: `agent-notes: vault not readable (${err.message})` });
+      }
+    }
+  };
+};

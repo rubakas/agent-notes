@@ -12,6 +12,7 @@ from .fs import (
     place_file, place_dir_contents,
     remove_symlink, remove_all_symlinks_in_dir, remove_dir_if_empty,
 )
+from .state_store import load_state, get_scope
 
 # Re-import the atomic helpers from install (they stay in install.py):
 # We intentionally avoid circular import by lazy-importing inside functions.
@@ -121,7 +122,8 @@ def install_component_for_backend(
 def uninstall_component_for_backend(
     backend: CLIBackend,
     component: str,
-    scope: str
+    scope: str,
+    copy_mode: bool = False,
 ) -> None:
     """Uninstall one component for one backend."""
     dst = target_dir_for(backend, component, scope)
@@ -133,23 +135,20 @@ def uninstall_component_for_backend(
         if filename:
             config_file = dst / filename
             print(f"Removing {backend.label} config from {dst} ...")
-            remove_symlink(config_file)
+            remove_symlink(config_file, copy_mode)
     else:
         # Only print if directory exists and has content
         if any(dst.iterdir()):
             print(f"Removing {backend.label} {component} from {dst} ...")
-        remove_all_symlinks_in_dir(dst)
+        remove_all_symlinks_in_dir(dst, copy_mode)
         remove_dir_if_empty(dst)
 
 
 def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = None) -> None:
-    """Top-level: install scripts (global only) + every (backend, component) combo."""
+    """Top-level: install every (backend, component) combo."""
     if registry is None:
         registry = load_registry()
-    
-    if scope == "global":
-        install_scripts_global()
-    
+
     for backend in registry.all():
         for component in COMPONENT_TYPES:
             install_component_for_backend(backend, component, scope, copy_mode)
@@ -174,7 +173,6 @@ def _install_universal_skills(copy_mode: bool, registry: CLIRegistry) -> None:
     if not dist_skills_dir.exists():
         return
 
-    print(f"Installing universal skills ...")
     target = config.AGENTS_HOME / "skills"
     target.mkdir(parents=True, exist_ok=True)
     skill_dirs = [d for d in dist_skills_dir.iterdir() if d.is_dir()]
@@ -189,16 +187,21 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
     """Top-level uninstall."""
     if registry is None:
         registry = load_registry()
-    
-    if scope == "global":
-        uninstall_scripts_global()
-    
+
+    # Determine copy_mode from state so plain copy-installed files are removed too
+    copy_mode = False
+    state = load_state()
+    if state is not None:
+        scope_state = get_scope(state, scope)
+        if scope_state is not None:
+            copy_mode = (scope_state.mode == "copy")
+
     for backend in registry.all():
         for component in COMPONENT_TYPES:
-            uninstall_component_for_backend(backend, component, scope)
+            uninstall_component_for_backend(backend, component, scope, copy_mode)
 
     if scope == "global":
-        _uninstall_universal_skills()
+        _uninstall_universal_skills(copy_mode)
 
     # Remove SessionStart hook for Claude Code only
     try:
@@ -208,12 +211,12 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
         pass
 
 
-def _uninstall_universal_skills() -> None:
+def _uninstall_universal_skills(copy_mode: bool = False) -> None:
 
     target = config.AGENTS_HOME / "skills"
     if target.exists() and any(target.iterdir()):
         print(f"Removing universal skills from {target} ...")
-        remove_all_symlinks_in_dir(target)
+        remove_all_symlinks_in_dir(target, copy_mode)
         remove_dir_if_empty(target)
 
 
@@ -233,7 +236,7 @@ def _session_hook_paths(backend, scope: str):
 
 def _install_session_hook(backend, scope: str) -> None:
     """Install the SessionStart hook and write the context file for Claude Code."""
-    from .settings_writer import install_hook
+    from .settings_writer import install_hook, install_allow_entry, remove_allow_entry
     from .session_context import write_context
     from .. import config
 
@@ -249,45 +252,20 @@ def _install_session_hook(backend, scope: str) -> None:
     print(f"Installing Claude Code SessionStart hook ...")
     write_context(context_file, agents, version)
     install_hook(settings_path, "SessionStart", hook_command)
+    # Remove old standalone entry if present (backward compat cleanup)
+    remove_allow_entry(settings_path, "Bash(cost-report)")
+    install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
 
 
 def _uninstall_session_hook(backend, scope: str) -> None:
     """Remove the SessionStart hook and context file for Claude Code."""
-    from .settings_writer import remove_hook
+    from .settings_writer import remove_hook, remove_allow_entry
 
     settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
     print(f"Removing Claude Code SessionStart hook ...")
     context_file.unlink(missing_ok=True)
     remove_hook(settings_path, "SessionStart", hook_command)
+    remove_allow_entry(settings_path, "Bash(cost-report)")
+    remove_allow_entry(settings_path, "Bash(agent-notes cost-report)")
 
 
-def install_scripts_global() -> None:
-    """Install scripts to ~/.local/bin/."""
-    from .fs import place_file
-    
-    dist_scripts_dir = config.DIST_DIR / "scripts"
-    bin_home = Path.home() / ".local" / "bin"
-    
-    if not dist_scripts_dir.exists():
-        return
-    print(f"Installing scripts to {bin_home} ...")
-    bin_home.mkdir(parents=True, exist_ok=True)
-    for script in sorted(dist_scripts_dir.iterdir()):
-        if script.is_file():
-            place_file(script, bin_home / script.name)
-            (bin_home / script.name).chmod(0o755)
-
-
-def uninstall_scripts_global() -> None:
-    """Uninstall scripts from ~/.local/bin/."""
-    from .fs import remove_symlink
-    
-    dist_scripts_dir = config.DIST_DIR / "scripts"
-    bin_home = Path.home() / ".local" / "bin"
-    
-    if not dist_scripts_dir.exists():
-        return
-    print(f"Removing scripts from {bin_home} ...")
-    for script in sorted(dist_scripts_dir.iterdir()):
-        if script.is_file():
-            remove_symlink(bin_home / script.name)

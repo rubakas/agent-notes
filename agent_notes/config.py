@@ -18,7 +18,6 @@ AGENTS_YAML = DATA_DIR / "agents" / "agents.yaml"
 AGENTS_DIR = DATA_DIR / "agents"
 RULES_DIR = DATA_DIR / "rules"
 SKILLS_DIR = DATA_DIR / "skills"
-SCRIPTS_DIR = DATA_DIR / "scripts"
 MODELS_DIR = DATA_DIR / "models"
 ROLES_DIR = DATA_DIR / "roles"
 
@@ -26,7 +25,6 @@ ROLES_DIR = DATA_DIR / "roles"
 DIST_DIR = PKG_DIR / "dist"
 DIST_RULES_DIR = DIST_DIR / "rules"
 DIST_SKILLS_DIR = DIST_DIR / "skills"
-DIST_SCRIPTS_DIR = DIST_DIR / "scripts"
 
 # Keep ROOT as alias for compatibility
 ROOT = PKG_DIR

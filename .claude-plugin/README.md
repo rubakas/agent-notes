@@ -9,9 +9,19 @@ Multi-agent development team with cost-optimized model routing for Claude Code.
 - Sonnet — coder, reviewer, security-auditor, devops, integrations, refactorer, and more
 - Haiku — explorer, analyst, api-reviewer, tech-writer (fast read-only work)
 
-**5 process discipline skills** (available as `/skill` immediately after install):
-- `tdd` — RED-GREEN-REFACTOR methodology with strict anti-patterns
-- `debugging-protocol` — 4-phase systematic debugging: instrument → evidence → hypothesis → fix
+**11 process discipline skills** (available as `/skill` immediately after install):
+
+Recent additions inspired by [mattpocock/skills](https://github.com/mattpocock/skills):
+- `grill-me` — interview the user relentlessly until the plan is fully resolved
+- `grill-with-docs` — same, but cross-references CONTEXT.md and ADRs; updates docs inline
+- `caveman` — ultra-compressed reply mode (~75% token savings) for rapid iteration
+- `setup-project-context` — bootstraps a CONTEXT.md domain glossary (ubiquitous language)
+- `improve-codebase-architecture` — deletion test to find shallow modules; surfaces deepening opportunities
+- `zoom-out` — quick orientation map of an unfamiliar code area
+
+Core skills:
+- `tdd` — RED-GREEN-REFACTOR with tracer-bullet vertical slices; horizontal-slicing anti-pattern added
+- `debugging-protocol` — build a feedback loop first; 9 strategies across 4 phases
 - `brainstorming` — explore multiple approaches before committing
 - `code-review` — 5-lens review: correctness, safety, performance, clarity, consistency
 - `refactoring-protocol` — safe incremental refactoring with green-test gates
@@ -41,7 +51,7 @@ agent-notes install
 | Feature | Plugin | Full install |
 |---|---|---|
 | 18 specialized agents | ✓ | ✓ |
-| Process skills (5) | ✓ | ✓ |
+| Process skills (11) | ✓ | ✓ |
 | Session context hook | ✓ | ✓ |
 | Domain skills (Rails, Docker, Git) | — | ✓ |
 | Slash commands (/review /debug /brainstorm) | — | ✓ |

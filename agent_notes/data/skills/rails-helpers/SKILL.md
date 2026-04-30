@@ -1,6 +1,6 @@
 ---
 name: rails-helpers
-description: "Rails view helpers: application helpers, domain-specific helpers, forms, and HTML processing"
+description: "Rails view helpers: application helpers, domain-specific helpers, forms, and HTML processing. Use when user is writing view helpers or extracting presentation logic from views."
 group: rails
 ---
 

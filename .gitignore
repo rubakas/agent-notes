@@ -40,3 +40,5 @@ MagicMock/
 # Credentials
 .pypirc
 scripts/.pypirc
+credentials.toml
+.agent-notes/

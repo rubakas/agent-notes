@@ -1,6 +1,6 @@
 ---
 name: refactoring-protocol
-description: "Safe refactoring: green tests first, one extraction at a time, structure OR behavior never both"
+description: "Safe refactoring: green tests first, one extraction at a time, structure OR behavior never both. Use when user wants to refactor code, reduce duplication, or says 'clean this up'."
 group: process
 ---
 

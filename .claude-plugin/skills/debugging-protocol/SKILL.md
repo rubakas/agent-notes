@@ -1,6 +1,6 @@
 ---
 name: debugging-protocol
-description: "4-phase systematic debugging: instrument → evidence → hypothesis → fix"
+description: "Systematic debugging: build a feedback loop first, then reproduce, hypothesize, and fix. Use when user reports a bug, something is broken, or describes unexpected behavior."
 group: process
 ---
 
@@ -8,17 +8,35 @@ group: process
 
 Never guess. Never change code randomly. Follow the four phases.
 
-## Phase 1 — Instrument
+## Phase 1 — Build a feedback loop
 
-Before forming any hypothesis, add observability:
-- Add logging at the entry and exit of the failing code path.
-- Log inputs, intermediate values, and outputs — not just that something happened.
-- If a test is failing: read the **full stack trace** before doing anything else.
-- If a runtime error: reproduce in the smallest possible isolated case.
+**This is the skill.** Everything else is mechanical. If you have a fast, deterministic, pass/fail signal for the bug, you will find the cause. If you don't, no amount of staring at code will save you.
 
-Do not modify production logic in this phase.
+### Ways to build one — try in this order
 
-**For regressions:** run `git log --oneline -20` and use `git bisect` to find the commit that introduced the failure before instrumenting. Knowing when it broke tells you where to look.
+1. **Failing test** at whatever seam reaches the bug — unit, integration, e2e.
+2. **Curl / HTTP script** against a running dev server.
+3. **CLI invocation** with a fixture input, diffing stdout against a known-good snapshot.
+4. **Headless browser script** (Playwright / Puppeteer) — drives the UI, asserts on DOM/console/network.
+5. **Replay a captured trace** — save a real network request or event log; replay through the code path in isolation.
+6. **Throwaway harness** — minimal subset of the system that exercises the bug code path with a single function call.
+7. **Property / fuzz loop** — if the bug is "sometimes wrong output", run many random inputs and look for the failure.
+8. **Bisection harness** — if the bug appeared between two known states (commits, versions), automate "boot at state X, check, repeat" so you can bisect.
+9. **Differential loop** — run the same input through old-version vs new-version and diff outputs.
+
+### Iterate on the loop itself
+
+Once you have a loop, ask: Can I make it faster? Can I make the signal sharper (assert on the specific symptom, not "didn't crash")? Can I make it more deterministic (pin time, seed RNG, isolate filesystem)?
+
+A 30-second flaky loop is barely better than no loop. A 2-second deterministic loop is a debugging superpower.
+
+### Non-deterministic bugs
+
+The goal is not a clean repro but a **higher reproduction rate**. Loop the trigger many times, add stress, narrow timing windows. A 50%-flake bug is debuggable; 1% is not — keep raising the rate.
+
+### When you genuinely cannot build a loop
+
+Stop and say so explicitly. List what you tried. Ask the user for: (a) access to the environment that reproduces it, (b) a captured artifact (log dump, screen recording), or (c) permission to add temporary production instrumentation. Do NOT proceed to Phase 2 without a loop.
 
 ## Phase 2 — Gather evidence
 

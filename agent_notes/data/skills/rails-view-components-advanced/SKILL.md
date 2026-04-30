@@ -1,6 +1,6 @@
 ---
 name: rails-view-components-advanced
-description: "ViewComponent advanced: best practices, organization, lifecycle, and common patterns"
+description: "ViewComponent advanced: best practices, organization, lifecycle, and common patterns. Use when user needs complex component composition, polymorphic slots, or ViewComponent lifecycle hooks."
 group: rails
 ---
 

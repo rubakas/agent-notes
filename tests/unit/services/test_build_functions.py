@@ -10,47 +10,6 @@ from unittest.mock import patch
 _build_mod = importlib.import_module("agent_notes.commands.build")
 
 
-def test_copy_scripts_replaces_pricing_placeholder(tmp_path):
-    """copy_scripts() should replace {{PRICING}} with JSON from pricing.yaml."""
-    scripts_src = tmp_path / "scripts"
-    scripts_dst = tmp_path / "dist_scripts"
-    scripts_src.mkdir()
-
-    # Write a script file with the placeholder
-    script_file = scripts_src / "cost-report"
-    script_file.write_text("#!/usr/bin/env python3\nPRICING = {{PRICING}}\n")
-
-    import agent_notes.config as config_mod
-
-    with patch.object(config_mod, "SCRIPTS_DIR", scripts_src), \
-         patch.object(config_mod, "DIST_SCRIPTS_DIR", scripts_dst):
-        copied = _build_mod.copy_scripts()
-
-    assert len(copied) == 1
-    content = copied[0].read_text()
-    assert "{{PRICING}}" not in content
-    assert '"providers"' in content
-
-
-def test_copy_scripts_result_is_executable(tmp_path):
-    """copy_scripts() should make output files executable."""
-    import stat
-    scripts_src = tmp_path / "scripts"
-    scripts_dst = tmp_path / "dist_scripts"
-    scripts_src.mkdir()
-
-    (scripts_src / "my-script").write_text("#!/bin/sh\necho hi\n")
-
-    import agent_notes.config as config_mod
-
-    with patch.object(config_mod, "SCRIPTS_DIR", scripts_src), \
-         patch.object(config_mod, "DIST_SCRIPTS_DIR", scripts_dst):
-        copied = _build_mod.copy_scripts()
-
-    assert len(copied) == 1
-    mode = copied[0].stat().st_mode
-    assert mode & stat.S_IXUSR
-
 
 def test_copy_skills_copies_all_skill_dirs(tmp_path):
     """copy_skills() should copy every skill directory to dist/skills/."""
