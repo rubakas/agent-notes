@@ -14,27 +14,40 @@ This skill is the **single source of truth** for memory record format. The CLI i
 
 ### Filename rule
 
-- **Session notes** (`type=session`): filename is `<session-id>.md`
-  - Claude Code: stem of the active JSONL at `~/.claude/projects/<cwd-slug>/<session-id>.jsonl`
-  - OpenCode: the session row's `id`
-- **All other types**: filename is `<UTC-YYYY-MM-DD-HH-MM-SS>-<slug>.md`
+All notes use `YYYY-MM-DD_<slug>.md`. The folder encodes the type — no type segment in the filename.
 
-A session note is **per-session**, not per-message. Re-running `memory add` with `type=session` for the same session appends an `## Update <UTC ISO>` block to the existing file rather than creating a new one. If no session ID can be detected (e.g. invoked outside a CLI session), the note falls back to the timestamp+slug filename rule.
+- **Session notes** (`type=session`): `YYYY-MM-DD_<session-id>.md`
+  - Claude Code session ID: stem of the active JSONL at `~/.claude/projects/<cwd-slug>/<session-id>.jsonl`
+  - OpenCode: the session row's `id`
+  - If no session ID can be detected, falls back to `YYYY-MM-DD_<slug>.md` (slug of the title)
+- **All other types**: `YYYY-MM-DD_<slug>.md` where slug is the slugified title
+
+**Collision rule**: if the target filename already exists, `_HHMMSS` is appended before `.md` (e.g. `2026-04-30_fix-foo_142231.md`).
+
+A session note is **per-session**, not per-message. Re-running `memory add` with `type=session` for the same session appends an `## Update <UTC ISO>` block to the existing file rather than creating a new one.
 
 ### Frontmatter rule
 
-Every record has this frontmatter, in this order. No `date:` field — only `created_at:`.
+Every record uses the same template. No `date:` field — only `created_at:`.
 
 ```yaml
 ---
 created_at: 2026-04-28T19:30:35Z   # ISO 8601, UTC, "Z" suffix — REQUIRED
 type: pattern                       # pattern|decision|mistake|context|session — REQUIRED
-session_id: <id>                    # REQUIRED when detectable (Claude Code / OpenCode session); omitted otherwise
+session: 2026-04-28_<session-id>   # wikilink target (no brackets); absent on session notes themselves
 agent: lead                         # optional
-project: <name>                     # optional
-tags: [a, b]                        # optional
 ---
 ```
+
+After the frontmatter, every note body is followed by:
+
+```markdown
+## Related
+
+(empty initially; Obsidian links can be added manually)
+```
+
+Session notes additionally grow a `## Linked notes` section that the CLI populates automatically when non-session notes are written during the same session.
 
 ### Time rule
 
@@ -93,13 +106,16 @@ agent-notes memory vault             # confirm backend and path
 
 The vault is structured as:
 ```
-vault/
-├── Patterns/     — reusable solutions
-├── Decisions/    — architectural choices
-├── Mistakes/     — errors to avoid
-├── Context/      — project background
-└── Sessions/     — one file per session, named <session-id>.md
+vault/agent-notes/
+├── Patterns/     — reusable solutions        YYYY-MM-DD_<slug>.md
+├── Decisions/    — architectural choices     YYYY-MM-DD_<slug>.md
+├── Mistakes/     — errors to avoid           YYYY-MM-DD_<slug>.md
+├── Context/      — project background        YYYY-MM-DD_<slug>.md
+├── Sessions/     — one file per session      YYYY-MM-DD_<session-id>.md
+└── Index.md      — chronological list, newest first
 ```
+
+The root `agent-notes/` is shared across all projects — there is no per-project subfolder.
 
 ## Regenerate the index
 
@@ -126,22 +142,19 @@ The session note is updated on every meaningful state change. Specifically:
 
 Skipping any of these makes the session note stale and breaks cross-session reconstruction. The Done Gate in `global-claude.md` enforces this for the lead; team agents follow the read-before-work side via the next section.
 
-## Linking rule
+## Auto-linking rule
 
-Whenever a session is active and a non-session note is written (Decision / Pattern / Mistake / Context), the session note must be appended with a wikilink to it within the same logical operation:
+Whenever a session is active (Claude Code session ID detectable) and a non-session note is written, the CLI **automatically** appends a wikilink line to the session note's `## Linked notes` section:
 
-1. Write the new Decision / Pattern / Mistake / Context note via `agent-notes memory add ... <type> lead`. Capture the returned path.
-2. Append a single line to the session note via a second `agent-notes memory add "<session-title>" "Linked: [[<filename-stem>]] — <type> — <one-line-why>" session lead`.
+```
+- [[<filename-stem>]] — <type> — <title>
+```
 
-The cadence rule already mandates one append per phase outcome; this rule layers wikilinks onto that append. Result: the session note becomes the navigable hub for everything written during the session.
+This is done in the same `agent-notes memory add` call — no second call is needed. The operation is idempotent: if the link already exists, it is not duplicated.
 
-**General notes (project-truths, not tied to one session) do NOT get linked.** Examples:
-- A Pattern about Rails enum prefix: applies forever, lives in `Patterns/`, NOT referenced from any session note.
-- A Decision about choosing PostgreSQL: applies forever, lives in `Decisions/`, NOT referenced from a session note.
+The session note becomes the navigable hub for everything written during the session without any extra work from the agent.
 
-**Judgment call**: if the note explains "what we did today and why" → link it from the session note. If the note explains "how the project works in general" → don't link it.
-
-**Backend conditional**: this rule only applies when the configured memory backend is Obsidian. On the local backend (no vault, no wikilinks), skip the linking step — the cadence rule alone is enough.
+**Backend conditional**: auto-linking only applies when the configured memory backend is Obsidian. On the local backend, there are no wikilinks and this step is a no-op.
 
 ## Plan-mirror rule (Obsidian backend only)
 
