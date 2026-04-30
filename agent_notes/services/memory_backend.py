@@ -53,6 +53,12 @@ def _current_session_id() -> Optional[str]:
     return None
 
 
+def _current_project_name() -> str:
+    """Return the current working directory's name as the project name."""
+    name = Path.cwd().name
+    return name or ""
+
+
 # ── Obsidian backend ───────────────────────────────────────────────────────────
 
 def obsidian_init(vault: Path) -> None:
@@ -107,9 +113,12 @@ def _build_note(
     agent: str,
     session_stem: Optional[str],
     created_at: str,
+    project: str = "",
 ) -> str:
     """Render the canonical note content (frontmatter + heading + body + Related section)."""
     lines = ["---", f"created_at: {created_at}", f"type: {note_type}"]
+    if project:
+        lines.append(f"project: {project}")
     if session_stem and note_type != "session":
         lines.append(f"session: {session_stem}")
     if agent:
@@ -178,6 +187,9 @@ def obsidian_write_note(
     else:
         session_id = None
 
+    if not project:
+        project = _current_project_name()
+
     today = _today()
 
     if note_type == "session" and session_id:
@@ -185,7 +197,7 @@ def obsidian_write_note(
         # But first check if an existing file already has this session_id (any date prefix)
         existing = _find_session_note(vault, session_id)
         if existing is not None:
-            # Append to existing session note
+            # Append to existing session note — preserve existing frontmatter (including project)
             text = existing.read_text()
             fm, existing_body = _parse_frontmatter(text)
             if "created_at" not in fm:
@@ -193,6 +205,9 @@ def obsidian_write_note(
                 if re.fullmatch(r"\d{4}-\d{2}-\d{2}", created_at):
                     created_at = f"{created_at}T00:00:00Z"
                 new_fm_lines = ["---", f"created_at: {created_at}", f"type: {note_type}"]
+                existing_project = fm.get("project", "")
+                if existing_project:
+                    new_fm_lines.append(f"project: {existing_project}")
                 if agent:
                     new_fm_lines.append(f"agent: {agent}")
                 new_fm_lines.append("---")
@@ -206,7 +221,7 @@ def obsidian_write_note(
         path = folder / filename
         path.write_text(_build_note(
             title=title, body=body, note_type=note_type,
-            agent=agent, session_stem=None, created_at=created_at,
+            agent=agent, session_stem=None, created_at=created_at, project=project,
         ))
     elif note_type == "session":
         # No session_id available — fall back to timestamp+slug
@@ -215,7 +230,7 @@ def obsidian_write_note(
         path = folder / filename
         path.write_text(_build_note(
             title=title, body=body, note_type=note_type,
-            agent=agent, session_stem=None, created_at=created_at,
+            agent=agent, session_stem=None, created_at=created_at, project=project,
         ))
     else:
         # Non-session note
@@ -232,7 +247,7 @@ def obsidian_write_note(
         path = folder / filename
         path.write_text(_build_note(
             title=title, body=body, note_type=note_type,
-            agent=agent, session_stem=session_stem, created_at=created_at,
+            agent=agent, session_stem=session_stem, created_at=created_at, project=project,
         ))
 
         # Auto-link to session note
@@ -265,7 +280,8 @@ def _parse_note_metadata(path: Path) -> dict:
         (l.lstrip("# ").strip() for l in full_text.splitlines() if l.startswith("# ")),
         path.stem,
     )
-    return {"created_at": created_at, "type": note_type, "title": title}
+    project = fm.get("project", "")
+    return {"created_at": created_at, "type": note_type, "title": title, "project": project}
 
 
 def obsidian_regenerate_index(vault: Path) -> None:
@@ -299,7 +315,8 @@ def obsidian_regenerate_index(vault: Path) -> None:
             display_dt = f"{dt_str[:10]} {dt_str[11:16]}"
         else:
             display_dt = dt_str[:16] if len(dt_str) >= 16 else dt_str
-        lines.append(f"- {display_dt} [[{stem}]] — {meta['type']}")
+        project = meta.get("project", "")
+        lines.append(f"- [[{stem}|{display_dt}]] - {project}({meta['type']})")
 
     (vault / "Index.md").write_text("\n".join(lines) + "\n")
 
