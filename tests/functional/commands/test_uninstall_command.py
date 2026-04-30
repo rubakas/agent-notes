@@ -1,4 +1,5 @@
 """Functional tests for the uninstall command."""
+from __future__ import annotations
 
 import json
 import pytest
