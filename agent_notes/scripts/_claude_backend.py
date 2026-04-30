@@ -105,7 +105,9 @@ def run(since: float | None = None) -> int:
     # Each user message with toolUseResult.totalDurationMs records sub-agent wall time.
     agent_time_ms: dict[str, int] = {}
     for obj in lead_messages:
-        tool_result = obj.get("toolUseResult", {})
+        tool_result = obj.get("toolUseResult")
+        if not isinstance(tool_result, dict):
+            continue
         duration_ms = tool_result.get("totalDurationMs")
         agent_type = tool_result.get("agentType")
         if duration_ms is not None and agent_type:

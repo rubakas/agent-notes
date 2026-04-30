@@ -41,6 +41,14 @@ def _tool_use_result_msg(agent_type: str, duration_ms: int) -> dict:
     }
 
 
+def _string_tool_use_result_msg(stdout: str = "some bash output") -> dict:
+    """Simulate a user message where toolUseResult is a raw string (Bash tool result)."""
+    return {
+        "type": "user",
+        "toolUseResult": stdout,
+    }
+
+
 def _make_session(tmp_path: Path, subagents: list[dict],
                   lead_offsets: list[float] = None) -> tuple[str, str]:
     """
@@ -172,6 +180,41 @@ class TestTimeAggregation:
         _claude_backend.run()
         out = capsys.readouterr().out
         assert "1m 30s" in out, f"Expected '1m 30s' in output:\n{out}"
+
+    def test_string_tool_use_result_does_not_crash(self, tmp_path, monkeypatch, capsys):
+        """String-typed toolUseResult (Bash tool output) must not crash and contributes 0ms."""
+        # Mix a string toolUseResult with a valid dict one; only the dict should count.
+        main_lines = [
+            json.dumps(_assistant_msg(offset=0.0)),
+            json.dumps(_string_tool_use_result_msg("raw bash stdout")),
+            json.dumps(_tool_use_result_msg("coder", 30_000)),
+        ]
+
+        session_uuid = str(uuid.uuid4())
+        slug = str(tmp_path).replace("/", "-")
+        proj_dir = tmp_path / ".claude" / "projects" / slug
+        proj_dir.mkdir(parents=True)
+        main_jsonl = proj_dir / f"{session_uuid}.jsonl"
+        main_jsonl.write_text("\n".join(main_lines) + "\n")
+
+        sa_dir = proj_dir / session_uuid / "subagents"
+        sa_dir.mkdir(parents=True)
+        sa_jsonl = sa_dir / "agent-0000.jsonl"
+        sa_jsonl.write_text(json.dumps(_assistant_msg(offset=30.0)) + "\n")
+        meta = sa_dir / "agent-0000.meta.json"
+        meta.write_text(json.dumps({"agentType": "coder"}))
+
+        monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+                            lambda: tmp_path / "nonexistent-state.json")
+
+        # Must not raise AttributeError
+        _claude_backend.run()
+        out = capsys.readouterr().out
+
+        # The dict-typed result (30 000 ms = 30s) should still be reflected
+        assert "30s" in out, f"Expected '30s' in output:\n{out}"
 
     def test_total_row_sums_all_durations(self, tmp_path, monkeypatch, capsys):
         """TOTAL row time = lead_time + sum of sub-agent durations."""
