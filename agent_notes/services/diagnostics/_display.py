@@ -102,7 +102,7 @@ def _check_config(backend, scope: str) -> tuple:
 def _check_role_models(state):
     """Display role→model assignments and check compatibility."""
     from ...model_registry import load_model_registry
-    from ...cli_backend import load_registry
+    from ...registries.cli_registry import load_registry
     from ...role_registry import load_role_registry
     from ...config import Color
 
@@ -218,7 +218,7 @@ def print_summary(scope: str):
     print(f"Checking AgentNotes {label} installation:")
     print("")
 
-    from ...cli_backend import load_registry
+    from ...registries.cli_registry import load_registry
     registry = load_registry()
     for backend in registry.all():
         if not backend.supports("agents"):

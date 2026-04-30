@@ -1,4 +1,5 @@
 """Session cost report for Claude Code — reads JSONL transcripts."""
+from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
