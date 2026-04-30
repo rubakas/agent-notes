@@ -175,7 +175,8 @@ class TestObsidianRegenerateIndex:
         obsidian_regenerate_index(tmp_path)
 
         index_content = (tmp_path / "Index.md").read_text()
-        assert "[[2026-04-28_test-pattern]]" in index_content
+        # New format: [[stem|display_dt]] — stem appears inside the piped wikilink
+        assert "[[2026-04-28_test-pattern|" in index_content
 
     def test_index_lists_notes_from_all_categories(self, tmp_path):
         for cat, title in [("Patterns", "Pattern Note"), ("Sessions", "Session Note")]:
@@ -219,6 +220,7 @@ class TestObsidianRegenerateIndex:
         assert "## By category" not in index_content
 
     def test_index_is_sorted_newest_first(self, tmp_path):
+        import re
         patterns = tmp_path / "Patterns"
         patterns.mkdir()
         for i in range(5):
@@ -229,7 +231,9 @@ class TestObsidianRegenerateIndex:
         obsidian_regenerate_index(tmp_path)
         content = (tmp_path / "Index.md").read_text()
         lines = [l for l in content.splitlines() if l.startswith("- ")]
-        dts = [l.split(" ")[1] for l in lines]
+        # New format: - [[stem|YYYY-MM-DD HH:MM]] - project(type)
+        # Extract the display datetime from inside the pipe: [[stem|<dt>]]
+        dts = [re.search(r"\|([^\]]+)\]\]", l).group(1) for l in lines]
         assert dts == sorted(dts, reverse=True)
 
     def test_index_falls_back_to_legacy_date_field(self, tmp_path):
@@ -454,6 +458,7 @@ class TestIndexFormat:
         return path
 
     def test_index_is_chronological_newest_first(self, tmp_path):
+        import re
         patterns = tmp_path / "Patterns"
         for i in range(5):
             self._make_note(patterns, f"2026-04-29_note-{i}", "pattern",
@@ -461,8 +466,9 @@ class TestIndexFormat:
         obsidian_regenerate_index(tmp_path)
         content = (tmp_path / "Index.md").read_text()
         lines = [l for l in content.splitlines() if l.startswith("- ")]
-        # Extract the datetime portion (first word after "- ")
-        dts = [l.split(" ")[1] for l in lines]
+        # New format: - [[stem|YYYY-MM-DD HH:MM]] - project(type)
+        # Extract the display datetime from inside the pipe: [[stem|<dt>]]
+        dts = [re.search(r"\|([^\]]+)\]\]", l).group(1) for l in lines]
         assert dts == sorted(dts, reverse=True)
 
     def test_index_line_format(self, tmp_path):
@@ -471,7 +477,9 @@ class TestIndexFormat:
                         "2026-04-29T10:00:00Z", "Test pattern title")
         obsidian_regenerate_index(tmp_path)
         content = (tmp_path / "Index.md").read_text()
-        assert "- 2026-04-29 10:00 [[2026-04-29_test-pat]] — pattern" in content
+        # New format: - [[stem|display_dt]] - project(type)
+        # Note has no project field so it renders as empty: (pattern)
+        assert "- [[2026-04-29_test-pat|2026-04-29 10:00]] - (pattern)" in content
 
     def test_index_has_no_by_category_section(self, tmp_path):
         patterns = tmp_path / "Patterns"
@@ -480,3 +488,199 @@ class TestIndexFormat:
         content = (tmp_path / "Index.md").read_text()
         assert "## By category" not in content
         assert "## Recent activity" not in content
+
+
+# ── Project field in frontmatter and index ────────────────────────────────────
+
+class TestProjectField:
+    """Tests for the `project` frontmatter field introduced in the obsidian redesign."""
+
+    def _parse_yaml_frontmatter(self, text: str) -> dict:
+        """Extract key/value pairs from the YAML frontmatter block."""
+        if not text.startswith("---"):
+            return {}
+        end = text.find("\n---", 3)
+        if end == -1:
+            return {}
+        fm_block = text[3:end].strip()
+        result = {}
+        for line in fm_block.splitlines():
+            if ":" in line:
+                k, _, v = line.partition(":")
+                result[k.strip()] = v.strip()
+        return result
+
+    def test_obsidian_write_note_auto_fills_project_from_cwd(self, tmp_path, monkeypatch):
+        """project="" triggers auto-fill from Path.cwd().name."""
+        import agent_notes.services.memory_backend as mb
+        monkeypatch.setattr(mb.Path, "cwd", classmethod(lambda cls: Path("/fake/my-repo")))
+
+        path = obsidian_write_note(
+            tmp_path, title="Auto project", body="body", note_type="pattern", project=""
+        )
+        fm = self._parse_yaml_frontmatter(path.read_text())
+        assert fm.get("project") == "my-repo"
+
+    def test_obsidian_write_note_explicit_project_overrides_cwd(self, tmp_path, monkeypatch):
+        """An explicit project value is used verbatim, ignoring cwd."""
+        import agent_notes.services.memory_backend as mb
+        monkeypatch.setattr(mb.Path, "cwd", classmethod(lambda cls: Path("/fake/some-other-dir")))
+
+        path = obsidian_write_note(
+            tmp_path, title="Explicit project", body="body", note_type="pattern",
+            project="my-project"
+        )
+        fm = self._parse_yaml_frontmatter(path.read_text())
+        assert fm.get("project") == "my-project"
+
+    def test_obsidian_write_note_omits_project_when_empty(self, tmp_path, monkeypatch):
+        """When _current_project_name() returns "" the project key is absent from frontmatter."""
+        import agent_notes.services.memory_backend as mb
+        monkeypatch.setattr(mb, "_current_project_name", lambda: "")
+
+        path = obsidian_write_note(
+            tmp_path, title="No project", body="body", note_type="pattern", project=""
+        )
+        fm = self._parse_yaml_frontmatter(path.read_text())
+        assert "project" not in fm
+        # Also verify the raw text has no project: line
+        assert "project:" not in path.read_text()
+
+    def test_obsidian_index_line_format_with_project(self, tmp_path):
+        """Index line renders - [[stem|dt]] - <project>(type) when project is present."""
+        patterns = tmp_path / "Patterns"
+        patterns.mkdir(parents=True, exist_ok=True)
+        stem = "2026-04-29_indexed-note"
+        (patterns / f"{stem}.md").write_text(
+            "---\ncreated_at: 2026-04-29T10:00:00Z\ntype: pattern\nproject: agent-notes\n---\n\n# Indexed Note\n\nbody\n"
+        )
+        obsidian_regenerate_index(tmp_path)
+        content = (tmp_path / "Index.md").read_text()
+        assert f"- [[{stem}|2026-04-29 10:00]] - agent-notes(pattern)" in content
+
+    def test_obsidian_index_line_format_legacy_no_project(self, tmp_path):
+        """Legacy notes without a project field render with empty project: - [[stem|dt]] - (type)."""
+        patterns = tmp_path / "Patterns"
+        patterns.mkdir(parents=True, exist_ok=True)
+        stem = "2026-04-29_legacy-note"
+        # No project field in frontmatter — simulates a pre-feature note
+        (patterns / f"{stem}.md").write_text(
+            "---\ncreated_at: 2026-04-29T09:00:00Z\ntype: pattern\n---\n\n# Legacy Note\n\nbody\n"
+        )
+        obsidian_regenerate_index(tmp_path)
+        content = (tmp_path / "Index.md").read_text()
+        assert f"- [[{stem}|2026-04-29 09:00]] - (pattern)" in content
+
+    def test_obsidian_session_update_preserves_project(self, tmp_path, monkeypatch):
+        """Appending an ## Update block to a session note must not overwrite the original project."""
+        cwd = tmp_path / "proj"
+        cwd.mkdir()
+        slug = str(cwd).replace("/", "-")
+        proj_dir = tmp_path / "home" / ".claude" / "projects" / slug
+        proj_dir.mkdir(parents=True)
+        (proj_dir / "sess-proj.jsonl").write_text("{}")
+        monkeypatch.setenv("CLAUDECODE", "1")
+        monkeypatch.chdir(cwd)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
+
+        import agent_notes.services.memory_backend as mb
+
+        # Write initial session note with project=alpha
+        monkeypatch.setattr(mb, "_current_project_name", lambda: "alpha")
+        vault = tmp_path / "vault"
+        first = obsidian_write_note(vault, title="S", body="first body", note_type="session")
+        fm_after_first = self._parse_yaml_frontmatter(first.read_text())
+        assert fm_after_first.get("project") == "alpha"
+
+        # Append update with a different project name (beta) — original frontmatter must survive
+        monkeypatch.setattr(mb, "_current_project_name", lambda: "beta")
+        second = obsidian_write_note(vault, title="S", body="second body", note_type="session")
+
+        assert first == second  # same file, update appended
+        content = second.read_text()
+        fm_after_update = self._parse_yaml_frontmatter(content)
+        assert fm_after_update.get("project") == "alpha", (
+            f"project field was overwritten; got {fm_after_update.get('project')!r}"
+        )
+        assert "second body" in content  # update content is present
+
+    def test_obsidian_session_update_does_not_stamp_project_onto_legacy_note(
+        self, tmp_path, monkeypatch
+    ):
+        """Appending to a legacy session note (no project key) must not stamp the caller's project.
+
+        Covers two branches:
+          - direct-append branch: existing note already has `created_at` in frontmatter
+          - legacy-migration branch: existing note has `date` instead of `created_at` (the buggy path)
+        """
+        import agent_notes.services.memory_backend as mb
+
+        # ------------------------------------------------------------------
+        # Branch 1: direct-append (created_at present, no project key)
+        # ------------------------------------------------------------------
+        cwd = tmp_path / "proj-a"
+        cwd.mkdir()
+        slug = str(cwd).replace("/", "-")
+        proj_dir = tmp_path / "home" / ".claude" / "projects" / slug
+        proj_dir.mkdir(parents=True)
+        (proj_dir / "direct-sess.jsonl").write_text("{}")
+        monkeypatch.setenv("CLAUDECODE", "1")
+        monkeypatch.chdir(cwd)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
+        monkeypatch.setattr(mb, "_current_project_name", lambda: "some-other-project")
+
+        vault_a = tmp_path / "vault-a"
+        sessions_a = vault_a / "Sessions"
+        sessions_a.mkdir(parents=True)
+        legacy_a = sessions_a / "direct-sess.md"
+        # Pre-feature note: has created_at but NO project key
+        legacy_a.write_text(
+            "---\ncreated_at: 2026-01-01T00:00:00Z\ntype: session\n---\n\n# Old\n\noriginal body\n"
+        )
+
+        obsidian_write_note(vault_a, title="Old", body="appended body", note_type="session")
+
+        content_a = legacy_a.read_text()
+        fm_a = self._parse_yaml_frontmatter(content_a)
+        assert "project" not in fm_a, (
+            f"direct-append branch: project stamped onto legacy note; got {fm_a.get('project')!r}"
+        )
+        assert "project:" not in content_a.split("---")[1], (
+            "direct-append branch: 'project:' key found in frontmatter block"
+        )
+        assert "appended body" in content_a
+
+        # ------------------------------------------------------------------
+        # Branch 2: legacy-migration (date present, no created_at, no project key)
+        # This is the branch where the bug originally manifested.
+        # ------------------------------------------------------------------
+        cwd2 = tmp_path / "proj-b"
+        cwd2.mkdir()
+        slug2 = str(cwd2).replace("/", "-")
+        proj_dir2 = tmp_path / "home" / ".claude" / "projects" / slug2
+        proj_dir2.mkdir(parents=True)
+        (proj_dir2 / "legacy-sess.jsonl").write_text("{}")
+        monkeypatch.chdir(cwd2)
+
+        vault_b = tmp_path / "vault-b"
+        sessions_b = vault_b / "Sessions"
+        sessions_b.mkdir(parents=True)
+        legacy_b = sessions_b / "legacy-sess.md"
+        # Pre-feature note: only `date` (no created_at, no project)
+        legacy_b.write_text(
+            "---\ndate: 2026-01-01\ntype: session\n---\n\n# Legacy\n\noriginal body\n"
+        )
+
+        obsidian_write_note(vault_b, title="Legacy", body="appended body", note_type="session")
+
+        content_b = legacy_b.read_text()
+        fm_b = self._parse_yaml_frontmatter(content_b)
+        assert "project" not in fm_b, (
+            f"legacy-migration branch: project stamped onto legacy note; got {fm_b.get('project')!r}"
+        )
+        # The frontmatter block is the text between the first and second ---
+        fm_block_b = content_b.split("---")[1]
+        assert "project:" not in fm_block_b, (
+            "legacy-migration branch: 'project:' key found in frontmatter block"
+        )
+        assert "appended body" in content_b
