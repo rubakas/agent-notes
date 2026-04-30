@@ -8,6 +8,7 @@ from ._formatting import (
     BOLD, DIM, GREEN, YELLOW, NC,
     tier_color, fmt_tokens, fmt_cost, fmt_time,
 )
+from ..services.state_store import state_file as _state_file
 
 
 def _parse_timestamp(ts: str) -> float:
@@ -54,6 +55,19 @@ def _load_jsonl(path: Path) -> list:
     return messages
 
 
+def _load_configured_models() -> dict[str, str]:
+    state_path = _state_file()
+    try:
+        with state_path.open() as f:
+            data = json.load(f)
+        role_models = data["global"]["clis"]["claude"]["role_models"]
+        if not isinstance(role_models, dict):
+            return {}
+        return role_models
+    except (FileNotFoundError, KeyError, json.JSONDecodeError):
+        return {}
+
+
 def _load_subagent_label(meta_path: Path) -> str:
     try:
         with meta_path.open() as f:
@@ -85,7 +99,19 @@ def run(since: float | None = None) -> int:
     session_id = transcript_file.stem
 
     raw_messages: list = []
-    for obj in _load_jsonl(transcript_file):
+    lead_messages = _load_jsonl(transcript_file)
+
+    # Collect per-agent wall-clock time from toolUseResult entries in parent transcript.
+    # Each user message with toolUseResult.totalDurationMs records sub-agent wall time.
+    agent_time_ms: dict[str, int] = {}
+    for obj in lead_messages:
+        tool_result = obj.get("toolUseResult", {})
+        duration_ms = tool_result.get("totalDurationMs")
+        agent_type = tool_result.get("agentType")
+        if duration_ms is not None and agent_type:
+            agent_time_ms[agent_type] = agent_time_ms.get(agent_type, 0) + duration_ms
+
+    for obj in lead_messages:
         raw_messages.append(("lead", obj))
 
     subagents_dir = transcript_dir / session_id / "subagents"
@@ -107,6 +133,15 @@ def run(since: float | None = None) -> int:
     first_ts = min(all_ts) if all_ts else None
     last_ts = max(all_ts) if all_ts else None
 
+    # Lead time: span of assistant messages in the parent transcript.
+    lead_ts = [
+        _parse_timestamp(obj.get("timestamp", ""))
+        for obj in lead_messages
+        if obj.get("message", {}).get("role") == "assistant" and obj.get("timestamp")
+    ]
+    lead_ts = [t for t in lead_ts if t > 0]
+    lead_time_ms = int((max(lead_ts) - min(lead_ts)) * 1000) if len(lead_ts) >= 2 else 0
+
     print(f"Session: {session_id}")
     if first_ts:
         print(f"Started: {_ts_to_iso(first_ts)}")
@@ -115,6 +150,10 @@ def run(since: float | None = None) -> int:
     if first_ts and last_ts:
         elapsed = last_ts - first_ts
         print(f"Elapsed: {fmt_time(elapsed)}")
+    configured = _load_configured_models()
+    if configured:
+        entries = ", ".join(f"{role}={model}" for role, model in sorted(configured.items()))
+        print(f"Configured: {entries}")
     if since is not None:
         print(f"Filtered: messages from {_ts_to_iso(since)} onward")
     print()
@@ -135,6 +174,8 @@ def run(since: float | None = None) -> int:
             continue
 
         model = _pricing.normalize_model(msg.get("model", "unknown") or "unknown")
+        if model == "<synthetic>":
+            continue
         inp = usage.get("input_tokens", 0) or 0
         outp = usage.get("output_tokens", 0) or 0
         cache = usage.get("cache_read_input_tokens", 0) or 0
@@ -157,7 +198,13 @@ def run(since: float | None = None) -> int:
         for (agent, model), g in groups.items()
     ]
 
-    time_str = "n/a"
+    def _time_str_for(label: str) -> str:
+        if label == "lead":
+            ms = lead_time_ms
+        else:
+            ms = agent_time_ms.get(label, 0)
+        return fmt_time(ms / 1000) if ms > 0 else "n/a"
+
     agent_col_w = max(len(f"{a}({m})") for a, m, *_ in costs) + 2
     tok_col_w = max(
         max(len(fmt_tokens(i, o, c)) for _, _, i, o, c, *_ in costs),
@@ -167,7 +214,8 @@ def run(since: float | None = None) -> int:
             sum(c for _, _, _, _, c, *_ in costs),
         ))
     ) + 2
-    time_col_w = len(time_str) + 2
+    all_time_strs = [_time_str_for(a) for a, *_ in costs]
+    time_col_w = max(len(s) for s in all_time_strs) + 2
     W = (agent_col_w, tok_col_w, time_col_w, 12, 12)
 
     bl_label = _pricing.baseline_label()
@@ -183,14 +231,16 @@ def run(since: float | None = None) -> int:
 
     total_inp = total_outp = total_cache = 0
     total_actual = total_vs = 0.0
+    total_time_ms = 0
 
     for agent, model, inp, outp, cache, actual, vs in costs:
         label = f"{agent}({model})"
         col = tier_color(model)
+        t_str = _time_str_for(agent)
         print(
             col + f"{label:<{W[0]}}" + NC
             + f" {fmt_tokens(inp, outp, cache):<{W[1]}}"
-            + f" {time_str:<{W[2]}}"
+            + f" {t_str:<{W[2]}}"
             + f" {fmt_cost(actual):<{W[3]}}"
             + f" {fmt_cost(vs):<{W[4]}}"
         )
@@ -199,15 +249,20 @@ def run(since: float | None = None) -> int:
         total_cache += cache
         total_actual += actual
         total_vs += vs
+        if agent == "lead":
+            total_time_ms += lead_time_ms
+        else:
+            total_time_ms += agent_time_ms.get(agent, 0)
 
     saved_pct = round((1 - total_actual / total_vs) * 100) if total_vs else 0
     total_label = f"TOTAL (saved {saved_pct}%)"
+    total_time_str = fmt_time(total_time_ms / 1000) if total_time_ms > 0 else "n/a"
     col = GREEN if total_actual <= 5 else YELLOW
     print(
         col + BOLD
         + f"{total_label:<{W[0]}}"
         + f" {fmt_tokens(total_inp, total_outp, total_cache):<{W[1]}}"
-        + f" {time_str:<{W[2]}}"
+        + f" {total_time_str:<{W[2]}}"
         + f" {fmt_cost(total_actual):<{W[3]}}"
         + f" {fmt_cost(total_vs):<{W[4]}}"
         + NC
