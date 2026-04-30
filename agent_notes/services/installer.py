@@ -173,7 +173,6 @@ def _install_universal_skills(copy_mode: bool, registry: CLIRegistry) -> None:
     if not dist_skills_dir.exists():
         return
 
-    print(f"Installing universal skills ...")
     target = config.AGENTS_HOME / "skills"
     target.mkdir(parents=True, exist_ok=True)
     skill_dirs = [d for d in dist_skills_dir.iterdir() if d.is_dir()]
@@ -237,7 +236,7 @@ def _session_hook_paths(backend, scope: str):
 
 def _install_session_hook(backend, scope: str) -> None:
     """Install the SessionStart hook and write the context file for Claude Code."""
-    from .settings_writer import install_hook
+    from .settings_writer import install_hook, install_allow_entry
     from .session_context import write_context
     from .. import config
 
@@ -253,15 +252,17 @@ def _install_session_hook(backend, scope: str) -> None:
     print(f"Installing Claude Code SessionStart hook ...")
     write_context(context_file, agents, version)
     install_hook(settings_path, "SessionStart", hook_command)
+    install_allow_entry(settings_path, "Bash(cost-report)")
 
 
 def _uninstall_session_hook(backend, scope: str) -> None:
     """Remove the SessionStart hook and context file for Claude Code."""
-    from .settings_writer import remove_hook
+    from .settings_writer import remove_hook, remove_allow_entry
 
     settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
     print(f"Removing Claude Code SessionStart hook ...")
     context_file.unlink(missing_ok=True)
     remove_hook(settings_path, "SessionStart", hook_command)
+    remove_allow_entry(settings_path, "Bash(cost-report)")
 
 
