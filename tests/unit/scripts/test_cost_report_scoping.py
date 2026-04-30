@@ -214,6 +214,72 @@ class TestLoadConfiguredModels:
 
         assert result == {}
 
+    def test_returns_local_role_models_when_global_is_none(self, tmp_path, monkeypatch):
+        """Regression: global uninstalled leaves data["global"] as None; local install must be used."""
+        state_file = tmp_path / "state.json"
+        cwd = str(tmp_path)
+        state_file.write_text(json.dumps({
+            "global": None,
+            "local": {
+                cwd: {
+                    "clis": {
+                        "claude": {
+                            "role_models": {
+                                "lead": "claude-opus-4-7",
+                                "coder": "claude-sonnet-4-6",
+                            }
+                        }
+                    }
+                }
+            }
+        }))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+        monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+
+        result = _claude_backend._load_configured_models()
+
+        assert result == {"lead": "claude-opus-4-7", "coder": "claude-sonnet-4-6"}
+
+    def test_returns_empty_dict_when_both_global_and_local_absent(self, tmp_path, monkeypatch):
+        """When global is None and local has no entry for cwd, return empty dict."""
+        state_file = tmp_path / "state.json"
+        state_file.write_text(json.dumps({"global": None, "local": {}}))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+        monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+
+        result = _claude_backend._load_configured_models()
+
+        assert result == {}
+
+    def test_returns_global_role_models_when_global_is_present(self, tmp_path, monkeypatch):
+        """Regression guard: global install still takes priority when present."""
+        state_file = tmp_path / "state.json"
+        cwd = str(tmp_path)
+        state_file.write_text(json.dumps({
+            "global": {
+                "clis": {
+                    "claude": {
+                        "role_models": {"lead": "claude-opus-4-7"}
+                    }
+                }
+            },
+            "local": {
+                cwd: {
+                    "clis": {
+                        "claude": {
+                            "role_models": {"lead": "claude-sonnet-4-6"}
+                        }
+                    }
+                }
+            }
+        }))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+        monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+
+        result = _claude_backend._load_configured_models()
+
+        assert result == {"lead": "claude-opus-4-7"}
+
 
 class TestConfiguredHeaderLine:
     def _write_state(self, state_file: Path, role_models: dict) -> None:

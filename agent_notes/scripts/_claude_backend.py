@@ -60,10 +60,26 @@ def _load_configured_models() -> dict[str, str]:
     try:
         with state_path.open() as f:
             data = json.load(f)
-        role_models = data["global"]["clis"]["claude"]["role_models"]
-        if not isinstance(role_models, dict):
-            return {}
-        return role_models
+        global_scope = data.get("global")
+        if global_scope:
+            role_models = (
+                global_scope.get("clis", {})
+                .get("claude", {})
+                .get("role_models")
+            )
+            if isinstance(role_models, dict):
+                return role_models
+        # Global absent or empty — fall back to local scope for cwd
+        local_scope = (
+            data.get("local", {})
+            .get(str(Path.cwd()), {})
+            .get("clis", {})
+            .get("claude", {})
+            .get("role_models")
+        )
+        if isinstance(local_scope, dict):
+            return local_scope
+        return {}
     except (FileNotFoundError, KeyError, json.JSONDecodeError):
         return {}
 
