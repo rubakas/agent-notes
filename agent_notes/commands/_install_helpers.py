@@ -182,16 +182,13 @@ def count_skills() -> int:
 
 
 def count_agents(backend) -> int:
-    """Count agent *.md files in backend's dist directory. Returns 0 if backend
+    """Count agents for backend from the canonical YAML source. Returns 0 if backend
     doesn't support agents."""
-    from ..services import installer
-    from ..domain.cli_backend import CLIBackend
     if not backend.supports("agents"):
         return 0
-    src = installer.dist_source_for(backend, "agents")
-    if src is None or not src.exists():
-        return 0
-    return len(list(src.glob("*.md")))
+    from ..registries.agent_registry import load_agent_registry
+    registry = load_agent_registry()
+    return sum(1 for a in registry.all() if not a.excluded_from(backend.name))
 
 
 def count_global() -> int:
