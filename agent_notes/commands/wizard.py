@@ -458,9 +458,11 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
 
 
 def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], version: str = '', memory_backend: str = 'local', memory_path: str = '') -> bool:
-    """Step 7: Confirmation."""
+    """Step 7: Confirmation — shows pre-flight summary including files to be backed up."""
+    import logging
     from ..services.ui import _clear_screen, _render_step_header
     from ..registries.cli_registry import load_registry
+    from ..services.installer import plan_install
     _clear_screen()
     _render_step_header(7, 7, version)
     skill_groups = _get_skill_groups()
@@ -468,6 +470,33 @@ def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skill
 
     _render_install_summary(clis, scope, copy_mode, selected_skills, role_models, skill_groups, registry,
                             memory_backend=memory_backend, memory_path=memory_path)
+
+    # Pre-flight: show which existing files will be backed up
+    _tty = sys.stdout.isatty()
+    _YELLOW = "\033[0;33m" if _tty else ""
+    _DIM    = "\033[2m"    if _tty else ""
+    _NC     = "\033[0m"    if _tty else ""
+
+    try:
+        manifest = plan_install(
+            scope=scope,
+            registry=registry,
+            selected_clis=set(clis),
+            selected_skills=selected_skills if selected_skills else None,
+            copy_mode=copy_mode,
+        )
+        overwrites = [a for a in manifest if a.action == "overwrite"]
+        to_install = [a for a in manifest if a.action != "skip"]
+
+        print(f"  {_DIM}Files to install:{_NC}  {len(to_install)}")
+        if overwrites:
+            print(f"  {_YELLOW}Files to back up ({len(overwrites)}):{_NC}")
+            for a in overwrites:
+                print(f"    {_DIM}{a.dst}{_NC}  →  {a.backup_path}")
+        print("")
+    except Exception:
+        # Pre-flight is best-effort — log at debug and continue
+        logging.getLogger(__name__).debug("plan_install failed during pre-flight", exc_info=True)
 
     choice = _safe_input("Proceed? [Y/n]: ", "Y").lower()
     return choice != "n"
