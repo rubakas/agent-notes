@@ -287,6 +287,11 @@ def main():
     p_memory.add_argument("name", nargs="?", help="Agent name / note title (for show/reset/add)")
     p_memory.add_argument("extra", nargs="*", help="Additional args (for add: body [type] [agent] [project])")
 
+    # cost-report
+    p_cost_report = subparsers.add_parser("cost-report", help="Report token usage and cost for the current AI session")
+    p_cost_report.add_argument("--since", help="Only include messages at or after this UTC datetime (ISO 8601)")
+    p_cost_report.add_argument("--session", help="Session ID to report on (Claude Code only)")
+
     # config
     p_config = subparsers.add_parser("config", help="Reconfigure role/agent/model/memory/skill assignments after install")
     p_config.add_argument("action", nargs="?", default="wizard",
@@ -354,6 +359,21 @@ def main():
     elif args.command == "config":
         from .commands.config import config
         config(action=args.action, args=getattr(args, "extra", None) or [], cli_filter=args.cli)
+    elif args.command == "cost-report":
+        # Rebuild sys.argv slice so cost_report.main() can parse it normally
+        argv = []
+        if args.since:
+            argv += ["--since", args.since]
+        if args.session:
+            argv += ["--session", args.session]
+        import sys
+        old_argv = sys.argv
+        sys.argv = ["agent-notes cost-report"] + argv
+        try:
+            from .scripts.cost_report import main as _cost_report_main
+            sys.exit(_cost_report_main())
+        finally:
+            sys.argv = old_argv
 
 if __name__ == "__main__":
     main()

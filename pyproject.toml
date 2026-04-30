@@ -37,7 +37,6 @@ dev = ["pytest>=7.0"]
 
 [project.scripts]
 agent-notes = "agent_notes.cli:main"
-cost-report = "agent_notes.scripts.cost_report:main"
 
 [tool.setuptools.dynamic]
 version = {file = "agent_notes/VERSION"}

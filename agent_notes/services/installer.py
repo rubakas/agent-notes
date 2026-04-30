@@ -236,7 +236,7 @@ def _session_hook_paths(backend, scope: str):
 
 def _install_session_hook(backend, scope: str) -> None:
     """Install the SessionStart hook and write the context file for Claude Code."""
-    from .settings_writer import install_hook, install_allow_entry
+    from .settings_writer import install_hook, install_allow_entry, remove_allow_entry
     from .session_context import write_context
     from .. import config
 
@@ -252,7 +252,9 @@ def _install_session_hook(backend, scope: str) -> None:
     print(f"Installing Claude Code SessionStart hook ...")
     write_context(context_file, agents, version)
     install_hook(settings_path, "SessionStart", hook_command)
-    install_allow_entry(settings_path, "Bash(cost-report)")
+    # Remove old standalone entry if present (backward compat cleanup)
+    remove_allow_entry(settings_path, "Bash(cost-report)")
+    install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
 
 
 def _uninstall_session_hook(backend, scope: str) -> None:
@@ -264,5 +266,6 @@ def _uninstall_session_hook(backend, scope: str) -> None:
     context_file.unlink(missing_ok=True)
     remove_hook(settings_path, "SessionStart", hook_command)
     remove_allow_entry(settings_path, "Bash(cost-report)")
+    remove_allow_entry(settings_path, "Bash(agent-notes cost-report)")
 
 

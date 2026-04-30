@@ -11,7 +11,7 @@ def _opencode_active() -> bool:
     return bool(os.environ.get("OPENCODE") or os.environ.get("OPENCODE_SESSION_ID"))
 
 
-def _by_recency(since: float | None = None) -> int:
+def _by_recency(since: float | None = None, session_id: str | None = None) -> int:
     """Fallback: pick whichever backend's data is newer."""
     slug = str(Path.cwd()).replace("/", "-")
     proj = Path.home() / ".claude" / "projects" / slug
@@ -35,8 +35,13 @@ def _by_recency(since: float | None = None) -> int:
                 "OpenCode backend will ignore the filter.",
                 file=sys.stderr,
             )
+        if session_id is not None:
+            print(
+                "warning: --session is not supported for the OpenCode backend; ignoring.",
+                file=sys.stderr,
+            )
         return _opencode_backend.run()
-    return _claude_backend.run(since=since)
+    return _claude_backend.run(since=since, session_id=session_id)
 
 
 def _parse_since(value: str) -> float:
@@ -53,6 +58,7 @@ def _parse_since(value: str) -> float:
 
 def main() -> int:
     since: float | None = None
+    session_id: str | None = None
 
     args = sys.argv[1:]
     remaining = []
@@ -67,24 +73,41 @@ def main() -> int:
         elif args[i].startswith("--since="):
             since = _parse_since(args[i].split("=", 1)[1])
             i += 1
+        elif args[i] == "--session":
+            if i + 1 >= len(args):
+                print("error: --session requires a session ID argument", file=sys.stderr)
+                sys.exit(1)
+            session_id = args[i + 1]
+            i += 2
+        elif args[i].startswith("--session="):
+            session_id = args[i].split("=", 1)[1]
+            i += 1
         elif args[i] in ("--help", "-h"):
             print(
-                "usage: cost-report [--since <ISO-datetime>]\n"
+                "usage: agent-notes cost-report [--since <ISO-datetime>] [--session <id>]\n"
                 "\n"
                 "Report token usage and cost for the current AI session.\n"
                 "\n"
                 "Options:\n"
-                "  --since <ISO>  Only include messages at or after this UTC datetime.\n"
-                "                 Accepts ISO 8601 format, e.g. 2026-04-30T12:00:00Z\n"
-                "  -h, --help     Show this help message and exit\n"
+                "  --since <ISO>      Only include messages at or after this UTC datetime.\n"
+                "                     Accepts ISO 8601 format, e.g. 2026-04-30T12:00:00Z\n"
+                "  --session <id>     Report on a specific session ID (Claude Code only).\n"
+                "  -h, --help         Show this help message and exit\n"
             )
             return 0
         else:
             remaining.append(args[i])
             i += 1
 
+    if session_id is not None and _opencode_active():
+        print(
+            "warning: --session is not supported for the OpenCode backend; ignoring.",
+            file=sys.stderr,
+        )
+        session_id = None
+
     if os.environ.get("CLAUDECODE") or os.environ.get("CLAUDE_CODE_ENTRYPOINT"):
-        return _claude_backend.run(since=since)
+        return _claude_backend.run(since=since, session_id=session_id)
     if _opencode_active():
         if since is not None:
             print(
@@ -93,7 +116,7 @@ def main() -> int:
                 file=sys.stderr,
             )
         return _opencode_backend.run()
-    return _by_recency(since=since)
+    return _by_recency(since=since, session_id=session_id)
 
 
 if __name__ == "__main__":

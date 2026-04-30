@@ -82,7 +82,7 @@ def _ts_to_iso(ts: float) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def run(since: float | None = None) -> int:
+def run(since: float | None = None, session_id: str | None = None) -> int:
     slug = str(Path.cwd()).replace("/", "-")
     transcript_dir = Path.home() / ".claude" / "projects" / slug
 
@@ -90,13 +90,18 @@ def run(since: float | None = None) -> int:
         print("No Claude Code transcript found for this project")
         return 0
 
-    jsonl_files = sorted(transcript_dir.glob("*.jsonl"), key=_last_message_ts)
-    if not jsonl_files:
-        print(f"No JSONL transcripts found in {transcript_dir}")
-        return 0
-
-    transcript_file = jsonl_files[-1]
-    session_id = transcript_file.stem
+    if session_id is not None:
+        transcript_file = transcript_dir / f"{session_id}.jsonl"
+        if not transcript_file.exists():
+            print(f"No transcript found for session {session_id!r} in {transcript_dir}")
+            return 1
+    else:
+        jsonl_files = sorted(transcript_dir.glob("*.jsonl"), key=_last_message_ts)
+        if not jsonl_files:
+            print(f"No JSONL transcripts found in {transcript_dir}")
+            return 0
+        transcript_file = jsonl_files[-1]
+        session_id = transcript_file.stem
 
     raw_messages: list = []
     lead_messages = _load_jsonl(transcript_file)

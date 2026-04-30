@@ -3,7 +3,8 @@ import pytest
 from pathlib import Path
 
 
-def test_cost_report_entry_point_registered():
+def test_cost_report_not_standalone_script():
+    """cost-report is now a subcommand of agent-notes, not a separate console_script."""
     try:
         import tomllib
     except ImportError:
@@ -13,7 +14,8 @@ def test_cost_report_entry_point_registered():
     with pyproject.open("rb") as f:
         data = tomllib.load(f)
     scripts = data["project"]["scripts"]
-    assert scripts.get("cost-report") == "agent_notes.scripts.cost_report:main"
+    assert "cost-report" not in scripts, "cost-report should not be a standalone console_script"
+    assert "agent-notes" in scripts
 
 
 def test_cost_report_module_imports():
