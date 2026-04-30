@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: "Explore multiple approaches before committing — read context, surface tradeoffs, then decide"
+description: "Explore multiple approaches before committing — read context, surface tradeoffs, then decide. Use when user wants to compare options, design an API, or says 'brainstorm'."
 group: process
 ---
 

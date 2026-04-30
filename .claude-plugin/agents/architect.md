@@ -1,7 +1,7 @@
 ---
 name: architect
 description: Proposes system architecture, module boundaries, data flow, and domain models. Framework-agnostic design analysis. Read-only. Triggers: architecture, design, domain model, boundaries, structure, refactor plan, system design.
-model: claude-opus-4-6
+model: opus
 tools: Read, Grep, Glob, WebFetch
 disallowedTools: Write, Edit, Bash
 color: purple
