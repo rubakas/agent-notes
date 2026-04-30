@@ -230,11 +230,11 @@ if [[ "$installed_version" != *"$expected_version"* ]]; then
 fi
 ok "agent-notes --version → $installed_version"
 
-info "Smoke test: cost-report --help"
-if ! "$SMOKE_VENV/bin/cost-report" --help > /dev/null 2>&1; then
-  error "cost-report --help exited non-zero"
+info "Smoke test: agent-notes cost-report --help"
+if ! "$SMOKE_VENV/bin/agent-notes" cost-report --help > /dev/null 2>&1; then
+  error "agent-notes cost-report --help exited non-zero"
 fi
-ok "cost-report --help → OK"
+ok "agent-notes cost-report --help → OK"
 
 # ─── DRY-RUN EXIT POINT ──────────────────────────────────────────────────────
 if $DRY_RUN; then
