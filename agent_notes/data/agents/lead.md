@@ -47,7 +47,7 @@ The session memory note is the durable cross-session record of work done. It MUS
    `agent-notes memory add "<title>" "<body>" decision|pattern|mistake|context <agent>`
    These land in `Decisions/`, `Patterns/`, etc. — independent of the session note.
 
-**Linking rule**: when an active session writes a non-session note (Decision / Pattern / Mistake / Context), the session note gets a wikilink to it in the same operation. See `obsidian-memory` SKILL "Linking rule" section. Obsidian backend only — no-op on local.
+**Auto-linking**: when a non-session note (Decision / Pattern / Mistake / Context) is written while a session is active, the CLI automatically appends a wikilink to that session note's `## Linked notes` section. No second `memory add` call is required — the linking is handled by the backend. Obsidian backend only — no-op on local.
 
 **Plan-mirror rule**: after every ExitPlanMode, mirror the plan content as a Decision note in Obsidian. See `obsidian-memory` SKILL "Plan-mirror rule" section. Obsidian backend only — no-op on local.
 
