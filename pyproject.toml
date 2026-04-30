@@ -9,7 +9,7 @@ description = "AI agent configuration manager for Claude Code, OpenCode, and Cop
 readme = "README.md"
 authors = [{ name = "Eugene Naumov", email = "min.verkligheten@gmail.com" }]
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = ["pyyaml>=6.0", "tomli>=1.1.0; python_version < '3.11'"]
 keywords = ["claude", "claude-code", "opencode", "ai-agent", "agent", "configuration", "claude-cli", "github-copilot"]
 classifiers = [
@@ -17,7 +17,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
