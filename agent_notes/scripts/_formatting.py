@@ -1,14 +1,20 @@
 """ANSI color constants and shared formatting helpers."""
+import os
+import sys
 
-BOLD = "\033[1m"
-DIM = "\033[2m"
-YELLOW = "\033[0;33m"
-GREEN = "\033[0;32m"
-CYAN = "\033[0;36m"
-NC = "\033[0m"
+_USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+
+BOLD   = "\033[1m"   if _USE_COLOR else ""
+DIM    = "\033[2m"   if _USE_COLOR else ""
+YELLOW = "\033[0;33m" if _USE_COLOR else ""
+GREEN  = "\033[0;32m" if _USE_COLOR else ""
+CYAN   = "\033[0;36m" if _USE_COLOR else ""
+NC     = "\033[0m"   if _USE_COLOR else ""
 
 
 def tier_color(model_id: str) -> str:
+    if not _USE_COLOR:
+        return ""
     if "opus" in model_id:
         return YELLOW
     if "sonnet" in model_id:

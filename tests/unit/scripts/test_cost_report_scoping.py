@@ -82,6 +82,8 @@ class TestCostReportScoping:
         slug, _ = _make_session(tmp_path, subagents)
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+                            lambda: tmp_path / "nonexistent-state.json")
 
         import agent_notes.scripts._claude_backend as backend
 
@@ -89,6 +91,7 @@ class TestCostReportScoping:
         out = capsys.readouterr().out
         for label in ("coder", "reviewer", "test-writer", "devops"):
             assert label in out, f"Expected agent label '{label}' in output"
+        assert "Configured:" not in out
 
     def test_cost_report_since_flag_filters_by_timestamp(
         self, tmp_path, monkeypatch, capsys
@@ -103,6 +106,8 @@ class TestCostReportScoping:
 
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+                            lambda: tmp_path / "nonexistent-state.json")
 
         # since = just after the 3rd subagent's message (offset=900 => t+900s)
         base_ts = datetime(2026, 4, 30, 10, 0, 0, tzinfo=timezone.utc).timestamp()
@@ -117,6 +122,7 @@ class TestCostReportScoping:
         assert "coder" not in out
         assert "reviewer" not in out
         assert "test-writer" not in out
+        assert "Configured:" not in out
 
     def test_cost_report_header_contains_session_id(
         self, tmp_path, monkeypatch, capsys
@@ -124,6 +130,8 @@ class TestCostReportScoping:
         _, session_uuid = _make_session(tmp_path, [])
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+                            lambda: tmp_path / "nonexistent-state.json")
 
         import agent_notes.scripts._claude_backend as backend
         backend.run()
@@ -134,6 +142,7 @@ class TestCostReportScoping:
         )
         assert session_line is not None, "Expected a 'Session:' header line"
         assert session_uuid in session_line
+        assert "Configured:" not in out
 
     def test_cost_report_no_15min_gap_logic(
         self, tmp_path, monkeypatch, capsys
@@ -154,6 +163,8 @@ class TestCostReportScoping:
 
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+                            lambda: tmp_path / "nonexistent-state.json")
 
         import agent_notes.scripts._claude_backend as backend
         backend.run()
@@ -162,3 +173,127 @@ class TestCostReportScoping:
         # Both messages contribute: total input = 100 + 200 = 300
         # fmt_tokens formats 300 as "300" (< 1000)
         assert "300" in out, "Expected combined token count (300 input) in TOTAL row"
+        assert "Configured:" not in out
+
+
+class TestLoadConfiguredModels:
+    def test_returns_role_models_when_state_json_exists(self, tmp_path, monkeypatch):
+        state_file = tmp_path / "state.json"
+        state_file.write_text(json.dumps({
+            "global": {
+                "clis": {
+                    "claude": {
+                        "role_models": {
+                            "lead": "claude-opus-4-7",
+                            "coder": "claude-sonnet-4-6",
+                        }
+                    }
+                }
+            }
+        }))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+
+        result = _claude_backend._load_configured_models()
+
+        assert result == {"lead": "claude-opus-4-7", "coder": "claude-sonnet-4-6"}
+
+    def test_returns_empty_dict_when_state_json_missing(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+                            lambda: tmp_path / "nonexistent.json")
+
+        result = _claude_backend._load_configured_models()
+
+        assert result == {}
+
+    def test_returns_empty_dict_when_role_models_key_absent(self, tmp_path, monkeypatch):
+        state_file = tmp_path / "state.json"
+        state_file.write_text(json.dumps({"global": {}}))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+
+        result = _claude_backend._load_configured_models()
+
+        assert result == {}
+
+
+class TestConfiguredHeaderLine:
+    def _write_state(self, state_file: Path, role_models: dict) -> None:
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        state_file.write_text(json.dumps({
+            "global": {"clis": {"claude": {"role_models": role_models}}}
+        }))
+
+    def test_configured_line_appears_when_role_models_non_empty(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        state_file = tmp_path / "state.json"
+        _make_session(tmp_path, [])
+        self._write_state(state_file, {"lead": "claude-opus-4-7", "coder": "claude-sonnet-4-6"})
+        monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+
+        _claude_backend.run()
+        out = capsys.readouterr().out
+
+        configured_line = next(
+            (line for line in out.splitlines() if line.startswith("Configured:")), None
+        )
+        assert configured_line is not None, "Expected a 'Configured:' header line"
+        assert "coder=claude-sonnet-4-6" in configured_line
+        assert "lead=claude-opus-4-7" in configured_line
+
+    def test_configured_line_sorted_alphabetically(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        state_file = tmp_path / "state.json"
+        _make_session(tmp_path, [])
+        self._write_state(state_file, {
+            "reviewer": "claude-sonnet-4-6",
+            "coder": "claude-sonnet-4-6",
+            "lead": "claude-opus-4-7",
+        })
+        monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+
+        _claude_backend.run()
+        out = capsys.readouterr().out
+
+        configured_line = next(
+            (line for line in out.splitlines() if line.startswith("Configured:")), None
+        )
+        assert configured_line is not None
+        # Roles should appear in alphabetical order: coder, lead, reviewer
+        coder_pos = configured_line.index("coder")
+        lead_pos = configured_line.index("lead")
+        reviewer_pos = configured_line.index("reviewer")
+        assert coder_pos < lead_pos < reviewer_pos
+
+    def test_configured_line_absent_when_role_models_empty(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        state_file = tmp_path / "state.json"
+        _make_session(tmp_path, [])
+        self._write_state(state_file, {})
+        monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+
+        _claude_backend.run()
+        out = capsys.readouterr().out
+
+        assert "Configured:" not in out
+
+    def test_configured_line_absent_when_state_json_missing(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        _make_session(tmp_path, [])
+        monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+                            lambda: tmp_path / "nonexistent-state.json")
+
+        _claude_backend.run()
+        out = capsys.readouterr().out
+
+        assert "Configured:" not in out
