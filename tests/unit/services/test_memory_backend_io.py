@@ -1,6 +1,5 @@
 """I/O tests for agent_notes.services.memory_backend (write to tmp_path)."""
 import re
-import time
 import pytest
 from pathlib import Path
 
@@ -128,12 +127,14 @@ class TestObsidianWriteNote:
         # Second --- closes the frontmatter
         assert content.count("---") >= 2
 
-    def test_two_rapid_notes_get_different_filenames(self, tmp_path):
+    def test_two_rapid_notes_get_different_filenames(self, tmp_path, monkeypatch):
+        import agent_notes.services.memory_backend as mb
+        calls = iter(["2026-04-30-10-00-00", "2026-04-30-10-00-01"])
+        monkeypatch.setattr(mb, "_now", lambda: next(calls))
+
         path1 = obsidian_write_note(
             tmp_path, title="Note One", body="body", note_type="pattern"
         )
-        # Sleep 1 second so the second-resolution timestamp differs
-        time.sleep(1)
         path2 = obsidian_write_note(
             tmp_path, title="Note Two", body="body", note_type="pattern"
         )
@@ -356,13 +357,13 @@ class TestIndexFormat:
         timestamps = re.findall(r"\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\]", activity_block)
         assert timestamps == sorted(timestamps, reverse=True)
 
-    def test_index_recent_activity_includes_type_and_description(self, tmp_path):
+    def test_index_recent_activity_includes_type(self, tmp_path):
         patterns = tmp_path / "Patterns"
         self._make_note(patterns, "2026-04-29-10-00-00-test-pat", "pattern",
                         "2026-04-29T10:00:00Z", "Test pattern title")
         obsidian_regenerate_index(tmp_path)
         content = (tmp_path / "Index.md").read_text()
-        assert "[2026-04-29T10:00:00Z] [[2026-04-29-10-00-00-test-pat]] - pattern - Test pattern title" in content
+        assert "[2026-04-29T10:00:00Z] [[2026-04-29-10-00-00-test-pat]] - pattern" in content
 
     def test_index_session_note_uses_display_text_override(self, tmp_path):
         sessions = tmp_path / "Sessions"

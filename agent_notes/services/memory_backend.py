@@ -210,7 +210,7 @@ def obsidian_regenerate_index(vault: Path) -> None:
             link = f"[[{stem}|{meta['title']}]]"
         else:
             link = f"[[{stem}]]"
-        lines.append(f"- [{meta['created_at']}] {link} - {meta['type']} - {meta['title']}")
+        lines.append(f"- [{meta['created_at']}] {link} - {meta['type']}")
     lines.append("")
 
     # Per-category breakdown
