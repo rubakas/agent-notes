@@ -16,7 +16,7 @@ agent-notes doctor
 
 | Component | Description |
 |-----------|-------------|
-| **Skills** | 35+ on-demand knowledge modules (Rails, Docker, Git, Kamal, Process) |
+| **Skills** | 42 on-demand knowledge modules (Rails, Docker, Git, Kamal, Process) |
 | **Agents** | 18 specialized AI subagents with hierarchical model strategy |
 | **Rules** | Global instructions, code quality, and safety guardrails |
 | **Config** | Global instructions for Claude Code, OpenCode, and GitHub Copilot |
@@ -151,9 +151,29 @@ Specialized subagents with hierarchical model strategy: **Opus 4.7 decides, Sonn
 
 agent-notes is a 4-layer engine (domain / registries / services / commands). All extensible content (CLIs, models, roles, agents, skills, rules) lives in `agent_notes/data/` as YAML — adding a new CLI/model/role is a YAML drop, no Python changes. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ADD_CLI.md](docs/ADD_CLI.md), [docs/ADD_MODEL.md](docs/ADD_MODEL.md), [docs/ADD_ROLE.md](docs/ADD_ROLE.md).
 
+## Improved Claude Code workflows
+
+Four failure modes that derail AI-assisted development, and the skills that address them. Inspired by [Matt Pocock's skills repo](https://github.com/mattpocock/skills).
+
+| Failure mode | What goes wrong | Skills that help |
+|---|---|---|
+| **Misalignment** | Claude starts building before the problem is resolved | `/grill-me`, `/grill-with-docs` |
+| **Verbosity** | Responses are bloated; context window fills with noise | `/caveman`, `/setup-project-context` |
+| **Broken code** | Claude codes without a feedback loop or evidence trail | `/tdd` (improved), `/debugging-protocol` (improved) |
+| **Ball of mud** | Architecture drifts; modules grow shallow and tangled | `/improve-codebase-architecture`, `/zoom-out` |
+
+- `/grill-me` — interview the user until the problem is fully resolved before touching code
+- `/grill-with-docs` — same, but cross-references CONTEXT.md and ADRs and updates them inline
+- `/caveman` — ultra-compressed reply mode (~75% token savings) for rapid iteration
+- `/setup-project-context` — bootstraps a CONTEXT.md domain glossary (ubiquitous language)
+- `/tdd` — RED-GREEN-REFACTOR with tracer-bullet vertical slices; horizontal-slicing anti-pattern added
+- `/debugging-protocol` — Phase 1 rewritten as "build a feedback loop first" with 9 strategies
+- `/improve-codebase-architecture` — deletion test to find shallow modules; surfaces deepening opportunities
+- `/zoom-out` — quick orientation map of an unfamiliar code area
+
 ## Skills
 
-35+ on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`.
+42 on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`.
 
 ### Using skills in Claude Code / OpenCode
 
