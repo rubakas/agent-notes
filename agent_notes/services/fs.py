@@ -2,6 +2,7 @@
 
 import shutil
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -68,35 +69,30 @@ def files_identical(a: Path, b: Path) -> bool:
         return False
 
 
+def _timestamped_backup_path(dst: Path) -> Path:
+    """Return a timestamped backup path for dst, e.g. CLAUDE.md.bak.20260430T022500123456Z."""
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    return Path(str(dst) + f".bak.{ts}")
+
+
 def handle_existing(src: Path, dst: Path) -> bool:
     """Handle an existing non-symlink destination file.
-    
-    Returns True if install should proceed, False to skip.
+
+    Backs up the destination with a timestamped name and proceeds with install.
+    Returns True if install should proceed, False to skip (identical content).
     """
     if files_identical(src, dst):
         _skipped(str(dst), "exists, identical content")
         return False
-    
-    print(f"\n  {_Color.YELLOW}CONFLICT{_Color.NC}  {dst}")
-    print(f"             File exists and differs from source.")
-    response = input("             (b)ackup and replace, (s)kip? [b/s] ").strip().lower()
-    
-    if response == 'b':
-        backup_path = Path(str(dst) + ".bak")
-        if dst.is_dir():
-            if backup_path.exists():
-                shutil.rmtree(backup_path)
-            shutil.copytree(dst, backup_path)
-            shutil.rmtree(dst)
-        else:
-            if backup_path.exists():
-                backup_path.unlink()
-            dst.rename(backup_path)
-        print(f"  {_Color.CYAN}BACKUP{_Color.NC}   {backup_path}")
-        return True
+
+    backup_path = _timestamped_backup_path(dst)
+    if dst.is_dir():
+        shutil.copytree(dst, backup_path)
+        shutil.rmtree(dst)
     else:
-        _skipped(str(dst), "user skipped")
-        return False
+        dst.rename(backup_path)
+    print(f"  {_Color.CYAN}BACKUP{_Color.NC}   {backup_path}")
+    return True
 
 
 def place_file(src: Path, dst: Path, copy_mode: bool = False) -> None:

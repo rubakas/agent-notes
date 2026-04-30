@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import List, NamedTuple, Optional
 
 from ..domain.cli_backend import CLIBackend
 from ..registries.cli_registry import CLIRegistry, load_registry
@@ -11,8 +11,18 @@ from .. import config
 from .fs import (
     place_file, place_dir_contents,
     remove_symlink, remove_all_symlinks_in_dir, remove_dir_if_empty,
+    files_identical, _timestamped_backup_path,
 )
 from .state_store import load_state, get_scope
+
+
+class InstallAction(NamedTuple):
+    """Describes a single file placement that plan_install would perform."""
+
+    action: str          # "install", "overwrite", or "skip"
+    src: Path
+    dst: Path
+    backup_path: Optional[Path]  # set when action == "overwrite"
 
 # Re-import the atomic helpers from install (they stay in install.py):
 # We intentionally avoid circular import by lazy-importing inside functions.
@@ -142,6 +152,151 @@ def uninstall_component_for_backend(
             print(f"Removing {backend.label} {component} from {dst} ...")
         remove_all_symlinks_in_dir(dst, copy_mode)
         remove_dir_if_empty(dst)
+
+
+def _plan_file(src: Path, dst: Path, copy_mode: bool = False) -> InstallAction:
+    """Return the InstallAction for a single src→dst placement."""
+    if copy_mode and dst.is_symlink() and dst.resolve() == src.resolve():
+        return InstallAction(action="skip", src=src, dst=dst, backup_path=None)
+    if dst.exists() and not dst.is_symlink():
+        if files_identical(src, dst):
+            return InstallAction(action="skip", src=src, dst=dst, backup_path=None)
+        backup_path = _timestamped_backup_path(dst)
+        return InstallAction(action="overwrite", src=src, dst=dst, backup_path=backup_path)
+    return InstallAction(action="install", src=src, dst=dst, backup_path=None)
+
+
+def _plan_component(
+    backend: CLIBackend,
+    component: str,
+    scope: str,
+    copy_mode: bool = False,
+) -> List[InstallAction]:
+    """Return InstallActions for one (backend, component, scope) without writing."""
+    src = dist_source_for(backend, component)
+    if src is None:
+        return []
+    dst = target_dir_for(backend, component, scope)
+    if dst is None:
+        return []
+
+    actions: List[InstallAction] = []
+
+    if component == "config":
+        filename = config_filename_for(backend)
+        if not filename:
+            return []
+        src_file = src / filename
+        if not src_file.exists():
+            return []
+        actions.append(_plan_file(src_file, dst / filename, copy_mode))
+    elif component in ("agents", "rules", "commands"):
+        for src_file in sorted(src.glob("*.md")):
+            if src_file.exists():
+                actions.append(_plan_file(src_file, dst / src_file.name, copy_mode))
+    elif component == "skills":
+        if not src.exists():
+            return []
+        for skill_dir in sorted(d for d in src.iterdir() if d.is_dir()):
+            actions.append(_plan_file(skill_dir, dst / skill_dir.name, copy_mode))
+
+    return actions
+
+
+def _plan_session_hook(
+    backend,
+    scope: str,
+) -> List[InstallAction]:
+    """Return InstallActions for the settings.json SessionStart hook write.
+
+    The hook is injected via merge (never a full overwrite), so:
+      - If settings.json does not exist: action="install"
+      - If settings.json exists but hook is absent: action="modify"
+      - If settings.json exists and hook is already present: action="skip"
+    """
+    from .settings_writer import has_hook
+
+    settings_path, _context_file, hook_command = _session_hook_paths(backend, scope)
+
+    if not settings_path.exists():
+        # Fresh write — settings.json will be created
+        return [InstallAction(action="install", src=settings_path, dst=settings_path, backup_path=None)]
+
+    if has_hook(settings_path, "SessionStart", hook_command):
+        # Already installed — no-op
+        return [InstallAction(action="skip", src=settings_path, dst=settings_path, backup_path=None)]
+
+    # Merge inject — file exists but hook is absent; classified as modify
+    return [InstallAction(action="modify", src=settings_path, dst=settings_path, backup_path=None)]
+
+
+def plan_install(
+    scope: str,
+    registry: Optional[CLIRegistry] = None,
+    selected_clis: Optional[set] = None,
+    selected_skills: Optional[List[str]] = None,
+    copy_mode: bool = False,
+) -> List[InstallAction]:
+    """Return a manifest of what install_all would do, without writing any files.
+
+    Each entry is an InstallAction(action, src, dst, backup_path) where:
+      action == "install"   — dst does not yet exist (fresh placement)
+      action == "modify"    — dst exists and will be merge-updated (e.g. settings.json hook)
+      action == "overwrite" — dst exists and differs; backup_path is the timestamped path
+      action == "skip"      — dst exists and is byte-identical (or symlink unchanged); no write needed
+    """
+    if registry is None:
+        registry = load_registry()
+
+    actions: List[InstallAction] = []
+
+    for backend in registry.all():
+        if selected_clis is not None and backend.name not in selected_clis:
+            continue
+        for component in COMPONENT_TYPES:
+            if component == "skills" and selected_skills is not None:
+                # Skills are filtered — plan them separately below
+                continue
+            actions.extend(_plan_component(backend, component, scope, copy_mode))
+
+    # Skills: respect the selected_skills filter (mirrors wizard's install_skills_filtered)
+    if scope == "global" or selected_skills is not None:
+        dist_skills_dir = config.DIST_SKILLS_DIR
+        if dist_skills_dir.exists():
+            skill_dirs = {d.name: d for d in dist_skills_dir.iterdir() if d.is_dir()}
+            names_to_plan = selected_skills if selected_skills is not None else list(skill_dirs.keys())
+
+            # Per-backend skill targets
+            for backend in registry.all():
+                if selected_clis is not None and backend.name not in selected_clis:
+                    continue
+                if not backend.supports("skills"):
+                    continue
+                dst_dir = target_dir_for(backend, "skills", scope)
+                if dst_dir is None:
+                    continue
+                for name in sorted(names_to_plan):
+                    skill_dir = skill_dirs.get(name)
+                    if skill_dir:
+                        actions.append(_plan_file(skill_dir, dst_dir / name, copy_mode))
+
+            # Universal skills mirror (~/.agents/skills/)
+            if scope == "global":
+                target = config.AGENTS_HOME / "skills"
+                for name in sorted(names_to_plan):
+                    skill_dir = skill_dirs.get(name)
+                    if skill_dir:
+                        actions.append(_plan_file(skill_dir, target / name, copy_mode))
+
+    # SessionStart hook for Claude Code — always planned when claude backend is selected
+    try:
+        claude_backend = registry.get("claude")
+        if selected_clis is None or claude_backend.name in selected_clis:
+            actions.extend(_plan_session_hook(claude_backend, scope))
+    except KeyError:
+        pass
+
+    return actions
 
 
 def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = None) -> None:
