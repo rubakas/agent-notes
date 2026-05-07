@@ -237,15 +237,6 @@ def main():
     p_uninstall = subparsers.add_parser("uninstall", help="Remove installed components")
     p_uninstall.add_argument("--local", action="store_true", help="Remove from current project")
     
-    # update
-    p_update = subparsers.add_parser("update", help="Pull latest, show diff, reinstall")
-    p_update.add_argument("--dry-run", action="store_true", help="Show diff only, do not reinstall")
-    p_update.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompt")
-    p_update.add_argument("--only", action="append", choices=["agents","skills","rules","commands","config","settings"],
-        help="Filter diff to these component types (repeatable)")
-    p_update.add_argument("--since", help="Override 'before' commit label (cosmetic only for now)")
-    p_update.add_argument("--skip-pull", action="store_true", help="Skip git pull")
-    
     # doctor
     p_doctor = subparsers.add_parser("doctor", help="Check installation health")
     p_doctor.add_argument("--local", action="store_true", help="Check local installation")
@@ -325,15 +316,6 @@ def main():
     elif args.command == "uninstall":
         from .commands.install import uninstall
         uninstall(local=args.local)
-    elif args.command == "update":
-        from .commands.update import update
-        update(
-            dry_run=args.dry_run,
-            yes=args.yes,
-            only=args.only,
-            since=args.since,
-            skip_pull=args.skip_pull,
-        )
     elif args.command == "doctor":
         from .commands.doctor import doctor
         doctor(local=args.local, fix=args.fix)

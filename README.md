@@ -85,7 +85,6 @@ agent-notes <command> [options]
 |---------|-------------|
 | `install [--local] [--copy]` | Interactive wizard or direct install |
 | `uninstall [--local]` | Remove installed components |
-| `update` | Pull latest, rebuild, reinstall |
 | `doctor [--local] [--fix]` | Check installation health |
 | `info` | Show status and component counts |
 | `list [clis\|models\|roles\|agents\|skills\|rules\|all]` | List engine components or installed |
