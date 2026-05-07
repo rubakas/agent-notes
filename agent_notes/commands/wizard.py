@@ -339,7 +339,12 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
         print(f"  {_DIM}Skills{_NC}    {', '.join(parts) if parts else 'none'}")
 
     if memory_backend and memory_backend != "none":
-        mem_label = (f"Obsidian  →  {memory_path}" if memory_path else "Obsidian") if memory_backend == "obsidian" else "Local markdown"
+        if memory_backend == "obsidian":
+            mem_label = f"Obsidian (session)  →  {memory_path}" if memory_path else "Obsidian (session)"
+        elif memory_backend == "wiki":
+            mem_label = f"Obsidian (wiki)  →  {memory_path}" if memory_path else "Obsidian (wiki)"
+        else:
+            mem_label = "Local markdown"
         print(f"  {_DIM}Memory{_NC}    {mem_label}")
 
     # ── Per-CLI sections ──────────────────────────────────────────────────────
@@ -407,7 +412,8 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
 
     options = [
         ("Local markdown files  (~/.claude/agent-memory/)", "local"),
-        ("Obsidian vault", "obsidian"),
+        ("Obsidian vault (session-oriented)", "obsidian"),
+        ("Obsidian vault (wiki)", "wiki"),
         ("None  (disable memory)", "none"),
     ]
 
@@ -430,8 +436,12 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
         default_path = str(_mem_base / "agent-notes")
         raw = _safe_input(f"  Memory folder path [{default_path}]: ", default_path)
         path = raw.strip() or default_path
+    elif backend == "wiki":
+        default_path = str(Path.home() / "Documents" / "Obsidian Vault" / "agent-wiki")
+        raw = _safe_input(f"  Wiki folder path [{default_path}]: ", default_path)
+        path = raw.strip() or default_path
 
-    label = {"local": "Local markdown", "obsidian": f"Obsidian ({path})", "none": "Disabled"}[backend]
+    label = {"local": "Local markdown", "obsidian": f"Obsidian (session)  ({path})", "wiki": f"Obsidian (wiki)  ({path})", "none": "Disabled"}[backend]
     print(f"  {Color.GREEN}✓{Color.NC} Memory: {label}")
     return backend, path
 
@@ -718,7 +728,11 @@ def _interactive_install() -> None:
         try:
             if memory_backend == "obsidian":
                 obsidian_init(_mem_path)
-                memory_label = f"Obsidian  →  {_mem_path}"
+                memory_label = f"Obsidian (session)  →  {_mem_path}"
+            elif memory_backend == "wiki":
+                from ..services.wiki_backend import wiki_init
+                wiki_init(_mem_path)
+                memory_label = f"Obsidian (wiki)  →  {_mem_path}"
             else:
                 local_init(_mem_path)
                 memory_label = f"Local markdown  →  {_mem_path}"
