@@ -471,15 +471,17 @@ class TestIndexFormat:
         dts = [re.search(r"\|([^\]]+)\]\]", l).group(1) for l in lines]
         assert dts == sorted(dts, reverse=True)
 
-    def test_index_line_format(self, tmp_path):
+    def test_index_line_format(self, tmp_path, monkeypatch):
+        import agent_notes.services.memory_backend as mb
+        monkeypatch.setattr(mb, "_current_project_name", lambda: "test-project")
         patterns = tmp_path / "Patterns"
         self._make_note(patterns, "2026-04-29_test-pat", "pattern",
                         "2026-04-29T10:00:00Z", "Test pattern title")
         obsidian_regenerate_index(tmp_path)
         content = (tmp_path / "Index.md").read_text()
         # New format: - [[stem|display_dt]] - project(type)
-        # Note has no project field so it renders as empty: (pattern)
-        assert "- [[2026-04-29_test-pat|2026-04-29 10:00]] - (pattern)" in content
+        # Note has no project field so falls back to _current_project_name()
+        assert "- [[2026-04-29_test-pat|2026-04-29 10:00]] - test-project(pattern)" in content
 
     def test_index_has_no_by_category_section(self, tmp_path):
         patterns = tmp_path / "Patterns"
@@ -558,8 +560,10 @@ class TestProjectField:
         content = (tmp_path / "Index.md").read_text()
         assert f"- [[{stem}|2026-04-29 10:00]] - agent-notes(pattern)" in content
 
-    def test_obsidian_index_line_format_legacy_no_project(self, tmp_path):
-        """Legacy notes without a project field render with empty project: - [[stem|dt]] - (type)."""
+    def test_obsidian_index_line_format_legacy_no_project(self, tmp_path, monkeypatch):
+        """Legacy notes without a project field fall back to _current_project_name() in the index."""
+        import agent_notes.services.memory_backend as mb
+        monkeypatch.setattr(mb, "_current_project_name", lambda: "agent-notes")
         patterns = tmp_path / "Patterns"
         patterns.mkdir(parents=True, exist_ok=True)
         stem = "2026-04-29_legacy-note"
@@ -569,7 +573,7 @@ class TestProjectField:
         )
         obsidian_regenerate_index(tmp_path)
         content = (tmp_path / "Index.md").read_text()
-        assert f"- [[{stem}|2026-04-29 09:00]] - (pattern)" in content
+        assert f"- [[{stem}|2026-04-29 09:00]] - agent-notes(pattern)" in content
 
     def test_obsidian_session_update_preserves_project(self, tmp_path, monkeypatch):
         """Appending an ## Update block to a session note must not overwrite the original project."""

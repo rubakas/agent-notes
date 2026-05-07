@@ -7,7 +7,7 @@ from typing import Optional
 
 @dataclass
 class MemoryConfig:
-    backend: str = "local"   # "obsidian" | "local" | "none"
+    backend: str = "local"   # "obsidian" | "local" | "wiki" | "none"
     path: str = ""           # vault root (obsidian) or memory dir (local). empty = use default
 
 

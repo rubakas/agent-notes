@@ -315,7 +315,7 @@ def obsidian_regenerate_index(vault: Path) -> None:
             display_dt = f"{dt_str[:10]} {dt_str[11:16]}"
         else:
             display_dt = dt_str[:16] if len(dt_str) >= 16 else dt_str
-        project = meta.get("project", "")
+        project = meta.get("project", "") or _current_project_name()
         lines.append(f"- [[{stem}|{display_dt}]] - {project}({meta['type']})")
 
     (vault / "Index.md").write_text("\n".join(lines) + "\n")
