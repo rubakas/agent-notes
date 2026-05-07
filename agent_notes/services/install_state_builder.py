@@ -171,10 +171,12 @@ def build_install_state(
             clis[backend.name] = backend_state
     
     # Create the new scope state
+    from ..config import get_version
     new_scope_state = ScopeState(
         installed_at=timestamp,
         updated_at=timestamp,
         mode=mode,
+        installed_version=get_version(),
         clis=clis,
     )
     
