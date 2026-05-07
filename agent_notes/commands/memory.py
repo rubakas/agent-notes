@@ -43,6 +43,13 @@ def do_init() -> None:
     if path is None:
         print("Memory path not configured.")
         return
+    if backend == "wiki":
+        from ..services.wiki_backend import wiki_init, WIKI_PAGE_TYPES
+        wiki_init(path)
+        print(f"{Color.GREEN}Wiki initialised at {path}{Color.NC}")
+        print(f"  Folders: raw/, wiki/{{{', '.join(WIKI_PAGE_TYPES)}}}")
+        print(f"  Index:   {path / 'wiki' / 'index.md'}")
+        return
     if backend == "obsidian":
         from ..services.memory_backend import obsidian_init, OBSIDIAN_CATEGORIES
         obsidian_init(path)
@@ -65,7 +72,11 @@ def do_index() -> None:
     if path is None:
         print("Memory path not configured.")
         return
-    if backend == "obsidian":
+    if backend == "wiki":
+        from ..services.wiki_backend import wiki_regenerate_index
+        wiki_regenerate_index(path)
+        print(f"{Color.GREEN}index.md regenerated at {path / 'wiki' / 'index.md'}{Color.NC}")
+    elif backend == "obsidian":
         from ..services.memory_backend import obsidian_regenerate_index
         obsidian_regenerate_index(path)
         print(f"{Color.GREEN}Index.md regenerated at {path / 'Index.md'}{Color.NC}")
@@ -75,8 +86,21 @@ def do_index() -> None:
         print(f"{Color.GREEN}Index.md regenerated at {path / 'Index.md'}{Color.NC}")
 
 
+_WIKI_TYPE_MAP = {
+    "pattern": "concepts",
+    "decision": "concepts",
+    "mistake": "concepts",
+    "context": "concepts",
+    "concept": "concepts",
+    "entity": "entities",
+    "synthesis": "synthesis",
+    "session": "sessions",
+    "source": "sources",
+}
+
+
 def do_add(title: str, body: str, note_type: str = "context", agent: str = "", project: str = "", tags: Optional[list] = None) -> None:
-    """Add a note to memory (obsidian backend only for structured notes)."""
+    """Add a note to memory (obsidian or wiki backend)."""
     backend, path = _load_memory_config()
     if backend == "none":
         print("Memory is disabled. Run `agent-notes memory vault` to check configuration.")
@@ -84,7 +108,21 @@ def do_add(title: str, body: str, note_type: str = "context", agent: str = "", p
     if path is None:
         print("Memory path not configured.")
         return
-    if backend == "obsidian":
+    if backend == "wiki":
+        from ..services.wiki_backend import wiki_write_page
+        page_type = _WIKI_TYPE_MAP.get(note_type, "concepts")
+        extra_tags = [note_type] if note_type not in ("concept", "entity", "synthesis", "session", "source") else []
+        page_path = wiki_write_page(
+            path,
+            title=title,
+            body=body,
+            page_type=page_type,
+            agent=agent,
+            project=project,
+            tags=(tags or []) + extra_tags,
+        )
+        print(f"{Color.GREEN}Wiki page saved: {page_path}{Color.NC}")
+    elif backend == "obsidian":
         from ..services.memory_backend import obsidian_init, obsidian_write_note
         obsidian_init(path)
         note_path = obsidian_write_note(
@@ -98,7 +136,7 @@ def do_add(title: str, body: str, note_type: str = "context", agent: str = "", p
         )
         print(f"{Color.GREEN}Note saved: {note_path}{Color.NC}")
     else:
-        print("The `add` subcommand is for the obsidian backend.")
+        print("The `add` subcommand is for the obsidian or wiki backend.")
         print("For local backend, write files directly to the agent subdirectory.")
 
 
@@ -108,6 +146,26 @@ def do_list() -> None:
 
     if backend == "none":
         print("Memory is disabled. Run `agent-notes memory backend` to enable it.")
+        return
+
+    if backend == "wiki":
+        if path is None or not path.exists():
+            print(f"Wiki not found at {path}")
+            return
+        from ..services.wiki_backend import wiki_list_pages
+        pages = wiki_list_pages(path)
+        if not pages:
+            print(f"No pages found in wiki {path}")
+            return
+        print(f"Wiki ({path}):")
+        print("")
+        current_type = None
+        for page in pages:
+            if page["type"] != current_type:
+                current_type = page["type"]
+                print(f"  {Color.CYAN}{current_type}{Color.NC}")
+            tags_str = f"  [{', '.join(page['tags'])}]" if page["tags"] else ""
+            print(f"    {page['file']}{tags_str}")
         return
 
     if backend == "obsidian":
@@ -361,6 +419,96 @@ def format_size(size_bytes: int) -> str:
     return f"{original_size:.1f}P"
 
 
+def do_ingest(title: str, body: str, concepts: Optional[list] = None, entities: Optional[list] = None, tags: Optional[list] = None) -> None:
+    """Ingest a source into the wiki backend."""
+    backend, path = _load_memory_config()
+    if backend != "wiki":
+        print("The `ingest` subcommand is only available for the wiki backend.")
+        return
+    if path is None:
+        print("Memory path not configured.")
+        return
+    from ..services.wiki_backend import wiki_ingest
+    result = wiki_ingest(
+        path,
+        title=title,
+        body=body,
+        concepts=concepts or [],
+        entities=entities or [],
+        tags=tags or [],
+    )
+    source_paths = result.get("source", [])
+    concept_paths = result.get("concepts", [])
+    entity_paths = result.get("entities", [])
+    print(f"{Color.GREEN}Ingested: {title}{Color.NC}")
+    for p in source_paths:
+        print(f"  source:  {p}")
+    for p in concept_paths:
+        print(f"  concept: {p}")
+    for p in entity_paths:
+        print(f"  entity:  {p}")
+
+
+def do_query(keyword: str) -> None:
+    """Search wiki pages by keyword."""
+    backend, path = _load_memory_config()
+    if backend != "wiki":
+        print("The `query` subcommand is only available for the wiki backend.")
+        return
+    if path is None:
+        print("Memory path not configured.")
+        return
+    from ..services.wiki_backend import wiki_query
+    results = wiki_query(path, keyword)
+    if not results:
+        print(f"No results found for: {keyword}")
+        return
+    print(f"Results for '{keyword}' ({len(results)} found):")
+    print("")
+    for r in results:
+        print(f"  {Color.CYAN}[{r['type']}]{Color.NC} {r['title']}")
+        print(f"    {r['path']}")
+        if r["snippet"]:
+            print(f"    ...{r['snippet']}...")
+        print("")
+
+
+def do_lint() -> None:
+    """Check wiki health."""
+    backend, path = _load_memory_config()
+    if backend != "wiki":
+        print("The `lint` subcommand is only available for the wiki backend.")
+        return
+    if path is None:
+        print("Memory path not configured.")
+        return
+    from ..services.wiki_backend import wiki_lint
+    issues = wiki_lint(path)
+    orphans = issues.get("orphans", [])
+    broken = issues.get("broken_links", [])
+    stale = issues.get("stale_index", [])
+
+    if not orphans and not broken and not stale:
+        print(f"{Color.GREEN}Wiki is healthy — no issues found.{Color.NC}")
+        return
+
+    if orphans:
+        print(f"{Color.YELLOW}Orphans ({len(orphans)} pages not linked from anywhere):{Color.NC}")
+        for p in orphans:
+            print(f"  {p}")
+        print("")
+    if broken:
+        print(f"{Color.YELLOW}Broken links ({len(broken)}):{Color.NC}")
+        for b in broken:
+            print(f"  {b}")
+        print("")
+    if stale:
+        print(f"{Color.YELLOW}Stale index ({len(stale)} pages newer than index.md):{Color.NC}")
+        for s in stale:
+            print(f"  {s}")
+        print(f"  Run: agent-notes memory index")
+
+
 def do_migrate() -> None:
     """Migrate vault from per-project layout to flat shared layout with new filenames."""
     import re
@@ -574,6 +722,25 @@ def memory(action: str = "list", name: Optional[str] = None, extra: Optional[lis
         do_import()
     elif action == "migrate":
         do_migrate()
+    elif action == "ingest":
+        if not name:
+            print("Error: ingest requires a title.")
+            exit(1)
+        body = extra[0] if extra else ""
+        concepts_csv = extra[1] if extra and len(extra) > 1 else ""
+        entities_csv = extra[2] if extra and len(extra) > 2 else ""
+        tags_csv = extra[3] if extra and len(extra) > 3 else ""
+        concepts = [c.strip() for c in concepts_csv.split(",") if c.strip()] if concepts_csv else None
+        entities = [e.strip() for e in entities_csv.split(",") if e.strip()] if entities_csv else None
+        tags = [t.strip() for t in tags_csv.split(",") if t.strip()] if tags_csv else None
+        do_ingest(name, body, concepts=concepts, entities=entities, tags=tags)
+    elif action == "query":
+        if not name:
+            print("Error: query requires a keyword.")
+            exit(1)
+        do_query(name)
+    elif action == "lint":
+        do_lint()
     else:
         print(f"Unknown command: {action}")
         show_help()
