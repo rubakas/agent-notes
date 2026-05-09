@@ -7,20 +7,30 @@ from typing import List, Optional
 from ...domain.diagnostics import Issue, FixAction
 
 
-def check_stale_files(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
-    """Check for installed files without matching source - DELEGATED to doctor_checks."""
-    # This function is kept for backwards compatibility but delegates to the new module
-    from ...cli_backend import load_registry
-    from ... import install_state, doctor_checks
+def _load_scope_state(scope: str):
+    """Load registry and scope state for a given scope.
+
+    Returns (registry, scope_state) where scope_state may be None if no
+    state file exists.
+    """
+    from ...registries.cli_registry import load_registry
+    from ... import install_state
     from ...state import get_scope
 
     registry = load_registry()
     state = install_state.load_current_state()
     if state is None:
-        scope_state = None
-    else:
-        project_path = Path.cwd() if scope == "local" else None
-        scope_state = get_scope(state, scope, project_path)
+        return registry, None
+    project_path = Path.cwd() if scope == "local" else None
+    scope_state = get_scope(state, scope, project_path)
+    return registry, scope_state
+
+
+def check_stale_files(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
+    """Check for installed files without matching source - DELEGATED to doctor_checks."""
+    from ... import doctor_checks
+
+    registry, scope_state = _load_scope_state(scope)
     doctor_checks.check_stale(scope, scope_state, registry, issues, fix_actions)
 
 
@@ -30,7 +40,7 @@ def _find_dist_source(symlink: Path, scope: str) -> Optional[Path]:
     Iterates all registered backends; returns first dist source whose
     component and filename match the given symlink.
     """
-    from ...cli_backend import load_registry
+    from ...registries.cli_registry import load_registry
     from ... import installer
     registry = load_registry()
 
@@ -75,35 +85,17 @@ def _find_dist_source(symlink: Path, scope: str) -> Optional[Path]:
 
 def check_broken_symlinks(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
     """Check for symlinks with non-existent targets - DELEGATED to doctor_checks."""
-    # This function is kept for backwards compatibility but delegates to the new module
-    from ...cli_backend import load_registry
-    from ... import install_state, doctor_checks
-    from ...state import get_scope
+    from ... import doctor_checks
 
-    registry = load_registry()
-    state = install_state.load_current_state()
-    if state is None:
-        scope_state = None
-    else:
-        project_path = Path.cwd() if scope == "local" else None
-        scope_state = get_scope(state, scope, project_path)
+    registry, scope_state = _load_scope_state(scope)
     doctor_checks.check_broken(scope, registry, issues, fix_actions, scope_state)
 
 
 def check_shadowed_files(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
     """Check for regular files where symlinks are expected - TARGETED check only."""
-    from ...cli_backend import load_registry
-    from ... import install_state, doctor_checks
-    from ...state import get_scope
+    from ... import doctor_checks
 
-    # Get expected paths and check each one individually
-    registry = load_registry()
-    state = install_state.load_current_state()
-    if state is None:
-        scope_state = None
-    else:
-        project_path = Path.cwd() if scope == "local" else None
-        scope_state = get_scope(state, scope, project_path)
+    registry, scope_state = _load_scope_state(scope)
 
     # Only check paths we know should exist
     for src, dst, backend_name, component in doctor_checks.expected_paths_for_install(registry, scope):
@@ -119,13 +111,14 @@ def check_shadowed_files(scope: str, issues: List[Issue], fix_actions: List[FixA
 
 def check_missing_files(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
     """Check for source files that aren't installed - DELEGATED to doctor_checks."""
-    # This function is kept for backwards compatibility but delegates to the new module
-    from ...cli_backend import load_registry
-    from ... import doctor_checks, install_state
+    from ... import doctor_checks
+    from ...registries.cli_registry import load_registry
+    from ... import install_state
     from ...state import get_scope
 
     registry = load_registry()
     # Pass scope state so opted-out backends aren't flagged as "missing".
+    # Use a try/except here since local scope resolution can raise ValueError/KeyError.
     state = install_state.load_current_state()
     scope_state = None
     if state is not None:
@@ -144,18 +137,9 @@ def check_missing_files(scope: str, issues: List[Issue], fix_actions: List[FixAc
 
 def check_content_drift(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
     """Check for copied files that differ from source - DELEGATED to doctor_checks."""
-    # This function is kept for backwards compatibility but delegates to the new module
-    from ...cli_backend import load_registry
-    from ... import install_state, doctor_checks
-    from ...state import get_scope
+    from ... import doctor_checks
 
-    registry = load_registry()
-    state = install_state.load_current_state()
-    if state is None:
-        scope_state = None
-    else:
-        project_path = Path.cwd() if scope == "local" else None
-        scope_state = get_scope(state, scope, project_path)
+    registry, scope_state = _load_scope_state(scope)
     doctor_checks.check_drift(scope, registry, issues, fix_actions, scope_state)
 
 
@@ -167,7 +151,7 @@ def check_build_freshness(issues: List[Issue], fix_actions: List[FixAction]):
     # Check agents.yaml vs generated agents
     if agents_yaml.exists():
         source_time = agents_yaml.stat().st_mtime
-        from ...cli_backend import load_registry
+        from ...registries.cli_registry import load_registry
         from ...config import dist_dir_for
 
         registry = load_registry()
@@ -184,7 +168,7 @@ def check_build_freshness(issues: List[Issue], fix_actions: List[FixAction]):
     # Check individual source agents
     source_agents_dir = AGENTS_DIR
     if source_agents_dir.exists():
-        from ...cli_backend import load_registry
+        from ...registries.cli_registry import load_registry
         from ...config import dist_dir_for
 
         registry = load_registry()
@@ -202,7 +186,7 @@ def check_build_freshness(issues: List[Issue], fix_actions: List[FixAction]):
                         fix_actions.append(FixAction("BUILD", str(gen_file), "regenerate from source"))
 
     # Check global source files
-    from ...cli_backend import load_registry
+    from ...registries.cli_registry import load_registry
     from ...config import global_template_path, global_output_path
 
     registry = load_registry()

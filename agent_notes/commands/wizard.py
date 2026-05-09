@@ -8,6 +8,7 @@ from .build import build
 from ._install_helpers import (
     count_agents, count_global, count_skills
 )
+from ..services.counts import count_rules_total as _count_rules_total
 from ..services.fs import place_file, place_dir_contents
 from ..services.ui import (
     _can_interactive, _safe_input, _checkbox_select, _radio_select,
@@ -79,22 +80,7 @@ def _get_skill_groups() -> Dict[str, List[str]]:
 
 def _count_rules() -> int:
     """Count rule files."""
-    # For testing, allow bypassing the registry
-    import os
-    if os.environ.get('_WIZARD_TEST_MODE'):
-        if not DIST_RULES_DIR.exists():
-            return 0
-        return len(list(DIST_RULES_DIR.glob("*.md")))
-    else:
-        try:
-            from ..registries import default_rule_registry
-            registry = default_rule_registry()
-            return len(registry.all())
-        except Exception:
-            # Fallback to old behavior if registry fails
-            if not DIST_RULES_DIR.exists():
-                return 0
-            return len(list(DIST_RULES_DIR.glob("*.md")))
+    return _count_rules_total()
 
 
 def _select_cli(step: int = 0, total: int = 0, version: str = '') -> Set[str]:
@@ -629,7 +615,27 @@ def _interactive_install() -> None:
         print(f"{Color.RED}Build failed: {e}{Color.NC}")
         return
 
-    # Execute installation
+    _execute_install(
+        clis=clis,
+        scope=scope,
+        copy_mode=copy_mode,
+        selected_skills=selected_skills,
+        role_models=role_models,
+        memory_backend=memory_backend,
+        memory_path=memory_path,
+    )
+
+
+def _execute_install(
+    clis: Set[str],
+    scope: str,
+    copy_mode: bool,
+    selected_skills: List[str],
+    role_models: Dict[str, Dict[str, str]],
+    memory_backend: str,
+    memory_path: str,
+) -> None:
+    """Run all installation steps after parameters have been collected and the build is done."""
     print(f"\nInstalling ({scope}, {'copy' if copy_mode else 'symlink'}) ...\n")
 
     from ..services import fs as _fs
