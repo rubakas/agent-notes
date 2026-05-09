@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import _claude_backend, _opencode_backend
+from ._opencode_backend import DB as _OPENCODE_DB
 
 
 def _opencode_active() -> bool:
@@ -21,8 +22,7 @@ def _by_recency(since: float | None = None, session_id: str | None = None) -> in
         if jsonls:
             claude_mtime = max(f.stat().st_mtime for f in jsonls)
 
-    opencode_db = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
-    opencode_mtime = opencode_db.stat().st_mtime if opencode_db.exists() else 0.0
+    opencode_mtime = _OPENCODE_DB.stat().st_mtime if _OPENCODE_DB.exists() else 0.0
 
     if claude_mtime == 0.0 and opencode_mtime == 0.0:
         print("No session data found (no Claude Code transcripts or OpenCode database).")
