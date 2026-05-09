@@ -154,6 +154,7 @@ def _scope_to_dict(s: ScopeState) -> dict:
         "installed_at": s.installed_at,
         "updated_at": s.updated_at,
         "mode": s.mode,
+        "installed_version": s.installed_version,
         "clis": {name: _backend_to_dict(bs) for name, bs in s.clis.items()},
     }
 
@@ -200,6 +201,7 @@ def _scope_from_dict(data: dict) -> ScopeState:
         installed_at=data.get("installed_at", ""),
         updated_at=data.get("updated_at", ""),
         mode=data.get("mode", "symlink"),
+        installed_version=data.get("installed_version", ""),
         clis=clis,
     )
 

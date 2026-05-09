@@ -33,6 +33,7 @@ class ScopeState:
     installed_at: str = ""
     updated_at: str = ""
     mode: str = "symlink"
+    installed_version: str = ""
     clis: dict[str, BackendState] = field(default_factory=dict)
 
 

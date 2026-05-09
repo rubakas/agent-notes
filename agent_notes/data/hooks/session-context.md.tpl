@@ -16,4 +16,4 @@ You have a specialized agent team installed. Delegate work to them — do not tr
 - Docs → tech-writer
 - Infrastructure → devops
 
-**Slash commands:** /plan /review /debug /brainstorm
+{{skills_catalog}}
