@@ -1,9 +1,16 @@
 """Display and summary functions for agent-notes diagnostics."""
 
+__all__ = [
+    "count_stale",
+    "print_summary",
+    "print_issues",
+]
+
 from pathlib import Path
 from typing import List, Dict
 
 from ...domain.diagnostics import Issue
+from ..counts import count_skills as _count_skills_impl, count_rules as _count_rules_impl
 
 
 def _cli_base_dir(backend, scope: str) -> Path:
@@ -34,50 +41,12 @@ def _count_agents(backend, scope: str) -> tuple:
 
 def _count_skills(backend, scope: str) -> tuple:
     """Count (installed, expected) skills for a CLI backend. Excludes broken symlinks."""
-    from ... import installer
-
-    # Helper to get DIST_SKILLS_DIR
-    def _get_dist_skills_dir():
-        from ...config import DIST_SKILLS_DIR
-        return DIST_SKILLS_DIR
-
-    if not backend.supports("skills"):
-        return 0, 0
-
-    # Count installed
-    skills_dir = installer.target_dir_for(backend, "skills", scope)
-    if skills_dir and skills_dir.exists():
-        installed = len([d for d in skills_dir.iterdir() if d.is_dir() and d.exists()])
-    else:
-        installed = 0
-
-    # Count expected (universal skills)
-    dist_skills_dir = _get_dist_skills_dir()
-    expected = len([d for d in dist_skills_dir.iterdir() if d.is_dir()]) if dist_skills_dir and dist_skills_dir.exists() else 0
-    return installed, expected
-
+    return _count_skills_impl(backend, scope)
 
 
 def _count_rules(backend, scope: str) -> tuple:
     """Count (installed, expected) rules for a CLI backend."""
-    from ... import installer
-
-    # Helper to get DIST_RULES_DIR
-    def _get_dist_rules_dir():
-        from ...config import DIST_RULES_DIR
-        return DIST_RULES_DIR
-
-    if not backend.supports("rules"):
-        return 0, 0
-
-    # Count installed
-    rules_dir = installer.target_dir_for(backend, "rules", scope)
-    installed = len(list(rules_dir.glob("*.md"))) if rules_dir and rules_dir.exists() else 0
-
-    # Count expected
-    dist_rules_dir = _get_dist_rules_dir()
-    expected = len(list(dist_rules_dir.glob("*.md"))) if dist_rules_dir and dist_rules_dir.exists() else 0
-    return installed, expected
+    return _count_rules_impl(backend, scope)
 
 
 def _check_config(backend, scope: str) -> tuple:
@@ -101,9 +70,9 @@ def _check_config(backend, scope: str) -> tuple:
 
 def _check_role_models(state):
     """Display role→model assignments and check compatibility."""
-    from ...model_registry import load_model_registry
+    from ...registries.model_registry import load_model_registry
     from ...registries.cli_registry import load_registry
-    from ...role_registry import load_role_registry
+    from ...registries.role_registry import load_role_registry
     from ...config import Color
 
     model_registry = load_model_registry()

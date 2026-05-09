@@ -14,14 +14,13 @@ from . import uninstall
 from . import build
 from . import doctor
 from . import validate
-from . import update
 from . import regenerate
 from . import list as list_cmd
 from . import memory as memory_cmd
 
 __all__ = [
     "install", "uninstall", "show_info",
-    "build", "doctor", "validate", "update",
+    "build", "doctor", "validate",
     "regenerate", "set_role", "interactive_install",
     "list_cmd", "memory_cmd",
 ]

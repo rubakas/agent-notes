@@ -62,24 +62,59 @@ def _check_session_hook(scope: str, issues: list) -> None:
         ))
 
 
+def check_version_drift(scope: str, issues: list, fix_actions: list) -> None:
+    """Check if the installed package version matches the current running version."""
+    from .. import install_state
+    from ..config import get_version
+    from ..domain.diagnostics import Issue, FixAction
+    from ..services.state_store import get_scope
+    from pathlib import Path
+
+    state = install_state.load_current_state()
+    if state is None:
+        return
+
+    project_path = Path.cwd() if scope == "local" else None
+    scope_state = get_scope(state, scope, project_path)
+    if scope_state is None:
+        return
+
+    installed_version = scope_state.installed_version
+    if not installed_version:
+        return
+
+    current_version = get_version()
+    if installed_version != current_version:
+        issues.append(Issue(
+            "version_drift",
+            "state.json",
+            f"Installed with v{installed_version} but running v{current_version}. "
+            "Run `agent-notes doctor --fix` or `agent-notes install` to update.",
+        ))
+        fix_actions.append(FixAction("_TRIGGER_INSTALL", "state.json", "reinstall to update"))
+
+
 def diagnose(scope: str, fix: bool = False) -> bool:
     """Run all diagnostic checks and optionally apply fixes."""
     from .. import install_state
-    
+
     print_summary(scope)
-    
+
     issues = []
     fix_actions = []
-    
+
     # Run checks
     check_stale_files(scope, issues, fix_actions)
-    check_broken_symlinks(scope, issues, fix_actions) 
+    check_broken_symlinks(scope, issues, fix_actions)
     check_shadowed_files(scope, issues, fix_actions)
     check_missing_files(scope, issues, fix_actions)
     check_content_drift(scope, issues, fix_actions)
-    
+
     # Build freshness check (scope-independent)
     check_build_freshness(issues, fix_actions)
+
+    # Version drift check
+    check_version_drift(scope, issues, fix_actions)
 
     # SessionStart hook check (Claude Code only)
     _check_session_hook(scope, issues)

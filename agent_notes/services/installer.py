@@ -393,6 +393,7 @@ def _install_session_hook(backend, scope: str) -> None:
     """Install the SessionStart hook and write the context file for Claude Code."""
     from .settings_writer import install_hook, install_allow_entry, remove_allow_entry
     from .session_context import write_context
+    from ..registries.skill_registry import default_skill_registry
     from .. import config
 
     settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
@@ -403,9 +404,11 @@ def _install_session_hook(backend, scope: str) -> None:
     if agents_dist.exists():
         agents = sorted(p.stem for p in agents_dist.glob("*.md"))
 
+    skills = default_skill_registry().all()
+
     version = config.get_version()
     print(f"Installing Claude Code SessionStart hook ...")
-    write_context(context_file, agents, version)
+    write_context(context_file, agents, version, skills)
     install_hook(settings_path, "SessionStart", hook_command)
     # Remove old standalone entry if present (backward compat cleanup)
     remove_allow_entry(settings_path, "Bash(cost-report)")

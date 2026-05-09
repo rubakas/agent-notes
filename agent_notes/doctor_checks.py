@@ -1,6 +1,14 @@
 """Scoped health checks for agent-notes — only touches files we own."""
 
 from __future__ import annotations
+
+__all__ = [
+    "expected_paths_for_install",
+    "check_missing",
+    "check_broken",
+    "check_drift",
+    "check_stale",
+]
 from pathlib import Path
 from typing import Optional
 

@@ -91,56 +91,46 @@ def global_output_path(backend) -> Optional[Path]:
     return dist_dir_for(backend) / backend.layout["config"]
 
 
-# === Backward compatibility - lazy evaluation of old constants ===
-def _lazy_backend_attr(backend_name: str, attr_func):
-    """Helper for creating lazy attributes that depend on registry.
-
-    Note: at initial config-module import time, ``agent_notes.cli_backend`` is
-    NOT safe to import (circular). In that case we fall back to hardcoded
-    values that match the shipped YAMLs. Later callers who import these
-    constants after initial module load get the correct values via this same
-    function (the registry is then importable).
-    """
-    def get_attr():
-        try:
-            from .registries.cli_registry import default_registry
-            backend = default_registry().get(backend_name)
-            return attr_func(backend)
-        except (ImportError, KeyError):
-            # Fallback to hardcoded values if registry not available (e.g. circular
-            # import at initial module-load time). These match the shipped YAMLs.
-            fallbacks = {
-                'claude': {'home': Path.home() / ".claude", 'template': "global-claude.md", 'dist': "claude"},
-                'opencode': {'home': Path.home() / ".config" / "opencode", 'template': "global-opencode.md", 'dist': "opencode"},
-                'copilot': {'home': Path.home() / ".github", 'template': "global-copilot.md", 'dist': "github"},
-            }
-            fb = fallbacks.get(backend_name, {})
-            # Match by the attr_func's role — we encode intent via __name__ for named
-            # functions, or by returning the generic dist/home/template via the lambdas
-            # below (see DIST_*/GLOBAL_*/*_HOME assignments).
-            name = attr_func.__name__
-            if name == 'global_home' or name == '_fb_home':
-                return fb.get('home')
-            elif name == 'template_path' or name == '_fb_template':
-                return DATA_DIR / fb.get('template', '')
-            elif name == 'dist_dir' or name == '_fb_dist':
-                return DIST_DIR / fb.get('dist', backend_name)
-    return get_attr
+# === Backward compatibility constants ===
+# Hardcoded fallbacks match the shipped YAMLs and protect against circular
+# imports if this module is ever imported very early in the load sequence.
+_FALLBACKS = {
+    'claude':   {'home': Path.home() / ".claude",               'template': "global-claude.md",   'dist': "claude"},
+    'opencode': {'home': Path.home() / ".config" / "opencode",  'template': "global-opencode.md", 'dist': "opencode"},
+    'copilot':  {'home': Path.home() / ".github",               'template': "global-copilot.md",  'dist': "github"},
+}
 
 
-# Create backward-compatibility constants. We give the lambdas named stand-ins
-# so the fallback branch in _lazy_backend_attr can classify them correctly even
-# when the registry isn't importable yet (circular import during config init).
-def _fb_home(b):    return b.global_home
-def _fb_dist(b):    return dist_dir_for(b)
-def _fb_template(b): return global_template_path(b)
+def _backend_home(name: str) -> Path:
+    try:
+        from .registries.cli_registry import default_registry
+        return default_registry().get(name).global_home
+    except (ImportError, KeyError):
+        return _FALLBACKS[name]['home']
 
-CLAUDE_HOME       = _lazy_backend_attr('claude',   _fb_home)()
-OPENCODE_HOME     = _lazy_backend_attr('opencode', _fb_home)()
-GITHUB_HOME       = _lazy_backend_attr('copilot',  _fb_home)()
-DIST_CLAUDE_DIR   = _lazy_backend_attr('claude',   _fb_dist)()
-DIST_OPENCODE_DIR = _lazy_backend_attr('opencode', _fb_dist)()
-DIST_GITHUB_DIR   = _lazy_backend_attr('copilot',  _fb_dist)()
-GLOBAL_CLAUDE_MD  = _lazy_backend_attr('claude',   _fb_template)()
-GLOBAL_OPENCODE_MD = _lazy_backend_attr('opencode', _fb_template)()
-GLOBAL_COPILOT_MD = _lazy_backend_attr('copilot',  _fb_template)()
+
+def _backend_dist(name: str) -> Path:
+    try:
+        from .registries.cli_registry import default_registry
+        return dist_dir_for(default_registry().get(name))
+    except (ImportError, KeyError):
+        return DIST_DIR / _FALLBACKS[name]['dist']
+
+
+def _backend_template(name: str) -> Path:
+    try:
+        from .registries.cli_registry import default_registry
+        return global_template_path(default_registry().get(name))
+    except (ImportError, KeyError):
+        return DATA_DIR / _FALLBACKS[name]['template']
+
+
+CLAUDE_HOME        = _backend_home('claude')
+OPENCODE_HOME      = _backend_home('opencode')
+GITHUB_HOME        = _backend_home('copilot')
+DIST_CLAUDE_DIR    = _backend_dist('claude')
+DIST_OPENCODE_DIR  = _backend_dist('opencode')
+DIST_GITHUB_DIR    = _backend_dist('copilot')
+GLOBAL_CLAUDE_MD   = _backend_template('claude')
+GLOBAL_OPENCODE_MD = _backend_template('opencode')
+GLOBAL_COPILOT_MD  = _backend_template('copilot')
