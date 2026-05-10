@@ -217,6 +217,24 @@ Agents accumulate knowledge across sessions using one of four backends, chosen d
 - **query** — Search wiki pages, synthesize answers with citations, optionally file answers back as new pages
 - **lint** — Health-check for contradictions, stale claims, orphan pages, missing cross-references
 
+### Ingest workflow
+
+**What ingest does** — Feeds external knowledge (URLs, files, folders) into the wiki brain for persistent, queryable knowledge.
+
+**Why it's session-only** — Ingest requires AI analysis to extract concepts, entities, and summaries. Without AI, it's just raw file archiving. The value chain is: read content → AI analyzes → store with metadata.
+
+**How to use it** — Invoke `/ingest <target>` during a Claude Code session:
+
+```
+/ingest https://docs.example.com/api
+/ingest ./path/to/file.py
+/ingest ./path/to/folder/
+```
+
+**What happens** — The AI reads the source, extracts title/summary/concepts/entities, and calls `agent-notes memory ingest` to create wiki pages with cross-references.
+
+**CLI fallback** — For manual use without AI analysis: `agent-notes memory ingest "<title>" "<body>" "<concepts>" "<entities>" "<tags>"` (you supply all metadata yourself).
+
 ### Obsidian setup
 
 Run `agent-notes install` and pick Obsidian when prompted. The wizard auto-detects existing vaults under `~/Documents`, `~/Desktop`, and `~`. To initialize the vault structure:

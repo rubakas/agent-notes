@@ -224,24 +224,13 @@ Analyze the content and extract:
 
 ### Step 3 — Ingest via CLI
 
-Call the appropriate command:
+Call the single ingest command regardless of source type:
 
-**For a URL:**
 ```bash
-agent-notes memory ingest-url "<url>" "<summary>" "<concepts_csv>" "<entities_csv>" "<tags_csv>"
+agent-notes memory ingest "<title>" "<summary>" "<concepts_csv>" "<entities_csv>" "<tags_csv>"
 ```
 
-**For a file:**
-```bash
-agent-notes memory ingest-file "<file_path>" "<summary>" "<concepts_csv>" "<entities_csv>" "<tags_csv>"
-```
-
-**For a folder:**
-```bash
-agent-notes memory ingest-folder "<folder_path>" "<summary>" "<concepts_csv>" "<entities_csv>" "<tags_csv>"
-```
-
-The CLI archives the raw content and creates the wiki source page. The AI-extracted concepts and entities are fanned out into their own wiki pages with cross-references.
+This creates the source page and fans out to concept and entity pages with cross-references. Note: raw content archiving is not available via CLI — the AI summary is the stored knowledge.
 
 ### Step 4 — Report
 
@@ -256,5 +245,5 @@ User: `/ingest https://karpathy.github.io/2023/01/20/llm-wiki/`
 
 1. Fetch URL with WebFetch
 2. Analyze: Title="LLM Wiki by Karpathy", Summary="Proposes using LLMs to maintain personal knowledge wikis...", Concepts=["LLM Wiki", "knowledge management", "fan-out pattern"], Entities=["Andrej Karpathy"], Tags=["ai", "knowledge-management"]
-3. Run: `agent-notes memory ingest-url "https://karpathy.github.io/2023/01/20/llm-wiki/" "Proposes using LLMs to maintain personal knowledge wikis..." "LLM Wiki,knowledge management,fan-out pattern" "Andrej Karpathy" "ai,knowledge-management"`
+3. Run: `agent-notes memory ingest "LLM Wiki by Karpathy" "Proposes using LLMs to maintain personal knowledge wikis..." "LLM Wiki,knowledge management,fan-out pattern" "Andrej Karpathy" "ai,knowledge-management"`
 4. Report results
