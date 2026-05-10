@@ -250,6 +250,30 @@ def do_show(name: str) -> None:
             print("")
         return
 
+    elif backend == "wiki":
+        if path is None:
+            print("Memory path not configured.")
+            return
+        from ..services.wiki_backend import WIKI_PAGE_TYPES
+        wiki_dir = path / "wiki"
+        if name not in WIKI_PAGE_TYPES:
+            print(f"Page type '{name}' not found. Available types: {', '.join(WIKI_PAGE_TYPES)}")
+            return
+        type_dir = wiki_dir / name
+        if not type_dir.exists():
+            print(f"No pages found for type '{name}' in wiki {path}")
+            return
+        print(f"Wiki pages in '{name}':")
+        print("")
+        for f in sorted(type_dir.glob("*.md")):
+            print(f"{Color.CYAN}--- {f.name} ---{Color.NC}")
+            try:
+                print(f.read_text())
+            except (UnicodeDecodeError, OSError):
+                print("(binary file or read error)")
+            print("")
+        return
+
     # local backend
     if path is None:
         path = MEMORY_DIR
@@ -281,6 +305,41 @@ def do_reset(name: Optional[str] = None) -> None:
 
     if backend == "none":
         print("Memory is disabled.")
+        return
+
+    if backend == "wiki":
+        if path is None or not path.exists():
+            print("No wiki found to reset.")
+            return
+        target = f"wiki at {path}" if name is None else f"wiki page type '{name}' at {path}"
+        print(f"{Color.RED}Warning: this will permanently delete the {target}.{Color.NC}")
+        confirm = input("Type 'yes' to confirm: ")
+        if confirm == "yes":
+            import shutil as _shutil
+            from ..services.wiki_backend import WIKI_PAGE_TYPES
+            if name is None:
+                wiki_dir = path / "wiki"
+                for page_type in WIKI_PAGE_TYPES:
+                    type_dir = wiki_dir / page_type
+                    if type_dir.exists():
+                        _shutil.rmtree(type_dir)
+                        type_dir.mkdir()
+                print(f"{Color.GREEN}Wiki at {path} cleared.{Color.NC}")
+            else:
+                from ..services.wiki_backend import WIKI_PAGE_TYPES
+                wiki_dir = path / "wiki"
+                if name not in WIKI_PAGE_TYPES:
+                    print(f"Page type '{name}' not found. Available types: {', '.join(WIKI_PAGE_TYPES)}")
+                    return
+                type_dir = wiki_dir / name
+                if not type_dir.exists():
+                    print(f"No pages found for type '{name}'.")
+                    return
+                _shutil.rmtree(type_dir)
+                type_dir.mkdir()
+                print(f"{Color.GREEN}Wiki pages for type '{name}' cleared.{Color.NC}")
+        else:
+            print("Cancelled.")
         return
 
     if path is None:
@@ -666,7 +725,7 @@ Commands:
   list             List all agent memories with sizes (default)
   vault            Show current backend and memory path
   index            Regenerate Index.md for the current backend
-  add <title> <body>  Add a note (obsidian backend)
+  add <title> <body>  Add a note (obsidian and wiki backends)
   migrate          Migrate old per-project layout to new shared flat layout
   size             Total disk usage
   show <name>      Show memory contents for one agent/category
@@ -674,6 +733,9 @@ Commands:
   reset <name>     Clear one agent's memory
   export           Back up memories to agent-notes/memory-backup/
   import           Restore from agent-notes/memory-backup/
+  ingest <title> <body>  Ingest source material and fan-out to concepts/entities (wiki backend)
+  query <keyword>  Search wiki pages by keyword (wiki backend)
+  lint             Check wiki health: orphans, broken links, stale index (wiki backend)
 
 Examples:
   agent-notes memory                    List all memories

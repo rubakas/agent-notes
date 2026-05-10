@@ -333,15 +333,6 @@ def obsidian_list_notes(vault: Path) -> list[dict]:
     return notes
 
 
-def obsidian_claude_md_section(vault: Path) -> str:
-    return (
-        f"## Agent Memory\n\n"
-        f"Your memory vault is at `{vault}`. Start at `Index.md` to find relevant context.\n"
-        f"Categories: Patterns, Decisions, Mistakes, Context, Sessions.\n"
-        f"Use `agent-notes memory add` to save insights, `agent-notes memory index` to refresh Index.md."
-    )
-
-
 # ── Local backend ──────────────────────────────────────────────────────────────
 
 def local_init(memory_dir: Path) -> None:
@@ -370,9 +361,3 @@ def local_regenerate_index(memory_dir: Path) -> None:
     (memory_dir / "Index.md").write_text("\n".join(lines))
 
 
-def local_claude_md_section(memory_dir: Path) -> str:
-    return (
-        f"## Agent Memory\n\n"
-        f"Your memory is at `{memory_dir}/`. Each agent has its own subdirectory.\n"
-        f"Files are plain markdown — read and write freely."
-    )

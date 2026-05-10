@@ -29,7 +29,6 @@ from .memory_backend import (
     _slug,
     _now_iso,
     _today,
-    _current_session_id,
     _parse_frontmatter,
 )
 
