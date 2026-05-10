@@ -259,28 +259,28 @@ def _select_skills(step: int = 0, total: int = 0, version: str = '') -> List[str
     selected_skills = list(process_skills)
 
     if tech_groups:
+        # Build one option per individual skill so users pick by name, not group label.
         options = []
+        all_skill_names = set()
         for group_name, skills in tech_groups.items():
-            desc = descriptions.get(group_name, group_name.lower())
-            count = len(skills)
-            label = f"{group_name.capitalize()} — {desc} ({count} {'skill' if count == 1 else 'skills'})"
-            options.append((label, group_name))
-
-        all_group_names = set(tech_groups.keys())
+            for skill_name in skills:
+                desc = descriptions.get(skill_name, skill_name)
+                label = f"{skill_name.capitalize()} — {desc}"
+                options.append((label, skill_name))
+                all_skill_names.add(skill_name)
 
         title = "Which domain skills to include?\n  (process skills are always included)"
         if _can_interactive():
-            selected_groups = _checkbox_select(title, options, defaults=all_group_names,
-                                               step=step, total=total, version=version)
+            selected_domain_skills = _checkbox_select(title, options, defaults=all_skill_names,
+                                                      step=step, total=total, version=version)
         else:
-            selected_groups = _checkbox_select_fallback(title, options, defaults=all_group_names,
-                                                        step=step, total=total, version=version)
+            selected_domain_skills = _checkbox_select_fallback(title, options, defaults=all_skill_names,
+                                                               step=step, total=total, version=version)
 
         skill_summary_parts = [f"process ({len(process_skills)})"] if process_skills else []
-        for group_name, skills in tech_groups.items():
-            if group_name in selected_groups:
-                selected_skills.extend(skills)
-                skill_summary_parts.append(f"{group_name.capitalize()} ({len(skills)})")
+        for skill_name in selected_domain_skills:
+            selected_skills.append(skill_name)
+            skill_summary_parts.append(skill_name.capitalize())
     else:
         skill_summary_parts = [f"process ({len(process_skills)})"] if process_skills else []
 
