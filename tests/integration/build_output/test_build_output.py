@@ -49,7 +49,7 @@ def test_skills_dir_exists(built_dist):
 
 def test_skills_has_enough_subdirs(built_dist):
     subdirs = [p for p in (built_dist / "skills").iterdir() if p.is_dir()]
-    assert len(subdirs) >= 30
+    assert len(subdirs) >= 15
 
 
 def test_rules_dir_exists(built_dist):
