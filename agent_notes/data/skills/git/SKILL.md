@@ -1,7 +1,7 @@
 ---
 name: git
 description: "Git workflow: analyzing changes, chunking commits, conventional commit messages. Use when user asks to commit, create a PR, or says 'git'."
-group: git
+group: process
 ---
 
 # Git Workflow
