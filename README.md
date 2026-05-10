@@ -2,7 +2,7 @@
 
 AI agent configuration manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [OpenCode](https://github.com/opencode-ai/opencode).
 
-Configures a Lead agent (Opus) that orchestrates a team of 18 specialized subagents across three model tiers — so Opus plans and reasons, Sonnet executes, and Haiku explores.
+Configures a Lead agent (Opus) that orchestrates a team of 18 specialized subagents across three model tiers — so Opus 4.6 plans and reasons, Sonnet 4.6 executes, and Haiku 4.5 explores.
 
 ## Quick Start
 
@@ -56,8 +56,8 @@ Iteration loop: edit source → `python -m build` → `pipx reinstall dist/*.whl
 
 ### 3. Plugin — limited functionality
 
-- **Claude Code**: install via the Claude Code plugin marketplace.
-- **OpenCode**: copy or symlink `.opencode-plugin/` into `~/.config/opencode/plugins/agent-notes/` and add `"plugin": ["agent-notes"]` to `opencode.json`.
+- **Claude Code**: install via the Claude Code plugin marketplace or copy/symlink `.claude-plugin/` into `~/.claude/plugins/agent-notes/`.
+- **OpenCode**: copy or symlink `.claude-plugin/` into `~/.config/opencode/plugins/agent-notes/` and add `"plugin": ["agent-notes"]` to `opencode.json`.
 
 The plugin runs a `session.start` hook that surfaces agent-notes context to the CLI session. It does **not** include the full `agent-notes` CLI (wizard, doctor, config, memory, etc.). For those, use install method 1 or 2.
 
@@ -83,8 +83,8 @@ agent-notes <command> [options]
 
 | Command | Description |
 |---------|-------------|
-| `install [--local] [--copy]` | Interactive wizard or direct install |
-| `uninstall [--local]` | Remove installed components |
+| `install [--local] [--copy] [--reconfigure]` | Interactive wizard or direct install |
+| `uninstall [--local \| --global]` | Remove installed components (both scopes by default) |
 | `doctor [--local] [--fix]` | Check installation health |
 | `info` | Show status and component counts |
 | `list [clis\|models\|roles\|agents\|skills\|rules\|all]` | List engine components or installed |
@@ -92,6 +92,7 @@ agent-notes <command> [options]
 | `regenerate [--cli <cli>]` | Rebuild files from state.json (Phase 10+) |
 | `validate` | Lint source configuration files |
 | `memory [list\|size\|show\|reset\|export\|import] [name]` | Manage agent memory |
+| `cost-report` | Show session cost breakdown by agent and model |
 
 ### Supported platforms
 
@@ -122,25 +123,25 @@ agent-notes memory add "Rails enum prefix" \
 
 ## Agent Team
 
-Specialized subagents with hierarchical model strategy: **Opus 4.7 decides, Sonnet 4 executes, Haiku 4.5 explores.**
+Specialized subagents with hierarchical model strategy: **Opus 4.6 decides, Sonnet 4.6 executes, Haiku 4.5 explores.**
 
 | Agent | Model | Role |
 |-------|-------|------|
-| **lead** | Opus 4.7 | Plans, delegates, reviews. Orchestrator. |
-| **architect** | Opus 4.7 | System architecture, module boundaries, domain models. Read-only. |
-| **debugger** | Opus 4.7 | Bug investigation: reproduces, isolates, identifies root cause. Read-only. |
-| **coder** | Sonnet 4 | Implements features, fixes bugs, edits files. |
-| **reviewer** | Sonnet 4 | Code quality review. Read-only. |
-| **security-auditor** | Sonnet 4 | Security vulnerability analysis. Read-only. |
-| **test-writer** | Sonnet 4 | Writes tests for any framework. |
-| **test-runner** | Sonnet 4 | Diagnoses and fixes failing tests. |
-| **system-auditor** | Sonnet 4 | Codebase health: duplication, N+1, coupling. Read-only. |
-| **database-specialist** | Sonnet 4 | Schema design, indexes, query performance, migrations. Read-only. |
-| **performance-profiler** | Sonnet 4 | Response times, memory, caching, bundle size. Read-only. |
-| **devops** | Sonnet 4 | Docker, CI/CD, deployment configs. |
-| **devil** | Sonnet 4 | Challenges plans to surface hidden risks. Read-only. |
-| **integrations** | Sonnet 4 | Third-party integrations: OAuth, webhooks, payments. |
-| **refactorer** | Sonnet 4 | Improves code structure without changing behavior. |
+| **lead** | Opus 4.6 | Plans, delegates, reviews. Orchestrator. |
+| **architect** | Opus 4.6 | System architecture, module boundaries, domain models. Read-only. |
+| **debugger** | Opus 4.6 | Bug investigation: reproduces, isolates, identifies root cause. Read-only. |
+| **coder** | Sonnet 4.6 | Implements features, fixes bugs, edits files. |
+| **reviewer** | Sonnet 4.6 | Code quality review. Read-only. |
+| **security-auditor** | Sonnet 4.6 | Security vulnerability analysis. Read-only. |
+| **test-writer** | Sonnet 4.6 | Writes tests for any framework. |
+| **test-runner** | Sonnet 4.6 | Diagnoses and fixes failing tests. |
+| **system-auditor** | Sonnet 4.6 | Codebase health: duplication, N+1, coupling. Read-only. |
+| **database-specialist** | Sonnet 4.6 | Schema design, indexes, query performance, migrations. Read-only. |
+| **performance-profiler** | Sonnet 4.6 | Response times, memory, caching, bundle size. Read-only. |
+| **devops** | Sonnet 4.6 | Docker, CI/CD, deployment configs. |
+| **devil** | Sonnet 4.6 | Challenges plans to surface hidden risks. Read-only. |
+| **integrations** | Sonnet 4.6 | Third-party integrations: OAuth, webhooks, payments. |
+| **refactorer** | Sonnet 4.6 | Improves code structure without changing behavior. |
 | **analyst** | Haiku 4.5 | Requirements analysis: surfaces missing or contradictory requirements. Read-only. |
 | **api-reviewer** | Haiku 4.5 | API design, versioning, error handling, backward compatibility. Read-only. |
 | **tech-writer** | Haiku 4.5 | Documentation: READMEs, API docs, changelogs. |
@@ -148,7 +149,7 @@ Specialized subagents with hierarchical model strategy: **Opus 4.7 decides, Sonn
 
 ## Architecture
 
-agent-notes is a 4-layer engine (domain / registries / services / commands). All extensible content (CLIs, models, roles, agents, skills, rules) lives in `agent_notes/data/` as YAML — adding a new CLI/model/role is a YAML drop, no Python changes. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ADD_CLI.md](docs/ADD_CLI.md), [docs/ADD_MODEL.md](docs/ADD_MODEL.md), [docs/ADD_ROLE.md](docs/ADD_ROLE.md).
+agent-notes is a 4-layer engine (domain / registries / services / commands). All extensible content (CLIs, models, roles, agents, skills, rules) lives in `agent_notes/data/` as YAML — adding a new CLI/model/role is a YAML drop, no Python changes. Context is loaded in tiers: always-loaded (CLAUDE.md, rules, skill catalog), lazy-loaded (full skill content, agent prompts), and pull-based (memory notes). See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ADD_CLI.md](docs/ADD_CLI.md), [docs/ADD_MODEL.md](docs/ADD_MODEL.md), [docs/ADD_ROLE.md](docs/ADD_ROLE.md).
 
 ## Improved Claude Code workflows
 
@@ -174,6 +175,8 @@ Four failure modes that derail AI-assisted development, and the skills that addr
 
 42 on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`.
 
+The session context hook auto-generates a skill index from SKILL.md frontmatter at install time, so agents always know what skills are available without loading full skill content. This keeps context overhead low while maintaining skill discoverability.
+
 ### Using skills in Claude Code / OpenCode
 
 ```
@@ -191,6 +194,7 @@ Agents accumulate knowledge across sessions using one of three backends, chosen 
 |---------|---------|----------|
 | **Local** | `~/.claude/agent-memory/<agent>/` — plain markdown per agent | Simple setup, no extra tools |
 | **Obsidian** | Category vault with YAML frontmatter and `[[wikilinks]]` | Visual browsing, backlinks, Dataview queries |
+| **Wiki** | `~/Documents/Obsidian Vault/agent-wiki/` — structured wiki with categories | Team knowledge bases, shared context |
 | **None** | Disabled — no files written | Stateless or shared machines |
 
 ### Obsidian setup
@@ -238,7 +242,7 @@ Always use `_prefix: true` with Rails enums to avoid method name collisions.
 
 ## Development
 
-Python 3.9+ required. Build from source and run tests:
+Python 3.10+ required. Build from source and run tests:
 
 ```bash
 python -m build && pipx install dist/*.whl

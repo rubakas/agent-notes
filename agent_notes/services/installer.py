@@ -347,7 +347,7 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
     copy_mode = False
     state = load_state()
     if state is not None:
-        scope_state = get_scope(state, scope)
+        scope_state = get_scope(state, scope, project_path=Path.cwd() if scope == "local" else None)
         if scope_state is not None:
             copy_mode = (scope_state.mode == "copy")
 

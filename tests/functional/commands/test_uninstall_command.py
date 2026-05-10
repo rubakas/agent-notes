@@ -201,3 +201,134 @@ class TestUninstallIdempotent:
 
         do_uninstall()
         do_uninstall()  # must not raise
+
+
+# ── Regression: local scope does not raise ValueError ─────────────────────────
+
+class TestUninstallLocalScopeDoesNotCrash:
+    """Regression for: uninstall_all("local") raised ValueError because get_scope
+    was called without project_path when scope == "local"."""
+
+    def test_uninstall_all_local_does_not_raise_value_error(self, tmp_path, monkeypatch):
+        """uninstall_all('local') must not raise ValueError even when state exists."""
+        project_dir = tmp_path / "myproject"
+        project_dir.mkdir()
+
+        backend_home = tmp_path / "claude_home"
+        registry = CLIRegistry([_make_backend("claude", backend_home)])
+
+        xdg = tmp_path / "config"
+        xdg.mkdir()
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+        _write_minimal_state(
+            xdg / "agent-notes" / "state.json",
+            scope="local",
+            project_path=str(project_dir.resolve()),
+        )
+
+        # Simulate cwd being the local project so get_scope can resolve the path
+        monkeypatch.chdir(project_dir)
+
+        from agent_notes.services.installer import uninstall_all
+
+        # Must not raise ValueError("project_path required for local scope")
+        with patch("agent_notes.services.installer.load_registry", return_value=registry), \
+             patch("agent_notes.services.installer._uninstall_session_hook"):
+            uninstall_all("local", registry=registry)
+
+    def test_uninstall_command_local_flag_does_not_raise_value_error(self, tmp_path, monkeypatch):
+        """The uninstall command's --local path must not raise ValueError."""
+        project_dir = tmp_path / "myproject"
+        project_dir.mkdir()
+
+        backend_home = tmp_path / "claude_home"
+        registry = CLIRegistry([_make_backend("claude", backend_home)])
+
+        xdg = tmp_path / "config"
+        xdg.mkdir()
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+        _write_minimal_state(
+            xdg / "agent-notes" / "state.json",
+            scope="local",
+            project_path=str(project_dir.resolve()),
+        )
+
+        monkeypatch.chdir(project_dir)
+
+        with patch("agent_notes.services.installer.load_registry", return_value=registry), \
+             patch("agent_notes.services.installer._uninstall_session_hook"), \
+             patch("agent_notes.install_state.remove_install_state"):
+            from agent_notes.commands.uninstall import uninstall
+            uninstall(local=True)  # must not raise
+
+    def test_uninstall_all_local_with_no_state_does_not_raise(self, tmp_path, monkeypatch):
+        """When there is no state.json, uninstall_all('local') should still not raise."""
+        project_dir = tmp_path / "myproject"
+        project_dir.mkdir()
+
+        backend_home = tmp_path / "claude_home"
+        registry = CLIRegistry([_make_backend("claude", backend_home)])
+
+        xdg = tmp_path / "config"
+        xdg.mkdir()
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+        # Deliberately no state.json written
+
+        monkeypatch.chdir(project_dir)
+
+        from agent_notes.services.installer import uninstall_all
+
+        with patch("agent_notes.services.installer.load_registry", return_value=registry), \
+             patch("agent_notes.services.installer._uninstall_session_hook"):
+            uninstall_all("local", registry=registry)  # must not raise
+
+    def test_uninstall_all_local_reads_copy_mode_from_state(self, tmp_path, monkeypatch):
+        """When local state records mode='copy', uninstall_all resolves copy_mode correctly
+        without raising ValueError. The regression test is that get_scope is called with
+        project_path so it does not crash."""
+        project_dir = tmp_path / "myproject"
+        project_dir.mkdir()
+
+        backend_home = tmp_path / "claude_home"
+        registry = CLIRegistry([_make_backend("claude", backend_home)])
+
+        xdg = tmp_path / "config"
+        xdg.mkdir()
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+
+        # Write local state with mode=copy
+        sf = xdg / "agent-notes" / "state.json"
+        scope_dict = {
+            "installed_at": "2025-01-01T00:00:00Z",
+            "updated_at": "2025-01-01T00:00:00Z",
+            "mode": "copy",
+            "clis": {"claude": {"role_models": {}, "installed": {}}},
+        }
+        data = {
+            "source_path": "",
+            "source_commit": "",
+            "global": None,
+            "local": {str(project_dir.resolve()): scope_dict},
+            "memory": {"backend": "local", "path": ""},
+        }
+        sf.parent.mkdir(parents=True, exist_ok=True)
+        sf.write_text(__import__("json").dumps(data))
+
+        monkeypatch.chdir(project_dir)
+
+        from agent_notes.services.installer import uninstall_all
+
+        # Track whether uninstall_component_for_backend is called with copy_mode=True,
+        # confirming the copy_mode was correctly resolved from local state.
+        called_with_copy_mode = []
+
+        def record_copy_mode(backend, component, scope, copy_mode=False):
+            called_with_copy_mode.append(copy_mode)
+
+        with patch("agent_notes.services.installer.load_registry", return_value=registry), \
+             patch("agent_notes.services.installer._uninstall_session_hook"), \
+             patch("agent_notes.services.installer.uninstall_component_for_backend", side_effect=record_copy_mode):
+            # Must not raise ValueError("project_path required for local scope")
+            uninstall_all("local", registry=registry)
+
+        assert any(called_with_copy_mode), "copy_mode should have been resolved as True from local state"
