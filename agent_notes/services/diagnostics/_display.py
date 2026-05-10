@@ -23,7 +23,7 @@ def _cli_base_dir(backend, scope: str) -> Path:
 
 def _count_agents(backend, scope: str) -> tuple:
     """Count (installed, expected) agents for a CLI backend."""
-    from ... import installer
+    from ...services import installer
 
     if not backend.supports("agents"):
         return 0, 0
@@ -51,7 +51,7 @@ def _count_rules(backend, scope: str) -> tuple:
 
 def _check_config(backend, scope: str) -> tuple:
     """Check config files for a CLI backend. Returns (all_installed: bool, description: str, missing: list)."""
-    from ... import installer
+    from ...services import installer
 
     config_file = installer.config_filename_for(backend)
     if not config_file:
