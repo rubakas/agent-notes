@@ -1,7 +1,7 @@
 ---
 name: api-reviewer
 description: Reviews API design for consistency, versioning, error handling, and backward compatibility. Read-only analysis. Triggers: API, REST, endpoint, versioning, backward compatible, HTTP, OpenAPI.
-model: haiku
+model: sonnet
 disallowedTools: Write, Edit
 memory: user
 color: cyan
