@@ -2,7 +2,7 @@
 
 AI agent configuration manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [OpenCode](https://github.com/opencode-ai/opencode).
 
-Configures a Lead agent (Opus) that orchestrates a team of 18 specialized subagents across three model tiers — so Opus 4.6 plans and reasons, Sonnet 4.6 executes, and Haiku 4.5 explores.
+Configures a Lead agent (Opus) that orchestrates a team of 19 specialized subagents across three model tiers — so Opus 4.6 plans and reasons, Sonnet 4.6 executes, and Haiku 4.5 explores.
 
 ## Quick Start
 
@@ -16,8 +16,8 @@ agent-notes doctor
 
 | Component | Description |
 |-----------|-------------|
-| **Skills** | 42 on-demand knowledge modules (Rails, Docker, Git, Kamal, Process) |
-| **Agents** | 18 specialized AI subagents with hierarchical model strategy |
+| **Skills** | 42+ on-demand knowledge modules (Rails, Docker, Git, Kamal, Process) |
+| **Agents** | 19 specialized AI subagents with hierarchical model strategy |
 | **Rules** | Global instructions, code quality, and safety guardrails |
 | **Config** | Global instructions for Claude Code, OpenCode, and GitHub Copilot |
 
@@ -123,29 +123,31 @@ agent-notes memory add "Rails enum prefix" \
 
 ## Agent Team
 
-Specialized subagents with hierarchical model strategy: **Opus 4.6 decides, Sonnet 4.6 executes, Haiku 4.5 explores.**
+Specialized subagents with hierarchical model strategy: **Opus 4.6 reasons, Sonnet 4.6 executes, Haiku 4.5 scouts.**
 
-| Agent | Model | Role |
-|-------|-------|------|
-| **lead** | Opus 4.6 | Plans, delegates, reviews. Orchestrator. |
-| **architect** | Opus 4.6 | System architecture, module boundaries, domain models. Read-only. |
-| **debugger** | Opus 4.6 | Bug investigation: reproduces, isolates, identifies root cause. Read-only. |
-| **coder** | Sonnet 4.6 | Implements features, fixes bugs, edits files. |
-| **reviewer** | Sonnet 4.6 | Code quality review. Read-only. |
-| **security-auditor** | Sonnet 4.6 | Security vulnerability analysis. Read-only. |
-| **test-writer** | Sonnet 4.6 | Writes tests for any framework. |
-| **test-runner** | Sonnet 4.6 | Diagnoses and fixes failing tests. |
-| **system-auditor** | Sonnet 4.6 | Codebase health: duplication, N+1, coupling. Read-only. |
-| **database-specialist** | Sonnet 4.6 | Schema design, indexes, query performance, migrations. Read-only. |
-| **performance-profiler** | Sonnet 4.6 | Response times, memory, caching, bundle size. Read-only. |
-| **devops** | Sonnet 4.6 | Docker, CI/CD, deployment configs. |
-| **devil** | Sonnet 4.6 | Challenges plans to surface hidden risks. Read-only. |
-| **integrations** | Sonnet 4.6 | Third-party integrations: OAuth, webhooks, payments. |
-| **refactorer** | Sonnet 4.6 | Improves code structure without changing behavior. |
-| **analyst** | Haiku 4.5 | Requirements analysis: surfaces missing or contradictory requirements. Read-only. |
-| **api-reviewer** | Haiku 4.5 | API design, versioning, error handling, backward compatibility. Read-only. |
-| **tech-writer** | Haiku 4.5 | Documentation: READMEs, API docs, changelogs. |
-| **explorer** | Haiku 4.5 | Fast file discovery and pattern search. Read-only. |
+| Agent | Role | Model Tier | Purpose |
+|---|---|---|---|
+| lead | orchestrator | opus | Plans, coordinates, verifies — the team lead |
+| architect | reasoner | opus | System design, module boundaries, refactor planning |
+| debugger | reasoner | opus | Complex bug investigation, root-cause analysis |
+| coder | worker | sonnet | Implementation, file edits, bug fixes |
+| reviewer | worker | sonnet | Code quality, readability, correctness |
+| security-auditor | worker | sonnet | Auth, injection, XSS, secrets exposure |
+| test-writer | worker | sonnet | Creates tests for any framework |
+| test-runner | worker | sonnet | Diagnoses and fixes failing tests |
+| system-auditor | worker | sonnet | Duplication, dead code, coupling, complexity |
+| database-specialist | worker | sonnet | Schema design, indexes, query performance |
+| performance-profiler | worker | sonnet | Response times, memory, bundle size |
+| api-reviewer | worker | sonnet | REST conventions, versioning, backward compatibility |
+| devops | worker | sonnet | Docker, CI/CD, deployment, infrastructure |
+| devil | worker | sonnet | Devil's advocate — challenges plans and assumptions |
+| integrations | worker | sonnet | OAuth, webhooks, API clients, SSO |
+| refactorer | worker | sonnet | Extracts methods, reduces duplication, improves naming |
+| explorer | scout | haiku | Fast file discovery, pattern search |
+| analyst | scout | haiku | Requirements translation, acceptance criteria |
+| tech-writer | scout | haiku | READMEs, API docs, changelogs |
+
+**4 roles, 19 agents, 3 model tiers.** The tiered model strategy optimizes cost: Opus reasons ($15/1M tokens), Sonnet executes ($3/1M), Haiku scouts ($0.80/1M).
 
 ## Architecture
 
@@ -153,7 +155,7 @@ agent-notes is a 4-layer engine (domain / registries / services / commands). All
 
 ## Improved Claude Code workflows
 
-Four failure modes that derail AI-assisted development, and the skills that address them. Inspired by [Matt Pocock's skills repo](https://github.com/mattpocock/skills).
+Four failure modes that derail AI-assisted development, and the skills that address them.
 
 | Failure mode | What goes wrong | Skills that help |
 |---|---|---|
@@ -173,7 +175,7 @@ Four failure modes that derail AI-assisted development, and the skills that addr
 
 ## Skills
 
-42 on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`.
+42+ on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`.
 
 The session context hook auto-generates a skill index from SKILL.md frontmatter at install time, so agents always know what skills are available without loading full skill content. This keeps context overhead low while maintaining skill discoverability.
 
@@ -186,7 +188,7 @@ Load the docker-compose skill for multi-service setup
 
 ## Agent Memory
 
-Agents accumulate knowledge across sessions using one of three backends, chosen during `agent-notes install`.
+Agents accumulate knowledge across sessions using one of four backends, chosen during `agent-notes install`.
 
 ### Backends
 
@@ -194,8 +196,26 @@ Agents accumulate knowledge across sessions using one of three backends, chosen 
 |---------|---------|----------|
 | **Local** | `~/.claude/agent-memory/<agent>/` — plain markdown per agent | Simple setup, no extra tools |
 | **Obsidian** | Category vault with YAML frontmatter and `[[wikilinks]]` | Visual browsing, backlinks, Dataview queries |
-| **Wiki** | `~/Documents/Obsidian Vault/agent-wiki/` — structured wiki with categories | Team knowledge bases, shared context |
+| **Wiki** | Structured wiki with page types and versioning | Team knowledge bases, compounding knowledge |
 | **None** | Disabled — no files written | Stateless or shared machines |
+
+### Session tracking by backend
+
+| Feature | Local | Obsidian | Wiki |
+|---|---|---|---|
+| Storage location | `~/.claude/agent-memory/<agent>/` | Obsidian vault with categories | Structured wiki with page types |
+| Note types | Flat markdown per agent | `pattern`, `decision`, `mistake`, `context`, `session` | `source`, `concept`, `entity`, `synthesis`, `session` |
+| Session tracking | None | Auto-created session notes with `## Linked notes` | Session pages in `wiki/sessions/` |
+| Cross-referencing | None | `[[wikilinks]]` auto-appended to session notes | Markdown links maintained by LLM |
+| Key operations | read/write | add, list, show, reset, export, import | ingest, query, lint + add, list, show |
+| Best for | Simple setup, no extra tools | Visual browsing, backlinks, Dataview queries | Team knowledge bases, compounding knowledge |
+
+**Obsidian backend** — Uses category directories (`Patterns/`, `Decisions/`, `Mistakes/`, `Context/`, `Sessions/`). When you write a non-session note during an active session, the CLI auto-links it to the session note via `[[wikilinks]]`. Plans are mirrored as Decision notes.
+
+**Wiki backend** — Implements Karpathy's LLM Wiki pattern (v1). Structure: `raw/` for immutable source material, `wiki/` for LLM-maintained pages organized into `sources/`, `concepts/`, `entities/`, `synthesis/`, `sessions/`. Three key operations:
+- **ingest** — Process source material, extract key info, update entity/concept pages, append to log
+- **query** — Search wiki pages, synthesize answers with citations, optionally file answers back as new pages
+- **lint** — Health-check for contradictions, stale claims, orphan pages, missing cross-references
 
 ### Obsidian setup
 
@@ -239,6 +259,11 @@ tags: [rails, models]
 
 Always use `_prefix: true` with Rails enums to avoid method name collisions.
 ```
+
+## Inspired by
+
+- [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — The wiki memory backend implements his compile-once, query-forever knowledge pattern with structured page types and three core operations (ingest, query, lint)
+- [Matt Pocock's skills repo](https://github.com/mattpocock/skills) — Skill format (SKILL.md per directory), failure-mode table (misalignment, verbosity, broken code, architectural degradation), and several core skills (tdd, grill-me, grill-with-docs, improve-codebase-architecture, zoom-out, caveman)
 
 ## Development
 

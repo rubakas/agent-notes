@@ -331,6 +331,13 @@ def _memory_instructions(st) -> str:
     if resolved is None:
         return "Memory is disabled for this installation."
 
+    if backend == "wiki":
+        return (
+            f"Save memories using the `agent-notes memory add` CLI — it writes to the wiki at `{resolved}` automatically. "
+            "Do not write memory files directly.\n\n"
+            "Use: `agent-notes memory add \"<title>\" \"<body>\" [type] [agent]`\n"
+            "Types: `sources`, `concepts`, `entities`, `synthesis`, `sessions`. Agent: `lead`."
+        )
     label = "the configured Obsidian vault at" if backend == "obsidian" else "writes to"
     return (
         f"Save memories using the `agent-notes memory add` CLI — it {label} `{resolved}` automatically. "

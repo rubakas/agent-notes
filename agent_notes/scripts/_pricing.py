@@ -1,5 +1,6 @@
 """Load pricing data and provide cost calculation helpers."""
 import re
+import sys
 from fnmatch import fnmatch
 from importlib import resources
 
@@ -38,6 +39,7 @@ def get_price(model_id: str) -> dict:
     for patterns, price in table:
         if any(fnmatch(model_id, p) for p in patterns):
             return price
+    sys.stderr.write(f"Warning: no pricing entry for model '{model_id}', falling back to Sonnet rates\n")
     return {"in": 3.00, "out": 15.00, "cache": 0.30}
 
 
