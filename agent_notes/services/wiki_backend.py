@@ -215,6 +215,196 @@ def wiki_ingest(
     return result
 
 
+# ── Ingest from file ──────────────────────────────────────────────────────────
+
+def wiki_ingest_file(
+    wiki_root: Path,
+    *,
+    file_path: Path,
+    title: str = "",
+    body: str = "",
+    concepts: list[str] | None = None,
+    entities: list[str] | None = None,
+    tags: list[str] | None = None,
+) -> dict[str, list[Path]]:
+    """Ingest a local file into the wiki. Reads content, derives title, delegates to wiki_ingest."""
+    if not file_path.is_file():
+        raise FileNotFoundError(f"File not found: {file_path}")
+    raw_content = file_path.read_text(errors="replace")
+    if not title:
+        title = file_path.stem.replace("-", " ").replace("_", " ").title()
+    if not body:
+        body = f"Ingested from local file: {file_path}"
+    return wiki_ingest(
+        wiki_root,
+        title=title,
+        body=body,
+        raw_content=raw_content,
+        raw_filename=file_path.name,
+        concepts=concepts,
+        entities=entities,
+        tags=tags,
+    )
+
+
+# ── Ingest from folder ────────────────────────────────────────────────────────
+
+_SKIP_DIRS = {"__pycache__", ".git", "node_modules", ".venv", "dist", "build"}
+_DEFAULT_EXTENSIONS = {".py", ".md", ".yaml", ".yml", ".toml", ".json", ".txt", ".rs", ".ts", ".js", ".rb", ".go", ".java"}
+
+
+def _parse_gitignore_patterns(gitignore_path: Path) -> list[str]:
+    """Return non-empty, non-comment patterns from a .gitignore file."""
+    patterns = []
+    for line in gitignore_path.read_text(errors="replace").splitlines():
+        line = line.rstrip()
+        if line and not line.startswith("#"):
+            patterns.append(line)
+    return patterns
+
+
+def _matches_gitignore(rel_path: str, patterns: list[str]) -> bool:
+    """Return True if rel_path matches any gitignore pattern (simplified fnmatch)."""
+    import fnmatch
+    parts = rel_path.replace("\\", "/").split("/")
+    name = parts[-1]
+    for pattern in patterns:
+        # Strip leading slash for anchored patterns — treat as simple fnmatch
+        clean = pattern.lstrip("/")
+        if not clean:
+            continue
+        if fnmatch.fnmatch(name, clean):
+            return True
+        if fnmatch.fnmatch(rel_path, clean):
+            return True
+        if fnmatch.fnmatch(rel_path, f"**/{clean}"):
+            return True
+    return False
+
+
+def wiki_ingest_folder(
+    wiki_root: Path,
+    *,
+    folder_path: Path,
+    title: str = "",
+    body: str = "",
+    concepts: list[str] | None = None,
+    entities: list[str] | None = None,
+    tags: list[str] | None = None,
+    extensions: list[str] | None = None,
+    respect_gitignore: bool = True,
+) -> dict[str, list[Path]]:
+    """Ingest a local folder recursively into the wiki. Concatenates file contents."""
+    if not folder_path.is_dir():
+        raise FileNotFoundError(f"Folder not found: {folder_path}")
+    allowed_exts = set(extensions) if extensions is not None else _DEFAULT_EXTENSIONS
+
+    gitignore_patterns: list[str] = []
+    if respect_gitignore:
+        gitignore_path = folder_path / ".gitignore"
+        if gitignore_path.exists():
+            gitignore_patterns = _parse_gitignore_patterns(gitignore_path)
+
+    parts: list[str] = []
+    file_count = 0
+
+    for file in sorted(folder_path.rglob("*")):
+        if not file.is_file():
+            continue
+        # Skip junk directories
+        if any(skip in file.parts for skip in _SKIP_DIRS):
+            continue
+        # Skip files with egg-info in path
+        if any(part.endswith(".egg-info") for part in file.parts):
+            continue
+        # Extension filter
+        if file.suffix not in allowed_exts:
+            continue
+        # Gitignore filter
+        rel = str(file.relative_to(folder_path))
+        if gitignore_patterns and _matches_gitignore(rel, gitignore_patterns):
+            continue
+
+        try:
+            content = file.read_text(errors="replace")
+        except OSError:
+            continue
+
+        parts.append(f"\n\n--- FILE: {rel} ---\n\n{content}\n")
+        file_count += 1
+
+    raw_content = "".join(parts).lstrip("\n")
+
+    if not title:
+        title = folder_path.name.replace("-", " ").replace("_", " ").title()
+    if not body:
+        body = f"Ingested from local folder: {folder_path} ({file_count} files)"
+
+    raw_filename = f"{_slug(title)}-folder.md"
+
+    return wiki_ingest(
+        wiki_root,
+        title=title,
+        body=body,
+        raw_content=raw_content,
+        raw_filename=raw_filename,
+        concepts=concepts,
+        entities=entities,
+        tags=tags,
+    )
+
+
+# ── Ingest from URL ───────────────────────────────────────────────────────────
+
+def wiki_ingest_url(
+    wiki_root: Path,
+    *,
+    url: str,
+    title: str = "",
+    body: str = "",
+    concepts: list[str] | None = None,
+    entities: list[str] | None = None,
+    tags: list[str] | None = None,
+) -> dict[str, list[Path]]:
+    """Fetch a URL and ingest its content into the wiki."""
+    import urllib.request
+    import urllib.error
+    from urllib.parse import urlparse
+
+    with urllib.request.urlopen(url) as response:
+        raw_bytes = response.read()
+    try:
+        raw_content = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        raw_content = raw_bytes.decode("latin-1")
+
+    if not title:
+        m = re.search(r"<title[^>]*>([^<]+)</title>", raw_content, re.IGNORECASE)
+        if m:
+            title = m.group(1).strip()
+        else:
+            parsed = urlparse(url)
+            title = (parsed.hostname or "") + (parsed.path.rstrip("/") or "")
+
+    if not body:
+        body = f"Ingested from URL: {url}"
+
+    parsed = urlparse(url)
+    url_slug = _slug((parsed.hostname or "") + "-" + parsed.path.strip("/").replace("/", "-"))
+    raw_filename = f"{url_slug}.html"
+
+    return wiki_ingest(
+        wiki_root,
+        title=title,
+        body=body,
+        raw_content=raw_content,
+        raw_filename=raw_filename,
+        concepts=concepts,
+        entities=entities,
+        tags=tags,
+    )
+
+
 # ── Query ─────────────────────────────────────────────────────────────────────
 
 def wiki_query(wiki_root: Path, keyword: str) -> list[dict]:

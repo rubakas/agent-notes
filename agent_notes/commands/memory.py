@@ -508,6 +508,102 @@ def do_ingest(title: str, body: str, concepts: Optional[list] = None, entities: 
         print(f"  entity:  {p}")
 
 
+def do_ingest_file(file_path: str, title: str = "", body: str = "",
+                   concepts: Optional[list] = None, entities: Optional[list] = None,
+                   tags: Optional[list] = None) -> None:
+    """Ingest a local file into the wiki backend."""
+    backend, path = _load_memory_config()
+    if backend != "wiki":
+        print("The `ingest-file` subcommand is only available for the wiki backend.")
+        return
+    if path is None:
+        print("Memory path not configured.")
+        return
+    fp = Path(file_path)
+    if not fp.exists():
+        print(f"Error: file not found: {file_path}")
+        exit(1)
+    from ..services.wiki_backend import wiki_ingest_file
+    result = wiki_ingest_file(
+        path,
+        file_path=fp,
+        title=title,
+        body=body,
+        concepts=concepts or [],
+        entities=entities or [],
+        tags=tags or [],
+    )
+    _print_ingest_result(result)
+
+
+def do_ingest_url(url: str, title: str = "", body: str = "",
+                  concepts: Optional[list] = None, entities: Optional[list] = None,
+                  tags: Optional[list] = None) -> None:
+    """Ingest a URL into the wiki backend."""
+    backend, path = _load_memory_config()
+    if backend != "wiki":
+        print("The `ingest-url` subcommand is only available for the wiki backend.")
+        return
+    if path is None:
+        print("Memory path not configured.")
+        return
+    from ..services.wiki_backend import wiki_ingest_url
+    result = wiki_ingest_url(
+        path,
+        url=url,
+        title=title,
+        body=body,
+        concepts=concepts or [],
+        entities=entities or [],
+        tags=tags or [],
+    )
+    _print_ingest_result(result)
+
+
+def do_ingest_folder(folder_path: str, title: str = "", body: str = "",
+                     concepts: Optional[list] = None, entities: Optional[list] = None,
+                     tags: Optional[list] = None) -> None:
+    """Ingest a local folder into the wiki backend."""
+    backend, path = _load_memory_config()
+    if backend != "wiki":
+        print("The `ingest-folder` subcommand is only available for the wiki backend.")
+        return
+    if path is None:
+        print("Memory path not configured.")
+        return
+    fp = Path(folder_path)
+    if not fp.exists():
+        print(f"Error: folder not found: {folder_path}")
+        exit(1)
+    from ..services.wiki_backend import wiki_ingest_folder
+    result = wiki_ingest_folder(
+        path,
+        folder_path=fp,
+        title=title,
+        body=body,
+        concepts=concepts or [],
+        entities=entities or [],
+        tags=tags or [],
+    )
+    _print_ingest_result(result)
+
+
+def _print_ingest_result(result: dict) -> None:
+    source_paths = result.get("source", [])
+    concept_paths = result.get("concepts", [])
+    entity_paths = result.get("entities", [])
+    title = ""
+    if source_paths:
+        title = source_paths[0].stem.replace("-", " ").title()
+    print(f"{Color.GREEN}Ingested: {title}{Color.NC}")
+    for p in source_paths:
+        print(f"  source:  {p}")
+    for p in concept_paths:
+        print(f"  concept: {p}")
+    for p in entity_paths:
+        print(f"  entity:  {p}")
+
+
 def do_query(keyword: str) -> None:
     """Search wiki pages by keyword."""
     backend, path = _load_memory_config()
@@ -796,6 +892,42 @@ def memory(action: str = "list", name: Optional[str] = None, extra: Optional[lis
         entities = [e.strip() for e in entities_csv.split(",") if e.strip()] if entities_csv else None
         tags = [t.strip() for t in tags_csv.split(",") if t.strip()] if tags_csv else None
         do_ingest(name, body, concepts=concepts, entities=entities, tags=tags)
+    elif action == "ingest-file":
+        if not name:
+            print("Error: ingest-file requires a file path.")
+            exit(1)
+        body = extra[0] if extra else ""
+        concepts_csv = extra[1] if extra and len(extra) > 1 else ""
+        entities_csv = extra[2] if extra and len(extra) > 2 else ""
+        tags_csv = extra[3] if extra and len(extra) > 3 else ""
+        concepts = [c.strip() for c in concepts_csv.split(",") if c.strip()] if concepts_csv else None
+        entities = [e.strip() for e in entities_csv.split(",") if e.strip()] if entities_csv else None
+        tags = [t.strip() for t in tags_csv.split(",") if t.strip()] if tags_csv else None
+        do_ingest_file(name, body=body, concepts=concepts, entities=entities, tags=tags)
+    elif action == "ingest-url":
+        if not name:
+            print("Error: ingest-url requires a URL.")
+            exit(1)
+        body = extra[0] if extra else ""
+        concepts_csv = extra[1] if extra and len(extra) > 1 else ""
+        entities_csv = extra[2] if extra and len(extra) > 2 else ""
+        tags_csv = extra[3] if extra and len(extra) > 3 else ""
+        concepts = [c.strip() for c in concepts_csv.split(",") if c.strip()] if concepts_csv else None
+        entities = [e.strip() for e in entities_csv.split(",") if e.strip()] if entities_csv else None
+        tags = [t.strip() for t in tags_csv.split(",") if t.strip()] if tags_csv else None
+        do_ingest_url(name, body=body, concepts=concepts, entities=entities, tags=tags)
+    elif action == "ingest-folder":
+        if not name:
+            print("Error: ingest-folder requires a folder path.")
+            exit(1)
+        body = extra[0] if extra else ""
+        concepts_csv = extra[1] if extra and len(extra) > 1 else ""
+        entities_csv = extra[2] if extra and len(extra) > 2 else ""
+        tags_csv = extra[3] if extra and len(extra) > 3 else ""
+        concepts = [c.strip() for c in concepts_csv.split(",") if c.strip()] if concepts_csv else None
+        entities = [e.strip() for e in entities_csv.split(",") if e.strip()] if entities_csv else None
+        tags = [t.strip() for t in tags_csv.split(",") if t.strip()] if tags_csv else None
+        do_ingest_folder(name, body=body, concepts=concepts, entities=entities, tags=tags)
     elif action == "query":
         if not name:
             print("Error: query requires a keyword.")

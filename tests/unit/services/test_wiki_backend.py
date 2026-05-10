@@ -2,11 +2,16 @@
 import re
 import pytest
 from pathlib import Path
+from unittest.mock import patch, MagicMock
+from urllib.error import URLError
 
 from agent_notes.services.wiki_backend import (
     wiki_init,
     wiki_write_page,
     wiki_ingest,
+    wiki_ingest_file,
+    wiki_ingest_folder,
+    wiki_ingest_url,
     wiki_query,
     wiki_lint,
     wiki_list_pages,
@@ -826,3 +831,223 @@ class TestWikiIntegration:
         results = wiki_query(tmp_path, "Backpropagation")
         assert len(results) >= 1
         assert any(r["type"] == "concepts" for r in results)
+
+
+# ── wiki_ingest_file ──────────────────────────────────────────────────────────
+
+class TestWikiIngestFile:
+    def test_reads_file_and_stores_as_raw_content(self, tmp_path):
+        src = tmp_path / "notes.txt"
+        src.write_text("hello from the file")
+        wiki_ingest_file(tmp_path, file_path=src)
+        raw_files = list((tmp_path / "raw").glob("*"))
+        assert len(raw_files) == 1
+        assert "hello from the file" in raw_files[0].read_text()
+
+    def test_derives_title_from_filename_when_not_provided(self, tmp_path):
+        src = tmp_path / "my-cool-note.txt"
+        src.write_text("content")
+        result = wiki_ingest_file(tmp_path, file_path=src)
+        source_content = result["source"][0].read_text()
+        assert "My Cool Note" in source_content
+
+    def test_uses_provided_title_over_filename(self, tmp_path):
+        src = tmp_path / "irrelevant-name.txt"
+        src.write_text("content")
+        result = wiki_ingest_file(tmp_path, file_path=src, title="Custom Title")
+        source_content = result["source"][0].read_text()
+        assert "Custom Title" in source_content
+
+    def test_uses_file_name_as_raw_filename(self, tmp_path):
+        src = tmp_path / "original.md"
+        src.write_text("data")
+        wiki_ingest_file(tmp_path, file_path=src)
+        assert (tmp_path / "raw" / "original.md").exists()
+
+    def test_passes_concepts_and_entities_to_wiki_ingest(self, tmp_path):
+        src = tmp_path / "doc.txt"
+        src.write_text("text")
+        result = wiki_ingest_file(
+            tmp_path,
+            file_path=src,
+            concepts=["Alpha"],
+            entities=["Bob"],
+        )
+        assert len(result["concepts"]) == 1
+        assert len(result["entities"]) == 1
+
+    def test_raises_on_nonexistent_file(self, tmp_path):
+        missing = tmp_path / "ghost.txt"
+        with pytest.raises((FileNotFoundError, OSError)):
+            wiki_ingest_file(tmp_path, file_path=missing)
+
+    def test_default_body_mentions_file_path(self, tmp_path):
+        src = tmp_path / "myfile.txt"
+        src.write_text("data")
+        result = wiki_ingest_file(tmp_path, file_path=src)
+        source_content = result["source"][0].read_text()
+        assert "myfile.txt" in source_content
+
+
+# ── wiki_ingest_folder ────────────────────────────────────────────────────────
+
+class TestWikiIngestFolder:
+    def test_ingests_all_matching_files_in_folder(self, tmp_path):
+        folder = tmp_path / "project"
+        folder.mkdir()
+        (folder / "a.py").write_text("print('a')")
+        (folder / "b.py").write_text("print('b')")
+        wiki_root = tmp_path / "wiki_root"
+        result = wiki_ingest_folder(wiki_root, folder_path=folder)
+        raw_files = list((wiki_root / "raw").glob("*"))
+        raw_content = raw_files[0].read_text()
+        assert "print('a')" in raw_content
+        assert "print('b')" in raw_content
+
+    def test_skips_pycache_and_git_dirs(self, tmp_path):
+        folder = tmp_path / "project"
+        pycache = folder / "__pycache__"
+        pycache.mkdir(parents=True)
+        (pycache / "cached.py").write_text("cached")
+        git_dir = folder / ".git"
+        git_dir.mkdir(parents=True)
+        (git_dir / "config").write_text("gitconfig")
+        (folder / "real.py").write_text("real code")
+        wiki_root = tmp_path / "wiki_root"
+        wiki_ingest_folder(wiki_root, folder_path=folder)
+        raw_content = (wiki_root / "raw").glob("*")
+        content = next(raw_content).read_text()
+        assert "cached" not in content
+        assert "gitconfig" not in content
+        assert "real code" in content
+
+    def test_respects_extension_filter(self, tmp_path):
+        folder = tmp_path / "project"
+        folder.mkdir()
+        (folder / "script.py").write_text("python code")
+        (folder / "image.png").write_text("binary data")
+        wiki_root = tmp_path / "wiki_root"
+        wiki_ingest_folder(wiki_root, folder_path=folder)
+        raw_file = next((wiki_root / "raw").glob("*"))
+        content = raw_file.read_text()
+        assert "python code" in content
+        assert "binary data" not in content
+
+    def test_custom_extensions_override_defaults(self, tmp_path):
+        folder = tmp_path / "project"
+        folder.mkdir()
+        (folder / "notes.md").write_text("markdown notes")
+        (folder / "data.csv").write_text("csv data")
+        wiki_root = tmp_path / "wiki_root"
+        wiki_ingest_folder(wiki_root, folder_path=folder, extensions=[".csv"])
+        raw_file = next((wiki_root / "raw").glob("*"))
+        content = raw_file.read_text()
+        assert "csv data" in content
+        assert "markdown notes" not in content
+
+    def test_concatenates_files_with_path_headers(self, tmp_path):
+        folder = tmp_path / "project"
+        folder.mkdir()
+        (folder / "alpha.py").write_text("alpha code")
+        wiki_root = tmp_path / "wiki_root"
+        wiki_ingest_folder(wiki_root, folder_path=folder)
+        raw_file = next((wiki_root / "raw").glob("*"))
+        content = raw_file.read_text()
+        assert "--- FILE:" in content
+        assert "alpha.py" in content
+
+    def test_derives_title_from_folder_name(self, tmp_path):
+        folder = tmp_path / "my-project"
+        folder.mkdir()
+        (folder / "f.py").write_text("x")
+        wiki_root = tmp_path / "wiki_root"
+        result = wiki_ingest_folder(wiki_root, folder_path=folder)
+        source_content = result["source"][0].read_text()
+        assert "My Project" in source_content
+
+    def test_respects_gitignore_patterns(self, tmp_path):
+        folder = tmp_path / "project"
+        folder.mkdir()
+        (folder / ".gitignore").write_text("secret.txt\n")
+        (folder / "secret.txt").write_text("do not ingest this")
+        (folder / "public.py").write_text("ingest this")
+        wiki_root = tmp_path / "wiki_root"
+        wiki_ingest_folder(wiki_root, folder_path=folder, respect_gitignore=True)
+        raw_file = next((wiki_root / "raw").glob("*"))
+        content = raw_file.read_text()
+        assert "do not ingest this" not in content
+        assert "ingest this" in content
+
+    def test_empty_folder_still_creates_source_page(self, tmp_path):
+        folder = tmp_path / "empty-project"
+        folder.mkdir()
+        wiki_root = tmp_path / "wiki_root"
+        result = wiki_ingest_folder(wiki_root, folder_path=folder)
+        assert len(result["source"]) == 1
+        assert result["source"][0].exists()
+
+    def test_nonexistent_folder_raises(self, tmp_path):
+        missing = tmp_path / "no-such-folder"
+        wiki_root = tmp_path / "wiki_root"
+        with pytest.raises(FileNotFoundError, match="Folder not found"):
+            wiki_ingest_folder(wiki_root, folder_path=missing)
+
+
+# ── wiki_ingest_url ───────────────────────────────────────────────────────────
+
+def _make_mock_response(content: str, encoding: str = "utf-8") -> MagicMock:
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = content.encode(encoding)
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    return mock_resp
+
+
+class TestWikiIngestUrl:
+    def test_fetches_url_and_stores_content(self, tmp_path):
+        html = "<html><body>page content</body></html>"
+        mock_resp = _make_mock_response(html)
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            wiki_ingest_url(tmp_path, url="http://example.com/page")
+        raw_files = list((tmp_path / "raw").glob("*"))
+        assert len(raw_files) == 1
+        assert "page content" in raw_files[0].read_text()
+
+    def test_extracts_title_from_html_title_tag(self, tmp_path):
+        html = "<html><head><title>My Page Title</title></head><body>body</body></html>"
+        mock_resp = _make_mock_response(html)
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            result = wiki_ingest_url(tmp_path, url="http://example.com/page")
+        source_content = result["source"][0].read_text()
+        assert "My Page Title" in source_content
+
+    def test_falls_back_to_url_for_title_when_no_html_title(self, tmp_path):
+        html = "<html><body>no title tag here</body></html>"
+        mock_resp = _make_mock_response(html)
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            result = wiki_ingest_url(tmp_path, url="http://example.com/some/path")
+        source_content = result["source"][0].read_text()
+        assert "example.com" in source_content
+
+    def test_uses_provided_title_over_extracted(self, tmp_path):
+        html = "<html><head><title>HTML Title</title></head><body>body</body></html>"
+        mock_resp = _make_mock_response(html)
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            result = wiki_ingest_url(tmp_path, url="http://example.com/", title="Override Title")
+        source_content = result["source"][0].read_text()
+        assert "Override Title" in source_content
+        assert "HTML Title" not in source_content
+
+    def test_stores_fetched_content_as_raw(self, tmp_path):
+        html = "<html><body>raw stored content</body></html>"
+        mock_resp = _make_mock_response(html)
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            wiki_ingest_url(tmp_path, url="http://example.com/doc")
+        raw_files = list((tmp_path / "raw").glob("*.html"))
+        assert len(raw_files) == 1
+        assert "raw stored content" in raw_files[0].read_text()
+
+    def test_handles_fetch_error(self, tmp_path):
+        with patch("urllib.request.urlopen", side_effect=URLError("connection refused")):
+            with pytest.raises(URLError):
+                wiki_ingest_url(tmp_path, url="http://unreachable.example.com/")
