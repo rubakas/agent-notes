@@ -72,7 +72,7 @@ def check_missing(scope, registry, issues, fix_actions, scope_state: Optional[Sc
     and legitimately have no files on disk. When ``scope_state`` is None,
     fall back to expecting every registry backend (legacy behavior).
     """
-    from .doctor import Issue, FixAction  # reuse existing classes
+    from .domain.diagnostics import Issue, FixAction
     installed_backends: Optional[set[str]] = None
     if scope_state is not None:
         installed_backends = set(scope_state.clis.keys())
@@ -90,7 +90,7 @@ def check_missing(scope, registry, issues, fix_actions, scope_state: Optional[Sc
 
 def check_broken(scope, registry, issues, fix_actions, scope_state: Optional[ScopeState] = None):
     """Expected files that are broken symlinks."""
-    from .doctor import Issue, FixAction
+    from .domain.diagnostics import Issue, FixAction
     paths_to_check: set[tuple[Path, Path]] = set()
     
     # Expected paths from current dist
@@ -120,7 +120,7 @@ def check_drift(scope, registry, issues, fix_actions, scope_state: Optional[Scop
     
     Only meaningful when install mode was 'copy'. Limit to state.json paths if available.
     """
-    from .doctor import Issue, FixAction
+    from .domain.diagnostics import Issue, FixAction
     if scope_state is None:
         return  # without state.json, we don't know if drift is expected (no manifest)
     
@@ -146,7 +146,7 @@ def check_drift(scope, registry, issues, fix_actions, scope_state: Optional[Scop
 
 def check_stale(scope, scope_state, registry, issues, fix_actions):
     """State-based check: files listed in state.json whose dist source is gone."""
-    from .doctor import Issue, FixAction
+    from .domain.diagnostics import Issue, FixAction
     if scope_state is None:
         return
     
