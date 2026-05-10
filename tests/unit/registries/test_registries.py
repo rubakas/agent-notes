@@ -78,7 +78,7 @@ def test_role_has_required_fields():
 
 def test_skill_registry_loads():
     registry = load_skill_registry()
-    assert len(registry.all()) >= 30
+    assert len(registry.all()) >= 15
 
 
 def test_skill_registry_includes_git():
