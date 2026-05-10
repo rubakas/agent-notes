@@ -4,14 +4,14 @@ Multi-agent development team with cost-optimized model routing for Claude Code.
 
 ## What this plugin installs
 
-**18 specialized agents** with automatic model routing:
+**19 specialized agents** with automatic model routing:
 - Opus — architect, debugger, devil (complex reasoning tasks)
 - Sonnet — coder, reviewer, security-auditor, devops, integrations, refactorer, and more
 - Haiku — explorer, analyst, api-reviewer, tech-writer (fast read-only work)
 
 **11 process discipline skills** (available as `/skill` immediately after install):
 
-Recent additions inspired by [mattpocock/skills](https://github.com/mattpocock/skills):
+Recent additions inspired by [Matt Pocock's skills repo](https://github.com/mattpocock/skills):
 - `grill-me` — interview the user relentlessly until the plan is fully resolved
 - `grill-with-docs` — same, but cross-references CONTEXT.md and ADRs; updates docs inline
 - `caveman` — ultra-compressed reply mode (~75% token savings) for rapid iteration
@@ -50,10 +50,11 @@ agent-notes install
 
 | Feature | Plugin | Full install |
 |---|---|---|
-| 18 specialized agents | ✓ | ✓ |
+| 19 specialized agents | ✓ | ✓ |
 | Process skills (11) | ✓ | ✓ |
 | Session context hook | ✓ | ✓ |
 | Domain skills (Rails, Docker, Git) | — | ✓ |
 | Slash commands (/review /debug /brainstorm) | — | ✓ |
 | User config overrides | — | ✓ |
 | Doctor / health checks | — | ✓ |
+| Memory backends (Local, Obsidian, Wiki) | — | ✓ |

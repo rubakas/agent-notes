@@ -168,6 +168,21 @@ When mirrored, the new Decision participates in the Linking rule above — the a
 
 **Why mirror, not move**: Claude Code's plan-mode requires the local file to exist (the harness reads it on resume and ExitPlanMode writes to it). The Decision note in Obsidian is the navigable canonical record; the local file is the harness's working copy.
 
+## When to use Obsidian backend vs Wiki backend
+
+| Choose Obsidian when... | Choose Wiki when... |
+|---|---|
+| You want category-based organization (Patterns, Decisions, Mistakes) | You want knowledge that compounds (sources → concepts → synthesis) |
+| You need auto-linking between session notes and discoveries | You need the ingest → query → lint workflow |
+| You browse notes visually in Obsidian with backlinks | You're building a team knowledge base |
+| Your memory is about process (what worked, what failed) | Your memory is about domain knowledge (how things work) |
+
+**Process vs domain memory:**
+
+The Obsidian backend focuses on **process memory** — tracking decisions, patterns, and mistakes across sessions. It answers "What did we learn?" and "Why did we choose this?"
+
+The Wiki backend focuses on **domain memory** — compiling source material into a structured, cross-referenced knowledge base that compounds over time. It answers "How does this work?" and "What are the facts?"
+
 ## Read protocol (for team agents)
 
 Any dispatched agent that needs context about the project's current state — recent decisions, patterns, mistakes, or what the lead has done so far — MUST read the Obsidian vault before starting work:
