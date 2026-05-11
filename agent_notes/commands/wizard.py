@@ -295,12 +295,6 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     from ..registries.model_registry import load_model_registry
     from ..registries.role_registry import load_role_registry
 
-    # Evaluate color codes at render time so they're never stale from import-time disable
-    _tty = sys.stdout.isatty()
-    _DIM  = "\033[2m"  if _tty else ""
-    _NC   = "\033[0m"  if _tty else ""
-    _CYAN = "\033[0;36m" if _tty else ""
-
     selected_backends = [b for b in registry.all() if b.name in clis]
     models_registry = load_model_registry()
     role_registry = load_role_registry()
@@ -309,8 +303,8 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     # ── Shared section ────────────────────────────────────────────────────────
     print("")
     scope_label = "Global" if scope == "global" else "Local"
-    print(f"  {_DIM}Scope{_NC}     {scope_label}")
-    print(f"  {_DIM}Mode{_NC}      {'Copy' if copy_mode else 'Symlink'}")
+    print(f"  {Color.DIM}Scope{Color.NC}     {scope_label}")
+    print(f"  {Color.DIM}Mode{Color.NC}      {'Copy' if copy_mode else 'Symlink'}")
 
     if selected_skills:
         all_grouped = {s for gs in skill_groups.values() for s in gs}
@@ -322,7 +316,7 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
         ungrouped = sum(1 for s in selected_skills if s not in all_grouped)
         if ungrouped:
             parts.append(f"Other ({ungrouped})")
-        print(f"  {_DIM}Skills{_NC}    {', '.join(parts) if parts else 'none'}")
+        print(f"  {Color.DIM}Skills{Color.NC}    {', '.join(parts) if parts else 'none'}")
 
     if memory_backend and memory_backend != "none":
         if memory_backend == "obsidian":
@@ -331,22 +325,22 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
             mem_label = f"Obsidian (wiki)  →  {memory_path}" if memory_path else "Obsidian (wiki)"
         else:
             mem_label = "Local markdown"
-        print(f"  {_DIM}Memory{_NC}    {mem_label}")
+        print(f"  {Color.DIM}Memory{Color.NC}    {mem_label}")
 
     # ── Per-CLI sections ──────────────────────────────────────────────────────
     rules_count = _count_rules()
 
     for backend in selected_backends:
-        print(f"\n  {_CYAN}{backend.label}{_NC}")
+        print(f"\n  {Color.CYAN}{backend.label}{Color.NC}")
 
         # Agent roles
         if backend.name in role_models and role_models[backend.name]:
-            print(f"    {_DIM}Agent roles:{_NC}")
+            print(f"    {Color.DIM}Agent roles:{Color.NC}")
             for role_name, model_id in sorted(role_models[backend.name].items()):
                 role = role_map.get(role_name)
                 role_label = role.label if role else role_name
-                role_ansi = (_ROLE_ANSI.get(role.color, "") if role and role.color else "") if _tty else ""
-                colored_role = f"{role_ansi}{role_label}{_NC}" if role_ansi else role_label
+                role_ansi = (_ROLE_ANSI.get(role.color, "") if role and role.color else "") if Color.CYAN else ""
+                colored_role = f"{role_ansi}{role_label}{Color.NC}" if role_ansi else role_label
                 # Pad using visible label length (not raw string length which includes ANSI codes)
                 padding = " " * max(0, 28 - len(role_label))
                 try:
@@ -355,12 +349,12 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
                     alias = prov_alias[1] if prov_alias else model_id
                 except KeyError:
                     alias = model_id
-                print(f"      {colored_role}{padding} {_DIM}{alias}{_NC}")
+                print(f"      {colored_role}{padding} {Color.DIM}{alias}{Color.NC}")
 
         # Agents count
         if backend.supports("agents"):
             n_agents = count_agents(backend)
-            print(f"    {_DIM}Agents:{_NC}      {n_agents}")
+            print(f"    {Color.DIM}Agents:{Color.NC}      {n_agents}")
 
         # Config + Rules
         cfg = _cfg_filename(backend)
@@ -368,7 +362,7 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
             cfg_desc = cfg
             if rules_count:
                 cfg_desc += f" + {rules_count} rules"
-            print(f"    {_DIM}Config:{_NC}      {cfg_desc}")
+            print(f"    {Color.DIM}Config:{Color.NC}      {cfg_desc}")
 
     print("")
 
@@ -458,11 +452,6 @@ def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skill
                             memory_backend=memory_backend, memory_path=memory_path)
 
     # Pre-flight: show which existing files will be backed up
-    _tty = sys.stdout.isatty()
-    _YELLOW = "\033[0;33m" if _tty else ""
-    _DIM    = "\033[2m"    if _tty else ""
-    _NC     = "\033[0m"    if _tty else ""
-
     try:
         manifest = plan_install(
             scope=scope,
@@ -474,11 +463,11 @@ def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skill
         overwrites = [a for a in manifest if a.action == "overwrite"]
         to_install = [a for a in manifest if a.action != "skip"]
 
-        print(f"  {_DIM}Files to install:{_NC}  {len(to_install)}")
+        print(f"  {Color.DIM}Files to install:{Color.NC}  {len(to_install)}")
         if overwrites:
-            print(f"  {_YELLOW}Files to back up ({len(overwrites)}):{_NC}")
+            print(f"  {Color.YELLOW}Files to back up ({len(overwrites)}):{Color.NC}")
             for a in overwrites:
-                print(f"    {_DIM}{a.dst}{_NC}  →  {a.backup_path}")
+                print(f"    {Color.DIM}{a.dst}{Color.NC}  →  {a.backup_path}")
         print("")
     except Exception:
         # Pre-flight is best-effort — log at debug and continue

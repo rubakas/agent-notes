@@ -1,35 +1,11 @@
 """Filesystem primitives."""
 
 import shutil
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-
-# Local color/print helpers to avoid circular import
-class _Color:
-    RED = "\033[0;31m"
-    GREEN = "\033[0;32m"
-    YELLOW = "\033[0;33m"
-    BLUE = "\033[0;34m"
-    MAGENTA = "\033[0;35m"
-    CYAN = "\033[0;36m"
-    WHITE = "\033[0;37m"
-    BOLD = "\033[1m"
-    DIM = "\033[2m"
-    NC = "\033[0m"  # No color
-
-    @staticmethod
-    def disable():
-        """Disable colors (for non-TTY output)."""
-        for attr in ("RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE", "BOLD", "DIM", "NC"):
-            setattr(_Color, attr, "")
-
-
-# Disable colors if not a TTY
-if not sys.stdout.isatty():
-    _Color.disable()
+from .ui import Color as _Color
 
 # Set to True to suppress per-file LINKED/COPIED/SKIP output (e.g. during wizard)
 silent_file_ops = False
@@ -159,7 +135,6 @@ def remove_all_symlinks_in_dir(dir_path: Path, copy_mode: bool = False) -> int:
             count += 1
         elif copy_mode and item.exists():
             if item.is_dir():
-                import shutil
                 shutil.rmtree(item)
             else:
                 item.unlink()

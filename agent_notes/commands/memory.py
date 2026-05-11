@@ -318,14 +318,13 @@ def do_reset(name: Optional[str] = None) -> None:
         print(f"{Color.RED}Warning: this will permanently delete the {target}.{Color.NC}")
         confirm = input("Type 'yes' to confirm: ")
         if confirm == "yes":
-            import shutil as _shutil
             from ..services.wiki_backend import WIKI_PAGE_TYPES
             if name is None:
                 wiki_dir = path / "wiki"
                 for page_type in WIKI_PAGE_TYPES:
                     type_dir = wiki_dir / page_type
                     if type_dir.exists():
-                        _shutil.rmtree(type_dir)
+                        shutil.rmtree(type_dir)
                         type_dir.mkdir()
                 print(f"{Color.GREEN}Wiki at {path} cleared.{Color.NC}")
             else:
@@ -338,7 +337,7 @@ def do_reset(name: Optional[str] = None) -> None:
                 if not type_dir.exists():
                     print(f"No pages found for type '{name}'.")
                     return
-                _shutil.rmtree(type_dir)
+                shutil.rmtree(type_dir)
                 type_dir.mkdir()
                 print(f"{Color.GREEN}Wiki pages for type '{name}' cleared.{Color.NC}")
         else:
@@ -607,7 +606,6 @@ def do_lint() -> None:
 def do_migrate() -> None:
     """Migrate vault from per-project layout to flat shared layout with new filenames."""
     import re
-    import shutil
     from datetime import datetime, timezone
 
     backend, vault = _load_memory_config()
