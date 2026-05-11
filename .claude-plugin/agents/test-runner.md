@@ -43,17 +43,17 @@ When done, report back with:
 
 ## Memory (read-before-work, write-on-discovery)
 
-You are part of a team that shares state via an Obsidian vault at `/Users/en3e/Documents/Obsidian Vault/agent-wiki`.
+You are part of a team that shares state via an Obsidian vault at `/Users/en3e/Obsidian/agent-notes/notes/agent-notes`.
 
 ### Read before working
 
 If the task you've been given references an in-flight initiative, prior decision, recent pattern, or session progress, read the relevant vault files BEFORE you start:
 
-1. `/Users/en3e/Documents/Obsidian Vault/agent-wiki/Index.md` — what's been written and where
-2. `/Users/en3e/Documents/Obsidian Vault/agent-wiki/Sessions/<recent>.md` — current session log if the task is part of an ongoing thread
-3. `/Users/en3e/Documents/Obsidian Vault/agent-wiki/Decisions/` or `Patterns/` or `Mistakes/` — relevant cross-session knowledge
+1. `/Users/en3e/Obsidian/agent-notes/notes/agent-notes/Index.md` — what's been written and where
+2. `/Users/en3e/Obsidian/agent-notes/notes/agent-notes/Sessions/<recent>.md` — current session log if the task is part of an ongoing thread
+3. `/Users/en3e/Obsidian/agent-notes/notes/agent-notes/Decisions/` or `Patterns/` or `Mistakes/` — relevant cross-session knowledge
 
-If `/Users/en3e/Documents/Obsidian Vault/agent-wiki` is "disabled" (memory backend not configured), skip this — proceed without vault context.
+If `/Users/en3e/Obsidian/agent-notes/notes/agent-notes` is "disabled" (memory backend not configured), skip this — proceed without vault context.
 
 Do not duplicate effort. If a recent note already answers the question you'd be investigating, cite it in your report rather than re-deriving.
 
