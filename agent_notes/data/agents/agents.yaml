@@ -195,6 +195,26 @@ agents:
           "grep *": allow
           "git log*": allow
 
+  wiki-compiler:
+    description: "Implements Karpathy's LLM Wiki compile operation. Reads raw source material and writes rich, Wikipedia-style entity/concept pages with domain logic, data models, relationships, and cross-references. Triggers: wiki compile, enrich wiki, deep ingest, knowledge compilation."
+    role: worker
+    mode: subagent
+    color: purple
+    effort: medium
+    claude:
+      tools: "Read, Bash, Grep, Glob"
+      memory: user
+    opencode:
+      permission:
+        edit: deny
+        bash:
+          "*": deny
+          "agent-notes memory *": allow
+          "grep *": allow
+          "find *": allow
+          "head *": allow
+          "wc *": allow
+
   tech-writer:
     description: "Writes and updates documentation including READMEs, API docs, architecture notes, and inline comments. Triggers: documentation, README, docs, changelog, API docs, comment, explain."
     role: scout

@@ -1,13 +1,16 @@
 """Tests for session-id-based scoping in _claude_backend."""
 import json
+import sys
 import uuid
 import io
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from agent_notes.scripts import _claude_backend
+from agent_notes.scripts import cost_report
 
 
 # ── fixture builder ───────────────────────────────────────────────────────────
@@ -363,3 +366,148 @@ class TestConfiguredHeaderLine:
         out = capsys.readouterr().out
 
         assert "Configured:" not in out
+
+
+class TestEnvVarSessionAutoPass:
+    """Tests that cost_report.main() auto-populates session_id from CLAUDE_CODE_SESSION_ID."""
+
+    def test_session_id_from_env_var(self, monkeypatch):
+        """When CLAUDECODE=1 and CLAUDE_CODE_SESSION_ID=abc-123, run is called with session_id='abc-123'."""
+        monkeypatch.setenv("CLAUDECODE", "1")
+        monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "abc-123")
+        monkeypatch.delenv("OPENCODE", raising=False)
+        monkeypatch.delenv("OPENCODE_SESSION_ID", raising=False)
+        monkeypatch.setattr(sys, "argv", ["cost-report"])
+
+        calls = []
+
+        def fake_run(since=None, session_id=None):
+            calls.append({"since": since, "session_id": session_id})
+            return 0
+
+        monkeypatch.setattr("agent_notes.scripts._claude_backend.run", fake_run)
+
+        cost_report.main()
+
+        assert len(calls) == 1
+        assert calls[0]["session_id"] == "abc-123"
+
+    def test_explicit_session_overrides_env_var(self, monkeypatch):
+        """Explicit --session flag wins over CLAUDE_CODE_SESSION_ID."""
+        monkeypatch.setenv("CLAUDECODE", "1")
+        monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "abc-123")
+        monkeypatch.delenv("OPENCODE", raising=False)
+        monkeypatch.delenv("OPENCODE_SESSION_ID", raising=False)
+        monkeypatch.setattr(sys, "argv", ["cost-report", "--session", "explicit-456"])
+
+        calls = []
+
+        def fake_run(since=None, session_id=None):
+            calls.append({"since": since, "session_id": session_id})
+            return 0
+
+        monkeypatch.setattr("agent_notes.scripts._claude_backend.run", fake_run)
+
+        cost_report.main()
+
+        assert len(calls) == 1
+        assert calls[0]["session_id"] == "explicit-456"
+
+
+class TestFindTranscriptDir:
+    """Tests for _find_transcript_dir fallback search."""
+
+    def test_find_transcript_dir_found(self, tmp_path, monkeypatch):
+        """Returns the correct project directory when session JSONL exists."""
+        monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+
+        session_id = "my-session-abc"
+        proj_dir = tmp_path / ".claude" / "projects" / "some-slug"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / f"{session_id}.jsonl").write_text("{}\n")
+
+        result = _claude_backend._find_transcript_dir(session_id)
+
+        assert result == proj_dir
+
+    def test_find_transcript_dir_not_found(self, tmp_path, monkeypatch):
+        """Returns None when the session JSONL does not exist in any project dir."""
+        monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+
+        proj_dir = tmp_path / ".claude" / "projects" / "some-slug"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / "other-session.jsonl").write_text("{}\n")
+
+        result = _claude_backend._find_transcript_dir("nonexistent-session-id")
+
+        assert result is None
+
+    def test_find_transcript_dir_no_projects_dir(self, tmp_path, monkeypatch):
+        """Returns None gracefully when ~/.claude/projects/ doesn't exist at all."""
+        monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+
+        # No .claude/projects directory created
+        result = _claude_backend._find_transcript_dir("any-session-id")
+
+        assert result is None
+
+
+class TestRunFallbackSearch:
+    """Tests that run() uses .resolve() and falls back to _find_transcript_dir."""
+
+    def test_run_falls_back_to_search(self, tmp_path, monkeypatch, capsys):
+        """When slug-based dir doesn't exist, run() finds transcript via _find_transcript_dir."""
+        session_id = str(uuid.uuid4())
+
+        # Create a project dir with a slug that will NOT match cwd's slug
+        real_proj_dir = tmp_path / ".claude" / "projects" / "some-other-project-slug"
+        real_proj_dir.mkdir(parents=True)
+        jsonl = real_proj_dir / f"{session_id}.jsonl"
+        jsonl.write_text(json.dumps(_assistant_msg()) + "\n")
+
+        # Point home at tmp_path so ~/.claude resolves there
+        monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+        # cwd resolves to a path whose slug will NOT match "some-other-project-slug"
+        monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path / "completely-different"))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+                            lambda: tmp_path / "nonexistent-state.json")
+
+        result = _claude_backend.run(session_id=session_id)
+        out = capsys.readouterr().out
+
+        assert "No Claude Code transcript found" not in out
+        assert session_id in out
+
+    def test_run_with_resolve(self, tmp_path, monkeypatch, capsys):
+        """run() uses .resolve() on cwd — a symlinked path resolves to real path's slug."""
+        session_id = str(uuid.uuid4())
+
+        # The real resolved path
+        real_dir = tmp_path / "real"
+        real_dir.mkdir()
+
+        # Slug is derived from the resolved path
+        resolved_slug = str(real_dir).replace("/", "-")
+        proj_dir = tmp_path / ".claude" / "projects" / resolved_slug
+        proj_dir.mkdir(parents=True)
+        jsonl = proj_dir / f"{session_id}.jsonl"
+        jsonl.write_text(json.dumps(_assistant_msg()) + "\n")
+
+        # cwd() returns a mock whose .resolve() returns real_dir
+        class FakePath:
+            def __str__(self):
+                return str(real_dir / "symlink-name")  # pre-resolve path
+
+            def resolve(self):
+                return real_dir  # post-resolve path
+
+        monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: FakePath()))
+        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+                            lambda: tmp_path / "nonexistent-state.json")
+
+        result = _claude_backend.run(session_id=session_id)
+        out = capsys.readouterr().out
+
+        assert "No Claude Code transcript found" not in out
+        assert session_id in out

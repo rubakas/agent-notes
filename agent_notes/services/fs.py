@@ -1,35 +1,11 @@
 """Filesystem primitives."""
 
 import shutil
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-
-# Local color/print helpers to avoid circular import
-class _Color:
-    RED = "\033[0;31m"
-    GREEN = "\033[0;32m"
-    YELLOW = "\033[0;33m"
-    BLUE = "\033[0;34m"
-    MAGENTA = "\033[0;35m"
-    CYAN = "\033[0;36m"
-    WHITE = "\033[0;37m"
-    BOLD = "\033[1m"
-    DIM = "\033[2m"
-    NC = "\033[0m"  # No color
-
-    @staticmethod
-    def disable():
-        """Disable colors (for non-TTY output)."""
-        for attr in ("RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE", "BOLD", "DIM", "NC"):
-            setattr(_Color, attr, "")
-
-
-# Disable colors if not a TTY
-if not sys.stdout.isatty():
-    _Color.disable()
+from .ui import Color as _Color
 
 # Set to True to suppress per-file LINKED/COPIED/SKIP output (e.g. during wizard)
 silent_file_ops = False
@@ -51,7 +27,8 @@ def _linked(path: str) -> None:
 
 
 def _removed(path: str) -> None:
-    print(f"  {_Color.GREEN}REMOVED{_Color.NC}  {path}")
+    if not silent_file_ops:
+        print(f"  {_Color.GREEN}REMOVED{_Color.NC}  {path}")
 
 
 def files_identical(a: Path, b: Path) -> bool:
@@ -129,35 +106,43 @@ def place_dir_contents(src_dir: Path, dst_dir: Path, pattern: str, copy_mode: bo
             place_file(src_file, dst_file, copy_mode)
 
 
-def remove_symlink(target: Path, copy_mode: bool = False) -> None:
-    """Remove symlink if it exists. In copy_mode, also removes plain files (managed installs)."""
+def remove_symlink(target: Path, copy_mode: bool = False) -> bool:
+    """Remove symlink if it exists. In copy_mode, also removes plain files (managed installs).
+    Returns True if something was removed, False otherwise."""
     if target.is_symlink():
         target.unlink()
         _removed(str(target))
+        return True
     elif copy_mode and target.exists():
         target.unlink()
         _removed(str(target))
+        return True
     elif target.exists():
         _skipped(str(target))
+    return False
 
 
-def remove_all_symlinks_in_dir(dir_path: Path, copy_mode: bool = False) -> None:
-    """Remove all symlinks in a directory. In copy_mode, also removes plain files (managed installs)."""
+def remove_all_symlinks_in_dir(dir_path: Path, copy_mode: bool = False) -> int:
+    """Remove all symlinks in a directory. In copy_mode, also removes plain files (managed installs).
+    Returns the count of removed items."""
     if not dir_path.exists():
-        return
+        return 0
+    count = 0
     for item in dir_path.iterdir():
         if item.is_symlink():
             item.unlink()
             _removed(str(item))
+            count += 1
         elif copy_mode and item.exists():
             if item.is_dir():
-                import shutil
                 shutil.rmtree(item)
             else:
                 item.unlink()
             _removed(str(item))
+            count += 1
         elif item.exists():
             _skipped(str(item))
+    return count
 
 
 def remove_dir_if_empty(dir_path: Path) -> None:

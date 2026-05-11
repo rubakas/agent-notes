@@ -69,10 +69,10 @@ def show_info() -> None:
                     if counts:
                         backend_summaries.append(f"{backend_name} ({', '.join(counts)})")
                 if backend_summaries:
-                    print(f"            Backends: {', '.join(backend_summaries)}")
+                    print(f"            Storage: {', '.join(backend_summaries)}")
         else:
             print("  Global:   none")
-        
+
         # Local installs
         if st.local_installs:
             for project_path, ls in sorted(st.local_installs.items()):
@@ -87,6 +87,6 @@ def show_info() -> None:
                         if counts:
                             backend_summaries.append(f"{backend_name} ({', '.join(counts)})")
                     if backend_summaries:
-                        print(f"            Backends: {', '.join(backend_summaries)}")
+                        print(f"            Storage: {', '.join(backend_summaries)}")
         else:
             print("  Local:    none")

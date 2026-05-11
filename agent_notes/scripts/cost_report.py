@@ -14,7 +14,7 @@ def _opencode_active() -> bool:
 
 def _by_recency(since: float | None = None, session_id: str | None = None) -> int:
     """Fallback: pick whichever backend's data is newer."""
-    slug = str(Path.cwd()).replace("/", "-")
+    slug = str(Path.cwd().resolve()).replace("/", "-")
     proj = Path.home() / ".claude" / "projects" / slug
     claude_mtime = 0.0
     if proj.exists():
@@ -107,6 +107,8 @@ def main() -> int:
         session_id = None
 
     if os.environ.get("CLAUDECODE") or os.environ.get("CLAUDE_CODE_ENTRYPOINT"):
+        if session_id is None:
+            session_id = os.environ.get("CLAUDE_CODE_SESSION_ID")
         return _claude_backend.run(since=since, session_id=session_id)
     if _opencode_active():
         if since is not None:

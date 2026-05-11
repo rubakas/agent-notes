@@ -24,6 +24,8 @@ from typing import Optional
 
 WIKI_PAGE_TYPES = ["sources", "concepts", "entities", "synthesis", "sessions"]
 
+_RAW_CHUNK_MAX = 2 * 1024 * 1024  # 2 MB
+
 # Re-use helpers from memory_backend rather than duplicating them
 from .memory_backend import (
     _slug,
@@ -38,6 +40,9 @@ from .memory_backend import (
 def wiki_init(wiki_root: Path) -> None:
     """Create raw/, wiki/ tree with all subdirs, seed index.md and log.md."""
     (wiki_root / "raw").mkdir(parents=True, exist_ok=True)
+    ignore_path = wiki_root / ".obsidianignore"
+    if not ignore_path.exists():
+        _atomic_write(ignore_path, "raw/\n")
     wiki_dir = wiki_root / "wiki"
     wiki_dir.mkdir(parents=True, exist_ok=True)
     for sub in WIKI_PAGE_TYPES:
@@ -65,6 +70,7 @@ def wiki_write_page(
     tags: list[str] | None = None,
     aliases: list[str] | None = None,
     sources: list[str] | None = None,
+    confidence: str | None = None,
 ) -> Path:
     """Write or update a wiki page.
 
@@ -102,6 +108,7 @@ def wiki_write_page(
             tags=merged_tags,
             aliases=merged_aliases,
             sources=sources or _parse_list_field(fm.get("sources", "")),
+            confidence=confidence or fm.get("confidence", ""),
         )
         new_content = new_fm + existing_body.rstrip() + f"\n\n## Update {now}\n\n{body}\n"
         _atomic_write(page_path, new_content)
@@ -118,6 +125,7 @@ def wiki_write_page(
             tags=tags or [],
             aliases=aliases or [],
             sources=sources or [],
+            confidence=confidence or "",
         )
         _atomic_write(page_path, content)
         action_label = "created"
@@ -144,9 +152,11 @@ def wiki_ingest(
     body: str,
     raw_content: str = "",
     raw_filename: str = "",
+    raw_files: list[tuple[str, str]] | None = None,
     concepts: list[str] | None = None,
     entities: list[str] | None = None,
     tags: list[str] | None = None,
+    confidence: str | None = None,
 ) -> dict[str, list[Path]]:
     """Ingest a source: store raw, create source page, fan out to concepts/entities.
 
@@ -157,13 +167,18 @@ def wiki_ingest(
     result: dict[str, list[Path]] = {"source": [], "concepts": [], "entities": []}
 
     # Store raw content
-    raw_ref = ""
-    if raw_content:
+    raw_refs: list[str] = []
+    if raw_files:
+        for fname, fcontent in raw_files:
+            raw_path = wiki_root / "raw" / fname
+            _atomic_write(raw_path, fcontent)
+            raw_refs.append(f"raw/{fname}")
+    elif raw_content:
         if not raw_filename:
             raw_filename = f"{_slug(title)}.md"
         raw_path = wiki_root / "raw" / raw_filename
         _atomic_write(raw_path, raw_content)
-        raw_ref = f"raw/{raw_filename}"
+        raw_refs.append(f"raw/{raw_filename}")
 
     # Create/update source page
     source_path = wiki_write_page(
@@ -172,7 +187,8 @@ def wiki_ingest(
         body=body,
         page_type="sources",
         tags=tags or [],
-        sources=[raw_ref] if raw_ref else [],
+        sources=raw_refs if raw_refs else [],
+        confidence=confidence,
     )
     result["source"].append(source_path)
 
@@ -184,6 +200,7 @@ def wiki_ingest(
             body=f"Referenced from source: [[{_slug(title)}]]",
             page_type="concepts",
             tags=tags or [],
+            confidence=confidence,
         )
         result["concepts"].append(cp)
 
@@ -195,6 +212,7 @@ def wiki_ingest(
             body=f"Referenced from source: [[{_slug(title)}]]",
             page_type="entities",
             tags=tags or [],
+            confidence=confidence,
         )
         result["entities"].append(ep)
 
@@ -235,6 +253,41 @@ def wiki_ingest_file(
         title = file_path.stem.replace("-", " ").replace("_", " ").title()
     if not body:
         body = f"Ingested from local file: {file_path}"
+
+    if len(raw_content.encode()) > _RAW_CHUNK_MAX:
+        slug = _slug(title)
+        lines = raw_content.split("\n")
+        chunks: list[tuple[str, str]] = []
+        current_lines: list[str] = []
+        current_size = 0
+
+        for line in lines:
+            line_size = len(line.encode()) + 1
+            if current_lines and current_size + line_size > _RAW_CHUNK_MAX:
+                chunk_num = len(chunks) + 1
+                fname = f"{slug}-{chunk_num:03d}.md"
+                chunks.append((fname, "\n".join(current_lines)))
+                current_lines = [line]
+                current_size = line_size
+            else:
+                current_lines.append(line)
+                current_size += line_size
+
+        if current_lines:
+            chunk_num = len(chunks) + 1
+            fname = f"{slug}-{chunk_num:03d}.md"
+            chunks.append((fname, "\n".join(current_lines)))
+
+        return wiki_ingest(
+            wiki_root,
+            title=title,
+            body=body,
+            raw_files=chunks,
+            concepts=concepts,
+            entities=entities,
+            tags=tags,
+        )
+
     return wiki_ingest(
         wiki_root,
         title=title,
@@ -340,8 +393,42 @@ def wiki_ingest_folder(
     if not body:
         body = f"Ingested from local folder: {folder_path} ({file_count} files)"
 
-    raw_filename = f"{_slug(title)}-folder.md"
+    slug = _slug(title)
 
+    # Chunk if total size exceeds threshold
+    if len(raw_content.encode()) > _RAW_CHUNK_MAX:
+        chunks: list[tuple[str, str]] = []
+        current_chunk: list[str] = []
+        current_size = 0
+
+        for part in parts:
+            part_size = len(part.encode())
+            if current_chunk and current_size + part_size > _RAW_CHUNK_MAX:
+                chunk_num = len(chunks) + 1
+                fname = f"{slug}-folder-{chunk_num:03d}.md"
+                chunks.append((fname, "".join(current_chunk).lstrip("\n")))
+                current_chunk = [part]
+                current_size = part_size
+            else:
+                current_chunk.append(part)
+                current_size += part_size
+
+        if current_chunk:
+            chunk_num = len(chunks) + 1
+            fname = f"{slug}-folder-{chunk_num:03d}.md"
+            chunks.append((fname, "".join(current_chunk).lstrip("\n")))
+
+        return wiki_ingest(
+            wiki_root,
+            title=title,
+            body=body,
+            raw_files=chunks,
+            concepts=concepts,
+            entities=entities,
+            tags=tags,
+        )
+
+    raw_filename = f"{slug}-folder.md"
     return wiki_ingest(
         wiki_root,
         title=title,
@@ -450,14 +537,66 @@ def wiki_query(wiki_root: Path, keyword: str) -> list[dict]:
     return results
 
 
+# ── Raw scan ─────────────────────────────────────────────────────────────────
+
+def wiki_scan_raw(wiki_root: Path) -> list[dict]:
+    """Scan raw/ for files not yet referenced by any source page.
+
+    Returns list of dicts: {group: str, files: [str], total_size: int}.
+    Groups chunks by prefix (e.g. portal-domcap-001.md .. -017.md → group "portal-domcap").
+    """
+    import re
+
+    raw_dir = wiki_root / "raw"
+    if not raw_dir.exists():
+        return []
+
+    # Collect all raw refs from source pages
+    sources_dir = wiki_root / "wiki" / "sources"
+    known_refs: set[str] = set()
+    if sources_dir.exists():
+        for page in sources_dir.glob("*.md"):
+            try:
+                text = page.read_text()
+            except OSError:
+                continue
+            fm, _ = _parse_frontmatter(text)
+            for ref in _parse_list_field(fm.get("sources", "")):
+                known_refs.add(ref)
+
+    # Find unprocessed raw files
+    unprocessed: dict[str, list[Path]] = {}
+    chunk_re = re.compile(r"^(.+?)(?:-folder)?-(\d{3})\.md$")
+
+    for f in sorted(raw_dir.iterdir()):
+        if not f.is_file():
+            continue
+        ref = f"raw/{f.name}"
+        if ref in known_refs:
+            continue
+
+        m = chunk_re.match(f.name)
+        group = m.group(1) if m else f.stem
+        unprocessed.setdefault(group, []).append(f)
+
+    return [
+        {
+            "group": group,
+            "files": [f.name for f in files],
+            "total_size": sum(f.stat().st_size for f in files),
+        }
+        for group, files in unprocessed.items()
+    ]
+
+
 # ── Lint ──────────────────────────────────────────────────────────────────────
 
 def wiki_lint(wiki_root: Path) -> dict[str, list]:
     """Check wiki health.
 
-    Returns {orphans: [...], broken_links: [...], stale_index: [...]}.
+    Returns {orphans: [...], broken_links: [...], stale_index: [...], needs_compilation: [...]}.
     """
-    issues: dict[str, list] = {"orphans": [], "broken_links": [], "stale_index": []}
+    issues: dict[str, list] = {"orphans": [], "broken_links": [], "stale_index": [], "needs_compilation": []}
 
     if not wiki_root.exists():
         return issues
@@ -492,6 +631,26 @@ def wiki_lint(wiki_root: Path) -> dict[str, list]:
         for page_path in all_pages:
             if page_path.stat().st_mtime > index_mtime:
                 issues["stale_index"].append(str(page_path))
+
+    # Check for stub pages that need compilation (concepts and entities only)
+    _stub_pattern = re.compile(r"^\s*Referenced from source:\s*\[\[[^\]]+\]\]\s*$", re.MULTILINE)
+    for stub_type in ("concepts", "entities"):
+        folder = wiki_dir / stub_type
+        if not folder.exists():
+            continue
+        for page_path in sorted(folder.glob("*.md")):
+            try:
+                text = page_path.read_text()
+            except OSError:
+                continue
+            _, body = _parse_frontmatter(text)
+            # Strip ## Related and ## Update sections
+            stripped = re.split(r"\n## (?:Related|Update\b)", body)[0]
+            # Strip H1 heading line
+            stripped = re.sub(r"^#[^\n]*\n", "", stripped, count=1)
+            stripped = stripped.strip()
+            if not stripped or _stub_pattern.match(stripped):
+                issues["needs_compilation"].append(str(page_path))
 
     return issues
 
@@ -751,6 +910,7 @@ def _build_page_frontmatter(
     tags: list[str],
     aliases: list[str],
     sources: list[str],
+    confidence: str = "",
 ) -> str:
     lines = ["---", f"created_at: {created_at}", f"updated_at: {updated_at}", f"type: {page_type}"]
     if tags:
@@ -766,6 +926,8 @@ def _build_page_frontmatter(
         lines.append(f"agent: {agent}")
     if project:
         lines.append(f"project: {project}")
+    if confidence:
+        lines.append(f'confidence: "{confidence}"')
     lines.append("---")
     lines.append("")
     return "\n".join(lines)
@@ -783,6 +945,7 @@ def _build_page_content(
     tags: list[str],
     aliases: list[str],
     sources: list[str],
+    confidence: str = "",
 ) -> str:
     fm = _build_page_frontmatter(
         created_at=created_at,
@@ -793,6 +956,7 @@ def _build_page_content(
         tags=tags,
         aliases=aliases,
         sources=sources,
+        confidence=confidence,
     )
     return fm + f"# {title}\n\n{body}\n\n## Related\n\n"
 

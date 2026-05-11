@@ -99,13 +99,27 @@ def _ts_to_iso(ts: float) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _find_transcript_dir(session_id: str) -> Path | None:
+    projects_dir = Path.home() / ".claude" / "projects"
+    if not projects_dir.exists():
+        return None
+    target = f"{session_id}.jsonl"
+    for proj_dir in projects_dir.iterdir():
+        if proj_dir.is_dir() and (proj_dir / target).exists():
+            return proj_dir
+    return None
+
+
 def run(since: float | None = None, session_id: str | None = None) -> int:
-    slug = str(Path.cwd()).replace("/", "-")
+    slug = str(Path.cwd().resolve()).replace("/", "-")
     transcript_dir = Path.home() / ".claude" / "projects" / slug
 
     if not transcript_dir.exists():
-        print("No Claude Code transcript found for this project")
-        return 0
+        if session_id:
+            transcript_dir = _find_transcript_dir(session_id)
+        if not transcript_dir or not transcript_dir.exists():
+            print("No Claude Code transcript found for this project")
+            return 0
 
     if session_id is not None:
         transcript_file = transcript_dir / f"{session_id}.jsonl"

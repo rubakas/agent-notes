@@ -1,6 +1,6 @@
 ---
 name: obsidian-memory
-description: "Save and retrieve agent memory in the Obsidian vault using agent-notes CLI. Defines the single record format for all memory notes. Use when saving decisions, patterns, or session state to the vault."
+description: "Save and retrieve agent memory in the Obsidian vault using agent-notes CLI. Defines the single record format for all memory notes. Use when saving decisions, patterns, or session state to the vault, or when ingesting URLs, files, or folders into the wiki brain."
 group: process
 ---
 
@@ -101,21 +101,24 @@ Do NOT save:
 ```bash
 agent-notes memory list              # all notes by category
 agent-notes memory show <agent>      # one agent's notes
-agent-notes memory vault             # confirm backend and path
+agent-notes memory vault             # confirm storage and path
 ```
 
 The vault is structured as:
 ```
-vault/agent-notes/
-├── Patterns/     — reusable solutions        YYYY-MM-DD_<slug>.md
-├── Decisions/    — architectural choices     YYYY-MM-DD_<slug>.md
-├── Mistakes/     — errors to avoid           YYYY-MM-DD_<slug>.md
-├── Context/      — project background        YYYY-MM-DD_<slug>.md
-├── Sessions/     — one file per session      YYYY-MM-DD_<session-id>.md
-└── Index.md      — chronological list, newest first
+vault/agent-notes/notes/
+├── <project-name>/
+│   ├── Patterns/     — reusable solutions        YYYY-MM-DD_<slug>.md
+│   ├── Decisions/    — architectural choices     YYYY-MM-DD_<slug>.md
+│   ├── Mistakes/     — errors to avoid           YYYY-MM-DD_<slug>.md
+│   ├── Context/      — project background        YYYY-MM-DD_<slug>.md
+│   ├── Sessions/     — one file per session      YYYY-MM-DD_<session-id>.md
+│   └── Index.md      — chronological list, newest first
+└── <another-project>/
+    └── ...
 ```
 
-The root `agent-notes/` is shared across all projects — there is no per-project subfolder.
+Where `<project-name>` is the last component of the current working directory (`Path.cwd().name`). Each project gets its own isolated subfolder.
 
 ## Regenerate the index
 
@@ -154,21 +157,21 @@ This is done in the same `agent-notes memory add` call — no second call is nee
 
 The session note becomes the navigable hub for everything written during the session without any extra work from the agent.
 
-**Backend conditional**: auto-linking only applies when the configured memory backend is Obsidian. On the local backend, there are no wikilinks and this step is a no-op.
+**Backend conditional**: auto-linking only applies when the configured memory storage is Obsidian. On local storage, there are no wikilinks and this step is a no-op.
 
-## Plan-mirror rule (Obsidian backend only)
+## Plan-mirror rule (Obsidian storage only)
 
 After every Claude Code `ExitPlanMode` invocation:
 
-1. Check the configured memory backend. The SKILL substitutes `{{MEMORY_PATH}}` at build time; if it resolves to a path under a vault, the backend is Obsidian.
+1. Check the configured memory storage. The SKILL substitutes `{{MEMORY_PATH}}` at build time; if it resolves to a path under a vault, the storage is Obsidian.
 2. If Obsidian: write the plan content as a Decision note via `agent-notes memory add "<plan-title>" "<plan-body>" decision lead`. The local plan file at `~/.claude/plans/<file>.md` stays for harness compatibility.
-3. If local backend or memory disabled: skip the mirror entirely. The plan stays at its harness path; nothing else needs to happen.
+3. If local storage or memory disabled: skip the mirror entirely. The plan stays at its harness path; nothing else needs to happen.
 
 When mirrored, the new Decision participates in the Linking rule above — the active session note (if any) gets a wikilink to it.
 
 **Why mirror, not move**: Claude Code's plan-mode requires the local file to exist (the harness reads it on resume and ExitPlanMode writes to it). The Decision note in Obsidian is the navigable canonical record; the local file is the harness's working copy.
 
-## When to use Obsidian backend vs Wiki backend
+## When to use Obsidian storage vs Wiki storage
 
 | Choose Obsidian when... | Choose Wiki when... |
 |---|---|
@@ -179,9 +182,9 @@ When mirrored, the new Decision participates in the Linking rule above — the a
 
 **Process vs domain memory:**
 
-The Obsidian backend focuses on **process memory** — tracking decisions, patterns, and mistakes across sessions. It answers "What did we learn?" and "Why did we choose this?"
+Obsidian storage focuses on **process memory** — tracking decisions, patterns, and mistakes across sessions. It answers "What did we learn?" and "Why did we choose this?"
 
-The Wiki backend focuses on **domain memory** — compiling source material into a structured, cross-referenced knowledge base that compounds over time. It answers "How does this work?" and "What are the facts?"
+Wiki storage focuses on **domain memory** — compiling source material into a structured, cross-referenced knowledge base that compounds over time. It answers "How does this work?" and "What are the facts?"
 
 ## Read protocol (for team agents)
 
@@ -194,3 +197,91 @@ Any dispatched agent that needs context about the project's current state — re
 The vault path is substituted into agent prompts at build time as `{{MEMORY_PATH}}`. If `{{MEMORY_PATH}}` resolves to "disabled", skip this protocol — memory is not configured.
 
 Agents do NOT need bash access for this; the vault is plain Markdown readable with the `Read` tool.
+
+## Ingest workflow
+
+Ingest external sources into the wiki brain for persistent, queryable knowledge.
+
+The user provides one of:
+- A **URL** (starts with `http://` or `https://`)
+- A **file path** (path to a single file)
+- A **folder path** (path to a directory)
+
+### Step 1 — Fetch the source
+
+| Source type | How to read |
+|---|---|
+| URL | Use `WebFetch` tool to retrieve the page content |
+| File | Use `Read` tool to read the file |
+| Folder | Use `Bash` to list files (`find <path> -type f`), then `Read` key files. Skip: `__pycache__`, `.git`, `node_modules`, `.venv`, `dist`, `build`, `.egg-info` |
+
+### Step 2 — AI analysis
+
+Analyze the content and extract:
+
+1. **Title** — a concise, descriptive name for this source
+2. **Summary** — 2-5 sentence overview of what this source contains and why it matters
+3. **Concepts** — key ideas, patterns, techniques, or abstractions (e.g., "dependency injection", "event sourcing", "fan-out pattern")
+4. **Entities** — specific named things: tools, libraries, people, projects, APIs (e.g., "PostgreSQL", "Karpathy", "wiki_backend.py")
+5. **Tags** — categorization labels (e.g., "python", "architecture", "api")
+
+### Step 3 — Ingest via CLI
+
+Call the single ingest command regardless of source type:
+
+```bash
+agent-notes memory ingest "<title>" "<summary>" "<concepts_csv>" "<entities_csv>" "<tags_csv>"
+```
+
+This creates the source page and fans out to concept and entity pages with cross-references. Note: raw content archiving is not available via CLI — the AI summary is the stored knowledge.
+
+### Step 4 — Report
+
+After ingestion, report to the user:
+- What was ingested (title, source type)
+- Key concepts and entities extracted
+- Number of wiki pages created/updated
+
+### Example
+
+User: `/ingest https://karpathy.github.io/2023/01/20/llm-wiki/`
+
+1. Fetch URL with WebFetch
+2. Analyze: Title="LLM Wiki by Karpathy", Summary="Proposes using LLMs to maintain personal knowledge wikis...", Concepts=["LLM Wiki", "knowledge management", "fan-out pattern"], Entities=["Andrej Karpathy"], Tags=["ai", "knowledge-management"]
+3. Run: `agent-notes memory ingest "LLM Wiki by Karpathy" "Proposes using LLMs to maintain personal knowledge wikis..." "LLM Wiki,knowledge management,fan-out pattern" "Andrej Karpathy" "ai,knowledge-management"`
+4. Report results
+
+### No-args mode — Karpathy compile operation
+
+When `/ingest` is called with no arguments, it triggers the Karpathy LLM Wiki **compile operation**: read raw sources, write rich wiki pages, cross-reference everything.
+
+**Step 1 — Scan**:
+```bash
+agent-notes memory ingest
+```
+Lists unprocessed raw file groups.
+
+**Step 2 — Inventory existing pages**: Read existing concept/entity pages. Identify stubs (body is just "Referenced from source") that need compilation.
+
+**Step 3 — Group by domain**: Cluster related concepts into batches of 5-10 for focused compilation. Examples:
+- Payments: ACH processing, wire approvals, reconciliation, mass payments
+- Real estate: deal management, construction draws, loan servicing, extensions
+- Integrations: DocuSign, Plaid, Slack, HubSpot
+
+**Step 4 — Dispatch wiki-compiler**: For each domain batch, dispatch the `wiki-compiler` agent:
+```
+wiki-compiler: "Compile these concepts from raw source material: [concept list].
+Wiki root: <path>. Raw chunks: portal-domcap-001.md through -017.md.
+Read the code, write rich Wikipedia-style pages."
+```
+
+The wiki-compiler greps raw chunks for relevant code, reads it, and writes rich pages via `agent-notes memory add`.
+
+**Step 5 — Synthesis**: After all batches complete, create synthesis pages for cross-cutting themes:
+- "Payment Architecture" — how ACH and wire flows connect
+- "Deal Lifecycle" — from origination to payoff
+- "Notification System" — email, Slack, task assignment integration
+
+Use: `agent-notes memory add "<title>" "<body>" synthesis lead`
+
+**Step 6 — Lint**: Run `agent-notes memory lint` to verify wiki health — no broken links, orphan pages, or stubs remaining.

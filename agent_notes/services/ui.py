@@ -1,5 +1,7 @@
 """Terminal UI primitives."""
 
+import os
+import glob
 import sys
 import shutil
 from pathlib import Path
@@ -14,7 +16,7 @@ except ImportError:
 
 # Export for backward compatibility
 __all__ = ['Color', 'ok', 'warn', 'fail', 'error', 'info', 'issue', 'linked', 'removed', 'skipped',
-           '_safe_input', '_can_interactive', '_read_key', '_checkbox_select', '_radio_select',
+           '_safe_input', '_path_input', '_can_interactive', '_read_key', '_checkbox_select', '_radio_select',
            '_checkbox_select_fallback', '_radio_select_fallback', '_HAS_TTY',
            '_clear_screen', '_render_step_header', '_render_nav_footer', '_terminal_width']
 
@@ -132,6 +134,39 @@ def _safe_input(prompt: str, default: str = "") -> str:
     except (KeyboardInterrupt, EOFError):
         print("\nInstallation cancelled.")
         sys.exit(0)
+
+
+def _path_input(prompt: str, default: str = "") -> str:
+    """Input with filesystem tab-completion. Falls back to _safe_input."""
+    try:
+        import readline
+    except ImportError:
+        return _safe_input(prompt, default)
+
+    def _path_completer(text: str, state: int):
+        expanded = os.path.expanduser(text)
+        if os.path.isdir(expanded) and not expanded.endswith(os.sep):
+            expanded += os.sep
+        matches = glob.glob(expanded + "*")
+        dirs = [m + os.sep if os.path.isdir(m) else m for m in matches]
+        if text.startswith("~"):
+            home = os.path.expanduser("~")
+            dirs = ["~" + d[len(home):] for d in dirs]
+        return dirs[state] if state < len(dirs) else None
+
+    old_completer = readline.get_completer()
+    old_delims = readline.get_completer_delims()
+    try:
+        readline.set_completer(_path_completer)
+        readline.set_completer_delims(" \t\n")
+        if "libedit" in getattr(readline, "__doc__", "") or "":
+            readline.parse_and_bind("bind ^I rl_complete")
+        else:
+            readline.parse_and_bind("tab: complete")
+        return _safe_input(prompt, default)
+    finally:
+        readline.set_completer(old_completer)
+        readline.set_completer_delims(old_delims)
 
 
 def _can_interactive() -> bool:

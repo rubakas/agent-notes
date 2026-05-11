@@ -19,16 +19,19 @@ def _load_memory_config():
 
 
 def do_vault() -> None:
-    """Show current backend and memory path."""
+    """Show current storage and memory path."""
     backend, path = _load_memory_config()
     if backend == "none":
-        print("Memory backend: disabled (none)")
+        print("Memory storage: disabled")
         return
     if backend == "obsidian":
-        print(f"Memory backend: obsidian")
+        print(f"Memory storage: obsidian")
         print(f"Vault path:     {path}")
+    elif backend == "wiki":
+        print(f"Memory storage: wiki")
+        print(f"Wiki path:      {path}")
     else:
-        print(f"Memory backend: local")
+        print(f"Memory storage: local")
         print(f"Memory path:    {path}")
     initialized = path is not None and path.exists()
     print(f"Initialized:    {'yes' if initialized else 'no — run: agent-notes memory init'}")
@@ -38,7 +41,7 @@ def do_init() -> None:
     """Initialize the memory vault — create folder structure and Index.md."""
     backend, path = _load_memory_config()
     if backend == "none":
-        print("Memory is disabled. Re-run `agent-notes install` and choose a memory backend.")
+        print("Memory is disabled. Re-run `agent-notes install` and choose memory storage.")
         return
     if path is None:
         print("Memory path not configured.")
@@ -100,7 +103,7 @@ _WIKI_TYPE_MAP = {
 
 
 def do_add(title: str, body: str, note_type: str = "context", agent: str = "", project: str = "", tags: Optional[list] = None) -> None:
-    """Add a note to memory (obsidian or wiki backend)."""
+    """Add a note to memory (obsidian or wiki storage)."""
     backend, path = _load_memory_config()
     if backend == "none":
         print("Memory is disabled. Run `agent-notes memory vault` to check configuration.")
@@ -136,8 +139,8 @@ def do_add(title: str, body: str, note_type: str = "context", agent: str = "", p
         )
         print(f"{Color.GREEN}Note saved: {note_path}{Color.NC}")
     else:
-        print("The `add` subcommand is for the obsidian or wiki backend.")
-        print("For local backend, write files directly to the agent subdirectory.")
+        print("The `add` subcommand is for obsidian or wiki storage.")
+        print("For local storage, write files directly to the agent subdirectory.")
 
 
 def do_list() -> None:
@@ -145,7 +148,7 @@ def do_list() -> None:
     backend, path = _load_memory_config()
 
     if backend == "none":
-        print("Memory is disabled. Run `agent-notes memory backend` to enable it.")
+        print("Memory is disabled. Run `agent-notes config` and select memory storage to enable it.")
         return
 
     if backend == "wiki":
@@ -315,14 +318,13 @@ def do_reset(name: Optional[str] = None) -> None:
         print(f"{Color.RED}Warning: this will permanently delete the {target}.{Color.NC}")
         confirm = input("Type 'yes' to confirm: ")
         if confirm == "yes":
-            import shutil as _shutil
             from ..services.wiki_backend import WIKI_PAGE_TYPES
             if name is None:
                 wiki_dir = path / "wiki"
                 for page_type in WIKI_PAGE_TYPES:
                     type_dir = wiki_dir / page_type
                     if type_dir.exists():
-                        _shutil.rmtree(type_dir)
+                        shutil.rmtree(type_dir)
                         type_dir.mkdir()
                 print(f"{Color.GREEN}Wiki at {path} cleared.{Color.NC}")
             else:
@@ -335,7 +337,7 @@ def do_reset(name: Optional[str] = None) -> None:
                 if not type_dir.exists():
                     print(f"No pages found for type '{name}'.")
                     return
-                _shutil.rmtree(type_dir)
+                shutil.rmtree(type_dir)
                 type_dir.mkdir()
                 print(f"{Color.GREEN}Wiki pages for type '{name}' cleared.{Color.NC}")
         else:
@@ -478,11 +480,43 @@ def format_size(size_bytes: int) -> str:
     return f"{original_size:.1f}P"
 
 
+def do_scan_raw() -> None:
+    """Scan raw/ for unprocessed files and print summary."""
+    backend, path = _load_memory_config()
+    if backend != "wiki":
+        print("The `ingest` subcommand is only available for wiki storage.")
+        return
+    if path is None:
+        print("Memory path not configured.")
+        return
+    from ..services.wiki_backend import wiki_scan_raw
+    groups = wiki_scan_raw(path)
+    if not groups:
+        print("No unprocessed files in raw/.")
+        return
+    total_files = sum(len(g["files"]) for g in groups)
+    print(f"Unprocessed raw files ({total_files} files in {len(groups)} groups):\n")
+    for g in groups:
+        size_kb = g["total_size"] / 1024
+        if size_kb >= 1024:
+            size_str = f"{size_kb / 1024:.1f} MB"
+        else:
+            size_str = f"{size_kb:.0f} KB"
+        file_count = len(g["files"])
+        if file_count == 1:
+            print(f"  {Color.CYAN}{g['group']}{Color.NC}  ({size_str})")
+            print(f"    {g['files'][0]}")
+        else:
+            print(f"  {Color.CYAN}{g['group']}{Color.NC}  ({file_count} chunks, {size_str})")
+            print(f"    {g['files'][0]} .. {g['files'][-1]}")
+        print()
+
+
 def do_ingest(title: str, body: str, concepts: Optional[list] = None, entities: Optional[list] = None, tags: Optional[list] = None) -> None:
     """Ingest a source into the wiki backend."""
     backend, path = _load_memory_config()
     if backend != "wiki":
-        print("The `ingest` subcommand is only available for the wiki backend.")
+        print("The `ingest` subcommand is only available for wiki storage.")
         return
     if path is None:
         print("Memory path not configured.")
@@ -508,107 +542,12 @@ def do_ingest(title: str, body: str, concepts: Optional[list] = None, entities: 
         print(f"  entity:  {p}")
 
 
-def do_ingest_file(file_path: str, title: str = "", body: str = "",
-                   concepts: Optional[list] = None, entities: Optional[list] = None,
-                   tags: Optional[list] = None) -> None:
-    """Ingest a local file into the wiki backend."""
-    backend, path = _load_memory_config()
-    if backend != "wiki":
-        print("The `ingest-file` subcommand is only available for the wiki backend.")
-        return
-    if path is None:
-        print("Memory path not configured.")
-        return
-    fp = Path(file_path)
-    if not fp.exists():
-        print(f"Error: file not found: {file_path}")
-        exit(1)
-    from ..services.wiki_backend import wiki_ingest_file
-    result = wiki_ingest_file(
-        path,
-        file_path=fp,
-        title=title,
-        body=body,
-        concepts=concepts or [],
-        entities=entities or [],
-        tags=tags or [],
-    )
-    _print_ingest_result(result)
-
-
-def do_ingest_url(url: str, title: str = "", body: str = "",
-                  concepts: Optional[list] = None, entities: Optional[list] = None,
-                  tags: Optional[list] = None) -> None:
-    """Ingest a URL into the wiki backend."""
-    backend, path = _load_memory_config()
-    if backend != "wiki":
-        print("The `ingest-url` subcommand is only available for the wiki backend.")
-        return
-    if path is None:
-        print("Memory path not configured.")
-        return
-    from ..services.wiki_backend import wiki_ingest_url
-    result = wiki_ingest_url(
-        path,
-        url=url,
-        title=title,
-        body=body,
-        concepts=concepts or [],
-        entities=entities or [],
-        tags=tags or [],
-    )
-    _print_ingest_result(result)
-
-
-def do_ingest_folder(folder_path: str, title: str = "", body: str = "",
-                     concepts: Optional[list] = None, entities: Optional[list] = None,
-                     tags: Optional[list] = None) -> None:
-    """Ingest a local folder into the wiki backend."""
-    backend, path = _load_memory_config()
-    if backend != "wiki":
-        print("The `ingest-folder` subcommand is only available for the wiki backend.")
-        return
-    if path is None:
-        print("Memory path not configured.")
-        return
-    fp = Path(folder_path)
-    if not fp.exists():
-        print(f"Error: folder not found: {folder_path}")
-        exit(1)
-    from ..services.wiki_backend import wiki_ingest_folder
-    result = wiki_ingest_folder(
-        path,
-        folder_path=fp,
-        title=title,
-        body=body,
-        concepts=concepts or [],
-        entities=entities or [],
-        tags=tags or [],
-    )
-    _print_ingest_result(result)
-
-
-def _print_ingest_result(result: dict) -> None:
-    source_paths = result.get("source", [])
-    concept_paths = result.get("concepts", [])
-    entity_paths = result.get("entities", [])
-    title = ""
-    if source_paths:
-        title = source_paths[0].stem.replace("-", " ").title()
-    print(f"{Color.GREEN}Ingested: {title}{Color.NC}")
-    for p in source_paths:
-        print(f"  source:  {p}")
-    for p in concept_paths:
-        print(f"  concept: {p}")
-    for p in entity_paths:
-        print(f"  entity:  {p}")
-
 
 def do_query(keyword: str) -> None:
     """Search wiki pages by keyword."""
     backend, path = _load_memory_config()
     if backend != "wiki":
-        print("The `query` subcommand is only available for the wiki backend.")
+        print("The `query` subcommand is only available for wiki storage.")
         return
     if path is None:
         print("Memory path not configured.")
@@ -632,7 +571,7 @@ def do_lint() -> None:
     """Check wiki health."""
     backend, path = _load_memory_config()
     if backend != "wiki":
-        print("The `lint` subcommand is only available for the wiki backend.")
+        print("The `lint` subcommand is only available for wiki storage.")
         return
     if path is None:
         print("Memory path not configured.")
@@ -667,12 +606,11 @@ def do_lint() -> None:
 def do_migrate() -> None:
     """Migrate vault from per-project layout to flat shared layout with new filenames."""
     import re
-    import shutil
     from datetime import datetime, timezone
 
     backend, vault = _load_memory_config()
     if backend != "obsidian":
-        print("migrate is only available for the obsidian backend.")
+        print("migrate is only available for obsidian storage.")
         return
     if vault is None:
         print("Memory path not configured.")
@@ -882,8 +820,8 @@ def memory(action: str = "list", name: Optional[str] = None, extra: Optional[lis
         do_migrate()
     elif action == "ingest":
         if not name:
-            print("Error: ingest requires a title.")
-            exit(1)
+            do_scan_raw()
+            exit(0)
         body = extra[0] if extra else ""
         concepts_csv = extra[1] if extra and len(extra) > 1 else ""
         entities_csv = extra[2] if extra and len(extra) > 2 else ""
@@ -892,42 +830,6 @@ def memory(action: str = "list", name: Optional[str] = None, extra: Optional[lis
         entities = [e.strip() for e in entities_csv.split(",") if e.strip()] if entities_csv else None
         tags = [t.strip() for t in tags_csv.split(",") if t.strip()] if tags_csv else None
         do_ingest(name, body, concepts=concepts, entities=entities, tags=tags)
-    elif action == "ingest-file":
-        if not name:
-            print("Error: ingest-file requires a file path.")
-            exit(1)
-        body = extra[0] if extra else ""
-        concepts_csv = extra[1] if extra and len(extra) > 1 else ""
-        entities_csv = extra[2] if extra and len(extra) > 2 else ""
-        tags_csv = extra[3] if extra and len(extra) > 3 else ""
-        concepts = [c.strip() for c in concepts_csv.split(",") if c.strip()] if concepts_csv else None
-        entities = [e.strip() for e in entities_csv.split(",") if e.strip()] if entities_csv else None
-        tags = [t.strip() for t in tags_csv.split(",") if t.strip()] if tags_csv else None
-        do_ingest_file(name, body=body, concepts=concepts, entities=entities, tags=tags)
-    elif action == "ingest-url":
-        if not name:
-            print("Error: ingest-url requires a URL.")
-            exit(1)
-        body = extra[0] if extra else ""
-        concepts_csv = extra[1] if extra and len(extra) > 1 else ""
-        entities_csv = extra[2] if extra and len(extra) > 2 else ""
-        tags_csv = extra[3] if extra and len(extra) > 3 else ""
-        concepts = [c.strip() for c in concepts_csv.split(",") if c.strip()] if concepts_csv else None
-        entities = [e.strip() for e in entities_csv.split(",") if e.strip()] if entities_csv else None
-        tags = [t.strip() for t in tags_csv.split(",") if t.strip()] if tags_csv else None
-        do_ingest_url(name, body=body, concepts=concepts, entities=entities, tags=tags)
-    elif action == "ingest-folder":
-        if not name:
-            print("Error: ingest-folder requires a folder path.")
-            exit(1)
-        body = extra[0] if extra else ""
-        concepts_csv = extra[1] if extra and len(extra) > 1 else ""
-        entities_csv = extra[2] if extra and len(extra) > 2 else ""
-        tags_csv = extra[3] if extra and len(extra) > 3 else ""
-        concepts = [c.strip() for c in concepts_csv.split(",") if c.strip()] if concepts_csv else None
-        entities = [e.strip() for e in entities_csv.split(",") if e.strip()] if entities_csv else None
-        tags = [t.strip() for t in tags_csv.split(",") if t.strip()] if tags_csv else None
-        do_ingest_folder(name, body=body, concepts=concepts, entities=entities, tags=tags)
     elif action == "query":
         if not name:
             print("Error: query requires a keyword.")

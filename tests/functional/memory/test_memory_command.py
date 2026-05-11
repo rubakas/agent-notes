@@ -63,6 +63,7 @@ class TestMemoryListWhenEmpty:
 class TestMemoryAddPatternWritesToVault:
     def test_memory_add_pattern_writes_to_vault(self, tmp_path, monkeypatch, capsys):
         vault = _setup_obsidian_backend(tmp_path, monkeypatch)
+        monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/code/test-project")))
 
         from agent_notes.commands.memory import memory
         memory(
@@ -74,8 +75,8 @@ class TestMemoryAddPatternWritesToVault:
         out = capsys.readouterr().out
         assert "saved" in out.lower() or "note" in out.lower()
 
-        # File should land in vault/Patterns/
-        patterns_dir = vault / "Patterns"
+        # File should land in vault/<project>/Patterns/
+        patterns_dir = vault / "test-project" / "Patterns"
         assert patterns_dir.exists(), "Patterns/ folder was not created"
         notes = list(patterns_dir.glob("*.md"))
         assert len(notes) >= 1, "No note was written to Patterns/"
@@ -84,14 +85,15 @@ class TestMemoryAddPatternWritesToVault:
 class TestMemoryIndexRegeneratesIndexMd:
     def test_memory_index_regenerates_index_md(self, tmp_path, monkeypatch, capsys):
         vault = _setup_obsidian_backend(tmp_path, monkeypatch)
+        monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/code/test-project")))
         # Seed at least one category folder so index has something to scan
-        (vault / "Patterns").mkdir()
-        (vault / "Patterns" / "note.md").write_text("# note\n")
+        (vault / "test-project" / "Patterns").mkdir(parents=True, exist_ok=True)
+        (vault / "test-project" / "Patterns" / "note.md").write_text("# note\n")
 
         from agent_notes.commands.memory import memory
         memory(action="index")
 
-        assert (vault / "Index.md").exists(), "Index.md was not created by memory index"
+        assert (vault / "test-project" / "Index.md").exists(), "Index.md was not created by memory index"
 
 
 class TestMemoryShowUnknownAgentErrors:
