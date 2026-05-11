@@ -51,7 +51,8 @@ def _linked(path: str) -> None:
 
 
 def _removed(path: str) -> None:
-    print(f"  {_Color.GREEN}REMOVED{_Color.NC}  {path}")
+    if not silent_file_ops:
+        print(f"  {_Color.GREEN}REMOVED{_Color.NC}  {path}")
 
 
 def files_identical(a: Path, b: Path) -> bool:
@@ -129,26 +130,33 @@ def place_dir_contents(src_dir: Path, dst_dir: Path, pattern: str, copy_mode: bo
             place_file(src_file, dst_file, copy_mode)
 
 
-def remove_symlink(target: Path, copy_mode: bool = False) -> None:
-    """Remove symlink if it exists. In copy_mode, also removes plain files (managed installs)."""
+def remove_symlink(target: Path, copy_mode: bool = False) -> bool:
+    """Remove symlink if it exists. In copy_mode, also removes plain files (managed installs).
+    Returns True if something was removed, False otherwise."""
     if target.is_symlink():
         target.unlink()
         _removed(str(target))
+        return True
     elif copy_mode and target.exists():
         target.unlink()
         _removed(str(target))
+        return True
     elif target.exists():
         _skipped(str(target))
+    return False
 
 
-def remove_all_symlinks_in_dir(dir_path: Path, copy_mode: bool = False) -> None:
-    """Remove all symlinks in a directory. In copy_mode, also removes plain files (managed installs)."""
+def remove_all_symlinks_in_dir(dir_path: Path, copy_mode: bool = False) -> int:
+    """Remove all symlinks in a directory. In copy_mode, also removes plain files (managed installs).
+    Returns the count of removed items."""
     if not dir_path.exists():
-        return
+        return 0
+    count = 0
     for item in dir_path.iterdir():
         if item.is_symlink():
             item.unlink()
             _removed(str(item))
+            count += 1
         elif copy_mode and item.exists():
             if item.is_dir():
                 import shutil
@@ -156,8 +164,10 @@ def remove_all_symlinks_in_dir(dir_path: Path, copy_mode: bool = False) -> None:
             else:
                 item.unlink()
             _removed(str(item))
+            count += 1
         elif item.exists():
             _skipped(str(item))
+    return count
 
 
 def remove_dir_if_empty(dir_path: Path) -> None:

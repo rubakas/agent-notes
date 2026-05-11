@@ -13,6 +13,7 @@ from .fs import (
     remove_symlink, remove_all_symlinks_in_dir, remove_dir_if_empty,
     files_identical, _timestamped_backup_path,
 )
+from . import fs as _fs
 from .state_store import load_state, get_scope
 
 
@@ -134,24 +135,23 @@ def uninstall_component_for_backend(
     component: str,
     scope: str,
     copy_mode: bool = False,
-) -> None:
-    """Uninstall one component for one backend."""
+) -> int:
+    """Uninstall one component for one backend. Returns count of files removed."""
     dst = target_dir_for(backend, component, scope)
     if dst is None or not dst.exists():
-        return
+        return 0
 
     if component == "config":
         filename = config_filename_for(backend)
         if filename:
             config_file = dst / filename
-            print(f"Removing {backend.label} config from {dst} ...")
-            remove_symlink(config_file, copy_mode)
+            removed = remove_symlink(config_file, copy_mode)
+            return 1 if removed else 0
+        return 0
     else:
-        # Only print if directory exists and has content
-        if any(dst.iterdir()):
-            print(f"Removing {backend.label} {component} from {dst} ...")
-        remove_all_symlinks_in_dir(dst, copy_mode)
+        count = remove_all_symlinks_in_dir(dst, copy_mode)
         remove_dir_if_empty(dst)
+        return count
 
 
 def _plan_file(src: Path, dst: Path, copy_mode: bool = False) -> InstallAction:
@@ -351,12 +351,34 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
         if scope_state is not None:
             copy_mode = (scope_state.mode == "copy")
 
-    for backend in registry.all():
-        for component in COMPONENT_TYPES:
-            uninstall_component_for_backend(backend, component, scope, copy_mode)
+    _fs.silent_file_ops = True
+    try:
+        # Track counts per (backend, component) for summary output
+        summary: dict[str, int] = {}
 
-    if scope == "global":
-        _uninstall_universal_skills(copy_mode)
+        for backend in registry.all():
+            for component in COMPONENT_TYPES:
+                count = uninstall_component_for_backend(backend, component, scope, copy_mode)
+                if count:
+                    dst = target_dir_for(backend, component, scope)
+                    if dst is not None:
+                        key = str(dst)
+                        summary[key] = summary.get(key, 0) + count
+
+        if scope == "global":
+            count = _uninstall_universal_skills(copy_mode)
+            if count:
+                target = config.AGENTS_HOME / "skills"
+                key = str(target)
+                summary[key] = summary.get(key, 0) + count
+    finally:
+        _fs.silent_file_ops = False
+
+    # Print summary lines for components that had files removed
+    home = Path.home()
+    for path_str, count in summary.items():
+        display = path_str.replace(str(home), "~")
+        print(f"  Cleaned: {display}/ ({count} files)")
 
     # Remove SessionStart hook for Claude Code only
     try:
@@ -366,13 +388,14 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
         pass
 
 
-def _uninstall_universal_skills(copy_mode: bool = False) -> None:
-
+def _uninstall_universal_skills(copy_mode: bool = False) -> int:
+    """Remove universal skills. Returns count of files removed."""
     target = config.AGENTS_HOME / "skills"
-    if target.exists() and any(target.iterdir()):
-        print(f"Removing universal skills from {target} ...")
-        remove_all_symlinks_in_dir(target, copy_mode)
-        remove_dir_if_empty(target)
+    if not target.exists():
+        return 0
+    count = remove_all_symlinks_in_dir(target, copy_mode)
+    remove_dir_if_empty(target)
+    return count
 
 
 def _session_hook_paths(backend, scope: str):

@@ -4,10 +4,14 @@ import time
 import pytest
 from pathlib import Path
 
+import agent_notes.services.fs as fs
 from agent_notes.services.fs import (
     _timestamped_backup_path,
     handle_existing,
     files_identical,
+    _removed,
+    remove_all_symlinks_in_dir,
+    remove_symlink,
 )
 
 # Timestamp pattern: YYYYMMDDTHHMMSSffffffZ  (digits only between T and Z)
@@ -190,3 +194,70 @@ class TestHandleExistingDifferingDirectory:
         handle_existing(src_dir, dst_dir)
 
         assert not dst_dir.exists(), "Original dst dir should be removed after backup"
+
+
+class TestRemovedRespectsSilent:
+    def test_removed_prints_when_not_silent(self, tmp_path, capsys):
+        original = fs.silent_file_ops
+        try:
+            fs.silent_file_ops = False
+            _removed("/some/path")
+        finally:
+            fs.silent_file_ops = original
+
+        out = capsys.readouterr().out
+        assert "REMOVED" in out
+        assert "/some/path" in out
+
+    def test_removed_suppresses_when_silent(self, tmp_path, capsys):
+        original = fs.silent_file_ops
+        try:
+            fs.silent_file_ops = True
+            _removed("/some/path")
+        finally:
+            fs.silent_file_ops = original
+
+        out = capsys.readouterr().out
+        assert out == ""
+
+
+class TestRemoveAllSymlinksInDir:
+    def test_returns_count_of_removed_symlinks(self, tmp_path):
+        src = tmp_path / "src"
+        src.mkdir()
+        dst_dir = tmp_path / "dst"
+        dst_dir.mkdir()
+        # Create 3 symlinks
+        for name in ("a.md", "b.md", "c.md"):
+            src_file = src / name
+            src_file.write_text(name)
+            (dst_dir / name).symlink_to(src_file)
+
+        count = remove_all_symlinks_in_dir(dst_dir)
+
+        assert count == 3
+
+    def test_returns_zero_for_nonexistent_dir(self, tmp_path):
+        count = remove_all_symlinks_in_dir(tmp_path / "nonexistent")
+        assert count == 0
+
+    def test_does_not_count_skipped_files(self, tmp_path):
+        dst_dir = tmp_path / "dst"
+        dst_dir.mkdir()
+        # Plain file (not a symlink) — should be skipped, not counted
+        (dst_dir / "plain.md").write_text("user content")
+
+        count = remove_all_symlinks_in_dir(dst_dir)
+
+        assert count == 0
+        assert (dst_dir / "plain.md").exists()
+
+    def test_counts_copy_mode_plain_files(self, tmp_path):
+        dst_dir = tmp_path / "dst"
+        dst_dir.mkdir()
+        (dst_dir / "managed.md").write_text("managed content")
+
+        count = remove_all_symlinks_in_dir(dst_dir, copy_mode=True)
+
+        assert count == 1
+        assert not (dst_dir / "managed.md").exists()
