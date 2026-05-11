@@ -184,7 +184,9 @@ def show(state=None) -> None:
     # Memory
     mem = state.memory
     if mem.backend == "obsidian":
-        mem_label = f"Obsidian ({mem.path})" if mem.path else "Obsidian"
+        mem_label = f"Obsidian session ({mem.path})" if mem.path else "Obsidian session"
+    elif mem.backend == "wiki":
+        mem_label = f"Obsidian wiki ({mem.path})" if mem.path else "Obsidian wiki"
     elif mem.backend == "local":
         mem_label = "Local markdown"
     else:
@@ -306,31 +308,43 @@ def _wizard_role_model(state, before: str) -> bool:
 
 def _wizard_memory(state, before: str) -> bool:
     """Branch 3: interactive memory backend change."""
-    from ..services.ui import _safe_input
+    from ..services.ui import _safe_input, _path_input
 
-    options = {
+    storage_options = {
         "1": ("local", "Local markdown files (~/.claude/agent-memory/)"),
         "2": ("obsidian", "Obsidian vault"),
         "3": ("none", "None (disable memory)"),
     }
 
-    print("\nMemory backend options:")
-    for key, (_, label) in options.items():
+    print("\nMemory storage options:")
+    for key, (_, label) in storage_options.items():
         print(f"  {key}) {label}")
 
     choice = _safe_input("Choice [1]: ", "1").strip()
-    if choice not in options:
+    if choice not in storage_options:
         print("Invalid choice. No changes made.")
         return False
 
-    backend, label = options[choice]
+    backend, label = storage_options[choice]
     path = ""
 
     if backend == "obsidian":
-        default_path = str(Path.home() / "Documents" / "Obsidian Vault" / "agent-notes")
-        path = _safe_input(f"Memory folder path [{default_path}]: ", default_path).strip()
-        if not path:
-            path = default_path
+        mode_options = {"1": ("obsidian", "Session-oriented"), "2": ("wiki", "Wiki")}
+        print("\n  Obsidian mode:")
+        for key, (_, mlabel) in mode_options.items():
+            print(f"    {key}) {mlabel}")
+        mode_choice = _safe_input("  Choice [1]: ", "1").strip()
+        if mode_choice in mode_options:
+            backend, label = mode_options[mode_choice]
+
+        subfolder = "notes" if backend == "obsidian" else "knowledge"
+        default_vault = str(Path.home() / "Documents" / "Obsidian Vault")
+        print(f"  Folder name: {subfolder}")
+        print("  Press Tab to autocomplete paths")
+        raw = _path_input(f"  Vault path [{default_vault}]: ", default_vault).strip()
+        vault = raw or default_vault
+        path = str(Path(vault) / subfolder)
+        print(f"  → {path}")
 
     state.memory.backend = backend
     state.memory.path = path
@@ -409,7 +423,7 @@ def interactive_config() -> None:
     print("\nWhat do you want to change?")
     print("  1) Role -> model assignments")
     print("  2) Role -> agent assignments")
-    print("  3) Memory backend")
+    print("  3) Memory storage")
     print("  4) Skill bundles")
     print("  5) Show full configuration (read-only)")
     print("  6) API keys / providers")

@@ -11,7 +11,7 @@ from ._install_helpers import (
 from ..services.counts import count_rules_total as _count_rules_total
 from ..services.fs import place_file, place_dir_contents
 from ..services.ui import (
-    _can_interactive, _safe_input, _checkbox_select, _radio_select,
+    _can_interactive, _safe_input, _path_input, _checkbox_select, _radio_select,
     _checkbox_select_fallback, _radio_select_fallback
 )
 from ..config import (
@@ -396,36 +396,47 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
     """Step N: choose memory backend. Returns (backend, path)."""
     from ..config import Color
 
-    options = [
+    storage_options = [
         ("Local markdown files  (~/.claude/agent-memory/)", "local"),
-        ("Obsidian vault (session-oriented)", "obsidian"),
-        ("Obsidian vault (wiki)", "wiki"),
+        ("Obsidian vault", "obsidian"),
         ("None  (disable memory)", "none"),
     ]
 
     if _can_interactive():
-        backend = _radio_select("How should agents store memory?", options, default=0,
+        storage = _radio_select("How should agents store memory?", storage_options, default=0,
                                 step=step, total=total, version=version)
     else:
-        backend = _radio_select_fallback("How should agents store memory?", options, default=0,
+        storage = _radio_select_fallback("How should agents store memory?", storage_options, default=0,
                                          step=step, total=total, version=version)
 
+    backend = storage
     path = ""
 
-    if backend == "obsidian":
+    if storage == "obsidian":
+        mode_options = [
+            ("Session-oriented  (decisions, patterns, session logs)", "obsidian"),
+            ("Wiki  (structured knowledge base)", "wiki"),
+        ]
+        if _can_interactive():
+            backend = _radio_select("Obsidian mode", mode_options, default=0,
+                                    step=step, total=total, version=version)
+        else:
+            backend = _radio_select_fallback("Obsidian mode", mode_options, default=0,
+                                             step=step, total=total, version=version)
+
+        subfolder = "notes" if backend == "obsidian" else "knowledge"
         candidates = _detect_obsidian_vaults()
+        default_vault = str(candidates[0]) if candidates else str(Path.home() / "Documents" / "Obsidian Vault")
         if candidates:
-            print(f"  {Color.DIM}Detected vaults (notes go into agent-notes/ inside):{Color.NC}")
+            print(f"  {Color.DIM}Detected vaults:{Color.NC}")
             for c in candidates[:3]:
-                print(f"    {c}/agent-notes")
-        _mem_base = candidates[0] if candidates else Path.home() / "Documents" / "Obsidian Vault"
-        default_path = str(_mem_base / "agent-notes")
-        raw = _safe_input(f"  Memory folder path [{default_path}]: ", default_path)
-        path = raw.strip() or default_path
-    elif backend == "wiki":
-        default_path = str(Path.home() / "Documents" / "Obsidian Vault" / "agent-wiki")
-        raw = _safe_input(f"  Wiki folder path [{default_path}]: ", default_path)
-        path = raw.strip() or default_path
+                print(f"    {c}")
+        print(f"  {Color.DIM}Folder name: {subfolder}{Color.NC}")
+        print(f"  {Color.DIM}Press Tab to autocomplete paths{Color.NC}")
+        raw = _path_input(f"  Vault path [{default_vault}]: ", default_vault)
+        vault = raw.strip() or default_vault
+        path = str(Path(vault) / subfolder)
+        print(f"  {Color.DIM}→ {path}{Color.NC}")
 
     label = {"local": "Local markdown", "obsidian": f"Obsidian (session)  ({path})", "wiki": f"Obsidian (wiki)  ({path})", "none": "Disabled"}[backend]
     print(f"  {Color.GREEN}✓{Color.NC} Memory: {label}")

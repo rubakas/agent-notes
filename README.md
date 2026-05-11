@@ -188,18 +188,18 @@ Load the docker-compose skill for multi-service setup
 
 ## Agent Memory
 
-Agents accumulate knowledge across sessions using one of four backends, chosen during `agent-notes install`.
+Agents accumulate knowledge across sessions using one of four storage options, chosen during `agent-notes install`.
 
-### Backends
+### Storage options
 
-| Backend | Storage | Best for |
+| Storage | Location | Best for |
 |---------|---------|----------|
 | **Local** | `~/.claude/agent-memory/<agent>/` — plain markdown per agent | Simple setup, no extra tools |
 | **Obsidian** | Category vault with YAML frontmatter and `[[wikilinks]]` | Visual browsing, backlinks, Dataview queries |
 | **Wiki** | Structured wiki with page types and versioning | Team knowledge bases, compounding knowledge |
 | **None** | Disabled — no files written | Stateless or shared machines |
 
-### Session tracking by backend
+### Session tracking by storage
 
 | Feature | Local | Obsidian | Wiki |
 |---|---|---|---|
@@ -210,9 +210,9 @@ Agents accumulate knowledge across sessions using one of four backends, chosen d
 | Key operations | read/write | add, list, show, reset, export, import | ingest, query, lint + add, list, show |
 | Best for | Simple setup, no extra tools | Visual browsing, backlinks, Dataview queries | Team knowledge bases, compounding knowledge |
 
-**Obsidian backend** — Uses category directories (`Patterns/`, `Decisions/`, `Mistakes/`, `Context/`, `Sessions/`). When you write a non-session note during an active session, the CLI auto-links it to the session note via `[[wikilinks]]`. Plans are mirrored as Decision notes.
+**Obsidian storage** — Uses category directories (`Patterns/`, `Decisions/`, `Mistakes/`, `Context/`, `Sessions/`). When you write a non-session note during an active session, the CLI auto-links it to the session note via `[[wikilinks]]`. Plans are mirrored as Decision notes.
 
-**Wiki backend** — Implements Karpathy's LLM Wiki pattern (v1). Structure: `raw/` for immutable source material, `wiki/` for LLM-maintained pages organized into `sources/`, `concepts/`, `entities/`, `synthesis/`, `sessions/`. Three key operations:
+**Wiki storage** — Implements Karpathy's LLM Wiki pattern (v1). Structure: `raw/` for immutable source material, `wiki/` for LLM-maintained pages organized into `sources/`, `concepts/`, `entities/`, `synthesis/`, `sessions/`. Three key operations:
 - **ingest** — Process source material, extract key info, update entity/concept pages, append to log
 - **query** — Search wiki pages, synthesize answers with citations, optionally file answers back as new pages
 - **lint** — Health-check for contradictions, stale claims, orphan pages, missing cross-references
@@ -250,17 +250,17 @@ The installed `CLAUDE.md` already points agents to your vault. At the start of a
 ```bash
 agent-notes memory init                    # create folder structure and Index.md
 agent-notes memory list                    # list all notes (by category or agent)
-agent-notes memory vault                   # show backend, path, and init status
+agent-notes memory vault                   # show storage, path, and init status
 agent-notes memory index                   # regenerate Index.md
 agent-notes memory add <title> <body> [type] [agent] [project]   # type: pattern|decision|mistake|context|session
 agent-notes memory show <agent>            # show one agent's notes (local backend)
 agent-notes memory reset [agent]           # clear memory (confirmation required)
 agent-notes memory export                  # back up to memory-backup/
 agent-notes memory import                  # restore from memory-backup/
-agent-notes install --reconfigure          # switch backends
+agent-notes install --reconfigure          # switch storage
 ```
 
-### Note format (Obsidian backend)
+### Note format (Obsidian storage)
 
 Every note agent-notes writes includes YAML frontmatter for filtering and Dataview queries:
 

@@ -47,13 +47,13 @@ class TestMemoryDirForBackendObsidianPlainRoot:
 
     def test_obsidian_returns_plain_vault_root(self):
         result = memory_dir_for_backend("obsidian")
-        expected = Path.home() / "Documents" / "Obsidian Vault" / "agent-notes"
+        expected = Path.home() / "Documents" / "Obsidian Vault" / "notes"
         assert result == expected
 
     def test_obsidian_root_does_not_contain_project_subfolder(self):
         result = memory_dir_for_backend("obsidian")
-        # Path must end exactly at agent-notes — no extra segment
-        assert result.name == "agent-notes"
+        # Path must end exactly at notes — no extra segment
+        assert result.name == "notes"
         assert result.parent.name == "Obsidian Vault"
 
     def test_obsidian_custom_path_returns_expanded_path(self, tmp_path):
