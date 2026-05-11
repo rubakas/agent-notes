@@ -22,8 +22,7 @@ USAGE = (
 # These describe what happens when the command is run with no flags.
 COMMAND_DEFAULTS = {
     "install":   "default: interactive wizard",
-    "uninstall": "default: global",
-    "update":    "default: pull, show diff, ask to apply",
+    "uninstall": "default: both scopes",
     "doctor":    "default: global scope, read-only",
 }
 
@@ -32,8 +31,6 @@ EXAMPLES = [
     ("agent-notes install",                    "Interactive wizard (recommended)"),
     ("agent-notes install --local",            "Install into current project (Claude + OpenCode, symlinks)"),
     ("agent-notes install --local --copy",     "Same, but copy files (allows local edits)"),
-    ("agent-notes update --dry-run",           "Show what would change, don't apply"),
-    ("agent-notes update --only agents --yes", "Apply only agent changes, no prompt"),
     ("agent-notes doctor --fix",               "Check and repair installation"),
     ("agent-notes list agents",                "List all configured agents"),
 ]
@@ -235,7 +232,8 @@ def main():
     
     # uninstall
     p_uninstall = subparsers.add_parser("uninstall", help="Remove installed components")
-    p_uninstall.add_argument("--local", action="store_true", help="Remove from current project")
+    p_uninstall.add_argument("--local", action="store_true", help="Remove from current project only")
+    p_uninstall.add_argument("--global", action="store_true", dest="global_", help="Remove from global scope only")
     
     # doctor
     p_doctor = subparsers.add_parser("doctor", help="Check installation health")
@@ -286,7 +284,7 @@ def main():
     # config
     p_config = subparsers.add_parser("config", help="Reconfigure role/agent/model/memory/skill assignments after install")
     p_config.add_argument("action", nargs="?", default="wizard",
-        choices=["wizard", "show", "role-model", "role-agent"],
+        choices=["wizard", "show", "role-model", "role-agent", "provider", "providers"],
         help="Config action (default: wizard)")
     p_config.add_argument("extra", nargs="*", help="Additional positional args (role, model, agent)")
     p_config.add_argument("--cli", help="Target CLI (claude / opencode / both)")
@@ -315,7 +313,7 @@ def main():
             interactive_install()
     elif args.command == "uninstall":
         from .commands.install import uninstall
-        uninstall(local=args.local)
+        uninstall(local=args.local, global_=args.global_)
     elif args.command == "doctor":
         from .commands.doctor import doctor
         doctor(local=args.local, fix=args.fix)
