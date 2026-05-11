@@ -91,6 +91,13 @@ class TestWikiInit:
         wiki_init(tmp_path)
         assert "some entries" in log_path.read_text()
 
+    def test_init_creates_obsidianignore(self, tmp_path):
+        """wiki_init should create .obsidianignore with raw/ entry."""
+        wiki_init(tmp_path)
+        ignore_path = tmp_path / ".obsidianignore"
+        assert ignore_path.exists()
+        assert "raw/" in ignore_path.read_text()
+
 
 # ── wiki_write_page ───────────────────────────────────────────────────────────
 
@@ -206,6 +213,15 @@ class TestWikiWritePageCreate:
         root = tmp_path / "new_wiki"
         wiki_write_page(root, title="P", body="b", page_type="concepts")
         assert (root / "wiki").is_dir()
+
+    def test_wiki_write_page_confidence_in_frontmatter(self, tmp_path):
+        path = wiki_write_page(tmp_path, title="Conf Page", body="b", page_type="concepts", confidence="high")
+        fm = _parse_frontmatter(path.read_text())
+        assert fm.get("confidence") == '"high"'
+
+    def test_wiki_write_page_confidence_none_omitted(self, tmp_path):
+        path = wiki_write_page(tmp_path, title="No Conf Page", body="b", page_type="concepts", confidence=None)
+        assert "confidence:" not in path.read_text()
 
 
 class TestWikiWritePageUpdate:
@@ -380,6 +396,26 @@ class TestWikiIngest:
         wiki_ingest(root, title="S", body="b")
         assert (root / "wiki").is_dir()
 
+    def test_ingest_with_raw_files(self, tmp_path):
+        """wiki_ingest should store multiple raw files and reference all in source."""
+        result = wiki_ingest(
+            tmp_path,
+            title="Multi Raw",
+            body="Test multiple raw files",
+            raw_files=[
+                ("chunk-001.md", "content one"),
+                ("chunk-002.md", "content two"),
+            ],
+        )
+
+        assert (tmp_path / "raw" / "chunk-001.md").exists()
+        assert (tmp_path / "raw" / "chunk-002.md").exists()
+
+        source_page = result["source"][0]
+        source_text = source_page.read_text()
+        assert "raw/chunk-001.md" in source_text
+        assert "raw/chunk-002.md" in source_text
+
 
 # ── wiki_query ────────────────────────────────────────────────────────────────
 
@@ -501,6 +537,29 @@ class TestWikiLint:
         assert result["orphans"] == []
         assert result["broken_links"] == []
         assert result["stale_index"] == []
+
+    def test_returns_dict_with_needs_compilation_key(self, tmp_path):
+        wiki_init(tmp_path)
+        result = wiki_lint(tmp_path)
+        assert "needs_compilation" in result
+
+    def test_lint_detects_stub_pages(self, tmp_path):
+        wiki_init(tmp_path)
+        stub = tmp_path / "wiki" / "concepts" / "my-stub.md"
+        stub.write_text(
+            "---\ncreated_at: 2026-01-01T00:00:00Z\nupdated_at: 2026-01-01T00:00:00Z\ntype: concepts\n---\n\n# My Stub\n\nReferenced from source: [[some-source]]\n"
+        )
+        result = wiki_lint(tmp_path)
+        assert any("my-stub" in entry for entry in result["needs_compilation"])
+
+    def test_lint_skips_compiled_pages(self, tmp_path):
+        wiki_init(tmp_path)
+        compiled = tmp_path / "wiki" / "concepts" / "compiled-page.md"
+        compiled.write_text(
+            "---\ncreated_at: 2026-01-01T00:00:00Z\nupdated_at: 2026-01-01T00:00:00Z\ntype: concepts\n---\n\n# Compiled Page\n\nThis page has real compiled content about the topic.\n\n## Related\n\n"
+        )
+        result = wiki_lint(tmp_path)
+        assert not any("compiled-page" in entry for entry in result["needs_compilation"])
 
 
 # ── wiki_list_pages ───────────────────────────────────────────────────────────
@@ -991,6 +1050,42 @@ class TestWikiIngestFolder:
         wiki_root = tmp_path / "wiki_root"
         with pytest.raises(FileNotFoundError, match="Folder not found"):
             wiki_ingest_folder(wiki_root, folder_path=missing)
+
+    def test_folder_ingest_chunks_large_content(self, tmp_path):
+        """Folder ingest should split into chunks when total > 2MB."""
+        folder = tmp_path / "big_project"
+        folder.mkdir()
+        # Create files that total > 2MB
+        content = "x" * (1024 * 1024)  # 1MB each
+        for i in range(3):
+            (folder / f"file{i}.py").write_text(content)
+
+        wiki_root = tmp_path / "wiki_root"
+        result = wiki_ingest_folder(wiki_root, folder_path=folder, title="Big Project")
+
+        raw_dir = wiki_root / "raw"
+        chunk_files = sorted(raw_dir.glob("big-project-folder-*.md"))
+        assert len(chunk_files) >= 2, f"Expected multiple chunks, got {len(chunk_files)}"
+
+        # Source page should reference all chunks
+        source_page = result["source"][0]
+        source_text = source_page.read_text()
+        for cf in chunk_files:
+            assert f"raw/{cf.name}" in source_text
+
+    def test_folder_ingest_small_content_no_chunks(self, tmp_path):
+        """Folder ingest under 2MB should produce single raw file."""
+        folder = tmp_path / "small_project"
+        folder.mkdir()
+        (folder / "main.py").write_text("print('hello')")
+
+        wiki_root = tmp_path / "wiki_root"
+        result = wiki_ingest_folder(wiki_root, folder_path=folder, title="Small Project")
+
+        raw_dir = wiki_root / "raw"
+        assert (raw_dir / "small-project-folder.md").exists()
+        chunk_files = list(raw_dir.glob("small-project-folder-*.md"))
+        assert len(chunk_files) == 0
 
 
 # ── wiki_ingest_url ───────────────────────────────────────────────────────────
