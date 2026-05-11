@@ -91,7 +91,7 @@ agent-notes <command> [options]
 | `set role <role> <model> [--cli <cli>]` | Change model for a role (Phase 10+) |
 | `regenerate [--cli <cli>]` | Rebuild files from state.json (Phase 10+) |
 | `validate` | Lint source configuration files |
-| `memory [list\|size\|show\|reset\|export\|import] [name]` | Manage agent memory |
+| `memory [add\|init\|vault\|index\|ingest\|query\|lint\|list\|size\|show\|reset\|export\|import] [name]` | Manage agent memory |
 | `cost-report` | Show session cost breakdown by agent and model |
 
 ### Supported platforms
@@ -253,7 +253,7 @@ agent-notes memory list                    # list all notes (by category or agen
 agent-notes memory vault                   # show storage, path, and init status
 agent-notes memory index                   # regenerate Index.md
 agent-notes memory add <title> <body> [type] [agent] [project]   # type: pattern|decision|mistake|context|session
-agent-notes memory show <agent>            # show one agent's notes (local backend)
+agent-notes memory show <agent>            # show one agent's notes (local storage)
 agent-notes memory reset [agent]           # clear memory (confirmation required)
 agent-notes memory export                  # back up to memory-backup/
 agent-notes memory import                  # restore from memory-backup/
