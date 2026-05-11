@@ -42,13 +42,19 @@ def memory_dir_for_backend(backend: str, custom_path: str = "") -> Optional[Path
     """Return the root memory directory for the given backend and optional custom path."""
     if backend == "none":
         return None
+    if backend == "local":
+        return Path(custom_path).expanduser() if custom_path else MEMORY_DIR
+    # obsidian and wiki are project-scoped
     if custom_path:
-        return Path(custom_path).expanduser()
-    if backend == "obsidian":
-        return Path.home() / "Documents" / "Obsidian Vault" / "notes"
-    if backend == "wiki":
-        return Path.home() / "Documents" / "Obsidian Vault" / "knowledge"
-    return MEMORY_DIR  # local default: ~/.claude/agent-memory
+        root = Path(custom_path).expanduser()
+    elif backend == "obsidian":
+        root = Path.home() / "Documents" / "Obsidian Vault" / "notes"
+    elif backend == "wiki":
+        root = Path.home() / "Documents" / "Obsidian Vault" / "knowledge"
+    else:
+        return MEMORY_DIR
+    project = Path.cwd().name
+    return root / project
 
 def get_version() -> str:
     """Read version from VERSION file."""

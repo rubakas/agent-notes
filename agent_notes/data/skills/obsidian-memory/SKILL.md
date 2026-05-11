@@ -106,16 +106,19 @@ agent-notes memory vault             # confirm storage and path
 
 The vault is structured as:
 ```
-vault/agent-notes/
-├── Patterns/     — reusable solutions        YYYY-MM-DD_<slug>.md
-├── Decisions/    — architectural choices     YYYY-MM-DD_<slug>.md
-├── Mistakes/     — errors to avoid           YYYY-MM-DD_<slug>.md
-├── Context/      — project background        YYYY-MM-DD_<slug>.md
-├── Sessions/     — one file per session      YYYY-MM-DD_<session-id>.md
-└── Index.md      — chronological list, newest first
+vault/agent-notes/notes/
+├── <project-name>/
+│   ├── Patterns/     — reusable solutions        YYYY-MM-DD_<slug>.md
+│   ├── Decisions/    — architectural choices     YYYY-MM-DD_<slug>.md
+│   ├── Mistakes/     — errors to avoid           YYYY-MM-DD_<slug>.md
+│   ├── Context/      — project background        YYYY-MM-DD_<slug>.md
+│   ├── Sessions/     — one file per session      YYYY-MM-DD_<session-id>.md
+│   └── Index.md      — chronological list, newest first
+└── <another-project>/
+    └── ...
 ```
 
-The root `agent-notes/` is shared across all projects — there is no per-project subfolder.
+Where `<project-name>` is the last component of the current working directory (`Path.cwd().name`). Each project gets its own isolated subfolder.
 
 ## Regenerate the index
 
