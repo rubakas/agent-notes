@@ -50,7 +50,7 @@ class TestMemoryDirForBackendObsidianProjectScoped:
     def test_obsidian_returns_project_scoped_path(self, monkeypatch):
         monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/code/my-project")))
         result = memory_dir_for_backend("obsidian")
-        expected = Path.home() / "Documents" / "Obsidian Vault" / "notes" / "my-project"
+        expected = Path.home() / "Obsidian" / "agent-notes" / "notes" / "my-project"
         assert result == expected
 
     def test_obsidian_path_ends_with_project_name(self, monkeypatch):
@@ -77,7 +77,7 @@ class TestMemoryDirForBackendWiki:
 
     def test_wiki_returns_knowledge_root_directly(self):
         result = memory_dir_for_backend("wiki")
-        expected = Path.home() / "Documents" / "Obsidian Vault" / "knowledge"
+        expected = Path.home() / "Obsidian" / "agent-notes" / "knowledge"
         assert result == expected
 
     def test_wiki_ignores_cwd(self, monkeypatch):

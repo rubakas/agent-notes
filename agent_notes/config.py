@@ -47,12 +47,12 @@ def memory_dir_for_backend(backend: str, custom_path: str = "") -> Optional[Path
     if backend == "wiki":
         if custom_path:
             return Path(custom_path).expanduser()
-        return Path.home() / "Documents" / "Obsidian Vault" / "knowledge"
+        return Path.home() / "Obsidian" / "agent-notes" / "knowledge"
     # obsidian is project-scoped
     if custom_path:
         root = Path(custom_path).expanduser()
     elif backend == "obsidian":
-        root = Path.home() / "Documents" / "Obsidian Vault" / "notes"
+        root = Path.home() / "Obsidian" / "agent-notes" / "notes"
     else:
         return MEMORY_DIR
     project = Path.cwd().name

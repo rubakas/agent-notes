@@ -338,7 +338,7 @@ def _wizard_memory(state, before: str) -> bool:
             backend, label = mode_options[mode_choice]
 
         subfolder = "notes" if backend == "obsidian" else "knowledge"
-        default_vault = str(Path.home() / "Documents" / "Obsidian Vault")
+        default_vault = str(Path.home() / "Obsidian" / "agent-notes")
         print(f"  Folder name: {subfolder}")
         print("  Press Tab to autocomplete paths")
         raw = _path_input(f"  Vault path [{default_vault}]: ", default_vault).strip()
