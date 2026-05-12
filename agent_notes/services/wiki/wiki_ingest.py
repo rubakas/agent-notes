@@ -11,8 +11,8 @@ from ._wiki_utils import (
     _atomic_write,
     _ensure_wiki_init,
     _log_operation,
-    _slug,
 )
+from .._memory_utils import _slug
 from .wiki_index import _cross_reference, wiki_regenerate_index
 from .wiki_storage import wiki_write_page
 

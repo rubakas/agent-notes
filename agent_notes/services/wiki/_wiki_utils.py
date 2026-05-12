@@ -7,12 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from .._memory_utils import (
-    _slug,  # noqa: F401
-    _now_iso,
-    _today,  # noqa: F401
-    _parse_frontmatter,  # noqa: F401
-)
+from .._memory_utils import _now_iso
 
 
 WIKI_PAGE_TYPES = ["sources", "concepts", "entities", "synthesis", "sessions"]
