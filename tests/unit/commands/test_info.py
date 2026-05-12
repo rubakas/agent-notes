@@ -40,9 +40,9 @@ def _run_info(monkeypatch, *, global_agents_exist=False, local_agents_exist=Fals
     fake_claude_home.__truediv__ = lambda self, other: fake_agents_dir if other == "agents" else MagicMock()
     monkeypatch.setattr("agent_notes.commands.info.CLAUDE_HOME", fake_claude_home)
 
-    # Patch install_state.load_current_state
+    # Patch load_current_state where info.py imports it
     monkeypatch.setattr(
-        "agent_notes.install_state.load_current_state",
+        "agent_notes.commands.info._load_current_state",
         lambda: state,
     )
 

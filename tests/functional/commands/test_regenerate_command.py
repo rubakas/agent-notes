@@ -46,8 +46,8 @@ class TestRegenerateCallsRenderingPipeline:
         # generate_agent_files is imported from .build inside regenerate(), so patch at source
         with patch("agent_notes.commands.build.generate_agent_files", mock_generate), \
              patch("agent_notes.services.installer.install_component_for_backend"), \
-             patch("agent_notes.install_state.build_install_state"), \
-             patch("agent_notes.install_state.record_install_state"):
+             patch("agent_notes.services.install_state_builder.build_install_state"), \
+             patch("agent_notes.services.state_store.record_install_state"):
             from agent_notes.commands.regenerate import regenerate
             regenerate()
 

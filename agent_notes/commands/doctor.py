@@ -64,13 +64,12 @@ def _check_session_hook(scope: str, issues: list) -> None:
 
 def check_version_drift(scope: str, issues: list, fix_actions: list) -> None:
     """Check if the installed package version matches the current running version."""
-    from .. import install_state
+    from ..services.state_store import load_current_state, get_scope
     from ..config import get_version
     from ..domain.diagnostics import Issue, FixAction
-    from ..services.state_store import get_scope
     from pathlib import Path
 
-    state = install_state.load_current_state()
+    state = load_current_state()
     if state is None:
         return
 
@@ -96,8 +95,6 @@ def check_version_drift(scope: str, issues: list, fix_actions: list) -> None:
 
 def diagnose(scope: str, fix: bool = False) -> bool:
     """Run all diagnostic checks and optionally apply fixes."""
-    from .. import install_state
-
     print_summary(scope)
 
     issues = []
@@ -120,7 +117,8 @@ def diagnose(scope: str, fix: bool = False) -> bool:
     _check_session_hook(scope, issues)
 
     # Print role→model assignments
-    state = install_state.load_current_state()
+    from ..services.state_store import load_current_state
+    state = load_current_state()
     if state is not None:
         _check_role_models(state)
     

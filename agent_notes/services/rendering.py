@@ -99,7 +99,7 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     """
     from ..registries.cli_registry import load_registry
     from ..registries.model_registry import load_model_registry
-    from .. import state as state_module
+    from ..services.state_store import load_state as _load_state_fn, get_scope as _get_scope
     from ..config import AGENTS_DIR, DIST_DIR
     
     generated_files = []
@@ -121,7 +121,7 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     
     # Get scope state if state is provided
     if state is not None:
-        scope_state = state_module.get_scope(state, scope, project_path)
+        scope_state = _get_scope(state, scope, project_path)
     
     for agent_name, agent_config in agents_config.items():
         # Read the source prompt
@@ -137,8 +137,7 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
         prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared")
 
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
-        from .. import state as _state_module
-        _st = _state_module.load()
+        _st = _load_state_fn()
         prompt_content = prompt_content.replace("{{MEMORY_PATH}}", _memory_path(_st))
 
         # Generate for each backend that supports agents
@@ -353,12 +352,12 @@ def render_globals() -> list[Path]:
         GLOBAL_CLAUDE_MD, GLOBAL_OPENCODE_MD, GLOBAL_COPILOT_MD,
         DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR
     )
-    from .. import state as state_module
+    from ..services.state_store import load_state as _load_state_fn2
 
     copied_files = []
 
     # Build claude.md with includes expanded and memory instructions substituted
-    st = state_module.load()
+    st = _load_state_fn2()
     from ..config import AGENTS_DIR
     claude_global_content = GLOBAL_CLAUDE_MD.read_text()
     claude_global_content = expand_includes(claude_global_content, AGENTS_DIR / "shared")

@@ -10,8 +10,8 @@ from typing import Optional
 
 def _load_state():
     """Load state or exit with a clear message."""
-    from .. import state as state_mod
-    st = state_mod.load()
+    from ..services.state_store import load_state
+    st = load_state()
     if st is None:
         print("No installation found. Run `agent-notes install` first.")
         sys.exit(1)
@@ -95,7 +95,7 @@ def _print_diff(before: str, after: str) -> None:
 
 def _apply_and_regenerate(state, before: str) -> None:
     """Show diff, prompt, then write + regenerate on Y."""
-    from .. import install_state
+    from ..services.state_store import record_install_state
     from ..config import Color
     from ..services.ui import _safe_input
 
@@ -114,7 +114,7 @@ def _apply_and_regenerate(state, before: str) -> None:
         print("Discarded. No changes written.")
         return
 
-    install_state.record_install_state(state)
+    record_install_state(state)
     print("State written.")
 
     # Regenerate

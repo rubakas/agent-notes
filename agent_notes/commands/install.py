@@ -3,19 +3,20 @@
 from pathlib import Path
 
 from ..config import Color, PKG_DIR
-from .. import install_state
+from ..services.install_state_builder import build_install_state
+from ..services.state_store import load_current_state, record_install_state, remove_install_state
 from ._install_helpers import _verify_install
 
 
 def install(local: bool = False, copy: bool = False, reconfigure: bool = False) -> None:
     """Build from source and install to targets."""
-    from ..state import get_scope, state_file
+    from ..services.state_store import get_scope, state_file
     from pathlib import Path
-    
+
     scope = "local" if local else "global"
     project_path = Path.cwd().resolve() if local else None
 
-    state = install_state.load_current_state()
+    state = load_current_state()
     existing = get_scope(state, scope, project_path) if state else None
 
     if existing and not reconfigure:
@@ -55,7 +56,7 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False) 
 
     if existing and reconfigure:
         print(f"Clearing existing {scope} state (--reconfigure) ...")
-        install_state.remove_install_state(scope, project_path)
+        remove_install_state(scope, project_path)
         # Fall through to normal install flow
     
     # Validate args
@@ -88,13 +89,13 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False) 
     # Record state
     try:
         project_path = Path.cwd() if local else None
-        st = install_state.build_install_state(
+        st = build_install_state(
             mode="copy" if copy else "symlink",
             scope="local" if local else "global",
             repo_root=PKG_DIR.parent,  # repo root (parent of agent_notes pkg)
             project_path=project_path,
         )
-        install_state.record_install_state(st)
+        record_install_state(st)
     except Exception as e:
         print(f"{Color.YELLOW}Warning: failed to write state.json: {e}{Color.NC}")
 
@@ -117,7 +118,7 @@ def uninstall(local: bool = False, global_: bool = False) -> None:
 
         # Remove state entry for this scope
         try:
-            install_state.remove_install_state(scope, project_path)
+            remove_install_state(scope, project_path)
         except Exception as e:
             print(f"{Color.YELLOW}Warning: failed to clear state.json: {e}{Color.NC}")
 

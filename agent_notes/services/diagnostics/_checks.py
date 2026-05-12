@@ -14,11 +14,10 @@ def _load_scope_state(scope: str):
     state file exists.
     """
     from ...registries.cli_registry import load_registry
-    from ... import install_state
-    from ...state import get_scope
+    from ...services.state_store import load_current_state, get_scope
 
     registry = load_registry()
-    state = install_state.load_current_state()
+    state = load_current_state()
     if state is None:
         return registry, None
     project_path = Path.cwd() if scope == "local" else None
@@ -113,13 +112,12 @@ def check_missing_files(scope: str, issues: List[Issue], fix_actions: List[FixAc
     """Check for source files that aren't installed - DELEGATED to doctor_checks."""
     from ... import doctor_checks
     from ...registries.cli_registry import load_registry
-    from ... import install_state
-    from ...state import get_scope
+    from ...services.state_store import load_current_state, get_scope
 
     registry = load_registry()
     # Pass scope state so opted-out backends aren't flagged as "missing".
     # Use a try/except here since local scope resolution can raise ValueError/KeyError.
-    state = install_state.load_current_state()
+    state = load_current_state()
     scope_state = None
     if state is not None:
         try:
