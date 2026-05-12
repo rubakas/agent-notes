@@ -1,7 +1,8 @@
 ---
 name: obsidian-memory
-description: "Save and retrieve agent memory in the Obsidian vault using agent-notes CLI. Defines the single record format for all memory notes. Use when saving decisions, patterns, or session state to the vault, or when ingesting URLs, files, or folders into the wiki brain."
+description: "Save and retrieve agent memory in the Obsidian vault using agent-notes CLI. Defines the single record format for all memory notes. Use when saving decisions, patterns, or session state to the vault."
 group: process
+requires_memory: obsidian,wiki
 ---
 
 # Obsidian Memory
@@ -200,88 +201,6 @@ Agents do NOT need bash access for this; the vault is plain Markdown readable wi
 
 ## Ingest workflow
 
-Ingest external sources into the wiki brain for persistent, queryable knowledge.
+For ingesting external sources (URLs, files, folders), use the dedicated `/ingest` skill. It handles both wiki and obsidian backends automatically.
 
-The user provides one of:
-- A **URL** (starts with `http://` or `https://`)
-- A **file path** (path to a single file)
-- A **folder path** (path to a directory)
-
-### Step 1 — Fetch the source
-
-| Source type | How to read |
-|---|---|
-| URL | Use `WebFetch` tool to retrieve the page content |
-| File | Use `Read` tool to read the file |
-| Folder | Use `Bash` to list files (`find <path> -type f`), then `Read` key files. Skip: `__pycache__`, `.git`, `node_modules`, `.venv`, `dist`, `build`, `.egg-info` |
-
-### Step 2 — AI analysis
-
-Analyze the content and extract:
-
-1. **Title** — a concise, descriptive name for this source
-2. **Summary** — 2-5 sentence overview of what this source contains and why it matters
-3. **Concepts** — key ideas, patterns, techniques, or abstractions (e.g., "dependency injection", "event sourcing", "fan-out pattern")
-4. **Entities** — specific named things: tools, libraries, people, projects, APIs (e.g., "PostgreSQL", "Karpathy", "wiki_backend.py")
-5. **Tags** — categorization labels (e.g., "python", "architecture", "api")
-
-### Step 3 — Ingest via CLI
-
-Call the single ingest command regardless of source type:
-
-```bash
-agent-notes memory ingest "<title>" "<summary>" "<concepts_csv>" "<entities_csv>" "<tags_csv>"
-```
-
-This creates the source page and fans out to concept and entity pages with cross-references. Note: raw content archiving is not available via CLI — the AI summary is the stored knowledge.
-
-### Step 4 — Report
-
-After ingestion, report to the user:
-- What was ingested (title, source type)
-- Key concepts and entities extracted
-- Number of wiki pages created/updated
-
-### Example
-
-User: `/ingest https://karpathy.github.io/2023/01/20/llm-wiki/`
-
-1. Fetch URL with WebFetch
-2. Analyze: Title="LLM Wiki by Karpathy", Summary="Proposes using LLMs to maintain personal knowledge wikis...", Concepts=["LLM Wiki", "knowledge management", "fan-out pattern"], Entities=["Andrej Karpathy"], Tags=["ai", "knowledge-management"]
-3. Run: `agent-notes memory ingest "LLM Wiki by Karpathy" "Proposes using LLMs to maintain personal knowledge wikis..." "LLM Wiki,knowledge management,fan-out pattern" "Andrej Karpathy" "ai,knowledge-management"`
-4. Report results
-
-### No-args mode — Karpathy compile operation
-
-When `/ingest` is called with no arguments, it triggers the Karpathy LLM Wiki **compile operation**: read raw sources, write rich wiki pages, cross-reference everything.
-
-**Step 1 — Scan**:
-```bash
-agent-notes memory ingest
-```
-Lists unprocessed raw file groups.
-
-**Step 2 — Inventory existing pages**: Read existing concept/entity pages. Identify stubs (body is just "Referenced from source") that need compilation.
-
-**Step 3 — Group by domain**: Cluster related concepts into batches of 5-10 for focused compilation. Examples:
-- Payments: ACH processing, wire approvals, reconciliation, mass payments
-- Real estate: deal management, construction draws, loan servicing, extensions
-- Integrations: DocuSign, Plaid, Slack, HubSpot
-
-**Step 4 — Dispatch wiki-compiler**: For each domain batch, dispatch the `wiki-compiler` agent:
-```
-wiki-compiler: "Compile these concepts from raw source material: [concept list].
-Wiki root: <path>. Raw chunks: portal-domcap-001.md through -017.md.
-Read the code, write rich Wikipedia-style pages."
-```
-
-The wiki-compiler greps raw chunks for relevant code, reads it, and writes rich pages via `agent-notes memory add`.
-
-**Step 5 — Synthesis**: After all batches complete, create synthesis pages for cross-cutting themes:
-- "Payment Architecture" — how ACH and wire flows connect
-- "Deal Lifecycle" — from origination to payoff
-- "Notification System" — email, Slack, task assignment integration
-
-Use: `agent-notes memory add "<title>" "<body>" synthesis lead`
-
-**Step 6 — Lint**: Run `agent-notes memory lint` to verify wiki health — no broken links, orphan pages, or stubs remaining.
+See: `/ingest` — adapts the Karpathy ingest → compile → cross-reference flow to whichever backend is active.

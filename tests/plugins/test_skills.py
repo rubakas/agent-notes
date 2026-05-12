@@ -75,3 +75,20 @@ def test_skill_name_matches_dir(skill_dir):
     assert fm.get("name") == skill_dir.name, (
         f"{skill_dir.name}/SKILL.md: 'name' field is '{fm.get('name')}', expected '{skill_dir.name}'"
     )
+
+
+VALID_MEMORY_BACKENDS = {"obsidian", "wiki", "local", "none"}
+
+
+@pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=[d.name for d in SKILL_DIRS])
+def test_skill_requires_memory_has_valid_backends(skill_dir):
+    """If requires_memory is set, all values must be valid backend names."""
+    text = (skill_dir / "SKILL.md").read_text()
+    fm = _parse_frontmatter(text)
+    requires = fm.get("requires_memory", "")
+    if requires:
+        backends = {b.strip() for b in requires.split(",")}
+        invalid = backends - VALID_MEMORY_BACKENDS
+        assert not invalid, (
+            f"{skill_dir.name}/SKILL.md has invalid requires_memory backends: {invalid}"
+        )
