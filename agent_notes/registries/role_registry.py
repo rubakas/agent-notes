@@ -54,6 +54,7 @@ def load_role_registry(roles_dir: Optional[Path] = None) -> RoleRegistry:
             description=data["description"],
             typical_class=data["typical_class"],
             color=data.get("color", ""),
+            default_model=data.get("default_model", ""),
         ))
     
     return RoleRegistry(roles)

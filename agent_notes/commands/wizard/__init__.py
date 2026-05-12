@@ -80,10 +80,19 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
             if backend_name == "claude" and role.name == "orchestrator":
                 continue
 
-            default_model = next(
-                (m for m in reversed(compatible) if m.model_class == role.typical_class),
-                compatible[0],
-            )
+            if role.default_model:
+                default_model = next(
+                    (m for m in compatible if m.id == role.default_model),
+                    next(
+                        (m for m in reversed(compatible) if m.model_class == role.typical_class),
+                        compatible[0],
+                    ),
+                )
+            else:
+                default_model = next(
+                    (m for m in reversed(compatible) if m.model_class == role.typical_class),
+                    compatible[0],
+                )
             default_idx = compatible.index(default_model)
 
             options = []
@@ -262,7 +271,7 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
 
         subfolder = "notes" if backend == "obsidian" else "knowledge"
         candidates = _detect_obsidian_vaults()
-        default_vault = str(candidates[0]) if candidates else str(Path.home() / "Documents" / "Obsidian Vault")
+        default_vault = str(candidates[0]) if candidates else str(Path.home() / "Obsidian" / "agent-notes")
         if candidates:
             print(f"  {Color.DIM}Detected vaults:{Color.NC}")
             for c in candidates[:3]:

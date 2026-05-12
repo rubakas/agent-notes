@@ -11,3 +11,4 @@ class Role:
     description: str
     typical_class: str
     color: str = ""
+    default_model: str = ""
