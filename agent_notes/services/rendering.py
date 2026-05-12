@@ -139,6 +139,7 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
         _st = _load_state_fn()
         prompt_content = prompt_content.replace("{{MEMORY_PATH}}", _memory_path(_st))
+        prompt_content = prompt_content.replace("{{MEMORY_READING_GUIDE}}", _memory_reading_guide(_st))
 
         # Generate for each backend that supports agents
         for backend in registry.all():
@@ -307,6 +308,64 @@ def _memory_path(st) -> str:
         return "disabled"
 
     return str(resolved)
+
+
+def _memory_reading_guide(st) -> str:
+    """Return backend-appropriate reading instructions for {{MEMORY_READING_GUIDE}} substitution."""
+    from ..config import memory_dir_for_backend
+    from ..constants import Wiki, Obsidian
+
+    if st is None:
+        return "Memory is not configured. Proceed without reading any shared state."
+
+    backend = st.memory.backend
+    custom_path = st.memory.path
+
+    if backend == "none":
+        return "Memory is disabled. Proceed without reading any shared state."
+
+    resolved = memory_dir_for_backend(backend, custom_path)
+    if resolved is None:
+        return "Memory is disabled. Proceed without reading any shared state."
+
+    path = str(resolved)
+
+    if backend == "wiki":
+        _sessions, _concepts, _entities = Wiki.PAGE_TYPES[4], Wiki.PAGE_TYPES[1], Wiki.PAGE_TYPES[2]
+        return (
+            f"You are part of a team that shares state via a knowledge wiki at `{path}`.\n\n"
+            "### Read before working\n\n"
+            "If the task references an in-flight initiative, prior decision, or session progress, read the relevant wiki files BEFORE you start:\n\n"
+            f"1. `{path}/{Wiki.DIR}/{Wiki.INDEX}` — directory of all wiki pages\n"
+            f"2. `{path}/{Wiki.DIR}/{_sessions}/` — session logs for ongoing work\n"
+            f"3. `{path}/{Wiki.DIR}/{_concepts}/` — decisions, patterns, domain knowledge\n"
+            f"4. `{path}/{Wiki.DIR}/{_entities}/` — key entities and components\n\n"
+            f"If `{path}` is \"disabled\", skip this — proceed without wiki context."
+        )
+
+    if backend == "obsidian":
+        _sessions_cat, _decisions_cat, _patterns_cat, _mistakes_cat = (
+            Obsidian.CATEGORIES[4], Obsidian.CATEGORIES[1], Obsidian.CATEGORIES[0], Obsidian.CATEGORIES[2]
+        )
+        return (
+            f"You are part of a team that shares state via an Obsidian vault at `{path}`.\n\n"
+            "### Read before working\n\n"
+            "If the task you've been given references an in-flight initiative, prior decision, recent pattern, or session progress, read the relevant vault files BEFORE you start:\n\n"
+            f"1. `{path}/{Obsidian.INDEX}` — what's been written and where\n"
+            f"2. `{path}/{_sessions_cat}/<recent>.md` — current session log if the task is part of an ongoing thread\n"
+            f"3. `{path}/{_decisions_cat}/` or `{_patterns_cat}/` or `{_mistakes_cat}/` — relevant cross-session knowledge\n\n"
+            f"If `{path}` is \"disabled\" (memory backend not configured), skip this — proceed without vault context."
+        )
+
+    # local backend
+    return (
+        f"You are part of a team that shares state via a local memory store at `{path}`.\n\n"
+        "### Read before working\n\n"
+        "If the task references an in-flight initiative, prior decision, or session progress, read the relevant memory files BEFORE you start:\n\n"
+        f"1. `{path}/MEMORY.md` — index of saved memories\n"
+        f"2. `{path}/` — individual memory files by topic\n\n"
+        f"If `{path}` is \"disabled\", skip this — proceed without memory context."
+    )
 
 
 def _memory_instructions(st) -> str:
