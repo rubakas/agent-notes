@@ -12,10 +12,14 @@ _WIKI_TYPE_MAP = {
     "mistake": "concepts",
     "context": "concepts",
     "concept": "concepts",
+    "concepts": "concepts",
     "entity": "entities",
+    "entities": "entities",
     "synthesis": "synthesis",
     "session": "sessions",
+    "sessions": "sessions",
     "source": "sources",
+    "sources": "sources",
 }
 
 

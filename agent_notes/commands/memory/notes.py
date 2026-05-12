@@ -19,7 +19,7 @@ def do_add(title: str, body: str, note_type: str = "context", agent: str = "", p
     if backend == "wiki":
         from ...services.wiki_backend import wiki_write_page
         page_type = _common._WIKI_TYPE_MAP.get(note_type, "concepts")
-        extra_tags = [note_type] if note_type not in ("concept", "entity", "synthesis", "session", "source") else []
+        extra_tags = [note_type] if note_type not in ("concept", "entity", "synthesis", "session", "source", "concepts", "entities", "sessions", "sources") else []
         page_path = wiki_write_page(
             path,
             title=title,
