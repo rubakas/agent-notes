@@ -457,6 +457,7 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
     remove_matching_allow_entries(settings_path, "Bash(agent-notes")
     remove_allow_entry(settings_path, "Bash(cost-report)")
     install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
+    install_allow_entry(settings_path, "Bash(agent-notes memory *)")
 
     # Remove memory path permissions for all known backend default paths so that
     # stale entries from previous installs (even ones before the last state save)
