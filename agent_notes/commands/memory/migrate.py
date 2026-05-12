@@ -20,9 +20,8 @@ def do_migrate() -> None:
         print("Memory path not configured.")
         return
 
-    from ...services.obsidian_backend import (
-        OBSIDIAN_CATEGORIES, obsidian_regenerate_index,
-    )
+    from ...services.obsidian_backend import OBSIDIAN_CATEGORIES
+    from ...services.memory_router import memory_regenerate_index
     from ...services._memory_utils import _parse_frontmatter
 
     _NEW_FILE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_")
@@ -144,7 +143,7 @@ def do_migrate() -> None:
                 skipped += 1
 
     # Step 3: regenerate index
-    obsidian_regenerate_index(vault)
+    memory_regenerate_index(backend, vault)
 
     print(f"{moved} moved, {renamed} renamed, {skipped} skipped", end="")
     if errors:

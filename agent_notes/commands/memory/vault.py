@@ -32,23 +32,20 @@ def do_init() -> None:
     if path is None:
         print("Memory path not configured.")
         return
+    from ...services.memory_router import memory_init
+    memory_init(backend, path)
     if backend == "wiki":
-        from ...services.wiki_backend import wiki_init, WIKI_PAGE_TYPES
-        wiki_init(path)
+        from ...services.wiki_backend import WIKI_PAGE_TYPES
         print(f"{Color.GREEN}Wiki initialised at {path}{Color.NC}")
         print(f"  Folders: raw/, wiki/{{{', '.join(WIKI_PAGE_TYPES)}}}")
         print(f"  Index:   {path / 'wiki' / 'index.md'}")
-        return
-    if backend == "obsidian":
-        from ...services.obsidian_backend import obsidian_init, OBSIDIAN_CATEGORIES
-        obsidian_init(path)
+    elif backend == "obsidian":
+        from ...services.obsidian_backend import OBSIDIAN_CATEGORIES
         print(f"{Color.GREEN}Obsidian vault initialised at {path}{Color.NC}")
         print(f"  Folders: {', '.join(OBSIDIAN_CATEGORIES)}")
         print(f"  Index:   {path / 'Index.md'}")
         print(f"\nOpen the folder as a vault in Obsidian to start browsing.")
     else:
-        from ...services.local_backend import local_init
-        local_init(path)
         print(f"{Color.GREEN}Memory directory initialised at {path}{Color.NC}")
 
 
@@ -61,15 +58,9 @@ def do_index() -> None:
     if path is None:
         print("Memory path not configured.")
         return
+    from ...services.memory_router import memory_regenerate_index
+    memory_regenerate_index(backend, path)
     if backend == "wiki":
-        from ...services.wiki_backend import wiki_regenerate_index
-        wiki_regenerate_index(path)
         print(f"{Color.GREEN}index.md regenerated at {path / 'wiki' / 'index.md'}{Color.NC}")
-    elif backend == "obsidian":
-        from ...services.obsidian_backend import obsidian_regenerate_index
-        obsidian_regenerate_index(path)
-        print(f"{Color.GREEN}Index.md regenerated at {path / 'Index.md'}{Color.NC}")
     else:
-        from ...services.local_backend import local_regenerate_index
-        local_regenerate_index(path)
         print(f"{Color.GREEN}Index.md regenerated at {path / 'Index.md'}{Color.NC}")
