@@ -97,6 +97,18 @@ def remove_allow_entry(settings_path: Path, pattern: str) -> None:
     settings_path.write_text(json.dumps(data, indent=2) + "\n")
 
 
+def remove_matching_allow_entries(settings_path: Path, prefix: str) -> None:
+    """Remove all permission entries that start with the given prefix."""
+    data = _load_settings(settings_path)
+    allow = data.get("permissions", {}).get("allow", [])
+    filtered = [e for e in allow if not e.startswith(prefix)]
+    if len(filtered) == len(allow):
+        return
+    data.setdefault("permissions", {})["allow"] = filtered
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(json.dumps(data, indent=2) + "\n")
+
+
 def has_hook(settings_path: Path, hook_event: str, command: str) -> bool:
     """Return True if the hook is present in settings.json."""
     data = _load_settings(settings_path)

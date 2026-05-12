@@ -1088,6 +1088,57 @@ class TestWikiIngestFolder:
         assert len(chunk_files) == 0
 
 
+    def test_skips_credential_files_in_folder(self, tmp_path):
+        folder = tmp_path / "project"
+        folder.mkdir()
+        (folder / ".env.production").write_text("SECRET_KEY=abc123")
+        (folder / "credentials.json").write_text('{"key": "value"}')
+        (folder / "server.key").write_text("-----BEGIN PRIVATE KEY-----")
+        (folder / "real_code.py").write_text("def main(): pass")
+        wiki_root = tmp_path / "wiki_root"
+        wiki_ingest_folder(wiki_root, folder_path=folder)
+        raw_file = next((wiki_root / "raw").glob("*"))
+        content = raw_file.read_text()
+        assert "real_code" in content
+        assert "SECRET_KEY" not in content
+        assert "BEGIN PRIVATE KEY" not in content
+
+    def test_does_not_skip_code_files_with_similar_names(self, tmp_path):
+        folder = tmp_path / "project"
+        folder.mkdir()
+        (folder / "token_handler.py").write_text("def handle_token(): pass")
+        (folder / "secret_service.py").write_text("def secret_service(): pass")
+        (folder / "auth.py").write_text("def authenticate(): pass")
+        wiki_root = tmp_path / "wiki_root"
+        wiki_ingest_folder(wiki_root, folder_path=folder)
+        raw_file = next((wiki_root / "raw").glob("*"))
+        content = raw_file.read_text()
+        assert "handle_token" in content
+        assert "secret_service" in content
+        assert "authenticate" in content
+
+
+# ── wiki_ingest_file credential filtering ────────────────────────────────────
+
+class TestWikiIngestFileCredentials:
+    def test_ingest_file_refuses_credential_file(self, tmp_path):
+        cred_file = tmp_path / ".env.production"
+        cred_file.write_text("DB_PASSWORD=hunter2")
+        wiki_root = tmp_path / "wiki_root"
+        with pytest.raises(ValueError) as exc_info:
+            wiki_ingest_file(wiki_root, file_path=cred_file)
+        msg = str(exc_info.value).lower()
+        assert "credential" in msg or "refusing" in msg
+
+    def test_ingest_file_accepts_normal_file(self, tmp_path):
+        config_file = tmp_path / "config.py"
+        config_file.write_text("DEBUG = False")
+        wiki_root = tmp_path / "wiki_root"
+        result = wiki_ingest_file(wiki_root, file_path=config_file)
+        assert isinstance(result, dict)
+        assert "source" in result
+
+
 # ── wiki_ingest_url ───────────────────────────────────────────────────────────
 
 def _make_mock_response(content: str, encoding: str = "utf-8") -> MagicMock:

@@ -15,6 +15,7 @@ Directory layout managed by this module:
 
 from __future__ import annotations
 
+import fnmatch as _fnmatch
 import os
 import re
 import tempfile
@@ -26,8 +27,7 @@ WIKI_PAGE_TYPES = ["sources", "concepts", "entities", "synthesis", "sessions"]
 
 _RAW_CHUNK_MAX = 2 * 1024 * 1024  # 2 MB
 
-# Re-use helpers from memory_backend rather than duplicating them
-from .memory_backend import (
+from ._memory_utils import (
     _slug,
     _now_iso,
     _today,
@@ -248,6 +248,11 @@ def wiki_ingest_file(
     """Ingest a local file into the wiki. Reads content, derives title, delegates to wiki_ingest."""
     if not file_path.is_file():
         raise FileNotFoundError(f"File not found: {file_path}")
+    if _is_credential_file(file_path):
+        raise ValueError(
+            f"Refusing to ingest credential file: {file_path.name}. "
+            "Credential files must never be stored in the knowledge base."
+        )
     raw_content = file_path.read_text(errors="replace")
     if not title:
         title = file_path.stem.replace("-", " ").replace("_", " ").title()
@@ -304,6 +309,26 @@ def wiki_ingest_file(
 
 _SKIP_DIRS = {"__pycache__", ".git", "node_modules", ".venv", "dist", "build"}
 _DEFAULT_EXTENSIONS = {".py", ".md", ".yaml", ".yml", ".toml", ".json", ".txt", ".rs", ".ts", ".js", ".rb", ".go", ".java"}
+
+_CREDENTIAL_PATTERNS = [
+    ".env", ".env.*",
+    "*.key", "*.pem", "*.p12", "*.pfx", "*.jks",
+    "*.keystore", "*.truststore",
+    "credentials.*", "secrets.*", "*-secrets.*",
+    "service-account*.json",
+    "*secret*.yaml", "*secret*.yml", "*secret*.json",
+    "*apikey*.*", "*api-key*.*", "*api_key*.*",
+    "*private-key*.*", "*private_key*.*",
+]
+
+
+def _is_credential_file(path: Path) -> bool:
+    """Return True if the file matches known credential patterns."""
+    name = path.name.lower()
+    for pattern in _CREDENTIAL_PATTERNS:
+        if _fnmatch.fnmatch(name, pattern):
+            return True
+    return False
 
 
 def _parse_gitignore_patterns(gitignore_path: Path) -> list[str]:
@@ -376,6 +401,8 @@ def wiki_ingest_folder(
         # Gitignore filter
         rel = str(file.relative_to(folder_path))
         if gitignore_patterns and _matches_gitignore(rel, gitignore_patterns):
+            continue
+        if _is_credential_file(file):
             continue
 
         try:

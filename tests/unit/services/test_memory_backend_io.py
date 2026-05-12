@@ -3,7 +3,7 @@ import re
 import pytest
 from pathlib import Path
 
-from agent_notes.services.memory_backend import (
+from agent_notes.services.obsidian_backend import (
     obsidian_write_note,
     obsidian_regenerate_index,
     _parse_note_metadata,
@@ -142,7 +142,7 @@ class TestObsidianWriteNote:
         assert "## Related" in content
 
     def test_two_rapid_notes_with_same_title_get_different_filenames(self, tmp_path, monkeypatch):
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
         # Same day, same slug → collision → second gets _HHMMSS suffix
         monkeypatch.setattr(mb, "_today", lambda: "2026-04-30")
         monkeypatch.setattr(mb, "_now_hhmmss", lambda: "142231")
@@ -260,7 +260,7 @@ class TestSessionNoteFilename:
         monkeypatch.chdir(cwd)
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
 
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
         monkeypatch.setattr(mb, "_today", lambda: "2026-04-30")
 
         path = obsidian_write_note(
@@ -294,7 +294,7 @@ class TestSessionNoteFilename:
         monkeypatch.delenv("CLAUDECODE", raising=False)
         monkeypatch.delenv("CLAUDE_CODE_ENTRYPOINT", raising=False)
 
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
         monkeypatch.setattr(mb, "_today", lambda: "2026-04-30")
 
         path = obsidian_write_note(
@@ -307,7 +307,7 @@ class TestSessionNoteFilename:
     def test_non_session_types_use_date_slug(self, tmp_path, monkeypatch):
         monkeypatch.setenv("CLAUDECODE", "1")
 
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
         monkeypatch.setattr(mb, "_today", lambda: "2026-04-30")
 
         path = obsidian_write_note(
@@ -402,7 +402,7 @@ class TestSessionFrontmatterMigration:
         monkeypatch.chdir(cwd)
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
 
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
         monkeypatch.setattr(mb, "_today", lambda: "2026-01-01")
 
         vault = tmp_path / "vault"
@@ -472,7 +472,7 @@ class TestIndexFormat:
         assert dts == sorted(dts, reverse=True)
 
     def test_index_line_format(self, tmp_path, monkeypatch):
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
         monkeypatch.setattr(mb, "_current_project_name", lambda: "test-project")
         patterns = tmp_path / "Patterns"
         self._make_note(patterns, "2026-04-29_test-pat", "pattern",
@@ -514,7 +514,7 @@ class TestProjectField:
 
     def test_obsidian_write_note_auto_fills_project_from_cwd(self, tmp_path, monkeypatch):
         """project="" triggers auto-fill from Path.cwd().name."""
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
         monkeypatch.setattr(mb.Path, "cwd", classmethod(lambda cls: Path("/fake/my-repo")))
 
         path = obsidian_write_note(
@@ -525,7 +525,7 @@ class TestProjectField:
 
     def test_obsidian_write_note_explicit_project_overrides_cwd(self, tmp_path, monkeypatch):
         """An explicit project value is used verbatim, ignoring cwd."""
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
         monkeypatch.setattr(mb.Path, "cwd", classmethod(lambda cls: Path("/fake/some-other-dir")))
 
         path = obsidian_write_note(
@@ -537,7 +537,7 @@ class TestProjectField:
 
     def test_obsidian_write_note_omits_project_when_empty(self, tmp_path, monkeypatch):
         """When _current_project_name() returns "" the project key is absent from frontmatter."""
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
         monkeypatch.setattr(mb, "_current_project_name", lambda: "")
 
         path = obsidian_write_note(
@@ -562,7 +562,7 @@ class TestProjectField:
 
     def test_obsidian_index_line_format_legacy_no_project(self, tmp_path, monkeypatch):
         """Legacy notes without a project field fall back to _current_project_name() in the index."""
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
         monkeypatch.setattr(mb, "_current_project_name", lambda: "agent-notes")
         patterns = tmp_path / "Patterns"
         patterns.mkdir(parents=True, exist_ok=True)
@@ -587,7 +587,7 @@ class TestProjectField:
         monkeypatch.chdir(cwd)
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
 
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
 
         # Write initial session note with project=alpha
         monkeypatch.setattr(mb, "_current_project_name", lambda: "alpha")
@@ -617,7 +617,7 @@ class TestProjectField:
           - direct-append branch: existing note already has `created_at` in frontmatter
           - legacy-migration branch: existing note has `date` instead of `created_at` (the buggy path)
         """
-        import agent_notes.services.memory_backend as mb
+        import agent_notes.services.obsidian_backend as mb
 
         # ------------------------------------------------------------------
         # Branch 1: direct-append (created_at present, no project key)
@@ -688,3 +688,66 @@ class TestProjectField:
             "legacy-migration branch: 'project:' key found in frontmatter block"
         )
         assert "appended body" in content_b
+
+
+# ── Wikilink resolution ───────────────────────────────────────────────────────
+
+class TestWikilinkResolution:
+    def test_wikilink_resolution(self, tmp_path):
+        """Wikilinks in note body resolve to date-prefixed filenames."""
+        vault = tmp_path / "vault"
+        from agent_notes.services.obsidian_backend import obsidian_init, obsidian_write_note
+        obsidian_init(vault)
+
+        # Create a first note (simulates an existing note)
+        obsidian_write_note(
+            vault,
+            title="My Project",
+            body="Project overview.",
+            note_type="context",
+            agent="lead",
+        )
+
+        # Find the created file to get its actual filename
+        context_dir = vault / "Context"
+        files = list(context_dir.glob("*my-project.md"))
+        assert len(files) == 1
+        first_file = files[0]
+        expected_stem = first_file.stem  # e.g., "2026-05-12_my-project"
+
+        # Create a second note with a wikilink to the first
+        obsidian_write_note(
+            vault,
+            title="Related Note",
+            body="See [[my-project]] for details.",
+            note_type="pattern",
+            agent="lead",
+        )
+
+        # Read the second note and verify wikilink was resolved
+        pattern_dir = vault / "Patterns"
+        files = list(pattern_dir.glob("*related-note.md"))
+        assert len(files) == 1
+        content = files[0].read_text()
+        assert f"[[{expected_stem}]]" in content
+        assert "[[my-project]]" not in content
+
+    def test_wikilink_unresolvable_left_as_is(self, tmp_path):
+        """Wikilinks that don't match any file are left unchanged."""
+        vault = tmp_path / "vault"
+        from agent_notes.services.obsidian_backend import obsidian_init, obsidian_write_note
+        obsidian_init(vault)
+
+        obsidian_write_note(
+            vault,
+            title="Some Note",
+            body="See [[nonexistent-thing]] for details.",
+            note_type="context",
+            agent="lead",
+        )
+
+        context_dir = vault / "Context"
+        files = list(context_dir.glob("*some-note.md"))
+        assert len(files) == 1
+        content = files[0].read_text()
+        assert "[[nonexistent-thing]]" in content

@@ -412,12 +412,25 @@ def _session_hook_paths(backend, scope: str):
     return settings_path, context_file, hook_command
 
 
-def _install_session_hook(backend, scope: str) -> None:
+def _filter_skills_by_backend(skills, memory_backend: str):
+    result = []
+    for skill in skills:
+        if skill.requires_memory is None:
+            result.append(skill)
+        else:
+            allowed = {b.strip() for b in skill.requires_memory.split(",")}
+            if memory_backend in allowed:
+                result.append(skill)
+    return result
+
+
+def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
     """Install the SessionStart hook and write the context file for Claude Code."""
-    from .settings_writer import install_hook, install_allow_entry, remove_allow_entry
+    from .settings_writer import install_hook, install_allow_entry, remove_allow_entry, remove_matching_allow_entries
     from .session_context import write_context
     from ..registries.skill_registry import default_skill_registry
     from .. import config
+    from ..config import memory_dir_for_backend
 
     settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
 
@@ -427,26 +440,68 @@ def _install_session_hook(backend, scope: str) -> None:
     if agents_dist.exists():
         agents = sorted(p.stem for p in agents_dist.glob("*.md"))
 
-    skills = default_skill_registry().all()
+    if not memory_backend:
+        state = load_state()
+        memory_backend = state.memory.backend if state else "local"
+        memory_path = state.memory.path if state else ""
+
+    skills = _filter_skills_by_backend(default_skill_registry().all(), memory_backend)
 
     version = config.get_version()
     print(f"Installing Claude Code SessionStart hook ...")
     write_context(context_file, agents, version, skills)
     install_hook(settings_path, "SessionStart", hook_command)
-    # Remove old standalone entry if present (backward compat cleanup)
+
+    # Remove ALL agent-notes Bash permission entries (covers stale entries from
+    # any previous install, not just the immediately preceding one)
+    remove_matching_allow_entries(settings_path, "Bash(agent-notes")
     remove_allow_entry(settings_path, "Bash(cost-report)")
     install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
 
+    # Remove memory path permissions for all known backend default paths so that
+    # stale entries from previous installs (even ones before the last state save)
+    # are cleaned up before adding fresh entries.
+    for bk in ("wiki", "obsidian"):
+        default_path = memory_dir_for_backend(bk, "")
+        if default_path:
+            p = str(default_path) + "/**"
+            remove_allow_entry(settings_path, f"Read({p})")
+            remove_allow_entry(settings_path, f"Write({p})")
+            remove_allow_entry(settings_path, f"Edit({p})")
 
-def _uninstall_session_hook(backend, scope: str) -> None:
+    # Also remove any custom path recorded in old state
+    old_state = load_state()
+    if old_state and old_state.memory.backend in ("wiki", "obsidian") and old_state.memory.path:
+        old_resolved = memory_dir_for_backend(old_state.memory.backend, old_state.memory.path)
+        if old_resolved:
+            old_pattern = str(old_resolved) + "/**"
+            remove_allow_entry(settings_path, f"Read({old_pattern})")
+            remove_allow_entry(settings_path, f"Write({old_pattern})")
+            remove_allow_entry(settings_path, f"Edit({old_pattern})")
+
+    # Add read/write/edit permissions for the new memory vault path
+    if memory_backend in ("wiki", "obsidian"):
+        resolved_path = memory_dir_for_backend(memory_backend, memory_path)
+        if resolved_path:
+            path_pattern = str(resolved_path) + "/**"
+            install_allow_entry(settings_path, f"Read({path_pattern})")
+            install_allow_entry(settings_path, f"Write({path_pattern})")
+            install_allow_entry(settings_path, f"Edit({path_pattern})")
+
+
+def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
     """Remove the SessionStart hook and context file for Claude Code."""
-    from .settings_writer import remove_hook, remove_allow_entry
+    from .settings_writer import remove_hook, remove_allow_entry, remove_matching_allow_entries
 
     settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
+
     print(f"Removing Claude Code SessionStart hook ...")
     context_file.unlink(missing_ok=True)
     remove_hook(settings_path, "SessionStart", hook_command)
+    # Remove ALL agent-notes Bash permission entries (covers old naming too)
+    remove_matching_allow_entries(settings_path, "Bash(agent-notes")
     remove_allow_entry(settings_path, "Bash(cost-report)")
-    remove_allow_entry(settings_path, "Bash(agent-notes cost-report)")
+    # Read/Write/Edit entries for memory vault paths are intentionally kept —
+    # the user may still want Claude to access their vault without agent-notes.
 
 
