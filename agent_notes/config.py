@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from .constants import DEFAULT_VAULT_DIR, DEFAULT_VAULT_NAME, Wiki, Obsidian
+
 # Import UI from services for re-export
 from .services.ui import Color, ok, warn, fail, error, info, issue, linked, removed, skipped
 
@@ -47,12 +49,12 @@ def memory_dir_for_backend(backend: str, custom_path: str = "") -> Optional[Path
     if backend == "wiki":
         if custom_path:
             return Path(custom_path).expanduser()
-        return Path.home() / "Obsidian" / "agent-notes" / "knowledge"
+        return Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME / Wiki.SUBFOLDER
     # obsidian is project-scoped
     if custom_path:
         root = Path(custom_path).expanduser()
     elif backend == "obsidian":
-        root = Path.home() / "Obsidian" / "agent-notes" / "notes"
+        root = Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME / Obsidian.SUBFOLDER
     else:
         return MEMORY_DIR
     project = Path.cwd().name

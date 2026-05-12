@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from ..constants import DEFAULT_VAULT_DIR, DEFAULT_VAULT_NAME, Wiki, Obsidian
+
 
 def _load_state():
     """Load state or exit with a clear message."""
@@ -337,8 +339,8 @@ def _wizard_memory(state, before: str) -> bool:
         if mode_choice in mode_options:
             backend, label = mode_options[mode_choice]
 
-        subfolder = "notes" if backend == "obsidian" else "knowledge"
-        default_vault = str(Path.home() / "Obsidian" / "agent-notes")
+        subfolder = Obsidian.SUBFOLDER if backend == "obsidian" else Wiki.SUBFOLDER
+        default_vault = str(Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME)
         print(f"  Folder name: {subfolder}")
         print("  Press Tab to autocomplete paths")
         raw = _path_input(f"  Vault path [{default_vault}]: ", default_vault).strip()

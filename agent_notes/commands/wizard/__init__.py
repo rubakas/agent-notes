@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Dict, Set
 
 from ...config import Color
+from ...constants import DEFAULT_VAULT_DIR, DEFAULT_VAULT_NAME, Wiki, Obsidian
 from ...services.ui import (
     _can_interactive, _safe_input, _path_input, _checkbox_select, _radio_select,
     _checkbox_select_fallback, _radio_select_fallback,
@@ -269,9 +270,9 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
             backend = _radio_select_fallback("Obsidian mode", mode_options, default=0,
                                              step=step, total=total, version=version)
 
-        subfolder = "notes" if backend == "obsidian" else "knowledge"
+        subfolder = Obsidian.SUBFOLDER if backend == "obsidian" else Wiki.SUBFOLDER
         candidates = _detect_obsidian_vaults()
-        default_vault = str(candidates[0]) if candidates else str(Path.home() / "Obsidian" / "agent-notes")
+        default_vault = str(candidates[0]) if candidates else str(Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME)
         if candidates:
             print(f"  {Color.DIM}Detected vaults:{Color.NC}")
             for c in candidates[:3]:

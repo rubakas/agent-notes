@@ -15,9 +15,12 @@ from pathlib import Path
 from typing import Optional
 
 from ._memory_utils import _slug, _now_iso, _today, _now_hhmmss, _parse_frontmatter
+from ..constants import Obsidian  # noqa: F401
 
+OBSIDIAN_CATEGORIES = Obsidian.CATEGORIES
+OBSIDIAN_INDEX = Obsidian.INDEX
 
-OBSIDIAN_CATEGORIES = ["Patterns", "Decisions", "Mistakes", "Context", "Sessions"]
+_SESSIONS_FOLDER = Obsidian.CATEGORIES[4]  # "Sessions"
 
 
 def _current_session_id() -> Optional[str]:
@@ -41,9 +44,9 @@ def _current_project_name() -> str:
 def obsidian_init(vault: Path) -> None:
     """Create category folders and a stub Index.md if the vault is new."""
     vault.mkdir(parents=True, exist_ok=True)
-    for cat in OBSIDIAN_CATEGORIES:
+    for cat in Obsidian.CATEGORIES:
         (vault / cat).mkdir(exist_ok=True)
-    index = vault / "Index.md"
+    index = vault / Obsidian.INDEX
     if not index.exists():
         obsidian_regenerate_index(vault)
 
@@ -93,7 +96,7 @@ def _build_note(
 
 def _find_session_note(vault: Path, session_id: str) -> Optional[Path]:
     """Find the session note file for the given session_id (matches stem pattern YYYY-MM-DD_<id>)."""
-    sessions_dir = vault / "Sessions"
+    sessions_dir = vault / _SESSIONS_FOLDER
     if not sessions_dir.exists():
         return None
     for f in sessions_dir.glob("*.md"):
@@ -127,7 +130,7 @@ def _resolve_wikilinks(body: str, vault: Path) -> str:
         if re.match(r"^\d{4}-\d{2}-\d{2}_", slug):
             return m.group(0)
         target = f"_{slug}.md"
-        for cat in OBSIDIAN_CATEGORIES:
+        for cat in Obsidian.CATEGORIES:
             folder = vault / cat
             if not folder.is_dir():
                 continue
@@ -270,7 +273,7 @@ def obsidian_regenerate_index(vault: Path) -> None:
     now_iso = _now_iso()
 
     all_notes: list[tuple[str, Path]] = []
-    for cat in OBSIDIAN_CATEGORIES:
+    for cat in Obsidian.CATEGORIES:
         folder = vault / cat
         if not folder.exists():
             continue
@@ -299,13 +302,13 @@ def obsidian_regenerate_index(vault: Path) -> None:
         project = meta.get("project", "") or _current_project_name()
         lines.append(f"- [[{stem}|{display_dt}]] - {project}({meta['type']})")
 
-    (vault / "Index.md").write_text("\n".join(lines) + "\n")
+    (vault / Obsidian.INDEX).write_text("\n".join(lines) + "\n")
 
 
 def obsidian_list_notes(vault: Path) -> list[dict]:
     """Return list of note metadata dicts from the vault."""
     notes = []
-    for cat in OBSIDIAN_CATEGORIES:
+    for cat in Obsidian.CATEGORIES:
         folder = vault / cat
         if not folder.exists():
             continue

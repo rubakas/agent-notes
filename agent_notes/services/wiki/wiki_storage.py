@@ -17,24 +17,25 @@ from ._wiki_utils import (
     _validate_page_type,
 )
 from .._memory_utils import _slug, _now_iso, _parse_frontmatter
+from ...constants import Wiki
 
 
 def wiki_init(wiki_root: Path) -> None:
     """Create raw/, wiki/ tree with all subdirs, seed index.md and log.md."""
-    (wiki_root / "raw").mkdir(parents=True, exist_ok=True)
-    ignore_path = wiki_root / ".obsidianignore"
+    (wiki_root / Wiki.RAW_DIR).mkdir(parents=True, exist_ok=True)
+    ignore_path = wiki_root / Wiki.IGNORE_FILE
     if not ignore_path.exists():
-        _atomic_write(ignore_path, "raw/\n")
-    wiki_dir = wiki_root / "wiki"
+        _atomic_write(ignore_path, f"{Wiki.RAW_DIR}/\n")
+    wiki_dir = wiki_root / Wiki.DIR
     wiki_dir.mkdir(parents=True, exist_ok=True)
     for sub in WIKI_PAGE_TYPES:
         (wiki_dir / sub).mkdir(exist_ok=True)
 
-    index_path = wiki_dir / "index.md"
+    index_path = wiki_dir / Wiki.INDEX
     if not index_path.exists():
         _atomic_write(index_path, _render_empty_index())
 
-    log_path = wiki_dir / "log.md"
+    log_path = wiki_dir / Wiki.LOG
     if not log_path.exists():
         _atomic_write(log_path, "# Wiki Log\n")
 
@@ -62,7 +63,7 @@ def wiki_write_page(
     _validate_page_type(page_type)
     _ensure_wiki_init(wiki_root)
 
-    wiki_dir = wiki_root / "wiki"
+    wiki_dir = wiki_root / Wiki.DIR
     folder = wiki_dir / page_type
     folder.mkdir(parents=True, exist_ok=True)
 

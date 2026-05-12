@@ -8,16 +8,18 @@ from pathlib import Path
 from typing import Optional
 
 from .._memory_utils import _now_iso
+from ...constants import Wiki  # noqa: F401
 
-
-WIKI_PAGE_TYPES = ["sources", "concepts", "entities", "synthesis", "sessions"]
+WIKI_PAGE_TYPES = Wiki.PAGE_TYPES
+WIKI_DIR = Wiki.DIR
+WIKI_LOG = Wiki.LOG
 
 _RAW_CHUNK_MAX = 2 * 1024 * 1024  # 2 MB
 
 
 def _log_operation(wiki_root: Path, operation: str, title: str, details: str = "") -> None:
     """Append structured entry to wiki/log.md."""
-    log_path = wiki_root / "wiki" / "log.md"
+    log_path = wiki_root / WIKI_DIR / WIKI_LOG
     if not log_path.exists():
         log_path.write_text("# Wiki Log\n")
 
@@ -36,7 +38,7 @@ def _validate_page_type(page_type: str) -> None:
 
 def _ensure_wiki_init(wiki_root: Path) -> None:
     """Auto-initialize wiki_root if it doesn't exist."""
-    if not (wiki_root / "wiki").exists():
+    if not (wiki_root / WIKI_DIR).exists():
         from .wiki_storage import wiki_init  # late import to avoid circular dependency
         wiki_init(wiki_root)
 
