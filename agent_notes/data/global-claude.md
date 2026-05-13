@@ -38,6 +38,14 @@ The session memory note is the durable cross-session record of work done. It MUS
 
 **Plan-mirror rule**: after every ExitPlanMode, mirror the plan content as a Decision note in Obsidian. See `obsidian-memory` SKILL "Plan-mirror rule" section. Obsidian backend only — no-op on local.
 
+### Persist agent discoveries
+
+After receiving output from any agent, scan for a `## Discoveries` section. For each discovery:
+
+1. Review for quality — is this non-obvious, durable, and worth cross-session retrieval?
+2. Skip if ephemeral, derivable from git log, or already in memory
+3. Persist worthy ones: `agent-notes memory add "<title>" "<body>" <type> <agent-name>`
+
 <!-- include: pipelines -->
 
 ## Memory
