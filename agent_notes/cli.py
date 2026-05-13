@@ -284,7 +284,7 @@ def main():
     # config
     p_config = subparsers.add_parser("config", help="Reconfigure role/agent/model/memory/skill assignments after install")
     p_config.add_argument("action", nargs="?", default="wizard",
-        choices=["wizard", "show", "role-model", "role-agent", "provider", "providers"],
+        choices=["wizard", "show", "role-model", "role-agent", "provider", "providers", "memory"],
         help="Config action (default: wizard)")
     p_config.add_argument("extra", nargs="*", help="Additional positional args (role, model, agent)")
     p_config.add_argument("--cli", help="Target CLI (claude / opencode / both)")

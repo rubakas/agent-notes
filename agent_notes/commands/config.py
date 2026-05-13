@@ -313,9 +313,9 @@ def _wizard_memory(state, before: str) -> bool:
     from ..services.ui import _safe_input, _path_input
 
     storage_options = {
-        "1": ("local", "Local markdown files (~/.claude/agent-memory/)"),
+        "1": ("local", "Local files"),
         "2": ("obsidian", "Obsidian vault"),
-        "3": ("none", "None (disable memory)"),
+        "3": ("none", "Disabled"),
     }
 
     print("\nMemory storage options:")
@@ -331,7 +331,10 @@ def _wizard_memory(state, before: str) -> bool:
     path = ""
 
     if backend == "obsidian":
-        mode_options = {"1": ("obsidian", "Session-oriented"), "2": ("wiki", "Wiki")}
+        mode_options = {
+            "1": ("obsidian", "Session notes — project-scoped decisions, patterns, mistakes"),
+            "2": ("wiki", "Knowledge wiki — Karpathy compile-once pattern with concepts, entities, sources"),
+        }
         print("\n  Obsidian mode:")
         for key, (_, mlabel) in mode_options.items():
             print(f"    {key}) {mlabel}")
@@ -455,6 +458,13 @@ def interactive_config() -> None:
         print(f"Unknown choice '{choice}'. Quit.")
 
 
+def interactive_config_memory() -> None:
+    """Run the interactive memory config wizard."""
+    state = _load_state()
+    before = _state_snapshot(state)
+    _wizard_memory(state, before)
+
+
 # ── Entry point ──────────────────────────────────────────────────────────────
 
 def config(action: str = "wizard", args: Optional[list] = None, cli_filter: Optional[str] = None) -> None:
@@ -485,7 +495,9 @@ def config(action: str = "wizard", args: Optional[list] = None, cli_filter: Opti
             print("Usage: agent-notes config provider <name>")
             sys.exit(1)
         _wizard_provider_status(args[0])
+    elif action == "memory":
+        interactive_config_memory()
     else:
         print(f"Unknown config action: {action}")
-        print("Actions: wizard, show, role-model, role-agent, providers, provider")
+        print("Actions: wizard, show, role-model, role-agent, providers, provider, memory")
         sys.exit(1)
