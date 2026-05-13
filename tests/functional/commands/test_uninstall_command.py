@@ -257,7 +257,7 @@ class TestUninstallLocalScopeDoesNotCrash:
 
         with patch("agent_notes.services.installer.load_registry", return_value=registry), \
              patch("agent_notes.services.installer._uninstall_session_hook"), \
-             patch("agent_notes.install_state.remove_install_state"):
+             patch("agent_notes.services.state_store.remove_install_state"):
             from agent_notes.commands.uninstall import uninstall
             uninstall(local=True)  # must not raise
 

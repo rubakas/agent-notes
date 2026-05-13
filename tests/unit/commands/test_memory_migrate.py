@@ -23,7 +23,7 @@ def _make_file(path: Path, content: str = "---\ntitle: test\n---\nbody") -> Path
 
 def _patch_config(monkeypatch, vault: Path):
     """Redirect _load_memory_config to the given tmp vault."""
-    monkeypatch.setattr(mem_mod, "_load_memory_config", lambda: ("obsidian", vault))
+    monkeypatch.setattr(mem_mod._common, "_load_memory_config", lambda: ("obsidian", vault))
 
 
 # ── 10 & 11: bail-out guards ───────────────────────────────────────────────────
@@ -31,21 +31,21 @@ def _patch_config(monkeypatch, vault: Path):
 class TestMigrateBailOut:
     def test_non_obsidian_backend_prints_and_returns(self, monkeypatch, capsys):
         """When backend != obsidian, migrate prints a message and exits early."""
-        monkeypatch.setattr(mem_mod, "_load_memory_config", lambda: ("local", Path("/tmp/fake")))
+        monkeypatch.setattr(mem_mod._common, "_load_memory_config", lambda: ("local", Path("/tmp/fake")))
         mem_mod.do_migrate()
         out = capsys.readouterr().out
         assert "obsidian" in out.lower()
 
     def test_missing_vault_path_prints_and_returns(self, monkeypatch, capsys):
         """When vault path is None, migrate prints a message and exits early."""
-        monkeypatch.setattr(mem_mod, "_load_memory_config", lambda: ("obsidian", None))
+        monkeypatch.setattr(mem_mod._common, "_load_memory_config", lambda: ("obsidian", None))
         mem_mod.do_migrate()
         out = capsys.readouterr().out
         assert out.strip()  # something was printed
 
     def test_non_obsidian_backend_creates_no_files(self, monkeypatch, tmp_path):
         """Non-obsidian bail does not touch the filesystem."""
-        monkeypatch.setattr(mem_mod, "_load_memory_config", lambda: ("local", tmp_path))
+        monkeypatch.setattr(mem_mod._common, "_load_memory_config", lambda: ("local", tmp_path))
         before = set(tmp_path.rglob("*"))
         mem_mod.do_migrate()
         after = set(tmp_path.rglob("*"))

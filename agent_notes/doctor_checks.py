@@ -15,7 +15,8 @@ from typing import Optional
 from .registries.cli_registry import CLIRegistry
 from .domain.cli_backend import CLIBackend
 from .services import installer
-from .state import State, ScopeState, sha256_of
+from .domain.state import State, ScopeState
+from .services.state_store import sha256_of
 from .config import BIN_HOME, AGENTS_HOME, DIST_SKILLS_DIR
 
 

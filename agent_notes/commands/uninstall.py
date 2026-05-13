@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from ..config import Color
-from .. import install_state
+from ..services.state_store import remove_install_state
 
 
 def uninstall(local: bool = False) -> None:
@@ -21,6 +21,6 @@ def uninstall(local: bool = False) -> None:
     # Remove state for this scope only
     try:
         project_path = Path.cwd() if local else None
-        install_state.remove_install_state("local" if local else "global", project_path)
+        remove_install_state("local" if local else "global", project_path)
     except Exception as e:
         print(f"{Color.YELLOW}Warning: failed to update state.json: {e}{Color.NC}")

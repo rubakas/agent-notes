@@ -7,11 +7,13 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from ..constants import DEFAULT_VAULT_DIR, DEFAULT_VAULT_NAME, Wiki, Obsidian
+
 
 def _load_state():
     """Load state or exit with a clear message."""
-    from .. import state as state_mod
-    st = state_mod.load()
+    from ..services.state_store import load_state
+    st = load_state()
     if st is None:
         print("No installation found. Run `agent-notes install` first.")
         sys.exit(1)
@@ -95,7 +97,7 @@ def _print_diff(before: str, after: str) -> None:
 
 def _apply_and_regenerate(state, before: str) -> None:
     """Show diff, prompt, then write + regenerate on Y."""
-    from .. import install_state
+    from ..services.state_store import record_install_state
     from ..config import Color
     from ..services.ui import _safe_input
 
@@ -114,7 +116,7 @@ def _apply_and_regenerate(state, before: str) -> None:
         print("Discarded. No changes written.")
         return
 
-    install_state.record_install_state(state)
+    record_install_state(state)
     print("State written.")
 
     # Regenerate
@@ -311,9 +313,9 @@ def _wizard_memory(state, before: str) -> bool:
     from ..services.ui import _safe_input, _path_input
 
     storage_options = {
-        "1": ("local", "Local markdown files (~/.claude/agent-memory/)"),
+        "1": ("local", "Local files"),
         "2": ("obsidian", "Obsidian vault"),
-        "3": ("none", "None (disable memory)"),
+        "3": ("none", "Disabled"),
     }
 
     print("\nMemory storage options:")
@@ -329,7 +331,10 @@ def _wizard_memory(state, before: str) -> bool:
     path = ""
 
     if backend == "obsidian":
-        mode_options = {"1": ("obsidian", "Session-oriented"), "2": ("wiki", "Wiki")}
+        mode_options = {
+            "1": ("obsidian", "Session notes — project-scoped decisions, patterns, mistakes"),
+            "2": ("wiki", "Knowledge wiki — Karpathy compile-once pattern with concepts, entities, sources"),
+        }
         print("\n  Obsidian mode:")
         for key, (_, mlabel) in mode_options.items():
             print(f"    {key}) {mlabel}")
@@ -337,8 +342,8 @@ def _wizard_memory(state, before: str) -> bool:
         if mode_choice in mode_options:
             backend, label = mode_options[mode_choice]
 
-        subfolder = "notes" if backend == "obsidian" else "knowledge"
-        default_vault = str(Path.home() / "Documents" / "Obsidian Vault")
+        subfolder = Obsidian.SUBFOLDER if backend == "obsidian" else Wiki.SUBFOLDER
+        default_vault = str(Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME)
         print(f"  Folder name: {subfolder}")
         print("  Press Tab to autocomplete paths")
         raw = _path_input(f"  Vault path [{default_vault}]: ", default_vault).strip()
@@ -453,6 +458,13 @@ def interactive_config() -> None:
         print(f"Unknown choice '{choice}'. Quit.")
 
 
+def interactive_config_memory() -> None:
+    """Run the interactive memory config wizard."""
+    state = _load_state()
+    before = _state_snapshot(state)
+    _wizard_memory(state, before)
+
+
 # ── Entry point ──────────────────────────────────────────────────────────────
 
 def config(action: str = "wizard", args: Optional[list] = None, cli_filter: Optional[str] = None) -> None:
@@ -483,7 +495,9 @@ def config(action: str = "wizard", args: Optional[list] = None, cli_filter: Opti
             print("Usage: agent-notes config provider <name>")
             sys.exit(1)
         _wizard_provider_status(args[0])
+    elif action == "memory":
+        interactive_config_memory()
     else:
         print(f"Unknown config action: {action}")
-        print("Actions: wizard, show, role-model, role-agent, providers, provider")
+        print("Actions: wizard, show, role-model, role-agent, providers, provider, memory")
         sys.exit(1)

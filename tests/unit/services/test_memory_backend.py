@@ -4,11 +4,13 @@ import time
 import pytest
 from pathlib import Path
 
-from agent_notes.services.memory_backend import (
+from agent_notes.services._memory_utils import (
     _slug,
     _now,
     _now_iso,
     _today,
+)
+from agent_notes.services.obsidian_backend import (
     _current_session_id,
 )
 

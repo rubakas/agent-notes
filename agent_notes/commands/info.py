@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from .. import install_state
+from ..services.state_store import load_current_state as _load_current_state
 from ..config import get_version, CLAUDE_HOME, Color
 from ._install_helpers import count_skills, count_agents, count_global
 
@@ -49,7 +49,7 @@ def show_info() -> None:
         print(f"  Local:   {Color.CYAN}not detected{Color.NC}")
     
     # State info
-    st = install_state.load_current_state()
+    st = _load_current_state()
     if st is not None:
         print("")
         print("Last install:")

@@ -51,7 +51,7 @@ class TestMemoryListWhenEmpty:
         # mem_dir does not exist yet → no memories
         # Patch _load_memory_config so no real state file or MEMORY_DIR is consulted.
         import agent_notes.commands.memory as mem_mod
-        monkeypatch.setattr(mem_mod, "_load_memory_config", lambda: ("local", mem_dir))
+        monkeypatch.setattr(mem_mod._common, "_load_memory_config", lambda: ("local", mem_dir))
 
         from agent_notes.commands.memory import memory
         memory(action="list")  # must not raise

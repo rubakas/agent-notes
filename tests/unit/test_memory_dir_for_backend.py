@@ -50,7 +50,7 @@ class TestMemoryDirForBackendObsidianProjectScoped:
     def test_obsidian_returns_project_scoped_path(self, monkeypatch):
         monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/code/my-project")))
         result = memory_dir_for_backend("obsidian")
-        expected = Path.home() / "Documents" / "Obsidian Vault" / "notes" / "my-project"
+        expected = Path.home() / "Obsidian" / "agent-notes" / "notes" / "my-project"
         assert result == expected
 
     def test_obsidian_path_ends_with_project_name(self, monkeypatch):
@@ -72,26 +72,28 @@ class TestMemoryDirForBackendObsidianProjectScoped:
         assert r1 == r2
 
 
-class TestMemoryDirForBackendWikiProjectScoped:
-    """wiki backend returns a per-project subfolder under the knowledge root."""
+class TestMemoryDirForBackendWiki:
+    """wiki backend returns the knowledge root directly — not project-scoped."""
 
-    def test_wiki_returns_project_scoped_path(self, monkeypatch):
-        monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/code/my-project")))
+    def test_wiki_returns_knowledge_root_directly(self):
         result = memory_dir_for_backend("wiki")
-        expected = Path.home() / "Documents" / "Obsidian Vault" / "knowledge" / "my-project"
+        expected = Path.home() / "Obsidian" / "agent-notes" / "knowledge"
         assert result == expected
 
-    def test_wiki_path_ends_with_project_name(self, monkeypatch):
+    def test_wiki_ignores_cwd(self, monkeypatch):
         monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/repos/agent-notes")))
         result = memory_dir_for_backend("wiki")
-        assert result.name == "agent-notes"
-        assert result.parent.name == "knowledge"
+        assert result.name == "knowledge"
 
-    def test_wiki_custom_path_includes_project_subfolder(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/fake/my-project")))
+    def test_wiki_custom_path_used_directly(self, tmp_path):
         custom = tmp_path / "my" / "vault"
         result = memory_dir_for_backend("wiki", custom_path=str(custom))
-        assert result == custom / "my-project"
+        assert result == custom
+
+    def test_wiki_custom_path_tilde_expanded(self):
+        result = memory_dir_for_backend("wiki", custom_path="~/knowledge")
+        assert "~" not in str(result)
+        assert result == Path("~/knowledge").expanduser()
 
     def test_local_is_not_project_scoped(self, monkeypatch):
         monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/code/my-project")))

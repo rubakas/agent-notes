@@ -47,19 +47,19 @@ class SkillRegistry:
         return groups
 
 
-def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str, Optional[str]]:
-    """Parse SKILL.md frontmatter for description and group.
-    
+def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str, Optional[str], Optional[str]]:
+    """Parse SKILL.md frontmatter for description, group, and requires_memory.
+
     Returns:
-        (description, group) where description is first line if no frontmatter,
-        and group is None if not specified.
+        (description, group, requires_memory) where description is first line if no frontmatter,
+        group is None if not specified, and requires_memory is None if not specified.
     """
     if not skill_md_path.exists():
-        return skill_md_path.parent.name, None
-    
+        return skill_md_path.parent.name, None, None
+
     content = skill_md_path.read_text()
     lines = content.split('\n')
-    
+
     # Check for YAML frontmatter
     if lines and lines[0].strip() == '---':
         # Find the closing ---
@@ -68,13 +68,14 @@ def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str, Optional[str]]:
             if lines[i].strip() == '---':
                 end_idx = i
                 break
-        
+
         if end_idx is not None:
             # Parse the YAML frontmatter
             frontmatter_lines = lines[1:end_idx]
             group = None
             description = None
-            
+            requires_memory = None
+
             for line in frontmatter_lines:
                 if ':' in line:
                     key, value = line.split(':', 1)
@@ -84,7 +85,9 @@ def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str, Optional[str]]:
                         group = value
                     elif key == 'description':
                         description = value
-            
+                    elif key == 'requires_memory':
+                        requires_memory = value
+
             # If no description in frontmatter, use first non-empty line after frontmatter
             if not description:
                 for line in lines[end_idx + 1:]:
@@ -92,17 +95,17 @@ def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str, Optional[str]]:
                     if line and not line.startswith('#'):
                         description = line
                         break
-            
-            return description or skill_md_path.parent.name, group
-    
+
+            return description or skill_md_path.parent.name, group, requires_memory
+
     # No frontmatter - use first non-empty line as description
     for line in lines:
         line = line.strip()
         if line:
-            return line, None
-    
+            return line, None, None
+
     # Fallback to directory name
-    return skill_md_path.parent.name, None
+    return skill_md_path.parent.name, None, None
 
 
 def load_skill_registry(skills_dir: Optional[Path] = None) -> SkillRegistry:
@@ -122,13 +125,14 @@ def load_skill_registry(skills_dir: Optional[Path] = None) -> SkillRegistry:
         if not skill_md.exists():
             continue
         
-        description, group = _parse_skill_frontmatter(skill_md)
-        
+        description, group, requires_memory = _parse_skill_frontmatter(skill_md)
+
         skill = Skill(
             name=skill_dir.name,
             path=skill_dir,
             description=description,
-            group=group
+            group=group,
+            requires_memory=requires_memory,
         )
         skills.append(skill)
     

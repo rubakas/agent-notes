@@ -1,4 +1,4 @@
-"""Memory backend implementations for the three storage strategies.
+"""Obsidian memory backend — structured note storage in a local Obsidian vault.
 
 Single rule for ALL records (see skills/obsidian-memory/SKILL.md):
   - Filenames: `YYYY-MM-DD_<slug>.md`; collision → append `_HHMMSS` before `.md`.
@@ -11,34 +11,16 @@ Single rule for ALL records (see skills/obsidian-memory/SKILL.md):
 from __future__ import annotations
 import os
 import re
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from ._memory_utils import _slug, _now_iso, _today, _now_hhmmss, _parse_frontmatter
+from ..constants import Obsidian  # noqa: F401
 
-OBSIDIAN_CATEGORIES = ["Patterns", "Decisions", "Mistakes", "Context", "Sessions"]
+OBSIDIAN_CATEGORIES = Obsidian.CATEGORIES
+OBSIDIAN_INDEX = Obsidian.INDEX
 
-
-def _slug(title: str) -> str:
-    title = re.sub(r"^\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\s*", "", title)
-    title = re.sub(r"^\d{4}-\d{2}-\d{2}\s*", "", title)
-    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60]
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d-%H-%M-%S")
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _today() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-
-def _now_hhmmss() -> str:
-    return datetime.now(timezone.utc).strftime("%H%M%S")
+_SESSIONS_FOLDER = Obsidian.CATEGORIES[4]  # "Sessions"
 
 
 def _current_session_id() -> Optional[str]:
@@ -59,14 +41,12 @@ def _current_project_name() -> str:
     return name or ""
 
 
-# ── Obsidian backend ───────────────────────────────────────────────────────────
-
 def obsidian_init(vault: Path) -> None:
     """Create category folders and a stub Index.md if the vault is new."""
     vault.mkdir(parents=True, exist_ok=True)
-    for cat in OBSIDIAN_CATEGORIES:
+    for cat in Obsidian.CATEGORIES:
         (vault / cat).mkdir(exist_ok=True)
-    index = vault / "Index.md"
+    index = vault / Obsidian.INDEX
     if not index.exists():
         obsidian_regenerate_index(vault)
 
@@ -74,26 +54,6 @@ def obsidian_init(vault: Path) -> None:
 def _safe_session_id(sid: str) -> str:
     sid = re.sub(r"[^A-Za-z0-9_-]", "", sid)
     return sid[:128]
-
-
-def _parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
-    """Split a file into (frontmatter_dict, body_after_frontmatter).
-
-    Returns an empty dict if the file does not start with '---'.
-    """
-    if not text.startswith("---"):
-        return {}, text
-    end = text.find("\n---", 3)
-    if end == -1:
-        return {}, text
-    fm_block = text[3:end].strip()
-    rest = text[end + 4:].lstrip("\n")
-    fm: dict[str, str] = {}
-    for line in fm_block.splitlines():
-        if ":" in line:
-            k, _, v = line.partition(":")
-            fm[k.strip()] = v.strip()
-    return fm, rest
 
 
 def _build_filename(date_str: str, slug_part: str, folder: Path) -> str:
@@ -136,7 +96,7 @@ def _build_note(
 
 def _find_session_note(vault: Path, session_id: str) -> Optional[Path]:
     """Find the session note file for the given session_id (matches stem pattern YYYY-MM-DD_<id>)."""
-    sessions_dir = vault / "Sessions"
+    sessions_dir = vault / _SESSIONS_FOLDER
     if not sessions_dir.exists():
         return None
     for f in sessions_dir.glob("*.md"):
@@ -160,6 +120,28 @@ def _append_linked_note(session_path: Path, stem: str, note_type: str, title: st
     session_path.write_text(content)
 
 
+def _resolve_wikilinks(body: str, vault: Path) -> str:
+    """Replace [[slug]] wikilinks with [[date-prefixed-stem]] if a matching file exists."""
+    pattern = re.compile(r"\[\[([^\[\]|]+)\]\]")
+
+    def replace_match(m: re.Match) -> str:
+        slug = m.group(1)
+        # If already looks like a date-prefixed stem, leave as-is
+        if re.match(r"^\d{4}-\d{2}-\d{2}_", slug):
+            return m.group(0)
+        target = f"_{slug}.md"
+        for cat in Obsidian.CATEGORIES:
+            folder = vault / cat
+            if not folder.is_dir():
+                continue
+            for f in folder.iterdir():
+                if f.suffix == ".md" and f.name.lower().endswith(target.lower()):
+                    return f"[[{f.stem}]]"
+        return m.group(0)
+
+    return pattern.sub(replace_match, body)
+
+
 def obsidian_write_note(
     vault: Path,
     *,
@@ -180,6 +162,8 @@ def obsidian_write_note(
     }
     folder = vault / category_map.get(note_type, "Context")
     folder.mkdir(parents=True, exist_ok=True)
+
+    body = _resolve_wikilinks(body, vault)
 
     raw_session_id = _current_session_id()
     if raw_session_id is not None:
@@ -289,7 +273,7 @@ def obsidian_regenerate_index(vault: Path) -> None:
     now_iso = _now_iso()
 
     all_notes: list[tuple[str, Path]] = []
-    for cat in OBSIDIAN_CATEGORIES:
+    for cat in Obsidian.CATEGORIES:
         folder = vault / cat
         if not folder.exists():
             continue
@@ -318,46 +302,16 @@ def obsidian_regenerate_index(vault: Path) -> None:
         project = meta.get("project", "") or _current_project_name()
         lines.append(f"- [[{stem}|{display_dt}]] - {project}({meta['type']})")
 
-    (vault / "Index.md").write_text("\n".join(lines) + "\n")
+    (vault / Obsidian.INDEX).write_text("\n".join(lines) + "\n")
 
 
 def obsidian_list_notes(vault: Path) -> list[dict]:
     """Return list of note metadata dicts from the vault."""
     notes = []
-    for cat in OBSIDIAN_CATEGORIES:
+    for cat in Obsidian.CATEGORIES:
         folder = vault / cat
         if not folder.exists():
             continue
         for f in sorted(folder.glob("*.md")):
             notes.append({"category": cat, "file": f.name, "path": str(f)})
     return notes
-
-
-# ── Local backend ──────────────────────────────────────────────────────────────
-
-def local_init(memory_dir: Path) -> None:
-    memory_dir.mkdir(parents=True, exist_ok=True)
-
-
-def local_list_notes(memory_dir: Path) -> list[dict]:
-    if not memory_dir.exists():
-        return []
-    return [
-        {"agent": d.name, "path": str(d), "size": sum(f.stat().st_size for f in d.rglob("*") if f.is_file())}
-        for d in sorted(memory_dir.iterdir()) if d.is_dir()
-    ]
-
-
-def local_regenerate_index(memory_dir: Path) -> None:
-    agents = [d.name for d in sorted(memory_dir.iterdir()) if d.is_dir()] if memory_dir.exists() else []
-    lines = [f"# Agent Memory", f"Last updated: {_today()}", ""]
-    for agent in agents:
-        agent_dir = memory_dir / agent
-        files = list(agent_dir.glob("*.md"))
-        lines.append(f"## {agent} ({len(files)} files)")
-        for f in sorted(files):
-            lines.append(f"- [{f.stem}]({agent}/{f.name})")
-        lines.append("")
-    (memory_dir / "Index.md").write_text("\n".join(lines))
-
-

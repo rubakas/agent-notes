@@ -137,6 +137,7 @@ agent_notes/services/
 ├── diff.py                    # compute_diff (state comparison)
 ├── diagnostics.py             # check_health, identify_issues (validation)
 ├── validation.py              # validate_yaml (linting)
+├── memory_router.py           # backend-agnostic dispatch for memory operations
 └── __init__.py                # Public service exports
 ```
 
@@ -169,11 +170,11 @@ agent_notes/commands/
 ├── install.py         # install command — calls services.installer.install_all()
 ├── doctor.py          # doctor command — calls services.diagnostics.check_health()
 ├── list.py            # list command — queries registries
-├── wizard.py          # install wizard — calls services.install_state_builder
+├── wizard/            # install wizard — calls services.install_state_builder
 ├── update.py          # update command — calls services.diff, services.installer
 ├── build.py           # build command — calls services.rendering
 ├── validate.py        # validate command — calls services.validation
-├── memory.py          # memory command — calls services for state manipulation
+├── memory/            # memory command — calls services for state manipulation
 ├── regenerate.py      # regenerate command — rebuilds agents from state
 ├── set_role.py        # set role command — updates state, calls services
 ├── uninstall.py       # uninstall command

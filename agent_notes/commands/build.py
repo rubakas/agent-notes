@@ -91,18 +91,18 @@ def count_lines(file_path: Path) -> int:
 
 def build() -> None:
     """Build agent configuration files from source."""
-    from .. import state as state_module
+    from ..services.state_store import load_state
     from ..config import ROOT
-    
+
     # Read configuration
     try:
         agents_config, tiers = load_agents_config()
     except FileNotFoundError as e:
         print(f"Error: {e}")
         return
-    
+
     # Load state if present (no error if missing)
-    state = state_module.load()
+    state = load_state()
     
     # Generate agent files (state=None is backward compatible)
     print("Generating agent files...")

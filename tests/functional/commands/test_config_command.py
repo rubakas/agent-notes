@@ -86,8 +86,8 @@ def test_role_model_updates_state_file(state_file):
     with _patch_state_file(state_file):
         # Intercept apply to avoid full regenerate, but DO write state
         def _fake_apply(state, before):
-            from agent_notes import install_state
-            install_state.record_install_state(state)
+            from agent_notes.services.state_store import record_install_state
+            record_install_state(state)
 
         with patch("agent_notes.commands.config._apply_and_regenerate", side_effect=_fake_apply):
             role_model("orchestrator", "claude-sonnet-4-6")
@@ -130,8 +130,8 @@ def test_role_model_per_cli(tmp_path):
 
     with patch.object(state_store, "state_file", return_value=sf):
         def _fake_apply(state, before):
-            from agent_notes import install_state
-            install_state.record_install_state(state)
+            from agent_notes.services.state_store import record_install_state
+            record_install_state(state)
 
         with patch("agent_notes.commands.config._apply_and_regenerate", side_effect=_fake_apply):
             role_model("orchestrator", "claude-sonnet-4-6", cli_filter="claude")
@@ -156,7 +156,7 @@ def test_apply_then_regenerate_called(state_file):
     with _patch_state_file(state_file), \
          patch.object(ui_mod, "_safe_input", return_value="Y"), \
          patch("agent_notes.commands.regenerate.regenerate") as mock_regen, \
-         patch("agent_notes.install_state.record_install_state"):
+         patch("agent_notes.services.state_store.record_install_state"):
         _apply_and_regenerate(st, before)
 
     mock_regen.assert_called_once()
@@ -176,7 +176,7 @@ def test_apply_regenerate_skipped_on_no(state_file):
     with _patch_state_file(state_file), \
          patch.object(ui_mod, "_safe_input", return_value="n"), \
          patch("agent_notes.commands.regenerate.regenerate") as mock_regen, \
-         patch("agent_notes.install_state.record_install_state") as mock_write:
+         patch("agent_notes.services.state_store.record_install_state") as mock_write:
         _apply_and_regenerate(st, before)
 
     mock_regen.assert_not_called()

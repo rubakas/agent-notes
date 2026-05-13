@@ -99,6 +99,15 @@ def test_skill_has_required_fields():
         assert skill.group, f"Skill {skill.name} missing group"
 
 
+def test_ingest_skill_has_requires_memory():
+    registry = load_skill_registry()
+    ingest = registry.get("ingest")
+    assert ingest.requires_memory is not None, "ingest skill should have requires_memory set"
+    backends = {b.strip() for b in ingest.requires_memory.split(",")}
+    assert "obsidian" in backends, "ingest skill requires_memory should include obsidian"
+    assert "wiki" in backends, "ingest skill requires_memory should include wiki"
+
+
 # --- Agent registry ---
 
 def test_agent_registry_loads():

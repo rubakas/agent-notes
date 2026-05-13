@@ -17,15 +17,13 @@ def set_role(role_name: str, model_id: str, cli: Optional[str] = None, scope: Op
         scope: 'global' or 'local' (auto: global if exists, else local)
         local: Shortcut for scope='local'
     """
-    from .. import state as state_mod
-    from ..state import get_scope, set_scope
+    from ..services.state_store import load_state, get_scope, set_scope, state_file, record_install_state
     from ..registries.role_registry import load_role_registry
     from ..registries.model_registry import load_model_registry
     from ..registries.cli_registry import load_registry
-    from .. import install_state
-    
+
     # Load state.json
-    current_state = state_mod.load()
+    current_state = load_state()
     if current_state is None:
         print("No installation found. Run `agent-notes install` first.")
         sys.exit(1)
@@ -128,8 +126,8 @@ def set_role(role_name: str, model_id: str, cli: Optional[str] = None, scope: Op
         print(f"Updated {backend.label}: {role_name} → {model_id}")
     
     # Write back
-    install_state.record_install_state(current_state)
-    print(f"Wrote {state_mod.state_file()}")
+    record_install_state(current_state)
+    print(f"Wrote {state_file()}")
     
     # Trigger regenerate
     from ..regenerate import regenerate

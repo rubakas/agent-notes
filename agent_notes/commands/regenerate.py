@@ -16,17 +16,16 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
         local: Shortcut for scope='local'
         project_path: Explicit project path for local scope
     """
-    from .. import state as state_mod
-    from ..state import get_scope
+    from ..services.state_store import load_state, get_scope, record_install_state
+    from ..services.install_state_builder import build_install_state
     from ..config import DATA_DIR
     from .build import generate_agent_files
     from ..registries.cli_registry import load_registry
-    from .. import install_state
     from ..config import PKG_DIR
     import yaml
-    
+
     # Load state
-    current_state = state_mod.load()
+    current_state = load_state()
     if current_state is None:
         print("No state.json found. Nothing to regenerate.")
         sys.exit(1)
@@ -129,7 +128,7 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
             existing_role_models[cli_name] = backend_state.role_models
         
         # Build new state with current files but preserve role_models
-        new_state = install_state.build_install_state(
+        new_state = build_install_state(
             mode=scope_state.mode,
             scope=scope,
             repo_root=PKG_DIR.parent,
@@ -145,7 +144,7 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
             if project_path:
                 current_state.local_installs[str(project_path.resolve())] = new_state.local_installs[str(project_path.resolve())]
         
-        install_state.record_install_state(current_state)
+        record_install_state(current_state)
     except Exception as e:
         print(f"{Color.YELLOW}Warning: failed to update install state: {e}{Color.NC}")
     

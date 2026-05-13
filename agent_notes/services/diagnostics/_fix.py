@@ -8,7 +8,7 @@ from ...domain.diagnostics import Issue, FixAction
 
 def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
     """Apply fixes with user confirmation and safety guards."""
-    from ... import install_state
+    from ...services.state_store import load_current_state
     from ...config import Color
 
     non_build = [i for i in issues if i.type != "build_stale"]
@@ -24,7 +24,7 @@ def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
     print("")
 
     # Safety check: verify DELETE actions are safe
-    state = install_state.load_current_state()
+    state = load_current_state()
     safe_delete_paths = set()
     if state is not None:
         # All paths in state.json are safe to delete
