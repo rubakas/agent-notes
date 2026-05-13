@@ -58,12 +58,12 @@ If `/Users/en3e/Obsidian/agent-notes/notes/agent-notes` is "disabled" (memory ba
 
 Do not duplicate effort. If a recent note already answers the question you'd be investigating, cite it in your report rather than re-deriving.
 
-### Write on discovery
+### Report discoveries
 
-When you discover something non-obvious worth preserving across sessions:
-- A decision with rationale → `agent-notes memory add "<title>" "<body>" decision tech-writer`
-- A reusable pattern → `pattern`
-- A recurring mistake to avoid → `mistake`
-- Project-specific context → `context`
+When you discover something non-obvious worth preserving across sessions, include a `## Discoveries` section at the end of your report. For each discovery, state:
 
-Do NOT write to the vault for ephemeral state, in-progress task notes, or things derivable from `git log`. Memory is for the non-obvious that future sessions would otherwise re-derive.
+- **Type**: decision | pattern | mistake | context
+- **Title**: short descriptive name
+- **Body**: the insight, including why it matters
+
+The lead agent will review and persist worthy discoveries to the shared memory. Do NOT call `agent-notes memory add` yourself.
