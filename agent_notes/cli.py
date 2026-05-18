@@ -276,6 +276,11 @@ def main():
     p_memory.add_argument("name", nargs="?", help="Agent name / note title (for show/reset/add)")
     p_memory.add_argument("extra", nargs="*", help="Additional args (for add: body [type] [agent] [project])")
 
+    # hook
+    p_hook = subparsers.add_parser("hook", help="Claude Code PostToolUse hook integrations")
+    p_hook.add_argument("subaction", choices=["memory-bridge"],
+        help="Hook to run")
+
     # cost-report
     p_cost_report = subparsers.add_parser("cost-report", help="Report token usage and cost for the current AI session")
     p_cost_report.add_argument("--since", help="Only include messages at or after this UTC datetime (ISO 8601)")
@@ -339,6 +344,9 @@ def main():
     elif args.command == "config":
         from .commands.config import config
         config(action=args.action, args=getattr(args, "extra", None) or [], cli_filter=args.cli)
+    elif args.command == "hook":
+        from .commands.hook import hook
+        hook(args.subaction)
     elif args.command == "cost-report":
         # Rebuild sys.argv slice so cost_report.main() can parse it normally
         argv = []
