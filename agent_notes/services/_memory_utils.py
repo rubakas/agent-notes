@@ -27,6 +27,18 @@ def _now_hhmmss() -> str:
     return datetime.now(timezone.utc).strftime("%H%M%S")
 
 
+_YAML_NEEDS_QUOTING = re.compile(r'[:{}\[\]|>\'\"*&!%@`#]')
+
+
+def _yaml_safe(value: str) -> str:
+    """Wrap value in double quotes if it contains YAML-special characters."""
+    if not value:
+        return value
+    if _YAML_NEEDS_QUOTING.search(value):
+        return '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"'
+    return value
+
+
 def _parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
     """Split a file into (frontmatter_dict, body_after_frontmatter).
 

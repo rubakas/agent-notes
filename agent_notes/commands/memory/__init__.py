@@ -8,7 +8,6 @@ from .vault import do_vault, do_init, do_index
 from .notes import do_add, do_list, do_show, do_size
 from .transfer import do_export, do_import
 from .wiki import do_ingest, do_query, do_lint, do_scan_raw
-from .migrate import do_migrate
 from .reset import do_reset
 
 
@@ -47,7 +46,7 @@ Examples:
     print(help_text)
 
 
-def memory(action: str = "list", name: Optional[str] = None, extra: Optional[list] = None) -> None:
+def memory(action: str = "list", name: Optional[str] = None, extra: Optional[list] = None, description: str = "") -> None:
     """Manage agent memory."""
     if action == "list":
         do_list()
@@ -66,7 +65,7 @@ def memory(action: str = "list", name: Optional[str] = None, extra: Optional[lis
         note_type = extra[1] if extra and len(extra) > 1 else "context"
         agent = extra[2] if extra and len(extra) > 2 else ""
         project = extra[3] if extra and len(extra) > 3 else ""
-        do_add(name, body, note_type=note_type, agent=agent, project=project)
+        do_add(name, body, note_type=note_type, agent=agent, project=project, description=description)
     elif action == "size":
         do_size()
     elif action == "show":
@@ -80,8 +79,9 @@ def memory(action: str = "list", name: Optional[str] = None, extra: Optional[lis
         do_export()
     elif action == "import":
         do_import()
-    elif action == "migrate":
-        do_migrate()
+    elif action == "migrate-memory":
+        from .migrate_memory import do_migrate_memory
+        do_migrate_memory()
     elif action == "ingest":
         if not name:
             do_scan_raw()

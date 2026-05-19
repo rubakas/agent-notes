@@ -33,7 +33,7 @@ class TestMemoryPackageExports:
         assert callable(do_scan_raw)
 
     def test_migrate_function_importable(self):
-        from agent_notes.commands.memory import do_migrate
+        from agent_notes.commands.memory.migrate import do_migrate
         assert callable(do_migrate)
 
     def test_reset_function_importable(self):
@@ -48,7 +48,6 @@ class TestMemoryPackageExports:
             mem.do_add, mem.do_list, mem.do_show, mem.do_size,
             mem.do_export, mem.do_import,
             mem.do_ingest, mem.do_query, mem.do_lint, mem.do_scan_raw,
-            mem.do_migrate,
             mem.do_reset,
         ]
         for fn in do_functions:

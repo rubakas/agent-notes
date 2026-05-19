@@ -6,6 +6,12 @@ from typing import Optional
 
 
 @dataclass
+class MigrationState:
+    """Tracks which memory migrations have been applied."""
+    completed: list[str] = field(default_factory=list)
+
+
+@dataclass
 class MemoryConfig:
     backend: str = "local"   # "obsidian" | "local" | "wiki" | "none"
     path: str = ""           # vault root (obsidian) or memory dir (local). empty = use default
@@ -45,3 +51,4 @@ class State:
     global_install: Optional[ScopeState] = None         # JSON key is "global"
     local_installs: dict[str, ScopeState] = field(default_factory=dict)  # JSON key is "local"
     memory: MemoryConfig = field(default_factory=MemoryConfig)
+    memory_migrations: MigrationState = field(default_factory=MigrationState)

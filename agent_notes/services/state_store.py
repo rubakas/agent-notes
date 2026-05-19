@@ -10,7 +10,7 @@ from dataclasses import asdict
 from typing import Optional
 from datetime import datetime, timezone
 
-from ..domain.state import State, ScopeState, BackendState, InstalledItem, MemoryConfig
+from ..domain.state import State, ScopeState, BackendState, InstalledItem, MemoryConfig, MigrationState
 
 
 def state_dir() -> Path:
@@ -146,6 +146,7 @@ def _state_to_dict(s: State) -> dict:
         "global": _scope_to_dict(s.global_install) if s.global_install else None,
         "local": {path: _scope_to_dict(ss) for path, ss in s.local_installs.items()},
         "memory": {"backend": s.memory.backend, "path": s.memory.path},
+        "memory_migrations": {"completed": s.memory_migrations.completed},
     }
 
 
@@ -183,12 +184,16 @@ def _state_from_dict(data: dict) -> State:
         path=memory_data.get("path", ""),
     )
 
+    migrations_data = data.get("memory_migrations", {})
+    memory_migrations = MigrationState(completed=migrations_data.get("completed", []))
+
     return State(
         source_path=data.get("source_path", ""),
         source_commit=data.get("source_commit", ""),
         global_install=global_install,
         local_installs=local_installs,
         memory=memory,
+        memory_migrations=memory_migrations,
     )
 
 
