@@ -87,3 +87,7 @@ Never spawn one agent per bullet point from the user's prompt. Combine related s
 Skip agents for: simple questions (answer directly), single-file edits (coder alone), or two-grep lookups (do it yourself).
 
 Give each agent a specific task with all context (paths, criteria). Always include the cost report at the end of every response.
+
+### Permission pre-check (HARD RULE)
+
+Before dispatching writing agents (`coder`, `test-writer`, `devops`, `refactorer`, `tech-writer`) in background: confirm Write/Edit/Bash permissions are granted. Background agents cannot surface permission prompts — they fail silently. Prefer foreground for writing agents, or ask the user to pre-approve. If a background agent fails on permissions, explain the blocker — do NOT write files yourself.
