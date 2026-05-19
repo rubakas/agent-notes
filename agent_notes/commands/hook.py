@@ -1,8 +1,5 @@
-"""Hook command - Claude Code PostToolUse integration."""
+"""Hook command - Claude Code hook integrations."""
 
-import fnmatch
-import json
-import sys
 from pathlib import Path
 
 
@@ -13,25 +10,11 @@ def hook(subaction: str) -> None:
 
 
 def _memory_bridge() -> None:
-    """PostToolUse hook for the Read tool.
+    """SessionStart hook that prints the agent-notes memory index.
 
-    Reads JSON from stdin (Claude Code PostToolUse format), checks if the
-    file_path matches the Claude Code memory pattern, and if so prints the
-    agent-notes memory index so both memory systems are visible in context.
+    Unconditionally loads and prints the memory index so it is visible in
+    context at the start of every Claude Code session.
     """
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
-        return
-
-    try:
-        file_path = data["tool_input"]["file_path"]
-    except (KeyError, TypeError):
-        return
-
-    if not fnmatch.fnmatch(file_path, "*/.claude/projects/*/memory/*"):
-        return
-
     try:
         from .memory._common import _load_memory_config
         from ..constants import Obsidian, Wiki

@@ -34,16 +34,13 @@ def install_hook(settings_path: Path, hook_event: str, command: str) -> None:
             if h.get("command") == command:
                 return  # already installed
 
-    hook_entry = {
-        "hooks": {
-            hook_event: [
-                {"matcher": "", "hooks": [{"type": "command", "command": command}]}
-            ]
-        }
-    }
-    merged = _deep_merge(data, hook_entry)
+    hooks_dict = data.setdefault("hooks", {})
+    event_list = hooks_dict.setdefault(hook_event, [])
+    event_list.append(
+        {"matcher": "", "hooks": [{"type": "command", "command": command}]}
+    )
     settings_path.parent.mkdir(parents=True, exist_ok=True)
-    settings_path.write_text(json.dumps(merged, indent=2) + "\n")
+    settings_path.write_text(json.dumps(data, indent=2) + "\n")
 
 
 def remove_hook(settings_path: Path, hook_event: str, command: str) -> None:

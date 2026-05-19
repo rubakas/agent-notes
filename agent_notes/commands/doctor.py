@@ -61,6 +61,17 @@ def _check_session_hook(scope: str, issues: list) -> None:
             "SessionStart hook not found — run: agent-notes install to re-add the hook",
         ))
 
+    from ..constants import Hooks
+    from ..services.state_store import load_state
+    state = load_state()
+    if state and state.memory.backend in ("obsidian", "wiki"):
+        if not has_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE):
+            issues.append(Issue(
+                "missing_hook",
+                str(settings_path),
+                "memory-bridge SessionStart hook not found — run: agent-notes install to re-add",
+            ))
+
 
 def check_version_drift(scope: str, issues: list, fix_actions: list) -> None:
     """Check if the installed package version matches the current running version."""
