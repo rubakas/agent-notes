@@ -12,7 +12,7 @@ agent-notes doctor
 
 **What's Included**
 - 19 specialized AI subagents (Opus reasons, Sonnet executes, Haiku explores)
-- 42+ on-demand skills (Rails, Docker, Git, Kamal, Process)
+- 47+ on-demand skills (Rails, Docker, Git, Kamal, Process)
 - Global rules and guardrails
 - Agent memory with 3 storage options (Local, Obsidian, Wiki)
 - Configuration for Claude Code, OpenCode, and GitHub Copilot
@@ -237,7 +237,7 @@ Implements Karpathy's LLM Wiki pattern (v1). Auto-creates a folder per project (
 
 - **Query** — Search wiki pages, synthesize answers with citations, optionally file answers back as new pages
 
-- **Lint** — Health-check for contradictions, stale claims, orphan pages, missing cross-references
+- **Lint** — Health-check for contradictions, stale pages, data gaps, orphan pages, missing cross-references
 
 **Commands:**
 ```bash
@@ -282,7 +282,7 @@ The installed `CLAUDE.md` already points agents to your vault. At the start of a
 <details>
 <summary>Skills</summary>
 
-42+ on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`.
+47+ on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`.
 
 The session context hook auto-generates a skill index from SKILL.md frontmatter at install time, so agents always know what skills are available without loading full skill content. This keeps context overhead low while maintaining skill discoverability.
 
@@ -312,6 +312,11 @@ Load the docker-compose skill for multi-service setup
 - `/debugging-protocol` — Phase 1 rewritten as "build a feedback loop first" with 9 strategies
 - `/improve-codebase-architecture` — Deletion test to find shallow modules; surfaces deepening opportunities
 - `/zoom-out` — Quick orientation map of an unfamiliar code area
+- `/handoff` — Compact conversation into a handoff document for a fresh agent session
+- `/to-prd` — Synthesize conversation into a Product Requirements Document
+- `/to-issues` — Break a plan/PRD into vertical-slice issues (HITL/AFK classification)
+- `/prototype` — Throwaway prototypes: terminal app for logic or UI variations for visual
+- `/write-a-skill` — Meta-skill for creating new skills with proper structure
 
 </details>
 

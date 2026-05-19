@@ -20,5 +20,13 @@ class Wiki:
 class Obsidian:
     """Obsidian backend folder structure constants."""
     INDEX = "Index.md"
-    SUBFOLDER = "notes"
-    CATEGORIES = ["Patterns", "Decisions", "Mistakes", "Context", "Sessions"]
+    SUBFOLDER = "projects"
+    CATEGORIES = ["Patterns", "Decisions", "Mistakes", "Context", "Feedback", "Sessions"]
+    INDEX_SECTIONS = ["Decisions", "Patterns", "Context", "Mistakes", "Feedback"]
+    SESSION_CAP = 5
+
+
+class Hooks:
+    """Hook command strings used in Claude Code settings.json."""
+    MEMORY_BRIDGE = "agent-notes hook memory-bridge"
+    COST_REPORT = "agent-notes cost-report"

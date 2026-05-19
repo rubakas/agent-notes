@@ -275,6 +275,12 @@ def main():
         help="Memory action")
     p_memory.add_argument("name", nargs="?", help="Agent name / note title (for show/reset/add)")
     p_memory.add_argument("extra", nargs="*", help="Additional args (for add: body [type] [agent] [project])")
+    p_memory.add_argument("--description", default="", help="One-liner description for index display")
+
+    # hook
+    p_hook = subparsers.add_parser("hook", help="Claude Code hook integrations")
+    p_hook.add_argument("subaction", choices=["memory-bridge"],
+        help="Hook to run")
 
     # cost-report
     p_cost_report = subparsers.add_parser("cost-report", help="Report token usage and cost for the current AI session")
@@ -335,10 +341,13 @@ def main():
         regenerate(scope=args.scope, cli=args.cli, local=args.local)
     elif args.command == "memory":
         from .commands.memory import memory
-        memory(args.action, args.name, getattr(args, "extra", None))
+        memory(args.action, args.name, getattr(args, "extra", None), description=getattr(args, "description", ""))
     elif args.command == "config":
         from .commands.config import config
         config(action=args.action, args=getattr(args, "extra", None) or [], cli_filter=args.cli)
+    elif args.command == "hook":
+        from .commands.hook import hook
+        hook(args.subaction)
     elif args.command == "cost-report":
         # Rebuild sys.argv slice so cost_report.main() can parse it normally
         argv = []

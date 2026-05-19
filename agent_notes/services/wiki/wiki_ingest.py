@@ -9,6 +9,7 @@ from pathlib import Path
 from ._wiki_utils import (
     _RAW_CHUNK_MAX,
     _atomic_write,
+    _content_hash,
     _ensure_wiki_init,
     _log_operation,
 )
@@ -91,17 +92,22 @@ def wiki_ingest(
     result: dict[str, list[Path]] = {"source": [], "concepts": [], "entities": []}
 
     raw_refs: list[str] = []
+    raw_hash = ""
     if raw_files:
+        hash_parts = []
         for fname, fcontent in raw_files:
             raw_path = wiki_root / "raw" / fname
             _atomic_write(raw_path, fcontent)
             raw_refs.append(f"raw/{fname}")
+            hash_parts.append(fcontent)
+        raw_hash = _content_hash("".join(hash_parts))
     elif raw_content:
         if not raw_filename:
             raw_filename = f"{_slug(title)}.md"
         raw_path = wiki_root / "raw" / raw_filename
         _atomic_write(raw_path, raw_content)
         raw_refs.append(f"raw/{raw_filename}")
+        raw_hash = _content_hash(raw_content)
 
     source_path = wiki_write_page(
         wiki_root,
@@ -111,6 +117,7 @@ def wiki_ingest(
         tags=tags or [],
         sources=raw_refs if raw_refs else [],
         confidence=confidence,
+        content_hash=raw_hash,
     )
     result["source"].append(source_path)
 

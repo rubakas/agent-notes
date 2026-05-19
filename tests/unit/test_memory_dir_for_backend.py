@@ -50,14 +50,14 @@ class TestMemoryDirForBackendObsidianProjectScoped:
     def test_obsidian_returns_project_scoped_path(self, monkeypatch):
         monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/code/my-project")))
         result = memory_dir_for_backend("obsidian")
-        expected = Path.home() / "Obsidian" / "agent-notes" / "notes" / "my-project"
+        expected = Path.home() / "Obsidian" / "agent-notes" / "projects" / "my-project"
         assert result == expected
 
     def test_obsidian_path_ends_with_project_name(self, monkeypatch):
         monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/repos/agent-notes")))
         result = memory_dir_for_backend("obsidian")
         assert result.name == "agent-notes"
-        assert result.parent.name == "notes"
+        assert result.parent.name == "projects"
 
     def test_obsidian_custom_path_includes_project_subfolder(self, monkeypatch, tmp_path):
         monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/fake/my-project")))

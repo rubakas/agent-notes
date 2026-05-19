@@ -7,7 +7,7 @@ from . import _common
 from ...config import MEMORY_DIR, Color
 
 
-def do_add(title: str, body: str, note_type: str = "context", agent: str = "", project: str = "", tags: Optional[list] = None) -> None:
+def do_add(title: str, body: str, note_type: str = "context", agent: str = "", project: str = "", tags: Optional[list] = None, description: str = "") -> None:
     """Add a note to memory (obsidian or wiki storage)."""
     backend, path = _common._load_memory_config()
     if backend == "none":
@@ -40,6 +40,7 @@ def do_add(title: str, body: str, note_type: str = "context", agent: str = "", p
             note_type=note_type,
             agent=agent,
             project=project,
+            description=description,
             tags=tags or [],
         )
         print(f"{Color.GREEN}Note saved: {note_path}{Color.NC}")

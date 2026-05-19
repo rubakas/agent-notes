@@ -14,13 +14,13 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from ._memory_utils import _slug, _now_iso, _today, _now_hhmmss, _parse_frontmatter
+from ._memory_utils import _slug, _now_iso, _today, _now_hhmmss, _parse_frontmatter, _yaml_safe
 from ..constants import Obsidian  # noqa: F401
 
 OBSIDIAN_CATEGORIES = Obsidian.CATEGORIES
 OBSIDIAN_INDEX = Obsidian.INDEX
 
-_SESSIONS_FOLDER = Obsidian.CATEGORIES[4]  # "Sessions"
+_SESSIONS_FOLDER = "Sessions"
 
 
 def _current_session_id() -> Optional[str]:
@@ -74,15 +74,19 @@ def _build_note(
     session_stem: Optional[str],
     created_at: str,
     project: str = "",
+    description: str = "",
 ) -> str:
     """Render the canonical note content (frontmatter + heading + body + Related section)."""
     lines = ["---", f"created_at: {created_at}", f"type: {note_type}"]
+    if description:
+        description = description.replace("\n", " ").replace("\r", "")
+        lines.append(f"description: {_yaml_safe(description)}")
     if project:
-        lines.append(f"project: {project}")
+        lines.append(f"project: {_yaml_safe(project)}")
     if session_stem and note_type != "session":
         lines.append(f"session: {session_stem}")
     if agent:
-        lines.append(f"agent: {agent}")
+        lines.append(f"agent: {_yaml_safe(agent)}")
     lines.append("---")
     lines.append("")
     lines.append(f"# {title}")
@@ -147,9 +151,10 @@ def obsidian_write_note(
     *,
     title: str,
     body: str,
-    note_type: str,  # "pattern"|"decision"|"mistake"|"context"|"session"
+    note_type: str,  # "pattern"|"decision"|"mistake"|"context"|"feedback"|"session"
     agent: str = "",
     project: str = "",
+    description: str = "",
     tags: list[str] | None = None,
 ) -> Path:
     """Write a structured note to the correct category folder."""
@@ -158,6 +163,7 @@ def obsidian_write_note(
         "decision": "Decisions",
         "mistake": "Mistakes",
         "context": "Context",
+        "feedback": "Feedback",
         "session": "Sessions",
     }
     folder = vault / category_map.get(note_type, "Context")
@@ -206,6 +212,7 @@ def obsidian_write_note(
         path.write_text(_build_note(
             title=title, body=body, note_type=note_type,
             agent=agent, session_stem=None, created_at=created_at, project=project,
+            description=description,
         ))
     elif note_type == "session":
         # No session_id available — fall back to timestamp+slug
@@ -215,6 +222,7 @@ def obsidian_write_note(
         path.write_text(_build_note(
             title=title, body=body, note_type=note_type,
             agent=agent, session_stem=None, created_at=created_at, project=project,
+            description=description,
         ))
     else:
         # Non-session note
@@ -232,6 +240,7 @@ def obsidian_write_note(
         path.write_text(_build_note(
             title=title, body=body, note_type=note_type,
             agent=agent, session_stem=session_stem, created_at=created_at, project=project,
+            description=description,
         ))
 
         # Auto-link to session note
@@ -265,11 +274,17 @@ def _parse_note_metadata(path: Path) -> dict:
         path.stem,
     )
     project = fm.get("project", "")
-    return {"created_at": created_at, "type": note_type, "title": title, "project": project}
+    description = fm.get("description", "")
+    return {"created_at": created_at, "type": note_type, "title": title, "project": project, "description": description}
+
+
+def _description_or_title(meta: dict) -> str:
+    """Return description from frontmatter, falling back to title."""
+    return meta.get("description") or meta.get("title") or ""
 
 
 def obsidian_regenerate_index(vault: Path) -> None:
-    """Regenerate Index.md as a chronological list of all notes, newest first."""
+    """Regenerate Index.md grouped by note type, with sessions capped."""
     now_iso = _now_iso()
 
     all_notes: list[tuple[str, Path]] = []
@@ -287,20 +302,51 @@ def obsidian_regenerate_index(vault: Path) -> None:
         meta["_category"] = cat
         note_metas.append(meta)
 
-    note_metas.sort(key=lambda m: m["created_at"], reverse=True)
-
-    lines = [f"# Agent Memory Index", "", f"Last updated: {now_iso}", ""]
+    # Group by type
+    by_type: dict[str, list[dict]] = {}
     for meta in note_metas:
-        note: Path = meta["_path"]
-        stem = note.stem
-        dt_str = meta["created_at"]
-        # Format: YYYY-MM-DD HH:MM from the ISO timestamp
-        if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", dt_str):
-            display_dt = f"{dt_str[:10]} {dt_str[11:16]}"
-        else:
-            display_dt = dt_str[:16] if len(dt_str) >= 16 else dt_str
-        project = meta.get("project", "") or _current_project_name()
-        lines.append(f"- [[{stem}|{display_dt}]] - {project}({meta['type']})")
+        t = meta.get("type", "")
+        by_type.setdefault(t, []).append(meta)
+
+    # Sort each group newest first
+    for group in by_type.values():
+        group.sort(key=lambda m: m["created_at"], reverse=True)
+
+    # type field -> section header mapping
+    type_to_section = {
+        "decision": "Decisions",
+        "pattern": "Patterns",
+        "context": "Context",
+        "mistake": "Mistakes",
+        "feedback": "Feedback",
+    }
+
+    lines = ["# Agent Memory Index", "", f"Last updated: {now_iso}", ""]
+
+    for section in Obsidian.INDEX_SECTIONS:
+        type_key = next((k for k, v in type_to_section.items() if v == section), None)
+        if type_key is None:
+            continue
+        group = by_type.get(type_key, [])
+        if not group:
+            continue
+        lines.append(f"## {section}")
+        for meta in group:
+            stem = meta["_path"].stem
+            desc = _description_or_title(meta)
+            lines.append(f"- [[{stem}]] — {desc}")
+        lines.append("")
+
+    # Sessions section — capped
+    session_group = by_type.get("session", [])
+    if session_group:
+        cap = Obsidian.SESSION_CAP
+        lines.append(f"## Recent sessions (last {cap})")
+        for meta in session_group[:cap]:
+            stem = meta["_path"].stem
+            desc = _description_or_title(meta)
+            lines.append(f"- [[{stem}]] — {desc}")
+        lines.append("")
 
     (vault / Obsidian.INDEX).write_text("\n".join(lines) + "\n")
 

@@ -34,7 +34,7 @@ For each subtask, pick the cheapest capable agent:
 - **Free** (do it yourself): one Read/Grep/Glob answers it.
 - **Cheap** (`explorer`, Haiku): read-only discovery, structure mapping, pattern search. One `explorer` call beats multiple self-reads.
 - **Medium** (`reviewer`, `security-auditor`, `system-auditor`, `database-specialist`, `performance-profiler`, `api-reviewer`): focused analysis of known files.
-- **Reasoner** (`architect`, `debugger`, Opus): deep system design, complex root-cause analysis. Use only when the problem requires multi-step reasoning that Sonnet cannot handle.
+- **Reasoner** (`architect`, Opus): deep system design, complex root-cause analysis. Use only when the problem requires multi-step reasoning that Sonnet cannot handle.
 - **Expensive** (`coder`, `test-writer`, `test-runner`): writes files, open-ended work.
 
 Rules:
@@ -75,7 +75,7 @@ Never spawn one agent per bullet point from the user's prompt. Combine related s
 - `coder` — all file edits and implementation work
 - `reviewer` — code quality checks after implementation
 - `architect` — system design, module boundaries, refactor planning (Opus, expensive — use sparingly)
-- `debugger` — complex bug investigation, root-cause analysis (Opus, expensive — hand fix to `coder`)
+- `debugger` — bug investigation, root-cause analysis (Sonnet — hand fix to `coder`)
 - `security-auditor` — auth, input handling, data access
 - `test-writer` — create tests, `test-runner` — fix failing tests
 - `system-auditor` — codebase health: N+1, duplication, dead code
@@ -87,3 +87,7 @@ Never spawn one agent per bullet point from the user's prompt. Combine related s
 Skip agents for: simple questions (answer directly), single-file edits (coder alone), or two-grep lookups (do it yourself).
 
 Give each agent a specific task with all context (paths, criteria). Always include the cost report at the end of every response.
+
+### Permission pre-check (HARD RULE)
+
+Before dispatching writing agents (`coder`, `test-writer`, `devops`, `refactorer`, `tech-writer`) in background: confirm Write/Edit/Bash permissions are granted. Background agents cannot surface permission prompts — they fail silently. Prefer foreground for writing agents, or ask the user to pre-approve. If a background agent fails on permissions, explain the blocker — do NOT write files yourself.

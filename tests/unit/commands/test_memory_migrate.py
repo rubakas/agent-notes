@@ -4,6 +4,7 @@ import pytest
 from pathlib import Path
 
 import agent_notes.commands.memory as mem_mod
+from agent_notes.commands.memory.migrate import do_migrate
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -32,14 +33,14 @@ class TestMigrateBailOut:
     def test_non_obsidian_backend_prints_and_returns(self, monkeypatch, capsys):
         """When backend != obsidian, migrate prints a message and exits early."""
         monkeypatch.setattr(mem_mod._common, "_load_memory_config", lambda: ("local", Path("/tmp/fake")))
-        mem_mod.do_migrate()
+        do_migrate()
         out = capsys.readouterr().out
         assert "obsidian" in out.lower()
 
     def test_missing_vault_path_prints_and_returns(self, monkeypatch, capsys):
         """When vault path is None, migrate prints a message and exits early."""
         monkeypatch.setattr(mem_mod._common, "_load_memory_config", lambda: ("obsidian", None))
-        mem_mod.do_migrate()
+        do_migrate()
         out = capsys.readouterr().out
         assert out.strip()  # something was printed
 
@@ -47,7 +48,7 @@ class TestMigrateBailOut:
         """Non-obsidian bail does not touch the filesystem."""
         monkeypatch.setattr(mem_mod._common, "_load_memory_config", lambda: ("local", tmp_path))
         before = set(tmp_path.rglob("*"))
-        mem_mod.do_migrate()
+        do_migrate()
         after = set(tmp_path.rglob("*"))
         assert before == after
 
@@ -63,7 +64,7 @@ class TestPerProjectSubfolderFlattening:
             "---\ncreated_at: 2026-04-10T08:00:00Z\ntitle: t\n---\nbody",
         )
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         # File must have landed in vault/Sessions/
         sessions_dir = vault / "Sessions"
         md_files = list(sessions_dir.glob("*.md"))
@@ -78,7 +79,7 @@ class TestPerProjectSubfolderFlattening:
             "---\ntitle: foo\n---\nbody",
         )
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         decisions_dir = vault / "Decisions"
         names = [f.name for f in decisions_dir.glob("*.md")]
         assert any("foo" in n for n in names), f"Expected 'foo' in {names}"
@@ -90,7 +91,7 @@ class TestPerProjectSubfolderFlattening:
             "---\ntitle: t\n---\nbody",
         )
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         assert not (vault / "myproject").exists()
 
     def test_loose_file_preserved_and_subfolder_kept_when_nonempty(self, monkeypatch, tmp_path, capsys):
@@ -102,7 +103,7 @@ class TestPerProjectSubfolderFlattening:
         )
         loose = _make_file(vault / "myproject" / "notes.md", "loose content")
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         # Session was moved up to vault/Sessions/
         sessions_dir = vault / "Sessions"
         assert any(sessions_dir.glob("*.md"))
@@ -123,7 +124,7 @@ class TestPerProjectSubfolderFlattening:
         )
         original_content = existing.read_bytes()
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         assert existing.exists()
         assert existing.read_bytes() == original_content
 
@@ -138,7 +139,7 @@ class TestLegacyTimestampRename:
             "---\ntitle: old fix\n---\nbody content",
         )
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         dst = vault / "Decisions" / "2026-04-10_old-fix.md"
         assert dst.exists()
         assert not src.exists()
@@ -150,7 +151,7 @@ class TestLegacyTimestampRename:
         src.parent.mkdir(parents=True, exist_ok=True)
         src.write_bytes(original_content)
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         dst = vault / "Decisions" / "2026-04-10_old-fix.md"
         assert dst.read_bytes() == original_content
 
@@ -158,7 +159,7 @@ class TestLegacyTimestampRename:
         vault = _vault(tmp_path)
         _make_file(vault / "Decisions" / "2026-04-10-14-30-00-old-fix.md")
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         out = capsys.readouterr().out
         assert "1 renamed" in out or "renamed" in out
 
@@ -172,7 +173,7 @@ class TestSameDayCollision:
         _make_file(decisions / "2026-04-10-14-30-00-foo.md", "---\ntitle: foo\n---\nbody1")
         _make_file(decisions / "2026-04-10-15-45-12-foo.md", "---\ntitle: foo\n---\nbody2")
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         names = {f.name for f in decisions.glob("*.md")}
         assert "2026-04-10_foo.md" in names
         assert "2026-04-10_foo_154512.md" in names
@@ -183,7 +184,7 @@ class TestSameDayCollision:
         src1 = _make_file(decisions / "2026-04-10-14-30-00-foo.md")
         src2 = _make_file(decisions / "2026-04-10-15-45-12-foo.md")
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         assert not src1.exists()
         assert not src2.exists()
 
@@ -200,7 +201,7 @@ class TestBareUUIDWithFrontmatter:
             "---\ncreated_at: 2026-01-15T10:00:00Z\ntitle: my session\n---\nbody",
         )
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         dst = vault / "Sessions" / f"2026-01-15_{self.UUID}.md"
         assert dst.exists()
         assert not src.exists()
@@ -212,7 +213,7 @@ class TestBareUUIDWithFrontmatter:
         src.parent.mkdir(parents=True, exist_ok=True)
         src.write_bytes(content)
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         dst = vault / "Sessions" / f"2026-01-15_{self.UUID}.md"
         assert dst.read_bytes() == content
 
@@ -234,7 +235,7 @@ class TestBareUUIDWithoutFrontmatter:
         ts = known_dt.timestamp()
         os.utime(src, (ts, ts))
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         sessions = vault / "Sessions"
         names = [f.name for f in sessions.glob("*.md")]
         assert any(n.startswith("2025-06-20_") for n in names), f"Expected 2025-06-20_ prefix in {names}"
@@ -250,7 +251,7 @@ class TestAlreadyNewFormatSkipped:
             "---\ntitle: x\n---\nbody",
         )
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         assert existing.exists()
         # No additional files created
         names = [f.name for f in (vault / "Patterns").glob("*.md")]
@@ -260,7 +261,7 @@ class TestAlreadyNewFormatSkipped:
         vault = _vault(tmp_path)
         _make_file(vault / "Patterns" / "2026-04-29_already-new.md")
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         out = capsys.readouterr().out
         assert "1 skipped" in out or "skipped" in out
 
@@ -272,7 +273,7 @@ class TestUnrecognizedFilenameSkipped:
         vault = _vault(tmp_path)
         weird = _make_file(vault / "Context" / "random-name.md", "---\ntitle: x\n---\nbody")
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         assert weird.exists()
         assert weird.read_text() == "---\ntitle: x\n---\nbody"
 
@@ -280,7 +281,7 @@ class TestUnrecognizedFilenameSkipped:
         vault = _vault(tmp_path)
         _make_file(vault / "Context" / "random-name.md")
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         out = capsys.readouterr().out
         assert "skipped" in out
 
@@ -297,11 +298,11 @@ class TestIdempotency:
         _patch_config(monkeypatch, vault)
 
         # First run — migrate
-        mem_mod.do_migrate()
+        do_migrate()
         capsys.readouterr()  # discard first run output
 
         # Second run — should be a no-op
-        mem_mod.do_migrate()
+        do_migrate()
         out = capsys.readouterr().out
         assert "0 moved" in out
         assert "0 renamed" in out
@@ -314,12 +315,12 @@ class TestIdempotency:
         )
         _patch_config(monkeypatch, vault)
 
-        mem_mod.do_migrate()
+        do_migrate()
 
         # Snapshot state after first run
         before = {f.relative_to(vault): f.read_bytes() for f in vault.rglob("*.md")}
 
-        mem_mod.do_migrate()
+        do_migrate()
 
         after = {f.relative_to(vault): f.read_bytes() for f in vault.rglob("*.md")}
         assert before == after
@@ -335,17 +336,17 @@ class TestIndexRegenerated:
             "---\ntitle: my decision\n---\nbody",
         )
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         assert (vault / "Index.md").exists()
 
     def test_index_contains_wikilink_to_migrated_file(self, monkeypatch, tmp_path):
         vault = _vault(tmp_path)
         _make_file(
             vault / "Decisions" / "2026-04-10-14-30-00-my-decision.md",
-            "---\ntitle: my decision\n---\nbody",
+            "---\ntitle: my decision\ntype: decision\n---\nbody",
         )
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         index = (vault / "Index.md").read_text()
         # The stem of the renamed file should appear as a wikilink
         assert "[[" in index
@@ -354,7 +355,7 @@ class TestIndexRegenerated:
     def test_index_exists_even_with_empty_vault(self, monkeypatch, tmp_path):
         vault = _vault(tmp_path)
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         assert (vault / "Index.md").exists()
 
 
@@ -364,7 +365,7 @@ class TestSummaryLine:
     def test_summary_line_has_moved_renamed_skipped(self, monkeypatch, tmp_path, capsys):
         vault = _vault(tmp_path)
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         out = capsys.readouterr().out
         assert "moved" in out
         assert "renamed" in out
@@ -373,6 +374,6 @@ class TestSummaryLine:
     def test_no_errors_means_no_errors_token_in_output(self, monkeypatch, tmp_path, capsys):
         vault = _vault(tmp_path)
         _patch_config(monkeypatch, vault)
-        mem_mod.do_migrate()
+        do_migrate()
         out = capsys.readouterr().out
         assert "errors" not in out

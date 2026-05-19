@@ -138,6 +138,100 @@ class TestHasHook:
         assert has_hook(settings_path, "SessionStart", "echo hello") is False
 
 
+class TestInstallHookMultiplePerEvent:
+    def test_two_hooks_same_event_preserves_both(self, tmp_path):
+        settings_path = tmp_path / "settings.json"
+        install_hook(settings_path, "SessionStart", "echo first")
+        install_hook(settings_path, "SessionStart", "echo second")
+
+        data = json.loads(settings_path.read_text())
+        hooks = data["hooks"]["SessionStart"]
+        commands = [h["command"] for entry in hooks for h in entry.get("hooks", [])]
+        assert "echo first" in commands
+        assert "echo second" in commands
+
+    def test_three_hooks_same_event_preserves_all(self, tmp_path):
+        settings_path = tmp_path / "settings.json"
+        install_hook(settings_path, "SessionStart", "echo one")
+        install_hook(settings_path, "SessionStart", "echo two")
+        install_hook(settings_path, "SessionStart", "echo three")
+
+        data = json.loads(settings_path.read_text())
+        hooks = data["hooks"]["SessionStart"]
+        commands = [h["command"] for entry in hooks for h in entry.get("hooks", [])]
+        assert commands == ["echo one", "echo two", "echo three"]
+
+    def test_hooks_different_events_independent(self, tmp_path):
+        settings_path = tmp_path / "settings.json"
+        install_hook(settings_path, "SessionStart", "echo start")
+        install_hook(settings_path, "Stop", "echo stop")
+
+        data = json.loads(settings_path.read_text())
+
+        start_hooks = data["hooks"]["SessionStart"]
+        start_commands = [h["command"] for entry in start_hooks for h in entry.get("hooks", [])]
+        assert start_commands == ["echo start"]
+
+        stop_hooks = data["hooks"]["Stop"]
+        stop_commands = [h["command"] for entry in stop_hooks for h in entry.get("hooks", [])]
+        assert stop_commands == ["echo stop"]
+
+    def test_idempotent_with_multiple_existing(self, tmp_path):
+        settings_path = tmp_path / "settings.json"
+        install_hook(settings_path, "SessionStart", "echo A")
+        install_hook(settings_path, "SessionStart", "echo B")
+        install_hook(settings_path, "SessionStart", "echo A")  # duplicate
+
+        data = json.loads(settings_path.read_text())
+        hooks = data["hooks"]["SessionStart"]
+        commands = [h["command"] for entry in hooks for h in entry.get("hooks", [])]
+        assert commands.count("echo A") == 1
+        assert "echo B" in commands
+
+    def test_preserves_permissions_when_adding_hooks(self, tmp_path):
+        settings_path = tmp_path / "settings.json"
+        settings_path.write_text(json.dumps({
+            "permissions": {"allow": ["Bash(some-cmd)"]}
+        }, indent=2) + "\n")
+
+        install_hook(settings_path, "SessionStart", "echo first")
+        install_hook(settings_path, "SessionStart", "echo second")
+
+        data = json.loads(settings_path.read_text())
+        assert data["permissions"]["allow"] == ["Bash(some-cmd)"]
+
+        hooks = data["hooks"]["SessionStart"]
+        commands = [h["command"] for entry in hooks for h in entry.get("hooks", [])]
+        assert "echo first" in commands
+        assert "echo second" in commands
+
+
+class TestRemoveHookMultiple:
+    def test_remove_one_of_two_preserves_other(self, tmp_path):
+        settings_path = tmp_path / "settings.json"
+        install_hook(settings_path, "SessionStart", "echo A")
+        install_hook(settings_path, "SessionStart", "echo B")
+
+        remove_hook(settings_path, "SessionStart", "echo A")
+
+        data = json.loads(settings_path.read_text())
+        hooks = data["hooks"]["SessionStart"]
+        commands = [h["command"] for entry in hooks for h in entry.get("hooks", [])]
+        assert "echo A" not in commands
+        assert "echo B" in commands
+
+    def test_remove_last_cleans_up_event_and_hooks_key(self, tmp_path):
+        settings_path = tmp_path / "settings.json"
+        install_hook(settings_path, "SessionStart", "echo A")
+        install_hook(settings_path, "SessionStart", "echo B")
+
+        remove_hook(settings_path, "SessionStart", "echo A")
+        remove_hook(settings_path, "SessionStart", "echo B")
+
+        data = json.loads(settings_path.read_text())
+        assert "hooks" not in data
+
+
 class TestRemoveAllowEntry:
     def test_removes_existing_pattern(self, tmp_path):
         settings_path = tmp_path / "settings.json"

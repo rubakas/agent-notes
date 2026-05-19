@@ -426,7 +426,8 @@ def _filter_skills_by_backend(skills, memory_backend: str):
 
 def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
     """Install the SessionStart hook and write the context file for Claude Code."""
-    from .settings_writer import install_hook, install_allow_entry, remove_allow_entry, remove_matching_allow_entries
+    from .settings_writer import install_hook, install_allow_entry, remove_allow_entry, remove_matching_allow_entries, remove_hook
+    from ..constants import Hooks
     from .session_context import write_context
     from ..registries.skill_registry import default_skill_registry
     from .. import config
@@ -452,12 +453,27 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
     write_context(context_file, agents, version, skills)
     install_hook(settings_path, "SessionStart", hook_command)
 
+    # Memory-bridge hook: load agent-notes index at session start.
+    # Only useful for Obsidian-backed modes (obsidian, wiki).
+    if memory_backend in ("obsidian", "wiki"):
+        install_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
+    else:
+        remove_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
+
+    # Stop hook: emit cost report at end of session
+    install_hook(settings_path, "Stop", Hooks.COST_REPORT)
+
+    # Clean up stale PostToolUse hooks from previous versions
+    remove_hook(settings_path, "PostToolUse", Hooks.MEMORY_BRIDGE)
+
     # Remove ALL agent-notes Bash permission entries (covers stale entries from
     # any previous install, not just the immediately preceding one)
     remove_matching_allow_entries(settings_path, "Bash(agent-notes")
     remove_allow_entry(settings_path, "Bash(cost-report)")
     install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
     install_allow_entry(settings_path, "Bash(agent-notes memory *)")
+    if memory_backend in ("obsidian", "wiki"):
+        install_allow_entry(settings_path, f"Bash({Hooks.MEMORY_BRIDGE})")
 
     # Remove memory path permissions for all known backend default paths so that
     # stale entries from previous installs (even ones before the last state save)
@@ -493,12 +509,16 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
 def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
     """Remove the SessionStart hook and context file for Claude Code."""
     from .settings_writer import remove_hook, remove_allow_entry, remove_matching_allow_entries
+    from ..constants import Hooks
 
     settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
 
     print(f"Removing Claude Code SessionStart hook ...")
     context_file.unlink(missing_ok=True)
     remove_hook(settings_path, "SessionStart", hook_command)
+    remove_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
+    remove_hook(settings_path, "Stop", Hooks.COST_REPORT)
+    remove_hook(settings_path, "PostToolUse", Hooks.MEMORY_BRIDGE)
     # Remove ALL agent-notes Bash permission entries (covers old naming too)
     remove_matching_allow_entries(settings_path, "Bash(agent-notes")
     remove_allow_entry(settings_path, "Bash(cost-report)")

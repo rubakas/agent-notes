@@ -367,7 +367,7 @@ class TestSelectMemory:
         assert len(result) == 2
 
     def test_select_memory_obsidian_session_backend(self, monkeypatch):
-        """'obsidian' storage + default obsidian mode returns ('obsidian', path ending in /notes)."""
+        """'obsidian' storage + default obsidian mode returns ('obsidian', path ending in /projects)."""
         self._patch_non_interactive(monkeypatch)
         self._patch_detect_vaults(monkeypatch, [])
         self._patch_path_input(monkeypatch, "/tmp/MyVault")
@@ -380,7 +380,7 @@ class TestSelectMemory:
 
         backend, path = wizard_mod._select_memory(step=6, total=7)
         assert backend == "obsidian"
-        assert path.endswith("/notes")
+        assert path.endswith("/projects")
 
     def test_select_memory_obsidian_wiki_backend(self, monkeypatch):
         """'obsidian' storage + wiki mode returns ('wiki', path ending in /knowledge)."""
@@ -412,7 +412,7 @@ class TestSelectMemory:
         )
 
         backend, path = wizard_mod._select_memory(step=6, total=7)
-        expected = str(vault_dir / "notes")
+        expected = str(vault_dir / "projects")
         assert path == expected
 
     def test_select_memory_wiki_vault_path_with_knowledge_subfolder(self, monkeypatch, tmp_path):
@@ -498,4 +498,4 @@ class TestSelectMemory:
 
         backend, path = wizard_mod._select_memory(step=6, total=7)
         # Empty input → uses default_vault which is vault1
-        assert path == str(vault1 / "notes")
+        assert path == str(vault1 / "projects")

@@ -6,6 +6,7 @@ from pathlib import Path
 from agent_notes.services.obsidian_backend import (
     obsidian_write_note,
     obsidian_regenerate_index,
+    obsidian_init,
     _parse_note_metadata,
 )
 
@@ -175,15 +176,18 @@ class TestObsidianRegenerateIndex:
         obsidian_regenerate_index(tmp_path)
 
         index_content = (tmp_path / "Index.md").read_text()
-        # New format: [[stem|display_dt]] — stem appears inside the piped wikilink
-        assert "[[2026-04-28_test-pattern|" in index_content
+        # New format: [[stem]] — description_or_title
+        assert "[[2026-04-28_test-pattern]]" in index_content
 
     def test_index_lists_notes_from_all_categories(self, tmp_path):
-        for cat, title in [("Patterns", "Pattern Note"), ("Sessions", "Session Note")]:
+        for cat, note_type, title in [
+            ("Patterns", "pattern", "Pattern Note"),
+            ("Sessions", "session", "Session Note"),
+        ]:
             folder = tmp_path / cat
             folder.mkdir(parents=True, exist_ok=True)
             note = folder / f"2026-04-28_{cat.lower()}.md"
-            note.write_text(f"---\ncreated_at: 2026-04-28T10:00:00Z\ntype: x\n---\n\n# {title}\n\nbody\n")
+            note.write_text(f"---\ncreated_at: 2026-04-28T10:00:00Z\ntype: {note_type}\n---\n\n# {title}\n\nbody\n")
 
         obsidian_regenerate_index(tmp_path)
 
@@ -220,7 +224,6 @@ class TestObsidianRegenerateIndex:
         assert "## By category" not in index_content
 
     def test_index_is_sorted_newest_first(self, tmp_path):
-        import re
         patterns = tmp_path / "Patterns"
         patterns.mkdir()
         for i in range(5):
@@ -230,11 +233,10 @@ class TestObsidianRegenerateIndex:
             )
         obsidian_regenerate_index(tmp_path)
         content = (tmp_path / "Index.md").read_text()
-        lines = [l for l in content.splitlines() if l.startswith("- ")]
-        # New format: - [[stem|YYYY-MM-DD HH:MM]] - project(type)
-        # Extract the display datetime from inside the pipe: [[stem|<dt>]]
-        dts = [re.search(r"\|([^\]]+)\]\]", l).group(1) for l in lines]
-        assert dts == sorted(dts, reverse=True)
+        lines = [l for l in content.splitlines() if l.startswith("- [[")]
+        # Extract stems from [[stem]] entries; stems embed the date so sort order is preserved
+        stems = [re.search(r"\[\[([^\]]+)\]\]", l).group(1) for l in lines]
+        assert stems == sorted(stems, reverse=True)
 
     def test_index_falls_back_to_legacy_date_field(self, tmp_path):
         patterns = tmp_path / "Patterns"
@@ -458,30 +460,25 @@ class TestIndexFormat:
         return path
 
     def test_index_is_chronological_newest_first(self, tmp_path):
-        import re
         patterns = tmp_path / "Patterns"
         for i in range(5):
             self._make_note(patterns, f"2026-04-29_note-{i}", "pattern",
                             f"2026-04-29T10:00:0{i}Z", f"Note {i}")
         obsidian_regenerate_index(tmp_path)
         content = (tmp_path / "Index.md").read_text()
-        lines = [l for l in content.splitlines() if l.startswith("- ")]
-        # New format: - [[stem|YYYY-MM-DD HH:MM]] - project(type)
-        # Extract the display datetime from inside the pipe: [[stem|<dt>]]
-        dts = [re.search(r"\|([^\]]+)\]\]", l).group(1) for l in lines]
-        assert dts == sorted(dts, reverse=True)
+        lines = [l for l in content.splitlines() if l.startswith("- [[")]
+        # Stems embed the date/time, so lexicographic sort == chronological sort
+        stems = [re.search(r"\[\[([^\]]+)\]\]", l).group(1) for l in lines]
+        assert stems == sorted(stems, reverse=True)
 
-    def test_index_line_format(self, tmp_path, monkeypatch):
-        import agent_notes.services.obsidian_backend as mb
-        monkeypatch.setattr(mb, "_current_project_name", lambda: "test-project")
+    def test_index_line_format(self, tmp_path):
         patterns = tmp_path / "Patterns"
         self._make_note(patterns, "2026-04-29_test-pat", "pattern",
                         "2026-04-29T10:00:00Z", "Test pattern title")
         obsidian_regenerate_index(tmp_path)
         content = (tmp_path / "Index.md").read_text()
-        # New format: - [[stem|display_dt]] - project(type)
-        # Note has no project field so falls back to _current_project_name()
-        assert "- [[2026-04-29_test-pat|2026-04-29 10:00]] - test-project(pattern)" in content
+        # New format: - [[stem]] — description_or_title
+        assert "- [[2026-04-29_test-pat]] — Test pattern title" in content
 
     def test_index_has_no_by_category_section(self, tmp_path):
         patterns = tmp_path / "Patterns"
@@ -549,7 +546,7 @@ class TestProjectField:
         assert "project:" not in path.read_text()
 
     def test_obsidian_index_line_format_with_project(self, tmp_path):
-        """Index line renders - [[stem|dt]] - <project>(type) when project is present."""
+        """Index line renders - [[stem]] — title when note has no description."""
         patterns = tmp_path / "Patterns"
         patterns.mkdir(parents=True, exist_ok=True)
         stem = "2026-04-29_indexed-note"
@@ -558,22 +555,19 @@ class TestProjectField:
         )
         obsidian_regenerate_index(tmp_path)
         content = (tmp_path / "Index.md").read_text()
-        assert f"- [[{stem}|2026-04-29 10:00]] - agent-notes(pattern)" in content
+        assert f"- [[{stem}]] — Indexed Note" in content
 
-    def test_obsidian_index_line_format_legacy_no_project(self, tmp_path, monkeypatch):
-        """Legacy notes without a project field fall back to _current_project_name() in the index."""
-        import agent_notes.services.obsidian_backend as mb
-        monkeypatch.setattr(mb, "_current_project_name", lambda: "agent-notes")
+    def test_obsidian_index_line_format_legacy_no_project(self, tmp_path):
+        """Legacy notes without a project field still appear with their title in the index."""
         patterns = tmp_path / "Patterns"
         patterns.mkdir(parents=True, exist_ok=True)
         stem = "2026-04-29_legacy-note"
-        # No project field in frontmatter — simulates a pre-feature note
         (patterns / f"{stem}.md").write_text(
             "---\ncreated_at: 2026-04-29T09:00:00Z\ntype: pattern\n---\n\n# Legacy Note\n\nbody\n"
         )
         obsidian_regenerate_index(tmp_path)
         content = (tmp_path / "Index.md").read_text()
-        assert f"- [[{stem}|2026-04-29 09:00]] - agent-notes(pattern)" in content
+        assert f"- [[{stem}]] — Legacy Note" in content
 
     def test_obsidian_session_update_preserves_project(self, tmp_path, monkeypatch):
         """Appending an ## Update block to a session note must not overwrite the original project."""
@@ -751,3 +745,143 @@ class TestWikilinkResolution:
         assert len(files) == 1
         content = files[0].read_text()
         assert "[[nonexistent-thing]]" in content
+
+
+# ── Description field ─────────────────────────────────────────────────────────
+
+class TestDescriptionField:
+    def test_frontmatter_contains_description_when_provided(self, tmp_path):
+        path = obsidian_write_note(
+            tmp_path, title="Desc Note", body="body", note_type="pattern",
+            description="one-liner",
+        )
+        content = path.read_text()
+        assert "description: one-liner" in content
+
+    def test_frontmatter_omits_description_when_empty(self, tmp_path):
+        path = obsidian_write_note(
+            tmp_path, title="No Desc Note", body="body", note_type="pattern",
+        )
+        content = path.read_text()
+        assert "description:" not in content
+
+
+# ── Feedback category ─────────────────────────────────────────────────────────
+
+class TestFeedbackCategory:
+    def test_feedback_category_creates_folder(self, tmp_path):
+        obsidian_init(tmp_path)
+        assert (tmp_path / "Feedback").is_dir()
+
+    def test_write_feedback_note_lands_in_feedback_folder(self, tmp_path):
+        path = obsidian_write_note(
+            tmp_path, title="Feedback Note", body="body", note_type="feedback",
+        )
+        assert path.parent.name == "Feedback"
+
+
+# ── _yaml_safe() ─────────────────────────────────────────────────────────────
+
+class TestYamlSafe:
+    def setup_method(self):
+        from agent_notes.services._memory_utils import _yaml_safe
+        self._yaml_safe = _yaml_safe
+
+    def test_quotes_value_with_colon(self):
+        assert self._yaml_safe("uses: colons") == '"uses: colons"'
+
+    def test_quotes_value_with_bracket(self):
+        assert self._yaml_safe("list [items]") == '"list [items]"'
+
+    def test_leaves_plain_value(self):
+        assert self._yaml_safe("simple value") == "simple value"
+
+    def test_empty_string(self):
+        assert self._yaml_safe("") == ""
+
+    def test_escapes_internal_quotes(self):
+        result = self._yaml_safe('has "quotes"')
+        assert result == '"has \\"quotes\\""'
+
+
+class TestYamlSafeFrontmatter:
+    def test_description_with_colons_roundtrips(self, tmp_path):
+        """Description with YAML-special chars survives write+parse."""
+        from agent_notes.services.obsidian_backend import obsidian_write_note, _parse_note_metadata
+        path = obsidian_write_note(
+            tmp_path, title="Test", body="body",
+            note_type="decision", description="key: value: nested",
+        )
+        meta = _parse_note_metadata(path)
+        assert "key" in meta["description"]
+        assert "value" in meta["description"]
+
+
+# ── Grouped index ─────────────────────────────────────────────────────────────
+
+class TestGroupedIndex:
+    def test_index_groups_by_category(self, tmp_path):
+        """Index has ## section headers for each category with notes."""
+        obsidian_write_note(tmp_path, title="D1", body="b", note_type="decision")
+        obsidian_write_note(tmp_path, title="P1", body="b", note_type="pattern")
+        index = (tmp_path / "Index.md").read_text()
+        assert "## Decisions" in index
+        assert "## Patterns" in index
+
+    def test_index_empty_category_omitted(self, tmp_path):
+        """Categories with no notes don't appear in index."""
+        obsidian_write_note(tmp_path, title="D1", body="b", note_type="decision")
+        index = (tmp_path / "Index.md").read_text()
+        assert "## Patterns" not in index
+        assert "## Mistakes" not in index
+
+    def test_index_sessions_capped(self, tmp_path):
+        """Only last SESSION_CAP sessions appear in index."""
+        for i in range(8):
+            obsidian_write_note(tmp_path, title=f"Session {i}", body="b", note_type="session")
+        index = (tmp_path / "Index.md").read_text()
+        in_sessions = False
+        count = 0
+        for line in index.splitlines():
+            if line.startswith("## Recent sessions"):
+                in_sessions = True
+                continue
+            if in_sessions and line.startswith("## "):
+                break
+            if in_sessions and line.startswith("- [["):
+                count += 1
+        assert count <= 5
+
+    def test_index_description_from_frontmatter(self, tmp_path):
+        """Notes with description show it in the index."""
+        obsidian_write_note(
+            tmp_path, title="My Decision", body="body",
+            note_type="decision", description="one-liner for index",
+        )
+        index = (tmp_path / "Index.md").read_text()
+        assert "one-liner for index" in index
+
+    def test_index_description_fallback_to_title(self, tmp_path):
+        """Notes without description show title in the index."""
+        obsidian_write_note(
+            tmp_path, title="My Decision", body="body", note_type="decision",
+        )
+        index = (tmp_path / "Index.md").read_text()
+        assert "My Decision" in index
+
+    def test_index_feedback_category_supported(self, tmp_path):
+        """Feedback notes appear under ## Feedback section."""
+        obsidian_write_note(tmp_path, title="FB1", body="b", note_type="feedback")
+        index = (tmp_path / "Index.md").read_text()
+        assert "## Feedback" in index
+
+    def test_index_section_order(self, tmp_path):
+        """Sections appear in INDEX_SECTIONS order, sessions last."""
+        obsidian_write_note(tmp_path, title="D1", body="b", note_type="decision")
+        obsidian_write_note(tmp_path, title="P1", body="b", note_type="pattern")
+        obsidian_write_note(tmp_path, title="S1", body="b", note_type="session")
+        index = (tmp_path / "Index.md").read_text()
+        dec_pos = index.find("## Decisions")
+        pat_pos = index.find("## Patterns")
+        ses_pos = index.find("## Recent sessions")
+        assert dec_pos < pat_pos < ses_pos
