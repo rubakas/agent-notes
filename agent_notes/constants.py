@@ -20,7 +20,7 @@ class Wiki:
 class Obsidian:
     """Obsidian backend folder structure constants."""
     INDEX = "Index.md"
-    SUBFOLDER = "notes"
+    SUBFOLDER = "projects"
     CATEGORIES = ["Patterns", "Decisions", "Mistakes", "Context", "Feedback", "Sessions"]
     INDEX_SECTIONS = ["Decisions", "Patterns", "Context", "Mistakes", "Feedback"]
     SESSION_CAP = 5

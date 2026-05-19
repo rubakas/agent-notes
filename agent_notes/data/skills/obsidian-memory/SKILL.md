@@ -107,7 +107,7 @@ agent-notes memory vault             # confirm storage and path
 
 The vault is structured as:
 ```
-vault/agent-notes/notes/
+vault/agent-notes/projects/
 ├── <project-name>/
 │   ├── Patterns/     — reusable solutions        YYYY-MM-DD_<slug>.md
 │   ├── Decisions/    — architectural choices     YYYY-MM-DD_<slug>.md
