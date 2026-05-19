@@ -196,9 +196,11 @@ def _get_target_path(source_path: Path, backend, component_type: str, scope: str
             base_dir = project_path / backend.local_dir
         else:
             base_dir = Path.cwd() / backend.local_dir
-    
+
     if component_type == "config":
-        # Config files go to the root of the backend directory
+        if scope == "local":
+            root = project_path if project_path else Path.cwd()
+            return root / source_path.name
         return base_dir / source_path.name
     elif component_type in ["agents", "rules", "skills"]:
         # These go into subdirectories according to backend layout

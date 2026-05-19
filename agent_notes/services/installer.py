@@ -77,7 +77,8 @@ def target_dir_for(backend: CLIBackend, component: str, scope: str) -> Optional[
         return None
     home = backend.global_home if scope == "global" else Path(backend.local_dir)
     if component == "config":
-        # config layout is a filename like "CLAUDE.md"; target is the home dir
+        if scope == "local":
+            return Path(".")
         return home
     # All others are subdirectories
     return home / layout_value.rstrip("/")
