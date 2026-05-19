@@ -79,9 +79,6 @@ def memory(action: str = "list", name: Optional[str] = None, extra: Optional[lis
         do_export()
     elif action == "import":
         do_import()
-    elif action == "migrate-memory":
-        from .migrate_memory import do_migrate_memory
-        do_migrate_memory()
     elif action == "ingest":
         if not name:
             do_scan_raw()

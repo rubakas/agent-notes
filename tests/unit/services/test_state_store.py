@@ -27,7 +27,6 @@ from agent_notes.domain.state import (
     BackendState,
     InstalledItem,
     MemoryConfig,
-    MigrationState,
 )
 
 
@@ -542,28 +541,6 @@ class TestStateSerializationRoundtrip:
         }
         restored = _state_from_dict(data)
         assert restored.memory.backend == "local"
-
-    def test_state_roundtrip_includes_memory_migrations(self):
-        state = State(
-            source_path="",
-            source_commit="",
-            global_install=None,
-            local_installs={},
-            memory_migrations=MigrationState(completed=["v1"]),
-        )
-        data = _state_to_dict(state)
-        restored = _state_from_dict(data)
-        assert restored.memory_migrations.completed == ["v1"]
-
-    def test_state_from_dict_missing_migrations_defaults_empty(self):
-        data = {
-            "source_path": "",
-            "source_commit": "",
-            "global": None,
-            "local": {},
-        }
-        restored = _state_from_dict(data)
-        assert restored.memory_migrations.completed == []
 
     def test_roundtrip_with_backend_state_and_installed_items(self):
         backend_state = BackendState(
