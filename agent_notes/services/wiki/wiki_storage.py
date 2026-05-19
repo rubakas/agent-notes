@@ -52,6 +52,7 @@ def wiki_write_page(
     aliases: list[str] | None = None,
     sources: list[str] | None = None,
     confidence: str | None = None,
+    content_hash: str = "",
 ) -> Path:
     """Write or update a wiki page.
 
@@ -89,6 +90,7 @@ def wiki_write_page(
             aliases=merged_aliases,
             sources=sources or _parse_list_field(fm.get("sources", "")),
             confidence=confidence or fm.get("confidence", ""),
+            content_hash=content_hash or fm.get("content_hash", ""),
         )
         new_content = new_fm + existing_body.rstrip() + f"\n\n## Update {now}\n\n{body}\n"
         _atomic_write(page_path, new_content)
@@ -106,6 +108,7 @@ def wiki_write_page(
             aliases=aliases or [],
             sources=sources or [],
             confidence=confidence or "",
+            content_hash=content_hash,
         )
         _atomic_write(page_path, content)
         action_label = "created"

@@ -1197,3 +1197,165 @@ class TestWikiIngestUrl:
         with patch("urllib.request.urlopen", side_effect=URLError("connection refused")):
             with pytest.raises(URLError):
                 wiki_ingest_url(tmp_path, url="http://unreachable.example.com/")
+
+
+# ── TestWikiLintExtended ──────────────────────────────────────────────────────
+
+class TestWikiLintExtended:
+    # --- Contradiction candidates ---
+
+    def test_returns_dict_with_contradiction_candidates_key(self, tmp_path):
+        wiki_init(tmp_path)
+        result = wiki_lint(tmp_path)
+        assert "contradiction_candidates" in result
+
+    def test_detects_contradiction_candidates(self, tmp_path):
+        # Two pages share a tag but have different sources → flagged
+        wiki_ingest(
+            tmp_path,
+            title="Source Alpha",
+            body="summary alpha",
+            raw_content="raw content alpha",
+            raw_filename="source-alpha.md",
+            tags=["shared-tag"],
+        )
+        wiki_ingest(
+            tmp_path,
+            title="Source Beta",
+            body="summary beta",
+            raw_content="raw content beta",
+            raw_filename="source-beta.md",
+            tags=["shared-tag"],
+        )
+        result = wiki_lint(tmp_path)
+        assert len(result["contradiction_candidates"]) >= 1
+        entry = result["contradiction_candidates"][0]
+        assert "shared-tag" in entry
+        assert "source" in entry.lower() or "[[" in entry
+
+    def test_no_contradiction_when_same_sources(self, tmp_path):
+        # Single page with a tag and one source — no pair, no contradiction
+        wiki_ingest(
+            tmp_path,
+            title="Only Source",
+            body="summary",
+            raw_content="raw content",
+            raw_filename="only-source.md",
+            tags=["unique-tag"],
+        )
+        result = wiki_lint(tmp_path)
+        assert result["contradiction_candidates"] == []
+
+    def test_no_contradiction_when_no_shared_tags(self, tmp_path):
+        wiki_ingest(
+            tmp_path,
+            title="Source One",
+            body="summary one",
+            raw_content="raw one",
+            raw_filename="source-one.md",
+            tags=["tag-one"],
+        )
+        wiki_ingest(
+            tmp_path,
+            title="Source Two",
+            body="summary two",
+            raw_content="raw two",
+            raw_filename="source-two.md",
+            tags=["tag-two"],
+        )
+        result = wiki_lint(tmp_path)
+        assert result["contradiction_candidates"] == []
+
+    # --- Stale pages ---
+
+    def test_returns_dict_with_stale_pages_key(self, tmp_path):
+        wiki_init(tmp_path)
+        result = wiki_lint(tmp_path)
+        assert "stale_pages" in result
+
+    def test_detects_stale_page_when_raw_changed(self, tmp_path):
+        wiki_ingest(
+            tmp_path,
+            title="Changeable Source",
+            body="summary",
+            raw_content="original raw content",
+            raw_filename="changeable-source.md",
+            tags=[],
+        )
+        # Overwrite the raw file with different content
+        raw_file = tmp_path / "raw" / "changeable-source.md"
+        raw_file.write_text("modified raw content — now stale")
+        result = wiki_lint(tmp_path)
+        stale_entries = result["stale_pages"]
+        assert any("changeable-source" in entry or "mismatch" in entry for entry in stale_entries)
+
+    def test_no_stale_when_hash_matches(self, tmp_path):
+        wiki_ingest(
+            tmp_path,
+            title="Stable Source",
+            body="summary",
+            raw_content="stable raw content",
+            raw_filename="stable-source.md",
+            tags=[],
+        )
+        result = wiki_lint(tmp_path)
+        # The source page references raw/stable-source.md which hasn't changed
+        stale = [e for e in result["stale_pages"] if "stable-source" in e]
+        assert stale == []
+
+    def test_flags_missing_content_hash(self, tmp_path):
+        # Manually write a source page with a raw/ source ref but no content_hash
+        wiki_init(tmp_path)
+        raw_file = tmp_path / "raw" / "hand-written.md"
+        raw_file.parent.mkdir(parents=True, exist_ok=True)
+        raw_file.write_text("some raw content")
+        page = tmp_path / "wiki" / "sources" / "hand-written.md"
+        page.write_text(
+            "---\n"
+            "created_at: 2026-01-01T00:00:00Z\n"
+            "updated_at: 2026-01-01T00:00:00Z\n"
+            "type: sources\n"
+            "sources: [raw/hand-written.md]\n"
+            "---\n\n"
+            "# Hand Written\n\nNo hash stored.\n\n## Related\n\n"
+        )
+        result = wiki_lint(tmp_path)
+        stale = result["stale_pages"]
+        assert any("hand-written" in e or "content_hash" in e or "missing" in e for e in stale)
+
+    # --- Data gaps ---
+
+    def test_returns_dict_with_data_gaps_key(self, tmp_path):
+        wiki_init(tmp_path)
+        result = wiki_lint(tmp_path)
+        assert "data_gaps" in result
+
+    def test_detects_data_gaps(self, tmp_path):
+        wiki_init(tmp_path)
+        page = tmp_path / "wiki" / "concepts" / "referencing-page.md"
+        page.write_text(
+            "---\n"
+            "created_at: 2026-01-01T00:00:00Z\n"
+            "updated_at: 2026-01-01T00:00:00Z\n"
+            "type: concepts\n"
+            "---\n\n"
+            "# Referencing Page\n\nSee [[ghost-page]] for details.\n\n## Related\n\n"
+        )
+        result = wiki_lint(tmp_path)
+        gaps = result["data_gaps"]
+        assert any("ghost-page" in entry for entry in gaps)
+
+    def test_no_data_gap_when_page_exists(self, tmp_path):
+        wiki_write_page(tmp_path, title="Target Page", body="content here", page_type="concepts")
+        source = tmp_path / "wiki" / "concepts" / "linking-page.md"
+        source.write_text(
+            "---\n"
+            "created_at: 2026-01-01T00:00:00Z\n"
+            "updated_at: 2026-01-01T00:00:00Z\n"
+            "type: concepts\n"
+            "---\n\n"
+            "# Linking Page\n\nSee [[target-page]] for details.\n\n## Related\n\n"
+        )
+        result = wiki_lint(tmp_path)
+        gaps = [g for g in result["data_gaps"] if "target-page" in g]
+        assert gaps == []

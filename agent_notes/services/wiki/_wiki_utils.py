@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import tempfile
 from pathlib import Path
@@ -60,6 +61,11 @@ def _atomic_write(path: Path, content: str) -> None:
         raise
 
 
+def _content_hash(content: str) -> str:
+    """Return a short SHA-256 hash of content for staleness tracking."""
+    return hashlib.sha256(content.encode()).hexdigest()[:16]
+
+
 def _build_page_frontmatter(
     *,
     created_at: str,
@@ -71,6 +77,7 @@ def _build_page_frontmatter(
     aliases: list[str],
     sources: list[str],
     confidence: str = "",
+    content_hash: str = "",
 ) -> str:
     lines = ["---", f"created_at: {created_at}", f"updated_at: {updated_at}", f"type: {page_type}"]
     if tags:
@@ -88,6 +95,8 @@ def _build_page_frontmatter(
         lines.append(f"project: {project}")
     if confidence:
         lines.append(f'confidence: "{confidence}"')
+    if content_hash:
+        lines.append(f"content_hash: {content_hash}")
     lines.append("---")
     lines.append("")
     return "\n".join(lines)
@@ -106,6 +115,7 @@ def _build_page_content(
     aliases: list[str],
     sources: list[str],
     confidence: str = "",
+    content_hash: str = "",
 ) -> str:
     fm = _build_page_frontmatter(
         created_at=created_at,
@@ -117,6 +127,7 @@ def _build_page_content(
         aliases=aliases,
         sources=sources,
         confidence=confidence,
+        content_hash=content_hash,
     )
     return fm + f"# {title}\n\n{body}\n\n## Related\n\n"
 
