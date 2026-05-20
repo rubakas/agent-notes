@@ -119,29 +119,35 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
         print(f"{Color.YELLOW}Warning: failed to write state.json: {e}{Color.NC}")
 
 
+def _resolve_overrides_from_state(scope: str, project_path, profile_label: str = ""):
+    """Read folder/global_home overrides from state.json for the target scope."""
+    from ..services.state_store import load_state, get_scope
+
+    folder_overrides = None
+    global_home_override = None
+
+    state = load_state()
+    if state is None:
+        return folder_overrides, global_home_override
+
+    ss = get_scope(state, scope, project_path, profile_label=profile_label)
+    if ss is None:
+        return folder_overrides, global_home_override
+
+    for cli_name, bs in ss.clis.items():
+        if bs.local_dir_override:
+            folder_overrides = folder_overrides or {}
+            folder_overrides[cli_name] = bs.local_dir_override
+        if bs.global_home_override:
+            global_home_override = bs.global_home_override
+
+    return folder_overrides, global_home_override
+
+
 def uninstall(local: bool = False, global_: bool = False,
               profile_label: str = "") -> None:
     """Remove installed components managed by agent-notes."""
     from ..services import installer
-    from ..services.state_store import load_state, get_scope
-
-    # Resolve folder overrides from state when profile is specified
-    folder_overrides = None
-    global_home_override = None
-    if profile_label:
-        state = load_state()
-        if state:
-            for scope_name in ("global", "local"):
-                pp = Path.cwd().resolve() if scope_name == "local" else None
-                ss = get_scope(state, scope_name, pp, profile_label=profile_label)
-                if ss:
-                    for cli_name, bs in ss.clis.items():
-                        if bs.local_dir_override:
-                            folder_overrides = folder_overrides or {}
-                            folder_overrides[cli_name] = bs.local_dir_override
-                        if bs.global_home_override:
-                            global_home_override = bs.global_home_override
-                    break
 
     # Determine which scopes to uninstall
     if local and not global_:
@@ -152,6 +158,10 @@ def uninstall(local: bool = False, global_: bool = False,
         scopes = [("global", None), ("local", Path.cwd().resolve())]
 
     for scope, project_path in scopes:
+        # Always resolve overrides from state so we clean the right directories
+        folder_overrides, global_home_override = _resolve_overrides_from_state(
+            scope, project_path, profile_label)
+
         label_hint = f" profile={profile_label}" if profile_label else ""
         print(f"Uninstalling agent-notes ({scope}{label_hint}) ...")
         installer.uninstall_all(scope,
