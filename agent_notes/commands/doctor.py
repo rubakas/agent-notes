@@ -53,19 +53,33 @@ def _check_session_hook(scope: str, issues: list) -> None:
     except KeyError:
         return
 
-    settings_path, _context_file, hook_command = _session_hook_paths(claude_backend, scope)
-    if not has_hook(settings_path, "SessionStart", hook_command):
-        issues.append(Issue(
-            "missing_hook",
-            str(settings_path),
-            "SessionStart hook not found — run: agent-notes install to re-add the hook",
-        ))
-
-    from ..constants import Hooks
-    from ..services.state_store import load_state
+    from ..services.state_store import load_state, get_profiles_for_project
     state = load_state()
+
+    # Check all profiles for the current project (local scope) or default (global)
+    backends_to_check = [claude_backend]
+    if state and scope == "local":
+        for _key, ss in get_profiles_for_project(state, Path.cwd()):
+            bs = ss.clis.get("claude")
+            if bs and bs.local_dir_override:
+                backends_to_check.append(claude_backend.with_local_dir(bs.local_dir_override))
+
+    for backend in backends_to_check:
+        settings_path, _context_file, hook_command = _session_hook_paths(backend, scope)
+        if not settings_path.exists():
+            continue
+        if not has_hook(settings_path, "SessionStart", hook_command):
+            issues.append(Issue(
+                "missing_hook",
+                str(settings_path),
+                "SessionStart hook not found — run: agent-notes install to re-add the hook",
+            ))
+
+    # Memory bridge check on the default backend only
+    settings_path, _, _ = _session_hook_paths(claude_backend, scope)
+    from ..constants import Hooks
     if state and state.memory.backend in ("obsidian", "wiki"):
-        if not has_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE):
+        if settings_path.exists() and not has_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE):
             issues.append(Issue(
                 "missing_hook",
                 str(settings_path),

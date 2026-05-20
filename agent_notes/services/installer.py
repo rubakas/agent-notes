@@ -32,6 +32,20 @@ COMPONENT_TYPES = ("agents", "skills", "rules", "commands", "config")
 # Note: "scripts" is handled separately, not per-backend.
 
 
+def _apply_overrides(
+    backend: CLIBackend,
+    folder_overrides: Optional[dict] = None,
+    global_home_override: Optional[str] = None,
+) -> CLIBackend:
+    """Return a backend with folder/global_home overrides applied."""
+    effective = backend
+    if folder_overrides and backend.name in folder_overrides:
+        effective = effective.with_local_dir(folder_overrides[backend.name])
+    if global_home_override and backend.name == "claude":
+        effective = effective.with_global_home(Path(global_home_override).expanduser())
+    return effective
+
+
 def dist_source_for(backend: CLIBackend, component: str) -> Optional[Path]:
     """Return dist source path for a (backend, component) pair, or None if N/A.
     
@@ -237,6 +251,8 @@ def plan_install(
     selected_clis: Optional[set] = None,
     selected_skills: Optional[List[str]] = None,
     copy_mode: bool = False,
+    folder_overrides: Optional[dict] = None,
+    global_home_override: Optional[str] = None,
 ) -> List[InstallAction]:
     """Return a manifest of what install_all would do, without writing any files.
 
@@ -254,11 +270,12 @@ def plan_install(
     for backend in registry.all():
         if selected_clis is not None and backend.name not in selected_clis:
             continue
+        effective = _apply_overrides(backend, folder_overrides, global_home_override)
         for component in COMPONENT_TYPES:
             if component == "skills" and selected_skills is not None:
                 # Skills are filtered — plan them separately below
                 continue
-            actions.extend(_plan_component(backend, component, scope, copy_mode))
+            actions.extend(_plan_component(effective, component, scope, copy_mode))
 
     # Skills: respect the selected_skills filter (mirrors wizard's install_skills_filtered)
     if scope == "global" or selected_skills is not None:
@@ -273,7 +290,8 @@ def plan_install(
                     continue
                 if not backend.supports("skills"):
                     continue
-                dst_dir = target_dir_for(backend, "skills", scope)
+                effective = _apply_overrides(backend, folder_overrides, global_home_override)
+                dst_dir = target_dir_for(effective, "skills", scope)
                 if dst_dir is None:
                     continue
                 for name in sorted(names_to_plan):
@@ -293,6 +311,7 @@ def plan_install(
     try:
         claude_backend = registry.get("claude")
         if selected_clis is None or claude_backend.name in selected_clis:
+            claude_backend = _apply_overrides(claude_backend, folder_overrides, global_home_override)
             actions.extend(_plan_session_hook(claude_backend, scope))
     except KeyError:
         pass
@@ -300,14 +319,17 @@ def plan_install(
     return actions
 
 
-def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = None) -> None:
+def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = None,
+                folder_overrides: Optional[dict] = None,
+                global_home_override: Optional[str] = None) -> None:
     """Top-level: install every (backend, component) combo."""
     if registry is None:
         registry = load_registry()
 
     for backend in registry.all():
+        effective = _apply_overrides(backend, folder_overrides, global_home_override)
         for component in COMPONENT_TYPES:
-            install_component_for_backend(backend, component, scope, copy_mode)
+            install_component_for_backend(effective, component, scope, copy_mode)
 
     # Universal skills mirror: keep existing behavior — also install skills
     # to ~/.agents/skills/ for any backend that supports skills, only for global scope.
@@ -317,6 +339,7 @@ def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = N
     # SessionStart hook for Claude Code only
     try:
         claude_backend = registry.get("claude")
+        claude_backend = _apply_overrides(claude_backend, folder_overrides, global_home_override)
         _install_session_hook(claude_backend, scope)
     except KeyError:
         pass
@@ -339,7 +362,10 @@ def _install_universal_skills(copy_mode: bool, registry: CLIRegistry) -> None:
         place_file(skill_dir, target / skill_dir.name, copy_mode)
 
 
-def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
+def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
+                  folder_overrides: Optional[dict] = None,
+                  global_home_override: Optional[str] = None,
+                  profile_label: str = "") -> None:
     """Top-level uninstall."""
     if registry is None:
         registry = load_registry()
@@ -348,7 +374,11 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
     copy_mode = False
     state = load_state()
     if state is not None:
-        scope_state = get_scope(state, scope, project_path=Path.cwd() if scope == "local" else None)
+        scope_state = get_scope(
+            state, scope,
+            project_path=Path.cwd() if scope == "local" else None,
+            profile_label=profile_label,
+        )
         if scope_state is not None:
             copy_mode = (scope_state.mode == "copy")
 
@@ -358,10 +388,11 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
         summary: dict[str, int] = {}
 
         for backend in registry.all():
+            effective = _apply_overrides(backend, folder_overrides, global_home_override)
             for component in COMPONENT_TYPES:
-                count = uninstall_component_for_backend(backend, component, scope, copy_mode)
+                count = uninstall_component_for_backend(effective, component, scope, copy_mode)
                 if count:
-                    dst = target_dir_for(backend, component, scope)
+                    dst = target_dir_for(effective, component, scope)
                     if dst is not None:
                         key = str(dst)
                         summary[key] = summary.get(key, 0) + count
@@ -384,6 +415,7 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None) -> None:
     # Remove SessionStart hook for Claude Code only
     try:
         claude_backend = registry.get("claude")
+        claude_backend = _apply_overrides(claude_backend, folder_overrides, global_home_override)
         _uninstall_session_hook(claude_backend, scope)
     except KeyError:
         pass
@@ -402,14 +434,12 @@ def _uninstall_universal_skills(copy_mode: bool = False) -> int:
 def _session_hook_paths(backend, scope: str):
     """Return (settings_path, context_file, hook_command) for the given scope."""
     home = backend.global_home if scope == "global" else Path(backend.local_dir)
+    settings_path = home / "settings.json"
+    context_file = home / "agent-notes-context.md"
     if scope == "global":
-        settings_path = home / "settings.json"
-        context_file = home / "agent-notes-context.md"
-        hook_command = "cat ~/.claude/agent-notes-context.md 2>/dev/null || true"
+        hook_command = f"cat {home}/agent-notes-context.md 2>/dev/null || true"
     else:
-        settings_path = home / "settings.json"
-        context_file = home / "agent-notes-context.md"
-        hook_command = "cat .claude/agent-notes-context.md 2>/dev/null || true"
+        hook_command = f"cat {backend.local_dir}/agent-notes-context.md 2>/dev/null || true"
     return settings_path, context_file, hook_command
 
 

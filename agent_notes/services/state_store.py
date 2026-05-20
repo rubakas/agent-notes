@@ -55,6 +55,8 @@ def save_state(state: State) -> None:
     now = now_iso()
     if state.global_install:
         state.global_install.updated_at = now
+    for scope_state in state.global_installs.values():
+        scope_state.updated_at = now
     for scope_state in state.local_installs.values():
         scope_state.updated_at = now
     
@@ -84,39 +86,69 @@ def clear_state() -> None:
         file_path.unlink()
 
 
-def get_scope(state: State, scope: str, project_path: Optional[Path] = None) -> Optional[ScopeState]:
+def _local_key(project_path: Path, profile_label: str = "") -> str:
+    """Build the local_installs dict key, with optional #profile suffix."""
+    key = str(Path(project_path).resolve())
+    if profile_label:
+        key = f"{key}#{profile_label}"
+    return key
+
+
+def get_scope(state: State, scope: str, project_path: Optional[Path] = None,
+              profile_label: str = "") -> Optional[ScopeState]:
     """Fetch the ScopeState for a scope. scope is 'global' or 'local'.
     For 'local', project_path MUST be provided (absolute path).
-    Returns None if the scope hasn't been installed to yet."""
+    When profile_label is set, looks up the named profile instead of the default."""
     if scope == "global":
+        if profile_label:
+            return state.global_installs.get(profile_label)
         return state.global_install
     if scope == "local":
         if project_path is None:
             raise ValueError("project_path required for local scope")
-        return state.local_installs.get(str(Path(project_path).resolve()))
+        return state.local_installs.get(_local_key(project_path, profile_label))
     raise ValueError(f"Unknown scope: {scope}")
 
 
-def set_scope(state: State, scope: str, scope_state: ScopeState, project_path: Optional[Path] = None) -> None:
+def set_scope(state: State, scope: str, scope_state: ScopeState,
+              project_path: Optional[Path] = None, profile_label: str = "") -> None:
     """Set/replace the scope state."""
     if scope == "global":
-        state.global_install = scope_state
+        if profile_label:
+            state.global_installs[profile_label] = scope_state
+        else:
+            state.global_install = scope_state
     elif scope == "local":
         if project_path is None:
             raise ValueError("project_path required for local scope")
-        state.local_installs[str(Path(project_path).resolve())] = scope_state
+        state.local_installs[_local_key(project_path, profile_label)] = scope_state
     else:
         raise ValueError(f"Unknown scope: {scope}")
 
 
-def remove_scope(state: State, scope: str, project_path: Optional[Path] = None) -> None:
+def remove_scope(state: State, scope: str, project_path: Optional[Path] = None,
+                 profile_label: str = "") -> None:
     """Remove scope state (for uninstall)."""
     if scope == "global":
-        state.global_install = None
+        if profile_label:
+            state.global_installs.pop(profile_label, None)
+        else:
+            state.global_install = None
     elif scope == "local":
         if project_path is None:
             raise ValueError("project_path required for local scope")
-        state.local_installs.pop(str(Path(project_path).resolve()), None)
+        state.local_installs.pop(_local_key(project_path, profile_label), None)
+
+
+def get_profiles_for_project(state: State, project_path: Path) -> list[tuple[str, ScopeState]]:
+    """Return all (key, ScopeState) pairs for a given project path.
+    Matches both 'path' (legacy default) and 'path#label' keys."""
+    prefix = str(Path(project_path).resolve())
+    results = []
+    for key, ss in state.local_installs.items():
+        if key == prefix or key.startswith(prefix + "#"):
+            results.append((key, ss))
+    return results
 
 
 def default_state() -> State:
@@ -125,7 +157,8 @@ def default_state() -> State:
         source_path="",
         source_commit="",
         global_install=None,
-        local_installs={}
+        local_installs={},
+        global_installs={},
     )
 
 
@@ -140,43 +173,57 @@ def now_iso() -> str:
 
 
 def _state_to_dict(s: State) -> dict:
-    return {
+    d = {
         "source_path": s.source_path,
         "source_commit": s.source_commit,
         "global": _scope_to_dict(s.global_install) if s.global_install else None,
         "local": {path: _scope_to_dict(ss) for path, ss in s.local_installs.items()},
         "memory": {"backend": s.memory.backend, "path": s.memory.path},
     }
+    if s.global_installs:
+        d["global_installs"] = {label: _scope_to_dict(ss) for label, ss in s.global_installs.items()}
+    return d
 
 
 def _scope_to_dict(s: ScopeState) -> dict:
-    return {
+    d = {
         "installed_at": s.installed_at,
         "updated_at": s.updated_at,
         "mode": s.mode,
         "installed_version": s.installed_version,
         "clis": {name: _backend_to_dict(bs) for name, bs in s.clis.items()},
     }
+    if s.profile_label:
+        d["profile_label"] = s.profile_label
+    return d
 
 
 def _backend_to_dict(b: BackendState) -> dict:
-    return {
+    d = {
         "role_models": dict(b.role_models),
         "installed": {
             component: {name: asdict(item) for name, item in items.items()}
             for component, items in b.installed.items()
         },
     }
+    if b.local_dir_override:
+        d["local_dir_override"] = b.local_dir_override
+    if b.global_home_override:
+        d["global_home_override"] = b.global_home_override
+    return d
 
 
 def _state_from_dict(data: dict) -> State:
     """Load State from JSON dict, handling missing fields defensively."""
     global_data = data.get("global")
     global_install = _scope_from_dict(global_data) if global_data else None
-    
+
     local_data = data.get("local", {})
     local_installs = {path: _scope_from_dict(scope_data) for path, scope_data in local_data.items()}
-    
+
+    global_installs_data = data.get("global_installs", {})
+    global_installs = {label: _scope_from_dict(sd) for label, sd in global_installs_data.items()}
+
     memory_data = data.get("memory", {})
     memory = MemoryConfig(
         backend=memory_data.get("backend", "local"),
@@ -189,6 +236,7 @@ def _state_from_dict(data: dict) -> State:
         global_install=global_install,
         local_installs=local_installs,
         memory=memory,
+        global_installs=global_installs,
     )
 
 
@@ -196,29 +244,32 @@ def _scope_from_dict(data: dict) -> ScopeState:
     """Load ScopeState from JSON dict."""
     clis_data = data.get("clis", {})
     clis = {name: _backend_from_dict(backend_data) for name, backend_data in clis_data.items()}
-    
+
     return ScopeState(
         installed_at=data.get("installed_at", ""),
         updated_at=data.get("updated_at", ""),
         mode=data.get("mode", "symlink"),
         installed_version=data.get("installed_version", ""),
         clis=clis,
+        profile_label=data.get("profile_label", ""),
     )
 
 
 def _backend_from_dict(data: dict) -> BackendState:
     """Load BackendState from JSON dict."""
     role_models = data.get("role_models", {})
-    
+
     installed_data = data.get("installed", {})
     installed = {}
     for component, items_data in installed_data.items():
         items = {name: InstalledItem(**item_data) for name, item_data in items_data.items()}
         installed[component] = items
-    
+
     return BackendState(
         role_models=role_models,
         installed=installed,
+        local_dir_override=data.get("local_dir_override", ""),
+        global_home_override=data.get("global_home_override", ""),
     )
 
 
@@ -232,20 +283,23 @@ def load_current_state() -> Optional[State]:
     return load_state()
 
 
-def remove_install_state(scope: str, project_path: Optional[Path] = None) -> None:
+def remove_install_state(scope: str, project_path: Optional[Path] = None,
+                         profile_label: str = "") -> None:
     """Remove install state for the given scope without affecting other scopes.
-    
+
     For uninstall operations - this should only remove the target scope,
     not clear the entire state file.
     """
     current_state = load_state()
     if current_state is None:
         return  # Nothing to remove
-    
-    remove_scope(current_state, scope, project_path)
-    
+
+    remove_scope(current_state, scope, project_path, profile_label)
+
     # If state is now completely empty, clear the file
-    if current_state.global_install is None and not current_state.local_installs:
+    if (current_state.global_install is None
+            and not current_state.global_installs
+            and not current_state.local_installs):
         clear_state()
     else:
         save_state(current_state)

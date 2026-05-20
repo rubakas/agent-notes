@@ -20,6 +20,45 @@ from .execute import (
 from .orchestrator import interactive_install, _interactive_install
 
 
+def _select_profile(step: int = 0, total: int = 0, version: str = '') -> tuple:
+    """Step: Optional profile configuration for multi-subscription setups.
+
+    Returns (profile_label, folder_overrides, global_home_override):
+      - profile_label: str, e.g. "work" or "" for default
+      - folder_overrides: dict or None, e.g. {"claude": ".claude-work"}
+      - global_home_override: str or "", e.g. "~/.claude-work"
+    """
+    options = [
+        ("No, use default .claude folder", "no"),
+        ("Yes, set up a named profile (e.g. work, personal)", "yes"),
+    ]
+    if _can_interactive():
+        result = _radio_select("Set up a named profile? (for multi-subscription setups)", options, default=0,
+                               step=step, total=total, version=version)
+    else:
+        result = _radio_select_fallback("Set up a named profile? (for multi-subscription setups)", options, default=0,
+                                         step=step, total=total, version=version)
+
+    if result == "no":
+        print(f"  {Color.GREEN}✓{Color.NC} Profile: default")
+        return ("", None, "")
+
+    label = _safe_input(f"  Profile label (e.g. work, personal): ").strip()
+    if not label:
+        print(f"  {Color.GREEN}✓{Color.NC} Profile: default")
+        return ("", None, "")
+
+    default_folder = f".claude-{label}"
+    default_home = f"~/.claude-{label}"
+
+    folder = _safe_input(f"  Local folder [{default_folder}]: ").strip() or default_folder
+    home = _safe_input(f"  Global home [{default_home}]: ").strip() or default_home
+
+    folder_overrides = {"claude": folder}
+    print(f"  {Color.GREEN}✓{Color.NC} Profile: {label} (local={folder}, global={home})")
+    return (label, folder_overrides, home)
+
+
 def _select_cli(step: int = 0, total: int = 0, version: str = '') -> Set[str]:
     """Step 1: CLI selection."""
     from ...registries.cli_registry import load_registry

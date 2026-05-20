@@ -24,19 +24,22 @@ def install_skills_filtered(skill_names: List[str], targets: List[Path], copy_mo
                 place_file(skill_dir, target_dir / skill_name, copy_mode)
 
 
-def install_agents_filtered(clis: Set[str], scope: str, copy_mode: bool = False) -> None:
+def install_agents_filtered(clis: Set[str], scope: str, copy_mode: bool = False,
+                            folder_overrides: dict = None, global_home_override: str = "") -> None:
     """Install agents for selected CLIs (filtered by the wizard)."""
     from ...services import installer
+    from ...services.installer import _apply_overrides
     from ...registries.cli_registry import load_registry
 
     registry = load_registry()
     for backend in registry.all():
         if backend.name not in clis:
             continue
-        src = installer.dist_source_for(backend, "agents")
+        effective = _apply_overrides(backend, folder_overrides, global_home_override or None)
+        src = installer.dist_source_for(effective, "agents")
         if src is None:
             continue
-        dst = installer.target_dir_for(backend, "agents", scope)
+        dst = installer.target_dir_for(effective, "agents", scope)
         if dst is None:
             continue
 
@@ -47,9 +50,11 @@ def install_agents_filtered(clis: Set[str], scope: str, copy_mode: bool = False)
         place_dir_contents(src, dst, "*.md", copy_mode)
 
 
-def install_config_filtered(clis: Set[str], scope: str, copy_mode: bool = False) -> None:
+def install_config_filtered(clis: Set[str], scope: str, copy_mode: bool = False,
+                            folder_overrides: dict = None, global_home_override: str = "") -> None:
     """Install config + rules for selected CLIs."""
     from ...services import installer
+    from ...services.installer import _apply_overrides
     from ...registries.cli_registry import load_registry
 
     registry = load_registry()
@@ -57,18 +62,19 @@ def install_config_filtered(clis: Set[str], scope: str, copy_mode: bool = False)
     for backend in registry.all():
         if backend.name not in clis:
             continue
+        effective = _apply_overrides(backend, folder_overrides, global_home_override or None)
 
-        config_src = installer.dist_source_for(backend, "config")
-        config_dst = installer.target_dir_for(backend, "config", scope)
+        config_src = installer.dist_source_for(effective, "config")
+        config_dst = installer.target_dir_for(effective, "config", scope)
         if config_src is not None and config_dst is not None:
-            filename = installer.config_filename_for(backend)
+            filename = installer.config_filename_for(effective)
             if filename:
                 src_file = config_src / filename
                 if src_file.exists():
                     place_file(src_file, config_dst / filename, copy_mode)
 
-        rules_src = installer.dist_source_for(backend, "rules")
-        rules_dst = installer.target_dir_for(backend, "rules", scope)
+        rules_src = installer.dist_source_for(effective, "rules")
+        rules_dst = installer.target_dir_for(effective, "rules", scope)
         if rules_src is not None and rules_dst is not None:
             files = list(rules_src.glob("*.md"))
             if files:
@@ -83,15 +89,20 @@ def _execute_install(
     role_models: Dict[str, Dict[str, str]],
     memory_backend: str,
     memory_path: str,
+    profile_label: str = "",
+    folder_overrides: dict = None,
+    global_home_override: str = "",
 ) -> None:
     """Run all installation steps after parameters have been collected and the build is done."""
-    print(f"\nInstalling ({scope}, {'copy' if copy_mode else 'symlink'}) ...\n")
+    label_msg = f", profile={profile_label}" if profile_label else ""
+    print(f"\nInstalling ({scope}, {'copy' if copy_mode else 'symlink'}{label_msg}) ...\n")
 
     from ...services import fs as _fs
     _fs.silent_file_ops = True
 
     from ...registries.cli_registry import load_registry as _load_registry
     from ...services import installer as _installer
+    from ...services.installer import _apply_overrides
     _registry = _load_registry()
 
     # Skills
@@ -99,7 +110,8 @@ def _execute_install(
         targets = []
         for _b in _registry.all():
             if _b.name in clis and _b.supports("skills"):
-                _t = _installer.target_dir_for(_b, "skills", scope)
+                _eff = _apply_overrides(_b, folder_overrides, global_home_override or None)
+                _t = _installer.target_dir_for(_eff, "skills", scope)
                 if _t is not None:
                     targets.append(_t)
         if scope == "global":
@@ -118,7 +130,8 @@ def _execute_install(
         print(f"  {Color.GREEN}✓{Color.NC} Skills     {', '.join(_group_parts) if _group_parts else str(len(selected_skills)) + ' skills'}")
 
     # Agents
-    install_agents_filtered(clis, scope, copy_mode)
+    install_agents_filtered(clis, scope, copy_mode,
+                            folder_overrides=folder_overrides, global_home_override=global_home_override)
     _agent_parts = []
     for _b in _registry.all():
         if _b.name in clis and _b.supports("agents"):
@@ -129,7 +142,8 @@ def _execute_install(
         print(f"  {Color.GREEN}✓{Color.NC} Agents     {', '.join(_agent_parts)}")
 
     # Config + Rules
-    install_config_filtered(clis, scope, copy_mode)
+    install_config_filtered(clis, scope, copy_mode,
+                            folder_overrides=folder_overrides, global_home_override=global_home_override)
     _rules_n = _count_rules()
     _cfg_files = [_installer.config_filename_for(_b) for _b in _registry.all() if _b.name in clis and _installer.config_filename_for(_b)]
     _cfg_desc = ", ".join(_cfg_files) if _cfg_files else "config"
@@ -140,7 +154,8 @@ def _execute_install(
     from ...services.installer import install_component_for_backend as _install_component
     for _backend in _registry.all():
         if _backend.name in clis:
-            _install_component(_backend, "commands", scope, copy_mode)
+            _eff_cmd = _apply_overrides(_backend, folder_overrides, global_home_override or None)
+            _install_component(_eff_cmd, "commands", scope, copy_mode)
     _cmd_names = [f.stem for f in (PKG_DIR / "dist" / "commands").glob("*.md")] if (PKG_DIR / "dist" / "commands").exists() else []
     if _cmd_names:
         print(f"  {Color.GREEN}✓{Color.NC} Commands   {', '.join(sorted(_cmd_names))}")
@@ -150,7 +165,8 @@ def _execute_install(
     try:
         _claude = _registry.get("claude")
         if _claude.name in clis:
-            _install_session_hook(_claude, scope, memory_backend=memory_backend, memory_path=memory_path or "")
+            _claude_eff = _apply_overrides(_claude, folder_overrides, global_home_override or None)
+            _install_session_hook(_claude_eff, scope, memory_backend=memory_backend, memory_path=memory_path or "")
     except (KeyError, Exception):
         pass
 
@@ -169,6 +185,9 @@ def _execute_install(
             project_path=project_path,
             role_models=role_models,
             selected_clis=set(clis),
+            profile_label=profile_label,
+            folder_overrides=folder_overrides,
+            global_home_override=global_home_override or None,
         )
         st.memory = MemoryConfig(backend=memory_backend, path=memory_path)
         record_install_state(st)

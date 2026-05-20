@@ -226,6 +226,12 @@ def main():
     p_install.add_argument("--copy", action="store_true", help="Copy instead of symlink (with --local)")
     p_install.add_argument("--reconfigure", action="store_true",
         help="Clear existing state for this scope and re-run the wizard")
+    p_install.add_argument("--profile", metavar="LABEL",
+        help="Profile label for multi-subscription setups (e.g. work, personal)")
+    p_install.add_argument("--folder", metavar="DIR",
+        help="Local folder name override (e.g. .claude-work)")
+    p_install.add_argument("--global-home", metavar="DIR", dest="global_home",
+        help="Global home directory override (e.g. ~/.claude-work)")
     
     # build
     subparsers.add_parser("build", help="Build agent configuration files from source")
@@ -234,6 +240,8 @@ def main():
     p_uninstall = subparsers.add_parser("uninstall", help="Remove installed components")
     p_uninstall.add_argument("--local", action="store_true", help="Remove from current project only")
     p_uninstall.add_argument("--global", action="store_true", dest="global_", help="Remove from global scope only")
+    p_uninstall.add_argument("--profile", metavar="LABEL",
+        help="Profile label to uninstall (e.g. work)")
     
     # doctor
     p_doctor = subparsers.add_parser("doctor", help="Check installation health")
@@ -267,6 +275,7 @@ def main():
     p_regen.add_argument("--scope", choices=["global", "local"], help="Install scope")
     p_regen.add_argument("--cli", help="Regenerate specific CLI only")
     p_regen.add_argument("--local", action="store_true", help="Use local scope")
+    p_regen.add_argument("--profile", metavar="LABEL", help="Profile label")
     
     # memory
     p_memory = subparsers.add_parser("memory", help="Manage agent memory")
@@ -279,7 +288,7 @@ def main():
 
     # hook
     p_hook = subparsers.add_parser("hook", help="Claude Code hook integrations")
-    p_hook.add_argument("subaction", choices=["memory-bridge"],
+    p_hook.add_argument("subaction", choices=["memory-bridge", "session-discover"],
         help="Hook to run")
 
     # cost-report
@@ -311,15 +320,21 @@ def main():
         from .commands.build import build
         build()
     elif args.command == "install":
-        if args.local or args.copy:
+        if args.local or args.copy or args.profile or args.folder or args.global_home:
             from .commands.install import install
-            install(local=args.local, copy=args.copy, reconfigure=args.reconfigure)
+            install(
+                local=args.local, copy=args.copy, reconfigure=args.reconfigure,
+                profile_label=args.profile or "",
+                folder=args.folder or "",
+                global_home=args.global_home or "",
+            )
         else:
             from .commands.wizard import interactive_install
             interactive_install()
     elif args.command == "uninstall":
         from .commands.install import uninstall
-        uninstall(local=args.local, global_=args.global_)
+        uninstall(local=args.local, global_=args.global_,
+                  profile_label=getattr(args, 'profile', '') or "")
     elif args.command == "doctor":
         from .commands.doctor import doctor
         doctor(local=args.local, fix=args.fix)
@@ -338,7 +353,8 @@ def main():
             set_role(args.role_name, args.model_id, cli=args.cli, scope=args.scope, local=args.local)
     elif args.command == "regenerate":
         from .commands.regenerate import regenerate
-        regenerate(scope=args.scope, cli=args.cli, local=args.local)
+        regenerate(scope=args.scope, cli=args.cli, local=args.local,
+                   profile_label=getattr(args, 'profile', '') or "")
     elif args.command == "memory":
         from .commands.memory import memory
         memory(args.action, args.name, getattr(args, "extra", None), description=getattr(args, "description", ""))

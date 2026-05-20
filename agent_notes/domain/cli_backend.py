@@ -1,7 +1,7 @@
 """CLI backend dataclass — pure data model for CLI backend descriptors."""
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Optional
 
@@ -38,3 +38,9 @@ class CLIBackend:
             if provider in model_aliases:
                 return (provider, model_aliases[provider])
         return None
+
+    def with_local_dir(self, local_dir: str) -> 'CLIBackend':
+        return replace(self, local_dir=local_dir)
+
+    def with_global_home(self, global_home: Path) -> 'CLIBackend':
+        return replace(self, global_home=global_home)

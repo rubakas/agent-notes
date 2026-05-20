@@ -8,7 +8,8 @@ from ..services.state_store import load_current_state, record_install_state, rem
 from ._install_helpers import _verify_install
 
 
-def install(local: bool = False, copy: bool = False, reconfigure: bool = False) -> None:
+def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
+            profile_label: str = "", folder: str = "", global_home: str = "") -> None:
     """Build from source and install to targets."""
     from ..services.state_store import get_scope, state_file
     from pathlib import Path
@@ -16,12 +17,25 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False) 
     scope = "local" if local else "global"
     project_path = Path.cwd().resolve() if local else None
 
+    # Build folder overrides from --folder / --profile
+    folder_overrides = None
+    if folder:
+        folder_overrides = {"claude": folder}
+    elif profile_label and not folder:
+        folder_overrides = {"claude": f".claude-{profile_label}"}
+
+    # Default --global-home from profile label if not explicit
+    if profile_label and not global_home:
+        global_home = f"~/.claude-{profile_label}"
+
     state = load_current_state()
-    existing = get_scope(state, scope, project_path) if state else None
+    existing = get_scope(state, scope, project_path, profile_label=profile_label) if state else None
+
+    profile_hint = f" (profile: {profile_label})" if profile_label else ""
 
     if existing and not reconfigure:
         # Print existing-install summary
-        print(f"Found existing {scope} installation at {state_file()}")
+        print(f"Found existing {scope} installation{profile_hint} at {state_file()}")
         print(f"  Installed: {existing.installed_at}")
         cli_labels = []
         from ..registries.cli_registry import load_registry
@@ -35,7 +49,6 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False) 
         print(f"  Mode:      {existing.mode}")
         print()
         print("Verifying ...")
-        # Run verification. Use doctor_checks or a new helper.
         issues = _verify_install(existing, scope, project_path, registry)
         if not issues:
             print()
@@ -55,10 +68,10 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False) 
         return
 
     if existing and reconfigure:
-        print(f"Clearing existing {scope} state (--reconfigure) ...")
-        remove_install_state(scope, project_path)
+        print(f"Clearing existing {scope} state{profile_hint} (--reconfigure) ...")
+        remove_install_state(scope, project_path, profile_label=profile_label)
         # Fall through to normal install flow
-    
+
     # Validate args
     if copy and not local:
         print("Error: --copy is only valid with --local installs.")
@@ -75,34 +88,60 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False) 
         return
 
     # Execute
-    print(f"Installing ({'local' if local else 'global'}, {'copy' if copy else 'symlink'}) ...")
+    label_msg = f", profile={profile_label}" if profile_label else ""
+    print(f"Installing ({'local' if local else 'global'}, {'copy' if copy else 'symlink'}{label_msg}) ...")
     print("")
 
     from ..services import installer
     scope = "local" if local else "global"
     copy_mode = copy
-    installer.install_all(scope, copy_mode)
+    installer.install_all(scope, copy_mode,
+                          folder_overrides=folder_overrides,
+                          global_home_override=global_home or None)
 
     print("")
     print(f"{Color.GREEN}Done.{Color.NC} Restart Claude Code / OpenCode to pick up changes.")
-    
+
     # Record state
     try:
         project_path = Path.cwd() if local else None
         st = build_install_state(
             mode="copy" if copy else "symlink",
             scope="local" if local else "global",
-            repo_root=PKG_DIR.parent,  # repo root (parent of agent_notes pkg)
+            repo_root=PKG_DIR.parent,
             project_path=project_path,
+            profile_label=profile_label,
+            folder_overrides=folder_overrides,
+            global_home_override=global_home or None,
         )
         record_install_state(st)
     except Exception as e:
         print(f"{Color.YELLOW}Warning: failed to write state.json: {e}{Color.NC}")
 
 
-def uninstall(local: bool = False, global_: bool = False) -> None:
+def uninstall(local: bool = False, global_: bool = False,
+              profile_label: str = "") -> None:
     """Remove installed components managed by agent-notes."""
     from ..services import installer
+    from ..services.state_store import load_state, get_scope
+
+    # Resolve folder overrides from state when profile is specified
+    folder_overrides = None
+    global_home_override = None
+    if profile_label:
+        state = load_state()
+        if state:
+            for scope_name in ("global", "local"):
+                pp = Path.cwd().resolve() if scope_name == "local" else None
+                ss = get_scope(state, scope_name, pp, profile_label=profile_label)
+                if ss:
+                    for cli_name, bs in ss.clis.items():
+                        if bs.local_dir_override:
+                            folder_overrides = folder_overrides or {}
+                            folder_overrides[cli_name] = bs.local_dir_override
+                        if bs.global_home_override:
+                            global_home_override = bs.global_home_override
+                    break
 
     # Determine which scopes to uninstall
     if local and not global_:
@@ -113,12 +152,16 @@ def uninstall(local: bool = False, global_: bool = False) -> None:
         scopes = [("global", None), ("local", Path.cwd().resolve())]
 
     for scope, project_path in scopes:
-        print(f"Uninstalling agent-notes ({scope}) ...")
-        installer.uninstall_all(scope)
+        label_hint = f" profile={profile_label}" if profile_label else ""
+        print(f"Uninstalling agent-notes ({scope}{label_hint}) ...")
+        installer.uninstall_all(scope,
+                                folder_overrides=folder_overrides,
+                                global_home_override=global_home_override,
+                                profile_label=profile_label)
 
         # Remove state entry for this scope
         try:
-            remove_install_state(scope, project_path)
+            remove_install_state(scope, project_path, profile_label=profile_label)
         except Exception as e:
             print(f"{Color.YELLOW}Warning: failed to clear state.json: {e}{Color.NC}")
 
