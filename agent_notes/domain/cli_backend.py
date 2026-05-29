@@ -21,6 +21,7 @@ class CLIBackend:
     strip_memory_section: bool = False
     settings_template: Optional[str] = None
     accepted_providers: tuple[str, ...] = ()   # new
+    use_model_class: bool = False
 
     def supports(self, feature: str) -> bool:
         """Return True if the backend has that feature enabled."""

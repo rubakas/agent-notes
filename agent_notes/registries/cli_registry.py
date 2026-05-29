@@ -70,7 +70,8 @@ def load_registry(cli_dir: Optional[Path] = None) -> CLIRegistry:
             exclude_flag=data.get("exclude_flag"),
             strip_memory_section=data.get("strip_memory_section", False),
             settings_template=data.get("settings_template"),
-            accepted_providers=tuple(data.get("accepted_providers", []))
+            accepted_providers=tuple(data.get("accepted_providers", [])),
+            use_model_class=data.get("use_model_class", False)
         )
         backends.append(backend)
     

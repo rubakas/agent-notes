@@ -199,7 +199,7 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
                     resolved = model.resolve_for_providers(list(backend.accepted_providers))
                     if resolved is not None:
                         _provider, alias_str = resolved
-                        model_str = alias_str
+                        model_str = model.model_class if backend.use_model_class else alias_str
                 except KeyError:
                     pass  # fall through to class/tier fallback
             
@@ -233,7 +233,7 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
                         resolved = model.resolve_for_providers(list(backend.accepted_providers))
                         if resolved is not None:
                             _provider, alias_str = resolved
-                            model_str = alias_str
+                            model_str = model.model_class if backend.use_model_class else alias_str
                             break
             
             # Step 3: legacy tier fallback (for pre-v1.1 agents.yaml files that
