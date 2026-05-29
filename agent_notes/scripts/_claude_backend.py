@@ -12,25 +12,34 @@ from ._formatting import (
 from ..services.state_store import state_file as _state_file, load_state as _load_state
 
 
-def _resolve_claude_home() -> Path:
-    """Return the Claude home directory, respecting global_home_override if set."""
+def _resolve_claude_homes() -> list[Path]:
+    """Return all configured Claude home directories (deduped, default first)."""
     default = Path.home() / ".claude"
+    seen: set[Path] = set()
+    homes: list[Path] = []
+
+    def _add(p: Path) -> None:
+        resolved = p.resolve()
+        if resolved not in seen:
+            seen.add(resolved)
+            homes.append(p)
+
+    _add(default)
     try:
         state = _load_state()
-        if state is None:
-            return default
-        # Check default global install first, then any named profile
-        scope = state.global_install
-        if scope is None and state.global_installs:
-            scope = next(iter(state.global_installs.values()))
-        if scope is None:
-            return default
-        backend = scope.clis.get("claude")
-        if backend and backend.global_home_override:
-            return Path(backend.global_home_override).expanduser()
+        if state is not None:
+            scopes = []
+            if state.global_install:
+                scopes.append(state.global_install)
+            for ss in (state.global_installs or {}).values():
+                scopes.append(ss)
+            for scope in scopes:
+                backend = scope.clis.get("claude")
+                if backend and backend.global_home_override:
+                    _add(Path(backend.global_home_override).expanduser())
     except Exception:
         pass
-    return default
+    return homes
 
 
 def _parse_timestamp(ts: str) -> float:
@@ -121,21 +130,27 @@ def _ts_to_iso(ts: float) -> str:
 
 
 def _find_transcript_dir(session_id: str) -> Path | None:
-    projects_dir = _resolve_claude_home() / "projects"
-    if not projects_dir.exists():
-        return None
     target = f"{session_id}.jsonl"
-    for proj_dir in projects_dir.iterdir():
-        if proj_dir.is_dir() and (proj_dir / target).exists():
-            return proj_dir
+    for home in _resolve_claude_homes():
+        projects_dir = home / "projects"
+        if not projects_dir.exists():
+            continue
+        for proj_dir in projects_dir.iterdir():
+            if proj_dir.is_dir() and (proj_dir / target).exists():
+                return proj_dir
     return None
 
 
 def run(since: float | None = None, session_id: str | None = None) -> int:
     slug = str(Path.cwd().resolve()).replace("/", "-")
-    transcript_dir = _resolve_claude_home() / "projects" / slug
+    transcript_dir = None
+    for home in _resolve_claude_homes():
+        candidate = home / "projects" / slug
+        if candidate.exists():
+            transcript_dir = candidate
+            break
 
-    if not transcript_dir.exists():
+    if transcript_dir is None:
         if session_id:
             transcript_dir = _find_transcript_dir(session_id)
         if not transcript_dir or not transcript_dir.exists():
