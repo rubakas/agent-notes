@@ -9,7 +9,28 @@ from ._formatting import (
     BOLD, DIM, GREEN, YELLOW, NC,
     tier_color, fmt_tokens, fmt_cost, fmt_time,
 )
-from ..services.state_store import state_file as _state_file
+from ..services.state_store import state_file as _state_file, load_state as _load_state
+
+
+def _resolve_claude_home() -> Path:
+    """Return the Claude home directory, respecting global_home_override if set."""
+    default = Path.home() / ".claude"
+    try:
+        state = _load_state()
+        if state is None:
+            return default
+        # Check default global install first, then any named profile
+        scope = state.global_install
+        if scope is None and state.global_installs:
+            scope = next(iter(state.global_installs.values()))
+        if scope is None:
+            return default
+        backend = scope.clis.get("claude")
+        if backend and backend.global_home_override:
+            return Path(backend.global_home_override).expanduser()
+    except Exception:
+        pass
+    return default
 
 
 def _parse_timestamp(ts: str) -> float:
@@ -100,7 +121,7 @@ def _ts_to_iso(ts: float) -> str:
 
 
 def _find_transcript_dir(session_id: str) -> Path | None:
-    projects_dir = Path.home() / ".claude" / "projects"
+    projects_dir = _resolve_claude_home() / "projects"
     if not projects_dir.exists():
         return None
     target = f"{session_id}.jsonl"
@@ -112,7 +133,7 @@ def _find_transcript_dir(session_id: str) -> Path | None:
 
 def run(since: float | None = None, session_id: str | None = None) -> int:
     slug = str(Path.cwd().resolve()).replace("/", "-")
-    transcript_dir = Path.home() / ".claude" / "projects" / slug
+    transcript_dir = _resolve_claude_home() / "projects" / slug
 
     if not transcript_dir.exists():
         if session_id:

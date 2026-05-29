@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import _claude_backend, _opencode_backend
+from ._claude_backend import _resolve_claude_home
 from ._opencode_backend import DB as _OPENCODE_DB
 
 
@@ -15,7 +16,7 @@ def _opencode_active() -> bool:
 def _by_recency(since: float | None = None, session_id: str | None = None) -> int:
     """Fallback: pick whichever backend's data is newer."""
     slug = str(Path.cwd().resolve()).replace("/", "-")
-    proj = Path.home() / ".claude" / "projects" / slug
+    proj = _resolve_claude_home() / "projects" / slug
     claude_mtime = 0.0
     if proj.exists():
         jsonls = list(proj.glob("*.jsonl"))
