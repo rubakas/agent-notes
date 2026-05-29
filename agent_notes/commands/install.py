@@ -4,7 +4,7 @@ from pathlib import Path
 
 from ..config import Color, PKG_DIR
 from ..services.install_state_builder import build_install_state
-from ..services.state_store import load_current_state, record_install_state, remove_install_state
+from ..services.state_store import load_current_state, record_install_state, remove_install_state, label_from_key
 from ._install_helpers import _verify_install
 
 
@@ -145,9 +145,10 @@ def _resolve_overrides_from_state(scope: str, project_path, profile_label: str =
 
 
 def uninstall(local: bool = False, global_: bool = False,
-              profile_label: str = "") -> None:
+              profile_label: str = "", all_profiles: bool = False) -> None:
     """Remove installed components managed by agent-notes."""
     from ..services import installer
+    from ..services.state_store import load_state, get_profiles_for_project
 
     # Determine which scopes to uninstall
     if local and not global_:
@@ -156,6 +157,52 @@ def uninstall(local: bool = False, global_: bool = False,
         scopes = [("global", None)]
     else:
         scopes = [("global", None), ("local", Path.cwd().resolve())]
+
+    if all_profiles:
+        state = load_state()
+        if state is None:
+            print("Nothing to uninstall — no agent-notes state found.")
+            return
+        for scope, project_path in scopes:
+            if scope == "local":
+                profiles = get_profiles_for_project(state, project_path) if state else []
+                if not profiles:
+                    print(f"  No profiles found for {project_path}")
+                    continue
+                for key, _ss in profiles:
+                    label = label_from_key(key, project_path)
+                    folder_overrides, global_home_override = _resolve_overrides_from_state(
+                        scope, project_path, label)
+                    label_hint = f" profile={label}" if label else ""
+                    print(f"Uninstalling agent-notes ({scope}{label_hint}) ...")
+                    installer.uninstall_all(scope,
+                                            folder_overrides=folder_overrides,
+                                            global_home_override=global_home_override,
+                                            profile_label=label)
+                    try:
+                        remove_install_state(scope, project_path, profile_label=label)
+                    except Exception as e:
+                        print(f"{Color.YELLOW}Warning: failed to clear state.json: {e}{Color.NC}")
+            else:
+                # Global: uninstall default + all labeled profiles
+                global_labels = [""] if (state and state.global_install) else []
+                if state:
+                    global_labels += list(state.global_installs.keys())
+                for label in global_labels:
+                    folder_overrides, global_home_override = _resolve_overrides_from_state(
+                        scope, None, label)
+                    label_hint = f" profile={label}" if label else ""
+                    print(f"Uninstalling agent-notes ({scope}{label_hint}) ...")
+                    installer.uninstall_all(scope,
+                                            folder_overrides=folder_overrides,
+                                            global_home_override=global_home_override,
+                                            profile_label=label)
+                    try:
+                        remove_install_state(scope, None, profile_label=label)
+                    except Exception as e:
+                        print(f"{Color.YELLOW}Warning: failed to clear state.json: {e}{Color.NC}")
+        print(f"{Color.GREEN}Done.{Color.NC} agent-notes components removed.")
+        return
 
     for scope, project_path in scopes:
         # Always resolve overrides from state so we clean the right directories

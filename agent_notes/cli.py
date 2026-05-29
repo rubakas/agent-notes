@@ -240,8 +240,11 @@ def main():
     p_uninstall = subparsers.add_parser("uninstall", help="Remove installed components")
     p_uninstall.add_argument("--local", action="store_true", help="Remove from current project only")
     p_uninstall.add_argument("--global", action="store_true", dest="global_", help="Remove from global scope only")
-    p_uninstall.add_argument("--profile", metavar="LABEL",
+    profile_group = p_uninstall.add_mutually_exclusive_group()
+    profile_group.add_argument("--profile", metavar="LABEL",
         help="Profile label to uninstall (e.g. work)")
+    profile_group.add_argument("--all-profiles", action="store_true",
+        help="Uninstall all profiles for the target scope")
     
     # doctor
     p_doctor = subparsers.add_parser("doctor", help="Check installation health")
@@ -332,9 +335,12 @@ def main():
             from .commands.wizard import interactive_install
             interactive_install()
     elif args.command == "uninstall":
+        all_profiles = getattr(args, 'all_profiles', False)
+        profile_label = getattr(args, 'profile', '') or ""
         from .commands.install import uninstall
         uninstall(local=args.local, global_=args.global_,
-                  profile_label=getattr(args, 'profile', '') or "")
+                  profile_label=profile_label,
+                  all_profiles=all_profiles)
     elif args.command == "doctor":
         from .commands.doctor import doctor
         doctor(local=args.local, fix=args.fix)

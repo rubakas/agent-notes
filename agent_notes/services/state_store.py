@@ -140,6 +140,15 @@ def remove_scope(state: State, scope: str, project_path: Optional[Path] = None,
         state.local_installs.pop(_local_key(project_path, profile_label), None)
 
 
+def label_from_key(key: str, project_path) -> str:
+    """Extract the profile label from a local-install key.
+
+    Keys are 'path' (default profile) or 'path#label' (named profile).
+    """
+    prefix = str(Path(project_path).resolve())
+    return key[len(prefix) + 1:] if key.startswith(prefix + "#") else ""
+
+
 def get_profiles_for_project(state: State, project_path: Path) -> list[tuple[str, ScopeState]]:
     """Return all (key, ScopeState) pairs for a given project path.
     Matches both 'path' (legacy default) and 'path#label' keys."""

@@ -1,5 +1,7 @@
 """Health check for agent-notes installation."""
 
+from pathlib import Path
+
 # Re-export for backward compatibility. New code should import from agent_notes.domain.
 from ..domain.diagnostics import Issue, FixAction  # noqa: F401
 
@@ -125,12 +127,31 @@ def diagnose(scope: str, fix: bool = False) -> bool:
     issues = []
     fix_actions = []
 
-    # Run checks
-    check_stale_files(scope, issues, fix_actions)
-    check_broken_symlinks(scope, issues, fix_actions)
-    check_shadowed_files(scope, issues, fix_actions)
-    check_missing_files(scope, issues, fix_actions)
-    check_content_drift(scope, issues, fix_actions)
+    from ..services.state_store import load_current_state, get_profiles_for_project
+    from ..services.state_store import label_from_key
+
+    # For local scope, run checks against each installed profile
+    if scope == "local":
+        state = load_current_state()
+        profiles = []
+        if state:
+            profiles = get_profiles_for_project(state, Path.cwd().resolve())
+        # Fall back to default profile if none recorded
+        if not profiles:
+            profiles = [("", None)]
+        for key, _ss in profiles:
+            label = label_from_key(key, Path.cwd())
+            check_stale_files(scope, issues, fix_actions, profile_label=label)
+            check_broken_symlinks(scope, issues, fix_actions, profile_label=label)
+            check_shadowed_files(scope, issues, fix_actions, profile_label=label)
+            check_missing_files(scope, issues, fix_actions, profile_label=label)
+            check_content_drift(scope, issues, fix_actions, profile_label=label)
+    else:
+        check_stale_files(scope, issues, fix_actions)
+        check_broken_symlinks(scope, issues, fix_actions)
+        check_shadowed_files(scope, issues, fix_actions)
+        check_missing_files(scope, issues, fix_actions)
+        check_content_drift(scope, issues, fix_actions)
 
     # Build freshness check (scope-independent)
     check_build_freshness(issues, fix_actions)
@@ -142,7 +163,6 @@ def diagnose(scope: str, fix: bool = False) -> bool:
     _check_session_hook(scope, issues)
 
     # Print role→model assignments
-    from ..services.state_store import load_current_state
     state = load_current_state()
     if state is not None:
         _check_role_models(state)
