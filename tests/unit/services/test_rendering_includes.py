@@ -74,7 +74,11 @@ class TestRenderGlobalsExpandsIncludes:
              patch.object(config_mod, "GLOBAL_COPILOT_MD", fake_copilot_md), \
              patch.object(config_mod, "DIST_CLAUDE_DIR", dist_claude_dir), \
              patch.object(config_mod, "DIST_OPENCODE_DIR", dist_opencode_dir), \
-             patch.object(config_mod, "DIST_GITHUB_DIR", dist_github_dir):
+             patch.object(config_mod, "DIST_GITHUB_DIR", dist_github_dir), \
+             patch(
+                 "agent_notes.services.user_config.load_user_config",
+                 return_value={"cost_report_enabled": True},
+             ):
             from agent_notes.services.rendering import render_globals
             render_globals()
 

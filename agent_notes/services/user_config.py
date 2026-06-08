@@ -42,6 +42,13 @@ def get_patch(agent_name: str, config: dict) -> Optional[str]:
     return config.get("patches", {}).get(agent_name)
 
 
+def save_user_config(data: dict, path: Optional[Path] = None) -> None:
+    """Write user config dict to config_path() (or path if given), creating parent dirs."""
+    p = path or config_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+
+
 def merge_configs(base: dict, override: dict) -> dict:
     """Merge override on top of base. Nested dicts are merged; patches are concatenated."""
     result = dict(base)

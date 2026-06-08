@@ -8,22 +8,23 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 
-def expand_includes(text: str, shared_dir: Path) -> str:
+def expand_includes(text: str, shared_dir: Path, skip: Optional[set] = None) -> str:
     """Expand include directives in text by substituting shared content.
-    
+
     Scans for lines matching `<!-- include: NAME -->` (where NAME is [a-z0-9_-]+)
     and replaces each entire line with the contents of `shared_dir/NAME.md`.
-    
+
     Args:
         text: Input text that may contain include directives
         shared_dir: Path to directory containing shared .md files
-    
+        skip: Optional set of include NAMEs to suppress (replaced with empty string)
+
     Returns:
         Text with include directives expanded to their content
-    
+
     Raises:
         ValueError: If an include directive references a file that doesn't exist
-    
+
     Notes:
         - If shared_dir doesn't exist, returns text unchanged (backward compatibility)
         - Include directives must be on their own line (may have surrounding whitespace)
@@ -33,22 +34,26 @@ def expand_includes(text: str, shared_dir: Path) -> str:
     """
     if not shared_dir.exists():
         return text
-    
+
+    _skip = skip or set()
+
     # Pattern matches <!-- include: NAME --> on its own line with optional whitespace
     # NAME must be [a-z0-9_-]+
     pattern = r'^\s*<!--\s*include:\s*([a-z0-9_-]+)\s*-->\s*$'
-    
+
     def replace_include(match):
         include_name = match.group(1)
+        if include_name in _skip:
+            return ""
         include_file = shared_dir / f"{include_name}.md"
-        
+
         if not include_file.exists():
             raise ValueError(f"Unknown include: {include_name} (file not found: {include_file})")
-        
+
         content = include_file.read_text()
         # Strip trailing newline to avoid double blanks
         return content.rstrip('\n')
-    
+
     return re.sub(pattern, replace_include, text, flags=re.MULTILINE)
 
 
@@ -418,8 +423,11 @@ def render_globals() -> list[Path]:
     # Build claude.md with includes expanded and memory instructions substituted
     st = _load_state_fn2()
     from ..config import AGENTS_DIR
+    from ..services.user_config import load_user_config as _load_user_config
+    _ucfg = _load_user_config()
+    _include_skip = set() if _ucfg.get("cost_report_enabled", False) else {"cost_reporting"}
     claude_global_content = GLOBAL_CLAUDE_MD.read_text()
-    claude_global_content = expand_includes(claude_global_content, AGENTS_DIR / "shared")
+    claude_global_content = expand_includes(claude_global_content, AGENTS_DIR / "shared", skip=_include_skip)
     claude_global_content = claude_global_content.replace(
         "{{MEMORY_INSTRUCTIONS}}", _memory_instructions(st)
     )
@@ -427,16 +435,16 @@ def render_globals() -> list[Path]:
     claude_global.parent.mkdir(parents=True, exist_ok=True)
     claude_global.write_text(claude_global_content)
     copied_files.append(claude_global)
-    
+
     # Copy global-opencode.md to AGENTS.md
-    opencode_global_content = expand_includes(GLOBAL_OPENCODE_MD.read_text(), AGENTS_DIR / "shared")
+    opencode_global_content = expand_includes(GLOBAL_OPENCODE_MD.read_text(), AGENTS_DIR / "shared", skip=_include_skip)
     agents_global = DIST_OPENCODE_DIR / 'AGENTS.md'
     agents_global.parent.mkdir(parents=True, exist_ok=True)
     agents_global.write_text(opencode_global_content)
     copied_files.append(agents_global)
-    
+
     # Copy global-copilot.md to copilot-instructions.md
-    copilot_content = expand_includes(GLOBAL_COPILOT_MD.read_text(), AGENTS_DIR / "shared")
+    copilot_content = expand_includes(GLOBAL_COPILOT_MD.read_text(), AGENTS_DIR / "shared", skip=_include_skip)
     copilot_global = DIST_GITHUB_DIR / 'copilot-instructions.md'
     copilot_global.parent.mkdir(parents=True, exist_ok=True)
     copilot_global.write_text(copilot_content)

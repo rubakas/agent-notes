@@ -194,8 +194,13 @@ def show(state=None) -> None:
     else:
         mem_label = "Disabled"
 
+    from ..services.user_config import load_user_config
+    cost_report_enabled = load_user_config().get("cost_report_enabled", False)
+    cost_report_label = "enabled" if cost_report_enabled else "disabled"
+
     print("Current configuration:")
-    print(f"  Memory:   {mem_label}")
+    print(f"  Memory:      {mem_label}")
+    print(f"  Cost report: {cost_report_label}")
 
     # Scopes
     scopes = []
@@ -465,6 +470,17 @@ def interactive_config_memory() -> None:
     _wizard_memory(state, before)
 
 
+def cost_report_toggle(value: str) -> None:
+    """Enable or disable cost reporting in user config."""
+    from ..services.user_config import load_user_config, save_user_config
+    cfg = load_user_config()
+    cfg["cost_report_enabled"] = (value == "on")
+    save_user_config(cfg)
+    state_label = "enabled" if value == "on" else "disabled"
+    print(f"Cost reporting {state_label}.")
+    print("Run 'agent-notes regenerate' to update generated rules.")
+
+
 # ── Entry point ──────────────────────────────────────────────────────────────
 
 def config(action: str = "wizard", args: Optional[list] = None, cli_filter: Optional[str] = None) -> None:
@@ -497,7 +513,12 @@ def config(action: str = "wizard", args: Optional[list] = None, cli_filter: Opti
         _wizard_provider_status(args[0])
     elif action == "memory":
         interactive_config_memory()
+    elif action == "cost-report":
+        if len(args) != 1 or args[0] not in ("on", "off"):
+            print("Usage: agent-notes config cost-report <on|off>")
+            sys.exit(1)
+        cost_report_toggle(args[0])
     else:
         print(f"Unknown config action: {action}")
-        print("Actions: wizard, show, role-model, role-agent, providers, provider, memory")
+        print("Actions: wizard, show, role-model, role-agent, providers, provider, memory, cost-report")
         sys.exit(1)

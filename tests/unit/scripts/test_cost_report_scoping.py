@@ -387,7 +387,11 @@ class TestEnvVarSessionAutoPass:
 
         monkeypatch.setattr("agent_notes.scripts._claude_backend.run", fake_run)
 
-        cost_report.main()
+        with patch(
+            "agent_notes.services.user_config.load_user_config",
+            return_value={"cost_report_enabled": True},
+        ):
+            cost_report.main()
 
         assert len(calls) == 1
         assert calls[0]["session_id"] == "abc-123"
@@ -408,7 +412,11 @@ class TestEnvVarSessionAutoPass:
 
         monkeypatch.setattr("agent_notes.scripts._claude_backend.run", fake_run)
 
-        cost_report.main()
+        with patch(
+            "agent_notes.services.user_config.load_user_config",
+            return_value={"cost_report_enabled": True},
+        ):
+            cost_report.main()
 
         assert len(calls) == 1
         assert calls[0]["session_id"] == "explicit-456"

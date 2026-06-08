@@ -105,6 +105,11 @@ def main() -> int:
             remaining.append(args[i])
             i += 1
 
+    from ..services.user_config import load_user_config
+    if not load_user_config().get("cost_report_enabled", False):
+        print("Cost reporting is disabled. Enable with: agent-notes config cost-report on")
+        return 0
+
     if session_id is not None and _opencode_active():
         print(
             "warning: --session is not supported for the OpenCode backend; ignoring.",
