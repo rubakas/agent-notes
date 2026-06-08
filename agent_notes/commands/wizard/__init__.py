@@ -401,14 +401,14 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     print("")
 
 
-def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], version: str = '', memory_backend: str = 'local', memory_path: str = '') -> bool:
-    """Step 7: Confirmation — shows pre-flight summary including files to be backed up."""
+def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], version: str = '', memory_backend: str = 'local', memory_path: str = '', step: int = 0, total: int = 0) -> bool:
+    """Step: Confirmation — shows pre-flight summary including files to be backed up."""
     import logging
     from ...services.ui import _clear_screen, _render_step_header
     from ...registries.cli_registry import load_registry
     from ...services.installer import plan_install
     _clear_screen()
-    _render_step_header(7, 7, version)
+    _render_step_header(step, total, version)
     skill_groups = _get_skill_groups()
     registry = load_registry()
 

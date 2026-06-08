@@ -33,7 +33,7 @@ def _interactive_install() -> None:
     n_skills = count_skills()
     n_rules = _count_rules()
 
-    TOTAL_STEPS = 8
+    TOTAL_STEPS = 9
 
     _clear_screen()
     print(f"\n  {Color.BOLD}AgentNotes{Color.NC} {Color.CYAN}v{version}{Color.NC}")
@@ -66,9 +66,14 @@ def _interactive_install() -> None:
     # Step 7: Memory backend
     memory_backend, memory_path = _wiz._select_memory(step=7, total=TOTAL_STEPS, version=version)
 
-    # Step 8: Confirmation
+    # Step 8: Cost report
+    from .cost_report import _select_cost_report
+    cost_report_enabled = _select_cost_report(step=8, total=TOTAL_STEPS, version=version)
+
+    # Step 9: Confirmation
     if not _wiz._confirm_install(clis, scope, copy_mode, selected_skills, role_models, version=version,
-                                 memory_backend=memory_backend, memory_path=memory_path):
+                                 memory_backend=memory_backend, memory_path=memory_path,
+                                 step=9, total=TOTAL_STEPS):
         print("Installation cancelled.")
         return
 
@@ -91,4 +96,5 @@ def _interactive_install() -> None:
         profile_label=profile_label,
         folder_overrides=folder_overrides,
         global_home_override=global_home_override,
+        cost_report_enabled=cost_report_enabled,
     )
