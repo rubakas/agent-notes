@@ -25,6 +25,8 @@ class BackendState:
     installed: dict[str, dict[str, InstalledItem]] = field(default_factory=dict)
     # installed is a dict of component_type -> {filename/key -> InstalledItem}
     # e.g. installed["agents"]["lead.md"] = InstalledItem(...)
+    local_dir_override: str = ""     # e.g. ".claude-work", empty = use backend default
+    global_home_override: str = ""   # e.g. "~/.claude-work", empty = use backend default
 
 
 @dataclass
@@ -35,6 +37,7 @@ class ScopeState:
     mode: str = "symlink"
     installed_version: str = ""
     clis: dict[str, BackendState] = field(default_factory=dict)
+    profile_label: str = ""          # e.g. "work", "personal", "" = default
 
 
 @dataclass
@@ -45,3 +48,4 @@ class State:
     global_install: Optional[ScopeState] = None         # JSON key is "global"
     local_installs: dict[str, ScopeState] = field(default_factory=dict)  # JSON key is "local"
     memory: MemoryConfig = field(default_factory=MemoryConfig)
+    global_installs: dict[str, ScopeState] = field(default_factory=dict)  # keyed by profile label

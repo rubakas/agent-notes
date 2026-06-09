@@ -7,7 +7,7 @@ from typing import List, Optional
 from ...domain.diagnostics import Issue, FixAction
 
 
-def _load_scope_state(scope: str):
+def _load_scope_state(scope: str, profile_label: str = ""):
     """Load registry and scope state for a given scope.
 
     Returns (registry, scope_state) where scope_state may be None if no
@@ -21,15 +21,16 @@ def _load_scope_state(scope: str):
     if state is None:
         return registry, None
     project_path = Path.cwd() if scope == "local" else None
-    scope_state = get_scope(state, scope, project_path)
+    scope_state = get_scope(state, scope, project_path, profile_label=profile_label)
     return registry, scope_state
 
 
-def check_stale_files(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
+def check_stale_files(scope: str, issues: List[Issue], fix_actions: List[FixAction],
+                      profile_label: str = ""):
     """Check for installed files without matching source - DELEGATED to doctor_checks."""
     from ... import doctor_checks
 
-    registry, scope_state = _load_scope_state(scope)
+    registry, scope_state = _load_scope_state(scope, profile_label)
     doctor_checks.check_stale(scope, scope_state, registry, issues, fix_actions)
 
 
@@ -82,19 +83,21 @@ def _find_dist_source(symlink: Path, scope: str) -> Optional[Path]:
     return None
 
 
-def check_broken_symlinks(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
+def check_broken_symlinks(scope: str, issues: List[Issue], fix_actions: List[FixAction],
+                          profile_label: str = ""):
     """Check for symlinks with non-existent targets - DELEGATED to doctor_checks."""
     from ... import doctor_checks
 
-    registry, scope_state = _load_scope_state(scope)
+    registry, scope_state = _load_scope_state(scope, profile_label)
     doctor_checks.check_broken(scope, registry, issues, fix_actions, scope_state)
 
 
-def check_shadowed_files(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
+def check_shadowed_files(scope: str, issues: List[Issue], fix_actions: List[FixAction],
+                         profile_label: str = ""):
     """Check for regular files where symlinks are expected - TARGETED check only."""
     from ... import doctor_checks
 
-    registry, scope_state = _load_scope_state(scope)
+    registry, scope_state = _load_scope_state(scope, profile_label)
 
     # Only check paths we know should exist
     for src, dst, backend_name, component in doctor_checks.expected_paths_for_install(registry, scope):
@@ -108,7 +111,8 @@ def check_shadowed_files(scope: str, issues: List[Issue], fix_actions: List[FixA
                                            f"replace copy with symlink to {src}"))
 
 
-def check_missing_files(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
+def check_missing_files(scope: str, issues: List[Issue], fix_actions: List[FixAction],
+                        profile_label: str = ""):
     """Check for source files that aren't installed - DELEGATED to doctor_checks."""
     from ... import doctor_checks
     from ...registries.cli_registry import load_registry
@@ -122,7 +126,7 @@ def check_missing_files(scope: str, issues: List[Issue], fix_actions: List[FixAc
     if state is not None:
         try:
             project_path = Path.cwd().resolve() if scope == "local" else None
-            scope_state = get_scope(state, scope, project_path)
+            scope_state = get_scope(state, scope, project_path, profile_label=profile_label)
         except (ValueError, KeyError):
             scope_state = None
     # Call via kwargs only when we actually have scope_state — tests that
@@ -133,11 +137,12 @@ def check_missing_files(scope: str, issues: List[Issue], fix_actions: List[FixAc
         doctor_checks.check_missing(scope, registry, issues, fix_actions)
 
 
-def check_content_drift(scope: str, issues: List[Issue], fix_actions: List[FixAction]):
+def check_content_drift(scope: str, issues: List[Issue], fix_actions: List[FixAction],
+                        profile_label: str = ""):
     """Check for copied files that differ from source - DELEGATED to doctor_checks."""
     from ... import doctor_checks
 
-    registry, scope_state = _load_scope_state(scope)
+    registry, scope_state = _load_scope_state(scope, profile_label)
     doctor_checks.check_drift(scope, registry, issues, fix_actions, scope_state)
 
 

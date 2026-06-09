@@ -73,10 +73,30 @@ def show_info() -> None:
         else:
             print("  Global:   none")
 
+        # Named global profiles
+        if st.global_installs:
+            for label, gs in sorted(st.global_installs.items()):
+                print(f"  Global [{label}]: installed {gs.installed_at}, {gs.mode}")
+                if gs.clis:
+                    backend_summaries = []
+                    for backend_name, bs in sorted(gs.clis.items()):
+                        parts = []
+                        for component_type, items in bs.installed.items():
+                            if items:
+                                parts.append(f"{len(items)} {component_type}")
+                        if parts:
+                            extra = ""
+                            if bs.global_home_override:
+                                extra = f", home={bs.global_home_override}"
+                            backend_summaries.append(f"{backend_name} ({', '.join(parts)}{extra})")
+                    if backend_summaries:
+                        print(f"            Storage: {', '.join(backend_summaries)}")
+
         # Local installs
         if st.local_installs:
             for project_path, ls in sorted(st.local_installs.items()):
-                print(f"  Local:    {project_path}  (installed {ls.installed_at}, {ls.mode})")
+                profile_hint = f" [{ls.profile_label}]" if ls.profile_label else ""
+                print(f"  Local{profile_hint}:  {project_path}  (installed {ls.installed_at}, {ls.mode})")
                 if ls.clis:
                     backend_summaries = []
                     for backend_name, bs in sorted(ls.clis.items()):
@@ -85,7 +105,10 @@ def show_info() -> None:
                             if items:
                                 counts.append(f"{len(items)} {component_type}")
                         if counts:
-                            backend_summaries.append(f"{backend_name} ({', '.join(counts)})")
+                            extra = ""
+                            if bs.local_dir_override:
+                                extra = f", folder={bs.local_dir_override}"
+                            backend_summaries.append(f"{backend_name} ({', '.join(counts)}{extra})")
                     if backend_summaries:
                         print(f"            Storage: {', '.join(backend_summaries)}")
         else:

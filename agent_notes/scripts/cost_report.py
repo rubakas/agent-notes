@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import _claude_backend, _opencode_backend
+from ._claude_backend import _resolve_claude_homes
 from ._opencode_backend import DB as _OPENCODE_DB
 
 
@@ -15,12 +16,17 @@ def _opencode_active() -> bool:
 def _by_recency(since: float | None = None, session_id: str | None = None) -> int:
     """Fallback: pick whichever backend's data is newer."""
     slug = str(Path.cwd().resolve()).replace("/", "-")
-    proj = Path.home() / ".claude" / "projects" / slug
     claude_mtime = 0.0
-    if proj.exists():
-        jsonls = list(proj.glob("*.jsonl"))
-        if jsonls:
-            claude_mtime = max(f.stat().st_mtime for f in jsonls)
+    proj = None
+    for home in _resolve_claude_homes():
+        candidate = home / "projects" / slug
+        if candidate.exists():
+            jsonls = list(candidate.glob("*.jsonl"))
+            if jsonls:
+                mtime = max(f.stat().st_mtime for f in jsonls)
+                if mtime > claude_mtime:
+                    claude_mtime = mtime
+                    proj = candidate
 
     opencode_mtime = _OPENCODE_DB.stat().st_mtime if _OPENCODE_DB.exists() else 0.0
 
@@ -98,6 +104,11 @@ def main() -> int:
         else:
             remaining.append(args[i])
             i += 1
+
+    from ..services.user_config import load_user_config
+    if not load_user_config().get("cost_report_enabled", False):
+        print("Cost reporting is disabled. Enable with: agent-notes config cost-report on")
+        return 0
 
     if session_id is not None and _opencode_active():
         print(

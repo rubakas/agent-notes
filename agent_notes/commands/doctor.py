@@ -1,5 +1,7 @@
 """Health check for agent-notes installation."""
 
+from pathlib import Path
+
 # Re-export for backward compatibility. New code should import from agent_notes.domain.
 from ..domain.diagnostics import Issue, FixAction  # noqa: F401
 
@@ -53,19 +55,33 @@ def _check_session_hook(scope: str, issues: list) -> None:
     except KeyError:
         return
 
-    settings_path, _context_file, hook_command = _session_hook_paths(claude_backend, scope)
-    if not has_hook(settings_path, "SessionStart", hook_command):
-        issues.append(Issue(
-            "missing_hook",
-            str(settings_path),
-            "SessionStart hook not found — run: agent-notes install to re-add the hook",
-        ))
-
-    from ..constants import Hooks
-    from ..services.state_store import load_state
+    from ..services.state_store import load_state, get_profiles_for_project
     state = load_state()
+
+    # Check all profiles for the current project (local scope) or default (global)
+    backends_to_check = [claude_backend]
+    if state and scope == "local":
+        for _key, ss in get_profiles_for_project(state, Path.cwd()):
+            bs = ss.clis.get("claude")
+            if bs and bs.local_dir_override:
+                backends_to_check.append(claude_backend.with_local_dir(bs.local_dir_override))
+
+    for backend in backends_to_check:
+        settings_path, _context_file, hook_command = _session_hook_paths(backend, scope)
+        if not settings_path.exists():
+            continue
+        if not has_hook(settings_path, "SessionStart", hook_command):
+            issues.append(Issue(
+                "missing_hook",
+                str(settings_path),
+                "SessionStart hook not found — run: agent-notes install to re-add the hook",
+            ))
+
+    # Memory bridge check on the default backend only
+    settings_path, _, _ = _session_hook_paths(claude_backend, scope)
+    from ..constants import Hooks
     if state and state.memory.backend in ("obsidian", "wiki"):
-        if not has_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE):
+        if settings_path.exists() and not has_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE):
             issues.append(Issue(
                 "missing_hook",
                 str(settings_path),
@@ -111,12 +127,31 @@ def diagnose(scope: str, fix: bool = False) -> bool:
     issues = []
     fix_actions = []
 
-    # Run checks
-    check_stale_files(scope, issues, fix_actions)
-    check_broken_symlinks(scope, issues, fix_actions)
-    check_shadowed_files(scope, issues, fix_actions)
-    check_missing_files(scope, issues, fix_actions)
-    check_content_drift(scope, issues, fix_actions)
+    from ..services.state_store import load_current_state, get_profiles_for_project
+    from ..services.state_store import label_from_key
+
+    # For local scope, run checks against each installed profile
+    if scope == "local":
+        state = load_current_state()
+        profiles = []
+        if state:
+            profiles = get_profiles_for_project(state, Path.cwd().resolve())
+        # Fall back to default profile if none recorded
+        if not profiles:
+            profiles = [("", None)]
+        for key, _ss in profiles:
+            label = label_from_key(key, Path.cwd())
+            check_stale_files(scope, issues, fix_actions, profile_label=label)
+            check_broken_symlinks(scope, issues, fix_actions, profile_label=label)
+            check_shadowed_files(scope, issues, fix_actions, profile_label=label)
+            check_missing_files(scope, issues, fix_actions, profile_label=label)
+            check_content_drift(scope, issues, fix_actions, profile_label=label)
+    else:
+        check_stale_files(scope, issues, fix_actions)
+        check_broken_symlinks(scope, issues, fix_actions)
+        check_shadowed_files(scope, issues, fix_actions)
+        check_missing_files(scope, issues, fix_actions)
+        check_content_drift(scope, issues, fix_actions)
 
     # Build freshness check (scope-independent)
     check_build_freshness(issues, fix_actions)
@@ -128,7 +163,6 @@ def diagnose(scope: str, fix: bool = False) -> bool:
     _check_session_hook(scope, issues)
 
     # Print role→model assignments
-    from ..services.state_store import load_current_state
     state = load_current_state()
     if state is not None:
         _check_role_models(state)

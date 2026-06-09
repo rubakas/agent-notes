@@ -37,6 +37,9 @@ def build_install_state(
     # ^^ If given, only these backends are recorded as installed. None = all
     # backends with shipped content (legacy behavior, used by the plain
     # `agent-notes install` non-wizard path).
+    profile_label: str = "",
+    folder_overrides: Optional[dict[str, str]] = None,
+    global_home_override: Optional[str] = None,
 ) -> State:
     """Build a complete State snapshot.
     
@@ -81,21 +84,36 @@ def build_install_state(
         # Skip backends the user opted out of during wizard selection.
         if selected_clis is not None and backend.name not in selected_clis:
             continue
-        backend_state = BackendState()
+
+        # Apply profile overrides to backend paths
+        effective_backend = backend
+        local_dir_override = ""
+        global_home_override_val = ""
+        if folder_overrides and backend.name in folder_overrides:
+            local_dir_override = folder_overrides[backend.name]
+            effective_backend = effective_backend.with_local_dir(local_dir_override)
+        if global_home_override and backend.name == "claude":
+            global_home_override_val = global_home_override
+            effective_backend = effective_backend.with_global_home(Path(global_home_override).expanduser())
+
+        backend_state = BackendState(
+            local_dir_override=local_dir_override,
+            global_home_override=global_home_override_val,
+        )
         backend_has_content = False
-        
+
         # Set role_models from arg (empty dict for now)
         if role_models and backend.name in role_models:
             backend_state.role_models = role_models[backend.name].copy()
         
         # Check agents
-        if backend.supports("agents"):
-            agents_dir = PKG_DIR / "dist" / backend.name / "agents"
+        if effective_backend.supports("agents"):
+            agents_dir = PKG_DIR / "dist" / effective_backend.name / "agents"
             if agents_dir.exists():
                 for agent_file in agents_dir.glob("*.md"):
                     try:
                         sha = sha256_of(agent_file)
-                        target = _get_target_path(agent_file, backend, "agents", scope, project_path)
+                        target = _get_target_path(agent_file, effective_backend, "agents", scope, project_path)
                         if "agents" not in backend_state.installed:
                             backend_state.installed["agents"] = {}
                         backend_state.installed["agents"][agent_file.name] = InstalledItem(
@@ -107,7 +125,7 @@ def build_install_state(
                         continue
         
         # Check skills
-        if backend.supports("skills"):
+        if effective_backend.supports("skills"):
             # Skills are in dist/skills/, not dist/<backend>/skills/
             skills_dir = DIST_SKILLS_DIR
             if skills_dir.exists():
@@ -121,7 +139,7 @@ def build_install_state(
                             else:
                                 # If no SKILL.md, use empty string sha
                                 sha = ""
-                            target = _get_target_path(skill_dir, backend, "skills", scope, project_path)
+                            target = _get_target_path(skill_dir, effective_backend, "skills", scope, project_path)
                             if "skills" not in backend_state.installed:
                                 backend_state.installed["skills"] = {}
                             backend_state.installed["skills"][skill_dir.name] = InstalledItem(
@@ -132,14 +150,14 @@ def build_install_state(
                             continue
         
         # Check rules
-        if backend.supports("rules"):
+        if effective_backend.supports("rules"):
             # Rules come from dist/rules/
             rules_dir = DIST_RULES_DIR
             if rules_dir.exists():
                 for rule_file in rules_dir.glob("*.md"):
                     try:
                         sha = sha256_of(rule_file)
-                        target = _get_target_path(rule_file, backend, "rules", scope, project_path)
+                        target = _get_target_path(rule_file, effective_backend, "rules", scope, project_path)
                         if "rules" not in backend_state.installed:
                             backend_state.installed["rules"] = {}
                         backend_state.installed["rules"][rule_file.name] = InstalledItem(
@@ -150,11 +168,11 @@ def build_install_state(
                         continue
         
         # Check config files
-        config_file = PKG_DIR / "dist" / backend.name / backend.layout.get("config", "")
+        config_file = PKG_DIR / "dist" / effective_backend.name / effective_backend.layout.get("config", "")
         if config_file.exists():
             try:
                 sha = sha256_of(config_file)
-                target = _get_target_path(config_file, backend, "config", scope, project_path)
+                target = _get_target_path(config_file, effective_backend, "config", scope, project_path)
                 if "config" not in backend_state.installed:
                     backend_state.installed["config"] = {}
                 backend_state.installed["config"][config_file.name] = InstalledItem(
@@ -178,10 +196,11 @@ def build_install_state(
         mode=mode,
         installed_version=get_version(),
         clis=clis,
+        profile_label=profile_label,
     )
-    
+
     # Set the appropriate scope
-    set_scope(state, scope, new_scope_state, project_path)
+    set_scope(state, scope, new_scope_state, project_path, profile_label=profile_label)
     
     return state
 
@@ -196,9 +215,11 @@ def _get_target_path(source_path: Path, backend, component_type: str, scope: str
             base_dir = project_path / backend.local_dir
         else:
             base_dir = Path.cwd() / backend.local_dir
-    
+
     if component_type == "config":
-        # Config files go to the root of the backend directory
+        if scope == "local":
+            root = project_path if project_path else Path.cwd()
+            return root / source_path.name
         return base_dir / source_path.name
     elif component_type in ["agents", "rules", "skills"]:
         # These go into subdirectories according to backend layout

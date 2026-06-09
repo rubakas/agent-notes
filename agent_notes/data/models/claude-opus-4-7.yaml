@@ -2,8 +2,9 @@ id: claude-opus-4-7
 label: Claude Opus 4.7
 family: claude
 class: opus
+deprecated: true
 aliases:
-  anthropic:      opus
+  anthropic:      claude-opus-4-7
   github-copilot: github-copilot/claude-opus-4.7
 pricing:
   input:  5.00

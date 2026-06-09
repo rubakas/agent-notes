@@ -20,6 +20,8 @@ from agent_notes.services.state_store import (
     state_file,
     _state_to_dict,
     _state_from_dict,
+    _local_key,
+    get_profiles_for_project,
 )
 from agent_notes.domain.state import (
     State,
@@ -574,3 +576,299 @@ class TestStateSerializationRoundtrip:
         item = claude_state.installed["agents"]["lead.md"]
         assert item.sha == "abc123"
         assert item.mode == "symlink"
+
+    def test_roundtrip_with_profile_fields(self):
+        backend_state = BackendState(
+            role_models={"lead": "claude-opus-4"},
+            installed={},
+            local_dir_override=".claude-work",
+            global_home_override="~/.claude-work",
+        )
+        scope = ScopeState(
+            installed_at="2026-01-01T00:00:00Z",
+            updated_at="2026-01-01T00:00:00Z",
+            mode="symlink",
+            installed_version="2.0.0",
+            clis={"claude": backend_state},
+            profile_label="work",
+        )
+        state = State(
+            source_path="/src",
+            source_commit="abc",
+            global_install=None,
+            local_installs={"/home/user/proj#work": scope},
+        )
+        data = _state_to_dict(state)
+        restored = _state_from_dict(data)
+        local_scope = restored.local_installs["/home/user/proj#work"]
+        assert local_scope.profile_label == "work"
+        claude_bs = local_scope.clis["claude"]
+        assert claude_bs.local_dir_override == ".claude-work"
+        assert claude_bs.global_home_override == "~/.claude-work"
+
+    def test_roundtrip_global_installs(self):
+        scope = ScopeState(
+            installed_at="2026-01-01T00:00:00Z",
+            updated_at="2026-01-01T00:00:00Z",
+            mode="symlink",
+            installed_version="2.0.0",
+            clis={},
+            profile_label="personal",
+        )
+        state = State(
+            source_path="/src",
+            source_commit="abc",
+            global_install=None,
+            local_installs={},
+            global_installs={"personal": scope},
+        )
+        data = _state_to_dict(state)
+        restored = _state_from_dict(data)
+        assert "personal" in restored.global_installs
+        assert restored.global_installs["personal"].profile_label == "personal"
+
+    def test_backward_compat_no_profile_fields(self):
+        data = {
+            "source_path": "",
+            "source_commit": "",
+            "global": {
+                "installed_at": "2026-01-01T00:00:00Z",
+                "updated_at": "2026-01-01T00:00:00Z",
+                "mode": "symlink",
+                "installed_version": "2.0.0",
+                "clis": {"claude": {"role_models": {}, "installed": {}}},
+            },
+            "local": {},
+        }
+        restored = _state_from_dict(data)
+        assert restored.global_install.profile_label == ""
+        assert restored.global_install.clis["claude"].local_dir_override == ""
+        assert restored.global_install.clis["claude"].global_home_override == ""
+        assert restored.global_installs == {}
+
+
+# ---------------------------------------------------------------------------
+# TestLocalKey
+# ---------------------------------------------------------------------------
+
+class TestLocalKey:
+    def test_no_label_returns_plain_path(self, tmp_path):
+        project = tmp_path / "myproj"
+        project.mkdir()
+        key = _local_key(project)
+        assert key == str(project.resolve())
+        assert "#" not in key
+
+    def test_with_label_appends_hash_label(self, tmp_path):
+        project = tmp_path / "myproj"
+        project.mkdir()
+        key = _local_key(project, "work")
+        assert key == f"{project.resolve()}#work"
+
+    def test_empty_label_is_same_as_no_label(self, tmp_path):
+        project = tmp_path / "myproj"
+        project.mkdir()
+        assert _local_key(project, "") == _local_key(project)
+
+
+# ---------------------------------------------------------------------------
+# TestGetScopeWithProfile
+# ---------------------------------------------------------------------------
+
+class TestGetScopeWithProfile:
+    def test_get_global_profile(self):
+        scope = _make_scope()
+        state = State(
+            source_path="", source_commit="",
+            global_install=None, local_installs={},
+            global_installs={"work": scope},
+        )
+        result = get_scope(state, "global", profile_label="work")
+        assert result is scope
+
+    def test_get_global_profile_returns_none_when_missing(self):
+        state = default_state()
+        result = get_scope(state, "global", profile_label="work")
+        assert result is None
+
+    def test_get_global_default_ignores_global_installs(self):
+        default_scope = _make_scope(mode="symlink")
+        work_scope = _make_scope(mode="copy")
+        state = State(
+            source_path="", source_commit="",
+            global_install=default_scope, local_installs={},
+            global_installs={"work": work_scope},
+        )
+        result = get_scope(state, "global")
+        assert result is default_scope
+
+    def test_get_local_profile(self, tmp_path):
+        project = tmp_path / "proj"
+        project.mkdir()
+        scope = _make_scope()
+        key = f"{project.resolve()}#work"
+        state = State(
+            source_path="", source_commit="",
+            global_install=None,
+            local_installs={key: scope},
+        )
+        result = get_scope(state, "local", project_path=project, profile_label="work")
+        assert result is scope
+
+    def test_get_local_default_does_not_match_profiled(self, tmp_path):
+        project = tmp_path / "proj"
+        project.mkdir()
+        scope = _make_scope()
+        key = f"{project.resolve()}#work"
+        state = State(
+            source_path="", source_commit="",
+            global_install=None,
+            local_installs={key: scope},
+        )
+        result = get_scope(state, "local", project_path=project)
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# TestSetScopeWithProfile
+# ---------------------------------------------------------------------------
+
+class TestSetScopeWithProfile:
+    def test_set_global_profile(self):
+        state = default_state()
+        scope = _make_scope()
+        set_scope(state, "global", scope, profile_label="work")
+        assert state.global_installs["work"] is scope
+        assert state.global_install is None
+
+    def test_set_local_profile(self, tmp_path):
+        state = default_state()
+        project = tmp_path / "proj"
+        scope = _make_scope()
+        set_scope(state, "local", scope, project_path=project, profile_label="work")
+        key = f"{project.resolve()}#work"
+        assert key in state.local_installs
+        assert state.local_installs[key] is scope
+
+
+# ---------------------------------------------------------------------------
+# TestRemoveScopeWithProfile
+# ---------------------------------------------------------------------------
+
+class TestRemoveScopeWithProfile:
+    def test_remove_global_profile(self):
+        scope = _make_scope()
+        state = State(
+            source_path="", source_commit="",
+            global_install=_make_scope(),
+            local_installs={},
+            global_installs={"work": scope},
+        )
+        remove_scope(state, "global", profile_label="work")
+        assert "work" not in state.global_installs
+        assert state.global_install is not None
+
+    def test_remove_local_profile(self, tmp_path):
+        project = tmp_path / "proj"
+        project.mkdir()
+        key = f"{project.resolve()}#work"
+        state = State(
+            source_path="", source_commit="",
+            global_install=None,
+            local_installs={
+                str(project.resolve()): _make_scope(),
+                key: _make_scope(),
+            },
+        )
+        remove_scope(state, "local", project_path=project, profile_label="work")
+        assert key not in state.local_installs
+        assert str(project.resolve()) in state.local_installs
+
+
+# ---------------------------------------------------------------------------
+# TestGetProfilesForProject
+# ---------------------------------------------------------------------------
+
+class TestGetProfilesForProject:
+    def test_finds_default_and_labeled(self, tmp_path):
+        project = tmp_path / "proj"
+        project.mkdir()
+        default_scope = _make_scope(mode="symlink")
+        work_scope = _make_scope(mode="copy")
+        state = State(
+            source_path="", source_commit="",
+            global_install=None,
+            local_installs={
+                str(project.resolve()): default_scope,
+                f"{project.resolve()}#work": work_scope,
+            },
+        )
+        results = get_profiles_for_project(state, project)
+        assert len(results) == 2
+        keys = {k for k, _ in results}
+        assert str(project.resolve()) in keys
+        assert f"{project.resolve()}#work" in keys
+
+    def test_does_not_match_other_projects(self, tmp_path):
+        proj_a = tmp_path / "proj_a"
+        proj_b = tmp_path / "proj_b"
+        proj_a.mkdir()
+        proj_b.mkdir()
+        state = State(
+            source_path="", source_commit="",
+            global_install=None,
+            local_installs={
+                str(proj_a.resolve()): _make_scope(),
+                f"{proj_b.resolve()}#work": _make_scope(),
+            },
+        )
+        results = get_profiles_for_project(state, proj_a)
+        assert len(results) == 1
+        assert results[0][0] == str(proj_a.resolve())
+
+    def test_returns_empty_for_unknown_project(self, tmp_path):
+        state = default_state()
+        results = get_profiles_for_project(state, tmp_path / "unknown")
+        assert results == []
+
+
+# ---------------------------------------------------------------------------
+# TestRemoveInstallStateWithProfile
+# ---------------------------------------------------------------------------
+
+class TestRemoveInstallStateWithProfile:
+    def test_removes_profiled_local_leaves_default(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+        project = tmp_path / "proj"
+        project.mkdir()
+        default_scope = _make_scope()
+        work_scope = _make_scope(mode="copy")
+        state = State(
+            source_path="", source_commit="",
+            global_install=None,
+            local_installs={
+                str(project.resolve()): default_scope,
+                f"{project.resolve()}#work": work_scope,
+            },
+        )
+        save_state(state)
+        remove_install_state("local", project_path=project, profile_label="work")
+        loaded = load_state()
+        assert loaded is not None
+        assert str(project.resolve()) in loaded.local_installs
+        assert f"{project.resolve()}#work" not in loaded.local_installs
+
+    def test_removes_global_profile_leaves_default(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+        state = State(
+            source_path="", source_commit="",
+            global_install=_make_scope(),
+            local_installs={},
+            global_installs={"work": _make_scope(mode="copy")},
+        )
+        save_state(state)
+        remove_install_state("global", profile_label="work")
+        loaded = load_state()
+        assert loaded is not None
+        assert loaded.global_install is not None
+        assert "work" not in loaded.global_installs
