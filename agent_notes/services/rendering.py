@@ -128,13 +128,15 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     if state is not None:
         scope_state = _get_scope(state, scope, project_path)
     
+    _st = _load_state_fn()
+
     for agent_name, agent_config in agents_config.items():
         # Read the source prompt
         prompt_file = AGENTS_DIR / f'{agent_name}.md'
         if not prompt_file.exists():
             print(f"Warning: Missing source file {prompt_file}")
             continue
-        
+
         prompt_content = prompt_file.read_text()
 
         # Expand shared-content include directives (<!-- include: NAME -->)
@@ -143,7 +145,6 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
         prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared", skip=_agent_include_skip)
 
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
-        _st = _load_state_fn()
         prompt_content = prompt_content.replace("{{MEMORY_PATH}}", _memory_path(_st))
         prompt_content = prompt_content.replace("{{MEMORY_READING_GUIDE}}", _memory_reading_guide(_st))
 
