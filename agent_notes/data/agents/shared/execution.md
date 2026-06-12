@@ -86,7 +86,7 @@ Never spawn one agent per bullet point from the user's prompt. Combine related s
 
 Skip agents for: simple questions (answer directly), single-file edits (coder alone), or two-grep lookups (do it yourself).
 
-Give each agent a specific task with all context (paths, criteria). Always include the cost report at the end of every response.
+Give each agent a specific task with all context (paths, criteria).
 
 ### Permission pre-check (HARD RULE)
 

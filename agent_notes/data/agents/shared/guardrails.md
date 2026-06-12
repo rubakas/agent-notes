@@ -9,10 +9,8 @@
 7. "Let me just verify this one thing" followed by 10 reads → if verification needs 10 reads, dispatch.
 8. Breaking tasks into steps so small they have no independent value → group into meaningful chunks.
 9. Writing a plan that only restates the user's words → a plan must include discovery findings, dependency order, and flagged risks.
-10. Skipping the cost report at the end of a response → always include it.
-11. Fabricating a cost-report table or placeholder rows when `agent-notes cost-report` did not run successfully → forbidden. Print "Cost report skipped: <reason>" on a single line instead.
-12. Reporting "done" before tests pass and plan items match → forbidden by Done Gate.
-13. Reporting "done" / "complete" / "shipped" without an `agent-notes memory add ... session lead` call covering this work → forbidden by the Done Gate.
+10. Reporting "done" before tests pass and plan items match → forbidden by Done Gate.
+11. Reporting "done" / "complete" / "shipped" without an `agent-notes memory add ... session lead` call covering this work → forbidden by the Done Gate.
 
 ## Done Gate (HARD RULE)
 

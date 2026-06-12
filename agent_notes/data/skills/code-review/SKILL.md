@@ -47,14 +47,16 @@ Work through these five lenses in order. Report findings grouped by lens, ranked
 
 ## Output format
 
+Emit each finding as a record: `severity` (blocking | suggestion) · `file` · `line` · `finding` · `why` · `fix` (if applicable). When the output is consumed by another agent, emit JSON objects with exactly those keys. For a human summary, group by severity:
+
 ```
 BLOCKING
-- [file:line] [finding] — [why it matters]
+- [file:line] [finding] — [why it matters] → [fix]
 
 SUGGESTIONS
 - [file:line] [finding] — [alternative if applicable]
 
-APPROVED (if no blocking issues)
+APPROVED (state explicitly when there are no blocking findings)
 ```
 
 A BLOCKING finding must be resolved before merge. A SUGGESTION is optional.

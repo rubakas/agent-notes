@@ -2,7 +2,7 @@
 name: migrate-memory
 description: "Reconcile the Obsidian vault or Wiki knowledge base to the latest canonical format. Use after upgrading agent-notes or when vault structure looks outdated or inconsistent."
 group: process
-requires_memory: obsidian, wiki
+requires_memory: obsidian,wiki
 ---
 
 # Migrate Memory

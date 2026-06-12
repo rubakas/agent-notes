@@ -86,7 +86,8 @@ def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str, Optional[str], O
                     elif key == 'description':
                         description = value
                     elif key == 'requires_memory':
-                        requires_memory = value
+                        tokens = [t.strip() for t in value.split(",")]
+                        requires_memory = ",".join(t for t in tokens if t)
 
             # If no description in frontmatter, use first non-empty line after frontmatter
             if not description:

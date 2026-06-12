@@ -392,6 +392,168 @@ class TestInstalledVersionSerializationRoundTrip:
         assert loaded.global_install.installed_version == ""
 
 
+class TestCheckSkillFrontmatter:
+    """Tests for the warn-only check_skill_frontmatter check."""
+
+    def _make_skill(self, tmp_path, name, frontmatter_extra=""):
+        skill_dir = tmp_path / name
+        skill_dir.mkdir()
+        fm = f"---\nname: {name}\ndescription: \"A test skill.\"\ngroup: process\n{frontmatter_extra}---\n\n# {name}\n"
+        (skill_dir / "SKILL.md").write_text(fm)
+        return tmp_path
+
+    def test_no_warning_with_valid_skills(self, tmp_path, capsys, monkeypatch):
+        """No warnings printed when all skill frontmatter is valid."""
+        skills_dir = self._make_skill(tmp_path, "my-skill")
+
+        from agent_notes.registries.skill_registry import load_skill_registry, SkillRegistry
+        monkeypatch.setattr(
+            "agent_notes.commands.doctor.load_skill_registry",
+            lambda: load_skill_registry(skills_dir=skills_dir),
+        )
+
+        from agent_notes.commands.doctor import check_skill_frontmatter
+        issues: list = []
+        fix_actions: list = []
+        check_skill_frontmatter("global", issues, fix_actions)
+
+        out = capsys.readouterr().out
+        assert "[skill-frontmatter]" not in out
+        assert issues == [], "check_skill_frontmatter must not append to issues"
+        assert fix_actions == [], "check_skill_frontmatter must not append to fix_actions"
+
+    def test_warning_on_invalid_group(self, tmp_path, capsys, monkeypatch):
+        """Prints a warning for an invalid group value; does not add to issues."""
+        skills_dir = self._make_skill(tmp_path, "bad-group-skill", "group: invalid-group\n")
+        # Overwrite the pre-written group: process with invalid-group
+        skill_md = skills_dir / "bad-group-skill" / "SKILL.md"
+        text = skill_md.read_text().replace("group: process\n", "")
+        skill_md.write_text(text)
+        # Write skill with invalid group
+        skill_md.write_text(
+            "---\nname: bad-group-skill\ndescription: \"A test skill.\"\ngroup: invalid-group\n---\n\n# bad-group-skill\n"
+        )
+
+        from agent_notes.registries.skill_registry import load_skill_registry
+        monkeypatch.setattr(
+            "agent_notes.commands.doctor.load_skill_registry",
+            lambda: load_skill_registry(skills_dir=skills_dir),
+        )
+
+        from agent_notes.commands.doctor import check_skill_frontmatter
+        issues: list = []
+        fix_actions: list = []
+        check_skill_frontmatter("global", issues, fix_actions)
+
+        out = capsys.readouterr().out
+        assert "[skill-frontmatter]" in out
+        assert "invalid-group" in out
+        assert issues == [], "invalid group must NOT add a fatal Issue"
+        assert fix_actions == [], "invalid group must NOT add a FixAction"
+
+    def test_warning_on_invalid_requires_memory_token(self, tmp_path, capsys, monkeypatch):
+        """Prints a warning for an invalid requires_memory token; does not add to issues."""
+        skill_dir = tmp_path / "bad-memory-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: bad-memory-skill\ndescription: \"A test skill.\"\ngroup: process\nrequires_memory: obsidian,notabackend\n---\n\n# bad-memory-skill\n"
+        )
+
+        from agent_notes.registries.skill_registry import load_skill_registry
+        monkeypatch.setattr(
+            "agent_notes.commands.doctor.load_skill_registry",
+            lambda: load_skill_registry(skills_dir=tmp_path),
+        )
+
+        from agent_notes.commands.doctor import check_skill_frontmatter
+        issues: list = []
+        fix_actions: list = []
+        check_skill_frontmatter("global", issues, fix_actions)
+
+        out = capsys.readouterr().out
+        assert "[skill-frontmatter]" in out
+        assert "notabackend" in out
+        assert issues == [], "invalid requires_memory token must NOT add a fatal Issue"
+        assert fix_actions == [], "invalid requires_memory token must NOT add a FixAction"
+
+    def test_doctor_exit_code_unaffected_by_skill_warning(self, tmp_path, monkeypatch, capsys):
+        """doctor's return value (exit code) is unchanged by skill frontmatter warnings."""
+        _patch_state(tmp_path, monkeypatch)
+
+        skill_dir = tmp_path / "skills" / "bad-skill"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: bad-skill\ndescription: \"A test skill.\"\ngroup: bogus\n---\n\n# bad-skill\n"
+        )
+
+        from agent_notes.registries.skill_registry import load_skill_registry
+        monkeypatch.setattr(
+            "agent_notes.commands.doctor.load_skill_registry",
+            lambda: load_skill_registry(skills_dir=tmp_path / "skills"),
+        )
+
+        with patch("agent_notes.commands.doctor.check_stale_files", _no_op_checks), \
+             patch("agent_notes.commands.doctor.check_broken_symlinks", _no_op_checks), \
+             patch("agent_notes.commands.doctor.check_shadowed_files", _no_op_checks), \
+             patch("agent_notes.commands.doctor.check_missing_files", _no_op_checks), \
+             patch("agent_notes.commands.doctor.check_content_drift", _no_op_checks), \
+             patch("agent_notes.commands.doctor.check_build_freshness", _no_op_checks), \
+             patch("agent_notes.commands.doctor._check_session_hook", _no_op_checks), \
+             patch("agent_notes.commands.doctor.print_summary"), \
+             patch("agent_notes.commands.doctor._check_role_models"), \
+             patch("agent_notes.commands.doctor.print_issues", return_value=True):
+            from agent_notes.commands.doctor import doctor
+            result = doctor(local=False, fix=False)
+
+        assert result is True, "skill frontmatter warning must not change doctor's exit result"
+        out = capsys.readouterr().out
+        assert "[skill-frontmatter]" in out
+
+
+class TestCheckSkillFrontmatterNoFalsePositivesOnRealSkills:
+    """Regression: check_skill_frontmatter must not warn for any skill that ships with the package.
+
+    This guards against _VALID_GROUPS being too narrow and producing false-positive
+    warnings for legitimately-grouped skills (e.g. rails-*, docker-*, kamal skills).
+    Each parametrized case loads exactly one real skill in isolation so a future
+    regression is pinpointed to the offending skill name.
+    """
+
+    @staticmethod
+    def _real_skill_names():
+        """Return (name, skills_dir) pairs for every skill in the real skill registry."""
+        from agent_notes.config import SKILLS_DIR
+        from agent_notes.registries.skill_registry import load_skill_registry
+        registry = load_skill_registry(skills_dir=SKILLS_DIR)
+        return [(s.name, SKILLS_DIR) for s in registry.all()]
+
+    @pytest.mark.parametrize("skill_name,skills_dir", _real_skill_names.__func__())
+    def test_no_warning_for_shipped_skill(self, skill_name, skills_dir, tmp_path, capsys, monkeypatch):
+        """check_skill_frontmatter emits no [skill-frontmatter] warning for a real shipped skill."""
+        # Build a skills_dir containing only this one skill so other skills
+        # cannot mask or muffle the warning under test.
+        src_dir = skills_dir / skill_name
+        import shutil
+        isolated = tmp_path / "skills"
+        isolated.mkdir()
+        shutil.copytree(src_dir, isolated / skill_name)
+
+        from agent_notes.registries.skill_registry import load_skill_registry
+        monkeypatch.setattr(
+            "agent_notes.commands.doctor.load_skill_registry",
+            lambda: load_skill_registry(skills_dir=isolated),
+        )
+
+        from agent_notes.commands.doctor import check_skill_frontmatter
+        check_skill_frontmatter("global", [], [])
+
+        out = capsys.readouterr().out
+        assert "[skill-frontmatter]" not in out, (
+            f"check_skill_frontmatter produced a false-positive warning for "
+            f"real shipped skill '{skill_name}':\n{out}"
+        )
+
+
 class TestUpdateCommandRemoved:
     def test_update_command_module_does_not_exist(self):
         """The `update` command should have been removed from the commands package."""

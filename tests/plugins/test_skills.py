@@ -92,3 +92,18 @@ def test_skill_requires_memory_has_valid_backends(skill_dir):
         assert not invalid, (
             f"{skill_dir.name}/SKILL.md has invalid requires_memory backends: {invalid}"
         )
+
+
+@pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=[d.name for d in SKILL_DIRS])
+def test_skill_requires_memory_canonical_format(skill_dir):
+    """If requires_memory is set, it must use canonical format: comma-separated with no spaces after commas."""
+    text = (skill_dir / "SKILL.md").read_text()
+    fm = _parse_frontmatter(text)
+    requires = fm.get("requires_memory", "")
+    if requires:
+        tokens = requires.split(",")
+        for token in tokens:
+            assert token == token.strip(), (
+                f"{skill_dir.name}/SKILL.md: requires_memory token '{token}' has leading/trailing whitespace; "
+                f"use canonical form 'token1,token2' (no spaces after comma)"
+            )
