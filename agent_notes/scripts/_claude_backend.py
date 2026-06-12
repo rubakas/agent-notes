@@ -6,8 +6,7 @@ from pathlib import Path
 
 from . import _pricing
 from ._formatting import (
-    BOLD, DIM, GREEN, YELLOW, NC,
-    tier_color, fmt_tokens, fmt_cost, fmt_time,
+    fmt_time, render_cost_table,
 )
 from ..services.state_store import state_file as _state_file, load_state as _load_state
 
@@ -279,66 +278,15 @@ def run(since: float | None = None, session_id: str | None = None) -> int:
             ms = agent_time_ms.get(label, 0)
         return fmt_time(ms / 1000) if ms > 0 else "n/a"
 
-    agent_col_w = max(len(f"{a}({m})") for a, m, *_ in costs) + 2
-    tok_col_w = max(
-        max(len(fmt_tokens(i, o, c)) for _, _, i, o, c, *_ in costs),
-        len(fmt_tokens(
-            sum(i for _, _, i, *_ in costs),
-            sum(o for _, _, _, o, *_ in costs),
-            sum(c for _, _, _, _, c, *_ in costs),
-        ))
-    ) + 2
-    all_time_strs = [_time_str_for(a) for a, *_ in costs]
-    time_col_w = max(len(s) for s in all_time_strs) + 2
-    W = (agent_col_w, tok_col_w, time_col_w, 12, 12)
-
-    bl_label = _pricing.baseline_label()
-    header = (
-        f"{'agent(model)':<{W[0]}}"
-        f" {'in/out/cache':<{W[1]}}"
-        f" {'time':<{W[2]}}"
-        f" {'actual':<{W[3]}}"
-        f" {f'vs {bl_label}':<{W[4]}}"
+    total_time_ms = sum(
+        lead_time_ms if agent == "lead" else agent_time_ms.get(agent, 0)
+        for agent, *_ in costs
     )
-    print(BOLD + header + NC)
-    print(DIM + "-" * len(header) + NC)
-
-    total_inp = total_outp = total_cache = 0
-    total_actual = total_vs = 0.0
-    total_time_ms = 0
-
-    for agent, model, inp, outp, cache, actual, vs in costs:
-        label = f"{agent}({model})"
-        col = tier_color(model)
-        t_str = _time_str_for(agent)
-        print(
-            col + f"{label:<{W[0]}}" + NC
-            + f" {fmt_tokens(inp, outp, cache):<{W[1]}}"
-            + f" {t_str:<{W[2]}}"
-            + f" {fmt_cost(actual):<{W[3]}}"
-            + f" {fmt_cost(vs):<{W[4]}}"
-        )
-        total_inp += inp
-        total_outp += outp
-        total_cache += cache
-        total_actual += actual
-        total_vs += vs
-        if agent == "lead":
-            total_time_ms += lead_time_ms
-        else:
-            total_time_ms += agent_time_ms.get(agent, 0)
-
-    saved_pct = round((1 - total_actual / total_vs) * 100) if total_vs else 0
-    total_label = f"TOTAL (saved {saved_pct}%)"
     total_time_str = fmt_time(total_time_ms / 1000) if total_time_ms > 0 else "n/a"
-    col = GREEN if total_actual <= 5 else YELLOW
-    print(
-        col + BOLD
-        + f"{total_label:<{W[0]}}"
-        + f" {fmt_tokens(total_inp, total_outp, total_cache):<{W[1]}}"
-        + f" {total_time_str:<{W[2]}}"
-        + f" {fmt_cost(total_actual):<{W[3]}}"
-        + f" {fmt_cost(total_vs):<{W[4]}}"
-        + NC
-    )
+
+    rows = [
+        (f"{agent}({model})", model, inp, outp, cache, _time_str_for(agent), actual, vs)
+        for agent, model, inp, outp, cache, actual, vs in costs
+    ]
+    render_cost_table(rows, total_time_str, _pricing.baseline_label())
     return 0

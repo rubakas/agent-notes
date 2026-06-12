@@ -3,10 +3,7 @@ import sqlite3
 from pathlib import Path
 
 from . import _pricing
-from ._formatting import (
-    BOLD, DIM, GREEN, YELLOW, NC,
-    tier_color, fmt_tokens, fmt_time, fmt_cost,
-)
+from ._formatting import fmt_time, render_cost_table
 
 DB = Path.home() / ".local/share/opencode/opencode.db"
 
@@ -63,7 +60,7 @@ def run() -> int:
         return 0
 
     records = [
-        (agent, model or "unknown", inp or 0, outp or 0, cache or 0, sec or 0)
+        (agent, _pricing.normalize_model(model or "unknown"), inp or 0, outp or 0, cache or 0, sec or 0)
         for agent, model, inp, outp, cache, sec in rows
     ]
 
@@ -74,68 +71,13 @@ def run() -> int:
         for agent, model, inp, outp, cache, sec in records
     ]
 
-    _total_inp  = sum(i for _, _, i, *_ in costs)
-    _total_outp = sum(o for _, _, _, o, *_ in costs)
-    _total_cache = sum(c for _, _, _, _, c, *_ in costs)
-    _max_sec    = max(s for _, _, _, _, _, s, *_ in costs)
-    _total_sec  = sum(s for _, _, _, _, _, s, *_ in costs)
-    _total_time = f"{fmt_time(_max_sec)} / {fmt_time(_total_sec)} seq"
+    max_sec = max(s for _, _, _, _, _, s, *_ in costs)
+    total_sec = sum(s for _, _, _, _, _, s, *_ in costs)
+    total_time_str = f"{fmt_time(max_sec)} / {fmt_time(total_sec)} seq"
 
-    agent_col_w = max(len(f"{a}({m})") for a, m, *_ in costs) + 2
-    tok_col_w = max(
-        max(len(fmt_tokens(i, o, c)) for _, _, i, o, c, *_ in costs),
-        len(fmt_tokens(_total_inp, _total_outp, _total_cache))
-    ) + 2
-    time_col_w = max(
-        max(len(fmt_time(s)) for _, _, _, _, _, s, *_ in costs),
-        len(_total_time)
-    ) + 2
-    W = (agent_col_w, tok_col_w, time_col_w, 12, 12)
-
-    bl_label = _pricing.baseline_label()
-    header = (
-        f"{'agent(model)':<{W[0]}}"
-        f" {'in/out/cache':<{W[1]}}"
-        f" {'time':<{W[2]}}"
-        f" {'actual':<{W[3]}}"
-        f" {f'vs {bl_label}':<{W[4]}}"
-    )
-    print(BOLD + header + NC)
-    print(DIM + "-" * len(header) + NC)
-
-    total_inp = total_outp = total_cache = 0
-    total_actual = total_vs = max_sec = total_sec = 0.0
-
-    for agent, model, inp, outp, cache, sec, actual, vs in costs:
-        label = f"{agent}({model})"
-        time_str = fmt_time(sec)
-        col = tier_color(model)
-        print(
-            col + f"{label:<{W[0]}}" + NC
-            + f" {fmt_tokens(inp, outp, cache):<{W[1]}}"
-            + f" {time_str:<{W[2]}}"
-            + f" {fmt_cost(actual):<{W[3]}}"
-            + f" {fmt_cost(vs):<{W[4]}}"
-        )
-        total_inp += inp
-        total_outp += outp
-        total_cache += cache
-        total_actual += actual
-        total_vs += vs
-        max_sec = max(max_sec, sec)
-        total_sec += sec
-
-    saved_pct = round((1 - total_actual / total_vs) * 100) if total_vs else 0
-    total_label = f"TOTAL (saved {saved_pct}%)"
-    total_time = _total_time
-    col = GREEN if total_actual <= 5 else YELLOW
-    print(
-        col + BOLD
-        + f"{total_label:<{W[0]}}"
-        + f" {fmt_tokens(total_inp, total_outp, total_cache):<{W[1]}}"
-        + f" {total_time:<{W[2]}}"
-        + f" {fmt_cost(total_actual):<{W[3]}}"
-        + f" {fmt_cost(total_vs):<{W[4]}}"
-        + NC
-    )
+    rows = [
+        (f"{agent}({model})", model, inp, outp, cache, fmt_time(sec), actual, vs)
+        for agent, model, inp, outp, cache, sec, actual, vs in costs
+    ]
+    render_cost_table(rows, total_time_str, _pricing.baseline_label())
     return 0
