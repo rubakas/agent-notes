@@ -1,7 +1,6 @@
 """Frontmatter and agent file rendering."""
 
 import yaml
-import shutil
 import importlib
 import re
 from pathlib import Path
@@ -208,8 +207,7 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     if project_path is not None:
         project_config_file = Path(project_path) / ".claude" / "agent-notes.yaml"
         if project_config_file.exists():
-            from ..services.user_config import load_user_config as _load
-            project_config = _load(project_config_file)
+            project_config = load_user_config(project_config_file)
             user_config = merge_configs(user_config, project_config)
 
     registry = load_registry()
