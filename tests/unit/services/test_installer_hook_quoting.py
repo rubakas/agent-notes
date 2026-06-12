@@ -30,9 +30,9 @@ class TestSessionHookPathQuoting:
 
         _, _, hook_command = _session_hook_paths(backend, "global")
 
-        quoted = shlex.quote(str(home))
+        quoted = shlex.quote(str(home / "agent-notes-context.md"))
         assert quoted in hook_command, (
-            f"Expected shell-quoted path {quoted!r} in hook command, got: {hook_command!r}"
+            f"Expected shell-quoted full path {quoted!r} in hook command, got: {hook_command!r}"
         )
 
     def test_path_with_space_is_quoted_local(self, tmp_path):
@@ -43,9 +43,9 @@ class TestSessionHookPathQuoting:
 
         _, _, hook_command = _session_hook_paths(backend, "local")
 
-        quoted = shlex.quote(str(home))
+        quoted = shlex.quote(str(home / "agent-notes-context.md"))
         assert quoted in hook_command, (
-            f"Expected shell-quoted path {quoted!r} in hook command, got: {hook_command!r}"
+            f"Expected shell-quoted full path {quoted!r} in hook command, got: {hook_command!r}"
         )
 
     def test_path_with_semicolon_is_quoted(self, tmp_path):
@@ -64,7 +64,8 @@ class TestSessionHookPathQuoting:
         _, _, hook_command = _session_hook_paths(backend, "global")
 
         # The semicolon must not appear unquoted in the command
-        quoted = shlex.quote(special_path)
+        full_path = special_path + "/agent-notes-context.md"
+        quoted = shlex.quote(full_path)
         assert quoted in hook_command, (
             f"Expected shell-quoted path in hook command, got: {hook_command!r}. "
             f"Unquoted semicolon would allow shell injection."
