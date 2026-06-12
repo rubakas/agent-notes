@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from ..registries.skill_registry import load_skill_registry
+
 # Re-export for backward compatibility. New code should import from agent_notes.domain.
 from ..domain.diagnostics import Issue, FixAction  # noqa: F401
 
@@ -41,6 +43,42 @@ from ..services.fs import (
     symlink_target_exists, 
     files_differ
 )
+
+# Canonical group vocabulary for skill frontmatter.
+# "process" and "domain" come from the base skills in data/skills/.
+# "rails", "docker", and "kamal" come from the sub-skills that are generated
+# during the release/packaging step and land in data/skills/ of the built
+# package (e.g. rails-models → group: rails, rails-kamal → group: kamal,
+# docker-compose → group: docker).  There is no single source-of-truth
+# constant elsewhere in the codebase, so the full vocabulary is listed here.
+_VALID_GROUPS = {"process", "domain", "rails", "docker", "kamal"}
+_VALID_MEMORY_BACKENDS = {"obsidian", "wiki", "local", "none"}
+
+
+def check_skill_frontmatter(scope: str, issues: list, fix_actions: list, profile_label: str = "") -> None:
+    """Warn (non-fatal) about skill frontmatter violations.
+
+    Checks every skill for:
+    - non-empty name and description
+    - group, if present, is in {"process", "domain"}
+    - requires_memory tokens, if present, are each in {"obsidian", "wiki", "local", "none"}
+
+    Violations are printed as advisories and do NOT affect issues/fix_actions or exit code.
+    """
+    registry = load_skill_registry()
+    for skill in registry.all():
+        if not skill.name:
+            print(f"  [skill-frontmatter] {skill.path.name}: 'name' is empty")
+        if not skill.description:
+            print(f"  [skill-frontmatter] {skill.path.name}: 'description' is empty")
+        if skill.group and skill.group not in _VALID_GROUPS:
+            print(f"  [skill-frontmatter] {skill.name}: 'group' value '{skill.group}' is not in {sorted(_VALID_GROUPS)}")
+        if skill.requires_memory:
+            for token in skill.requires_memory.split(","):
+                token = token.strip()
+                if token and token not in _VALID_MEMORY_BACKENDS:
+                    print(f"  [skill-frontmatter] {skill.name}: 'requires_memory' token '{token}' is not in {sorted(_VALID_MEMORY_BACKENDS)}")
+
 
 def _check_session_hook(scope: str, issues: list) -> None:
     """Check that the Claude Code SessionStart hook is registered in settings.json."""
@@ -161,6 +199,9 @@ def diagnose(scope: str, fix: bool = False) -> bool:
 
     # SessionStart hook check (Claude Code only)
     _check_session_hook(scope, issues)
+
+    # Skill frontmatter advisory check (warn-only, non-fatal)
+    check_skill_frontmatter(scope, issues, fix_actions)
 
     # Print role→model assignments
     state = load_current_state()
