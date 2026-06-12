@@ -9,6 +9,9 @@ from ..config import AGENTS_YAML
 from ..domain.agent import AgentSpec
 from ._base import load_yaml_file
 
+# Top-level keys in agents.yaml that are NOT per-backend config entries.
+NON_BACKEND_KEYS = {"description", "role", "mode", "color", "effort", "claude_exclude"}
+
 
 class AgentRegistry:
     """Registry of agent configurations from agents.yaml."""
@@ -50,9 +53,6 @@ def load_agent_registry(yaml_path: Optional[Path] = None) -> AgentRegistry:
     agents_data = data.get("agents", {})
     if not agents_data:
         return AgentRegistry([])
-    
-    # Known top-level keys that are NOT per-backend config
-    NON_BACKEND_KEYS = {"description", "role", "mode", "color", "effort", "claude_exclude"}
     
     agents = []
     for name, config in agents_data.items():
