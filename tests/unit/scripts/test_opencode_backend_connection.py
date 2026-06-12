@@ -2,11 +2,12 @@
 
 Bug: `sqlite3.connect(DB).execute(SQL).fetchall()` opened a connection that was
 never explicitly closed — the connection object was dropped without close().
-Fix: use `with sqlite3.connect(DB) as conn:` so the connection is always closed.
+Fix: use `contextlib.closing(sqlite3.connect(DB))` so close() is always called.
 
 The fail-first test injects a spy around sqlite3.connect and asserts close() is
-called.  On the unfixed code, close() is never called explicitly, so only the GC
-would clean it up — failing the assertion.
+called.  On the broken `with sqlite3.connect(...) as conn:` form, Python's
+__exit__ only commits/rolls back — it does NOT call close() — so close_calls
+stays empty and the assertion fails, correctly catching the bug.
 """
 
 import sqlite3
@@ -60,7 +61,20 @@ class TestOpencodeBackendConnectionNotLeaked:
         close_calls = []
 
         class _SpyConn:
-            """Thin wrapper that records close() calls."""
+            """Thin wrapper that records close() calls.
+
+            __exit__ deliberately does NOT record "close" — only an explicit
+            .close() call should register.  This means the broken form:
+
+                with sqlite3.connect(DB) as conn: ...
+
+            fails the assertion (Python's sqlite3.Connection.__exit__ only
+            commits/rolls back; it never calls close()), while the correct form:
+
+                with contextlib.closing(sqlite3.connect(DB)) as conn: ...
+
+            passes because contextlib.closing.__exit__ calls conn.close().
+            """
 
             def __init__(self, path):
                 self._real = _original_connect(path)
@@ -72,13 +86,16 @@ class TestOpencodeBackendConnectionNotLeaked:
                 close_calls.append("close")
                 self._real.close()
 
-            # Context-manager support (used by `with sqlite3.connect(...) as conn:`)
+            # Context-manager support — __exit__ does NOT record close.
+            # Only a real .close() call should register.
             def __enter__(self):
                 return self
 
             def __exit__(self, exc_type, exc_val, exc_tb):
-                close_calls.append("close")
-                self._real.close()
+                # Intentionally empty: do not call close() here.
+                # This lets contextlib.closing trigger the real close() path
+                # while the bare `with sqlite3.connect(...) as conn:` form
+                # (which only commits via __exit__) is correctly detected as a leak.
                 return False
 
         with patch("agent_notes.scripts._opencode_backend.sqlite3.connect",

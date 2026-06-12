@@ -1,4 +1,5 @@
 """Session cost report for OpenCode — reads SQLite database."""
+import contextlib
 import sqlite3
 from pathlib import Path
 
@@ -54,7 +55,7 @@ def run() -> int:
         print(f"Database not found: {DB}")
         return 1
 
-    with sqlite3.connect(DB) as conn:
+    with contextlib.closing(sqlite3.connect(DB)) as conn:
         rows = conn.execute(SQL).fetchall()
     if not rows:
         print("No sessions found.")
