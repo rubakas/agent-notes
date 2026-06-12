@@ -108,6 +108,36 @@ def test_ingest_skill_has_requires_memory():
     assert "wiki" in backends, "ingest skill requires_memory should include wiki"
 
 
+def test_requires_memory_normalized_no_spaces():
+    """requires_memory with spaces after commas is normalized to canonical form (no spaces)."""
+    from pathlib import Path
+    import tempfile, textwrap
+
+    skill_md_content = textwrap.dedent("""\
+        ---
+        name: test-skill
+        description: "A test skill."
+        group: process
+        requires_memory: obsidian, wiki
+        ---
+
+        # Test Skill
+    """)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        skill_dir = Path(tmpdir) / "test-skill"
+        skill_dir.mkdir()
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(skill_md_content)
+
+        registry = load_skill_registry(skills_dir=Path(tmpdir))
+        skill = registry.get("test-skill")
+
+    assert skill.requires_memory == "obsidian,wiki", (
+        f"expected 'obsidian,wiki' but got '{skill.requires_memory}'"
+    )
+
+
 # --- Agent registry ---
 
 def test_agent_registry_loads():
