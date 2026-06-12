@@ -45,8 +45,10 @@ def do_add(title: str, body: str, note_type: str = "context", agent: str = "", p
         )
         print(f"{Color.GREEN}Note saved: {note_path}{Color.NC}")
     else:
-        print("The `add` subcommand is for obsidian or wiki storage.")
-        print("For local storage, write files directly to the agent subdirectory.")
+        import sys
+        print("The `add` subcommand is for obsidian or wiki storage.", file=sys.stderr)
+        print("For local storage, write files directly to the agent subdirectory.", file=sys.stderr)
+        sys.exit(1)
 
 
 def do_list() -> None:
