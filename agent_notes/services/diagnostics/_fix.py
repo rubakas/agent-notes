@@ -1,9 +1,27 @@
 """Fix actions for agent-notes diagnostics."""
 
 from pathlib import Path
-from typing import List
+from typing import List, Set
 
 from ...domain.diagnostics import Issue, FixAction
+
+
+def _is_safe_delete(file_path: Path, safe_delete_paths: Set[str]) -> bool:
+    """Return True if file_path is safe to delete (in state.json or a symlink into our dist/)."""
+    if str(file_path) in safe_delete_paths:
+        return True
+    if file_path.is_symlink():
+        target = file_path.readlink()
+        if not target.is_absolute():
+            target = file_path.parent / target
+        try:
+            from ...config import DIST_DIR
+            target_resolved = target.resolve()
+            dist_resolved = DIST_DIR.resolve()
+            return str(target_resolved).startswith(str(dist_resolved))
+        except (OSError, ValueError):
+            return False
+    return False
 
 
 def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
@@ -46,12 +64,11 @@ def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
         if action.action == "DELETE":
             file_path = Path(action.file)
             # Safety check: only allow DELETE if path is in state.json or is a symlink to our dist/
-            if str(file_path) not in safe_delete_paths:
+            if not _is_safe_delete(file_path, safe_delete_paths):
                 if file_path.is_symlink():
                     target = file_path.readlink()
                     if not target.is_absolute():
                         target = file_path.parent / target
-                    # Check if symlink target is within our dist/ directory
                     try:
                         from ...config import DIST_DIR
                         target_resolved = target.resolve()
@@ -96,24 +113,9 @@ def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
         if action.action == "DELETE":
             file_path = Path(action.file)
             # Recheck safety (same logic as above)
-            if str(file_path) not in safe_delete_paths:
-                if file_path.is_symlink():
-                    target = file_path.readlink()
-                    if not target.is_absolute():
-                        target = file_path.parent / target
-                    try:
-                        from ...config import DIST_DIR
-                        target_resolved = target.resolve()
-                        dist_resolved = DIST_DIR.resolve()
-                        if not str(target_resolved).startswith(str(dist_resolved)):
-                            print(f"  {Color.RED}SKIPPED{Color.NC}   {action.file} (unsafe)")
-                            continue
-                    except (OSError, ValueError):
-                        print(f"  {Color.RED}SKIPPED{Color.NC}   {action.file} (unsafe)")
-                        continue
-                else:
-                    print(f"  {Color.RED}SKIPPED{Color.NC}   {action.file} (unsafe)")
-                    continue
+            if not _is_safe_delete(file_path, safe_delete_paths):
+                print(f"  {Color.RED}SKIPPED{Color.NC}   {action.file} (unsafe)")
+                continue
 
             if file_path.exists() or file_path.is_symlink():
                 if file_path.is_symlink():
