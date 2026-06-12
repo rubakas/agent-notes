@@ -163,7 +163,7 @@ def validate() -> None:
     codeblock_ok = True
     for md_file in ROOT.rglob("*.md"):
         # Skip .git and node_modules
-        if ".git" in str(md_file) or "node_modules" in str(md_file):
+        if any(part in {".git", "node_modules"} for part in md_file.parts):
             continue
 
         if not check_unclosed_code_blocks(md_file):
