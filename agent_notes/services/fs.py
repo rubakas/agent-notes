@@ -180,7 +180,4 @@ def symlink_target_exists(path: Path) -> bool:
 
 def files_differ(file1: Path, file2: Path) -> bool:
     """Compare file contents."""
-    try:
-        return file1.read_bytes() != file2.read_bytes()
-    except (OSError, FileNotFoundError):
-        return True
+    return not files_identical(file1, file2)
