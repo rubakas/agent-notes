@@ -54,7 +54,8 @@ def run() -> int:
         print(f"Database not found: {DB}")
         return 1
 
-    rows = sqlite3.connect(DB).execute(SQL).fetchall()
+    with sqlite3.connect(DB) as conn:
+        rows = conn.execute(SQL).fetchall()
     if not rows:
         print("No sessions found.")
         return 0
