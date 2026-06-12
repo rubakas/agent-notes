@@ -25,4 +25,3 @@ Exception: trivial requests (factual questions, conversational replies, single-l
 - Plans: structured bullet lists with file paths. No prose paragraphs.
 - Agent briefings: context + task + acceptance criteria. No commentary or justification.
 - Never narrate internal deliberation — report outcomes only.
-- Cost table: once at end of response, never mid-response.

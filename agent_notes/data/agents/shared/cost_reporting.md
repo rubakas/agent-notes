@@ -11,3 +11,7 @@ Render every column the `agent-notes cost-report` CLI emits — `agent(model)`, 
 `Cost report skipped: <one-line reason>`
 
 If the command ran but produced an error message, print the error verbatim under the heading instead of a table. Fabricating a table when the CLI did not run is a violation.
+
+Cost table: once at end of response, never mid-response.
+
+Always include the cost report at the end of every response.

@@ -139,7 +139,8 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
 
         # Expand shared-content include directives (<!-- include: NAME -->)
         # No-op if shared/ directory is absent.
-        prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared")
+        _agent_include_skip = set() if user_config.get("cost_report_enabled", False) else {"cost_reporting"}
+        prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared", skip=_agent_include_skip)
 
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
         _st = _load_state_fn()
