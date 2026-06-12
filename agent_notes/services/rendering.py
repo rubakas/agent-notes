@@ -88,7 +88,100 @@ def _load_frontmatter_template(template_name):
         ) from e
 
 
-def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any], 
+def _resolve_model_str(
+    agent_name: str,
+    agent_config: Dict[str, Any],
+    backend,
+    scope_state,
+    model_registry,
+    user_config: Dict[str, Any],
+    tiers: Dict[str, Any],
+):
+    """Resolve the model string for a given agent+backend combination.
+
+    Returns (model_str, model_registry) where model_registry may have been
+    lazily loaded inside and is returned so the caller can cache it.
+    """
+    from ..registries.model_registry import load_model_registry
+    from ..services.user_config import resolve_agent_role, resolve_role_model
+
+    agent_role = resolve_agent_role(agent_name, agent_config.get('role'), user_config)
+    model_str = None
+
+    if (scope_state is not None and
+            agent_role is not None and
+            backend.name in scope_state.clis and
+            agent_role in scope_state.clis[backend.name].role_models):
+
+        # Step 1: state-driven resolution
+        model_id = scope_state.clis[backend.name].role_models[agent_role]
+
+        if model_registry is None:
+            model_registry = load_model_registry()
+
+        try:
+            model = model_registry.get(model_id)
+            resolved = model.resolve_for_providers(list(backend.accepted_providers))
+            if resolved is not None:
+                _provider, alias_str = resolved
+                model_str = model.model_class if backend.use_model_class else alias_str
+        except KeyError:
+            pass  # fall through to class/tier fallback
+
+    # User config override: explicit model for this role+backend
+    if model_str is None:
+        user_model = resolve_role_model(agent_role, backend.name, user_config)
+        if user_model:
+            model_str = user_model
+
+    # Step 2: role.typical_class fallback — the "works from shipped YAMLs
+    # with zero state" path. Loads the role and picks any model whose
+    # class matches role.typical_class and which has an alias for one
+    # of this backend's accepted providers.
+    if model_str is None and agent_role is not None:
+        if model_registry is None:
+            model_registry = load_model_registry()
+        try:
+            from ..registries.role_registry import load_role_registry
+            role_registry = load_role_registry()
+            role = role_registry.get(agent_role)
+        except (KeyError, FileNotFoundError, ValueError):
+            role = None
+
+        if role is not None:
+            # Prefer newer model IDs when multiple match the class.
+            # Registries are sorted ascending by id, so iterate reversed
+            # to pick e.g. claude-opus-4-7 over claude-opus-4-6.
+            for model in reversed(model_registry.all()):
+                if model.model_class != role.typical_class:
+                    continue
+                resolved = model.resolve_for_providers(list(backend.accepted_providers))
+                if resolved is not None:
+                    _provider, alias_str = resolved
+                    model_str = model.model_class if backend.use_model_class else alias_str
+                    break
+
+    # Step 3: legacy tier fallback (for pre-v1.1 agents.yaml files that
+    # still declare `tier:` instead of `role:`).
+    if model_str is None:
+        if 'tier' not in agent_config:
+            raise ValueError(
+                f"Agent '{agent_name}' has role='{agent_role}' but no model could be "
+                f"resolved for backend '{backend.name}'. Tried: state.role_models, "
+                f"role.typical_class->model.class matching, and legacy 'tier' fallback. "
+                f"Check that data/roles/{agent_role}.yaml exists and that at least one "
+                f"model in data/models/*.yaml has class={role.typical_class if 'role' in locals() and role else '?'} "
+                f"with an alias for one of {list(backend.accepted_providers)}."
+            )
+        tier = agent_config['tier']
+        if backend.name not in tiers[tier]:
+            raise ValueError(f"tier '{tier}' missing model for CLI '{backend.name}' in agents.yaml")
+        model_str = tiers[tier][backend.name]
+
+    return model_str, model_registry
+
+
+def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
                          state=None, scope='global', project_path=None) -> list[Path]:
     """Generate agent files for all CLI backends.
     
@@ -103,13 +196,12 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     If state is provided, tries state-driven resolution first, falls back to tiers on miss.
     """
     from ..registries.cli_registry import load_registry
-    from ..registries.model_registry import load_model_registry
     from ..services.state_store import load_state as _load_state_fn, get_scope as _get_scope
     from ..config import AGENTS_DIR, DIST_DIR
-    
+
     generated_files = []
 
-    from ..services.user_config import load_user_config, resolve_agent_role, resolve_role_model, get_patch, merge_configs
+    from ..services.user_config import load_user_config, get_patch, merge_configs
 
     user_config = load_user_config()
     # Merge project-level config if provided
@@ -186,79 +278,9 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
             #   2. Role-class fallback: role.typical_class matched against
             #      any model's class, with a compatible provider for this backend
             #   3. Legacy tier fallback: agent_config['tier'] -> tiers[tier][backend.name]
-            model_str = None
-            agent_role = resolve_agent_role(agent_name, agent_config.get('role'), user_config)
-            
-            if (scope_state is not None and 
-                agent_role is not None and 
-                backend.name in scope_state.clis and
-                agent_role in scope_state.clis[backend.name].role_models):
-                
-                # Step 1: state-driven resolution
-                model_id = scope_state.clis[backend.name].role_models[agent_role]
-                
-                # Lazy load model registry
-                if model_registry is None:
-                    model_registry = load_model_registry()
-                
-                try:
-                    model = model_registry.get(model_id)
-                    resolved = model.resolve_for_providers(list(backend.accepted_providers))
-                    if resolved is not None:
-                        _provider, alias_str = resolved
-                        model_str = model.model_class if backend.use_model_class else alias_str
-                except KeyError:
-                    pass  # fall through to class/tier fallback
-            
-            # User config override: explicit model for this role+backend
-            if model_str is None:
-                user_model = resolve_role_model(agent_role, backend.name, user_config)
-                if user_model:
-                    model_str = user_model
-
-            # Step 2: role.typical_class fallback — the "works from shipped YAMLs
-            # with zero state" path. Loads the role and picks any model whose
-            # class matches role.typical_class and which has an alias for one
-            # of this backend's accepted providers.
-            if model_str is None and agent_role is not None:
-                if model_registry is None:
-                    model_registry = load_model_registry()
-                try:
-                    from ..registries.role_registry import load_role_registry
-                    role_registry = load_role_registry()
-                    role = role_registry.get(agent_role)
-                except (KeyError, FileNotFoundError, ValueError):
-                    role = None
-                
-                if role is not None:
-                    # Prefer newer model IDs when multiple match the class.
-                    # Registries are sorted ascending by id, so iterate reversed
-                    # to pick e.g. claude-opus-4-7 over claude-opus-4-6.
-                    for model in reversed(model_registry.all()):
-                        if model.model_class != role.typical_class:
-                            continue
-                        resolved = model.resolve_for_providers(list(backend.accepted_providers))
-                        if resolved is not None:
-                            _provider, alias_str = resolved
-                            model_str = model.model_class if backend.use_model_class else alias_str
-                            break
-            
-            # Step 3: legacy tier fallback (for pre-v1.1 agents.yaml files that
-            # still declare `tier:` instead of `role:`).
-            if model_str is None:
-                if 'tier' not in agent_config:
-                    raise ValueError(
-                        f"Agent '{agent_name}' has role='{agent_role}' but no model could be "
-                        f"resolved for backend '{backend.name}'. Tried: state.role_models, "
-                        f"role.typical_class->model.class matching, and legacy 'tier' fallback. "
-                        f"Check that data/roles/{agent_role}.yaml exists and that at least one "
-                        f"model in data/models/*.yaml has class={role.typical_class if 'role' in locals() and role else '?'} "
-                        f"with an alias for one of {list(backend.accepted_providers)}."
-                    )
-                tier = agent_config['tier']
-                if backend.name not in tiers[tier]:
-                    raise ValueError(f"tier '{tier}' missing model for CLI '{backend.name}' in agents.yaml")
-                model_str = tiers[tier][backend.name]
+            model_str, model_registry = _resolve_model_str(
+                agent_name, agent_config, backend, scope_state, model_registry, user_config, tiers
+            )
             
             # Build context for template
             ctx = {
