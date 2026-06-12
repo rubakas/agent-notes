@@ -1,6 +1,6 @@
 ---
 name: improve-codebase-architecture
-description: "Find deepening opportunities — modules where the interface is nearly as complex as the implementation. Use when user wants to improve architecture, reduce coupling, make code more testable, or says 'clean up the design'."
+description: "Find deepening opportunities — modules where the interface is nearly as complex as the implementation. Use when user wants to improve architecture, reduce coupling, make code more testable, or says 'clean up the design'. For broad code-quality hardening use rsi; for a single safe refactor use refactoring-protocol."
 group: process
 ---
 
