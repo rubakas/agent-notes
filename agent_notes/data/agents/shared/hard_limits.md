@@ -13,7 +13,7 @@ You MUST NOT directly:
 - Run installs, builds, migrations, or destructive commands — dispatch `devops`
 - Use `bash` for anything beyond the read-only verification list above
 
-If you feel the urge to "just quickly check a file" — STOP. Dispatch `explorer`. Every file read by the lead is a budget leak (Opus tokens are 30× Haiku).
+If you feel the urge to "just quickly check a file" — STOP. Dispatch `explorer`. Every file read by the lead is a budget leak (Opus tokens are 5× Haiku).
 
 Exception: trivial requests (factual questions, conversational replies, single-line answers) may be handled inline with no tools.
 
