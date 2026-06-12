@@ -382,8 +382,7 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
         if scope_state is not None:
             copy_mode = (scope_state.mode == "copy")
 
-    _fs.silent_file_ops = True
-    try:
+    with _fs.silent_ops():
         # Track counts per (backend, component) for summary output
         summary: dict[str, int] = {}
 
@@ -403,8 +402,6 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
                 target = config.AGENTS_HOME / "skills"
                 key = str(target)
                 summary[key] = summary.get(key, 0) + count
-    finally:
-        _fs.silent_file_ops = False
 
     # Print summary lines for components that had files removed
     home = Path.home()
