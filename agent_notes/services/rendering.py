@@ -297,45 +297,48 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     return generated_files
 
 
-def _memory_path(st) -> str:
-    """Return the vault/memory path string for {{MEMORY_PATH}} substitution in agent prompts."""
+def _resolve_memory_path(st) -> Optional[str]:
+    """Return the resolved memory directory path as a string, or None if memory is disabled/absent."""
     from ..config import memory_dir_for_backend
 
     if st is None:
-        return "disabled"
+        return None
 
     backend = st.memory.backend
     custom_path = st.memory.path
 
     if backend == "none":
-        return "disabled"
+        return None
 
     resolved = memory_dir_for_backend(backend, custom_path)
     if resolved is None:
-        return "disabled"
+        return None
 
     return str(resolved)
 
 
+def _memory_path(st) -> str:
+    """Return the vault/memory path string for {{MEMORY_PATH}} substitution in agent prompts."""
+    resolved = _resolve_memory_path(st)
+    if resolved is None:
+        return "disabled"
+    return resolved
+
+
 def _memory_reading_guide(st) -> str:
     """Return backend-appropriate reading instructions for {{MEMORY_READING_GUIDE}} substitution."""
-    from ..config import memory_dir_for_backend
     from ..constants import Wiki, Obsidian
 
     if st is None:
         return "Memory is not configured. Proceed without reading any shared state."
 
     backend = st.memory.backend
-    custom_path = st.memory.path
 
-    if backend == "none":
-        return "Memory is disabled. Proceed without reading any shared state."
-
-    resolved = memory_dir_for_backend(backend, custom_path)
+    resolved = _resolve_memory_path(st)
     if resolved is None:
         return "Memory is disabled. Proceed without reading any shared state."
 
-    path = str(resolved)
+    path = resolved
 
     if backend == "wiki":
         _sessions, _concepts, _entities = Wiki.PAGE_TYPES[4], Wiki.PAGE_TYPES[1], Wiki.PAGE_TYPES[2]
@@ -377,8 +380,6 @@ def _memory_reading_guide(st) -> str:
 
 def _memory_instructions(st) -> str:
     """Return memory instructions text based on the configured backend."""
-    from ..config import memory_dir_for_backend
-
     if st is None:
         return (
             "Save memories using the `agent-notes memory add` CLI.\n\n"
@@ -387,12 +388,8 @@ def _memory_instructions(st) -> str:
         )
 
     backend = st.memory.backend
-    custom_path = st.memory.path
 
-    if backend == "none":
-        return "Memory is disabled for this installation."
-
-    resolved = memory_dir_for_backend(backend, custom_path)
+    resolved = _resolve_memory_path(st)
     if resolved is None:
         return "Memory is disabled for this installation."
 
