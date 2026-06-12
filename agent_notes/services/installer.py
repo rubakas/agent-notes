@@ -470,10 +470,10 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
     if agents_dist.exists():
         agents = sorted(p.stem for p in agents_dist.glob("*.md"))
 
+    current_state = load_state()
     if not memory_backend:
-        state = load_state()
-        memory_backend = state.memory.backend if state else "local"
-        memory_path = state.memory.path if state else ""
+        memory_backend = current_state.memory.backend if current_state else "local"
+        memory_path = current_state.memory.path if current_state else ""
 
     skills = _filter_skills_by_backend(default_skill_registry().all(), memory_backend)
 
@@ -516,9 +516,8 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
             remove_allow_entry(settings_path, f"Edit({p})")
 
     # Also remove any custom path recorded in old state
-    old_state = load_state()
-    if old_state and old_state.memory.backend in ("wiki", "obsidian") and old_state.memory.path:
-        old_resolved = memory_dir_for_backend(old_state.memory.backend, old_state.memory.path)
+    if current_state and current_state.memory.backend in ("wiki", "obsidian") and current_state.memory.path:
+        old_resolved = memory_dir_for_backend(current_state.memory.backend, current_state.memory.path)
         if old_resolved:
             old_pattern = str(old_resolved) + "/**"
             remove_allow_entry(settings_path, f"Read({old_pattern})")
