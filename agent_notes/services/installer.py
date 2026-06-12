@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from typing import List, NamedTuple, Optional
 
@@ -434,9 +435,9 @@ def _session_hook_paths(backend, scope: str):
     settings_path = home / "settings.json"
     context_file = home / "agent-notes-context.md"
     if scope == "global":
-        hook_command = f"cat {home}/agent-notes-context.md 2>/dev/null || true"
+        hook_command = f"cat {shlex.quote(str(home))}/agent-notes-context.md 2>/dev/null || true"
     else:
-        hook_command = f"cat {backend.local_dir}/agent-notes-context.md 2>/dev/null || true"
+        hook_command = f"cat {shlex.quote(str(backend.local_dir))}/agent-notes-context.md 2>/dev/null || true"
     return settings_path, context_file, hook_command
 
 
