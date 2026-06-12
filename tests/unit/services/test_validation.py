@@ -30,11 +30,17 @@ class TestHasField:
         missing = tmp_path / "ghost.md"
         assert has_field(missing, "title") is False
 
-    def test_returns_true_for_field_in_body_not_frontmatter(self, tmp_path):
-        """has_field is a simple substring check — matches anywhere in file."""
+    def test_returns_false_for_field_in_body_not_frontmatter(self, tmp_path):
+        """has_field must only look in frontmatter, not the document body."""
+        f = tmp_path / "note.md"
+        f.write_text("---\nauthor: Alice\n---\n\nname: in body\n")
+        assert has_field(f, "name") is False
+
+    def test_returns_false_for_field_in_body_no_frontmatter(self, tmp_path):
+        """Field appearing in body-only file (no frontmatter) must return False."""
         f = tmp_path / "note.md"
         f.write_text("No frontmatter here.\ntitle: in body\n")
-        assert has_field(f, "title") is True
+        assert has_field(f, "title") is False
 
     def test_returns_false_for_empty_file(self, tmp_path):
         f = tmp_path / "empty.md"
