@@ -1,6 +1,6 @@
 ---
 name: rsi
-description: "Recursive code-improvement loop: iteratively harden an existing codebase across bugs, performance, quality, consistency/homogeneity, pattern adherence, tests, atomicity, independence, and DRY — strictly without adding functionality. Use when the user wants to improve, clean up, or harden existing code, says 'rsi', or asks to raise code quality without new features."
+description: "Recursive code-improvement loop: iteratively harden an existing codebase across bugs, performance, quality, consistency/homogeneity, pattern adherence, tests, atomicity, independence, and DRY — strictly without adding functionality. Use when the user wants to improve, clean up, or harden existing code, says 'rsi', or asks to raise code quality without new features. For a single one-shot refactor use refactoring-protocol; for module or interface redesign use improve-codebase-architecture."
 group: process
 argument-hint: "[path or scope, optional]"
 ---
@@ -18,12 +18,15 @@ Iteratively improve EXISTING code until it stops yielding improvements. The lead
 ## The loop (lead-orchestrated, loop-until-dry)
 
 1. **Scope.** Resolve the target (arg path, or whole project). Identify the test command and confirm the suite is green. If it is red, stop and report — fix the suite before improving.
-2. **Scan — one dimension at a time.** Dispatch read-only agents to produce a ranked list of concrete opportunities, each as `file:line — why — dimension`:
+2. **Scan — one dimension at a time.** Dispatch read-only agents to produce a ranked list of concrete opportunities:
    - `debugger` / `security-auditor` → bugs, correctness, vulnerabilities
    - `performance-profiler` → hot paths, N+1, redundant work
    - `system-auditor` → duplication, dead code, coupling, inconsistent implementations of one concept
    - `reviewer` → readability, naming, pattern & consistency adherence
    - `test-writer` (read-only pass) → coverage gaps
+
+   Each opportunity is a **finding record**: `file` · `line` · `dimension` · `severity` (blocker | major | minor) · `why` · `fix` (one-line proposed change). When a downstream agent consumes the scan, emit findings as JSON objects with exactly those keys; otherwise the dashed form `file:line — dimension/severity — why — fix` is fine.
+
 3. **Prioritize.** Order: correctness/safety > missing tests on touched code > DRY/duplication > consistency/homogeneity > pattern & convention fit > performance > clarity/naming. Drop anything that changes behavior or adds capability.
 4. **Apply ONE atomic, independent change.** Dispatch `coder` (bugfix) or `refactorer` (behavior-preserving cleanup). Smallest viable diff.
 5. **Verify.** Run affected tests — must stay green. `reviewer` confirms: no behavior change, fits conventions, genuinely improves the dimension. On regression → revert and re-plan.
