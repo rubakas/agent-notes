@@ -36,7 +36,8 @@ Because you just wrote the code, you know exactly what behavior matters and how 
 
 ## GREEN — make it pass
 
-- Write the minimum code to pass the test. Hardcode values if that's all it takes — you'll triangulate with the next test.
+- Write the minimum code to pass the test. Hardcode values if that's all it takes — you'll triangulate with the next test. A hardcoded return is only valid as a transient step toward a general implementation; if it stays in permanently to satisfy the test, that is reward-hacking, not TDD.
+- Do not reach GREEN by gaming the test: no special-casing the test's specific inputs, no weakening the assertion, no deleting the assertion. The test must pass because the behavior is implemented, not because the check was neutered.
 - Run the test. Confirm green.
 - If still failing: read the failure output carefully before changing anything else.
 
