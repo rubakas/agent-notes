@@ -17,7 +17,7 @@ Iteratively improve EXISTING code until it stops yielding improvements. The lead
 
 ## The loop (lead-orchestrated, loop-until-dry)
 
-1. **Scope.** Resolve the target (arg path, or whole project). Identify the test command and confirm the suite is green. If it is red, stop and report — fix the suite before improving. Do NOT run the loop on code that lacks meaningful test coverage — write characterization tests first; a loop over weakly-tested code produces roughly an order of magnitude more false-positive "fixes" (~16% vs ~1.4% with strong suites).
+1. **Scope.** Resolve the target (arg path, or whole project). Identify the test command and confirm the suite is green. If it is red, stop and report — fix the suite before improving. Do NOT run the loop on code that lacks meaningful test coverage — write characterization tests first: studies report that looping over weakly-tested code produces roughly 10x more false-positive "fixes" than with a strong suite (~16% vs ~1.4%).
 2. **Scan — one dimension at a time.** Dispatch read-only agents to produce a ranked list of concrete opportunities:
    - `debugger` / `security-auditor` → bugs, correctness, vulnerabilities
    - `performance-profiler` → hot paths, N+1, redundant work
@@ -29,7 +29,7 @@ Iteratively improve EXISTING code until it stops yielding improvements. The lead
 
 3. **Prioritize.** Order: correctness/safety > missing tests on touched code > DRY/duplication > consistency/homogeneity > pattern & convention fit > performance > clarity/naming. Drop anything that changes behavior or adds capability.
 4. **Apply ONE atomic, independent change.** Dispatch `coder` (bugfix) or `refactorer` (behavior-preserving cleanup). Smallest viable diff.
-5. **Verify.** Run affected tests — must stay green. `reviewer` confirms: no behavior change, fits conventions, genuinely improves the dimension. On regression → revert and re-plan. Note: genuine logic bugs repair poorly in an iterative loop (~45% success vs ~77% for surface/name errors) — escalate real logic bugs to `debugger` instead of re-looping.
+5. **Verify.** Run affected tests — must stay green. `reviewer` confirms: no behavior change, fits conventions, genuinely improves the dimension. On regression → revert and re-plan. Note: research suggests genuine logic bugs repair poorly in an iterative loop (~45% vs ~77% for surface/name errors) — escalate real logic bugs to `debugger` rather than re-looping.
 6. **Commit (auto, atomic).** One concern per commit, independent and revertable. Use the `git` skill's message format. Then take the next opportunity.
 7. **Repeat passes.** Converge when TWO consecutive full passes surface no new actionable improvement. Then report.
 
@@ -53,7 +53,7 @@ Each dimension: what to **hunt**, what to **fix**, what to **leave alone**.
 - **Green-before / green-after.** A red suite halts the loop.
 - **No-feature gate.** If a change adds capability, it is out of scope — reject it.
 - **Atomic & independent commits.** Revert on regression with `git revert` — never `reset --hard` or force-push.
-- **Max 2 review rounds per change,** then accept or drop it. (~2 rounds empirically captures 76–95% of attainable improvement; further rounds are mostly wasted polish.)
+- **Max 2 review rounds per change,** then accept or drop it. (empirically, ~2 rounds captures most attainable improvement — on the order of 76–95% — so further rounds are mostly wasted polish.)
 - **Fail-first, anti-gaming.** Every regression/characterization test must be shown to FAIL on the unfixed code (it must actually reproduce the bug) BEFORE the fix lands. Reject any "fix" that games the test rather than addressing root cause — hardcoded expected values, weakened/removed assertions, special-casing the asserted inputs, or operator/equality overloading. A test that passes regardless of the fix proves nothing. The reviewer confirms the test genuinely falsifies the bug.
 
 ## Done
