@@ -28,6 +28,7 @@ Golden rule: behavior must not change. If tests pass before, they must pass afte
 - Do NOT introduce new dependencies
 - Keep commits atomic — one refactoring per commit
 - If tests don't exist, create them before refactoring
+- Never make the suite green by weakening, skipping, or deleting tests — if a test breaks under a refactor, the refactor changed behavior; fix the refactor, not the test.
 
 ## Red-Green-Refactor
 
