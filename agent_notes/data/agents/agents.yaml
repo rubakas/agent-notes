@@ -9,6 +9,7 @@ agents:
     color: purple
     effort: high
     claude_exclude: true
+    codex_exclude: true
     claude:
       tools: "Agent(coder, reviewer, security-auditor, test-writer, test-runner, system-auditor, database-specialist, performance-profiler, api-reviewer, tech-writer, devops, explorer), Read, Grep, Glob, Bash"
       memory: user

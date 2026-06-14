@@ -28,7 +28,7 @@ def install_agents_filtered(clis: Set[str], scope: str, copy_mode: bool = False,
                             folder_overrides: dict = None, global_home_override: str = "") -> None:
     """Install agents for selected CLIs (filtered by the wizard)."""
     from ...services import installer
-    from ...services.installer import _apply_overrides
+    from ...services.installer import _apply_overrides, _agent_glob
     from ...registries.cli_registry import load_registry
 
     registry = load_registry()
@@ -43,11 +43,12 @@ def install_agents_filtered(clis: Set[str], scope: str, copy_mode: bool = False,
         if dst is None:
             continue
 
-        files = list(src.glob("*.md"))
+        glob = _agent_glob(effective)
+        files = list(src.glob(glob))
         if not files:
             continue
 
-        place_dir_contents(src, dst, "*.md", copy_mode)
+        place_dir_contents(src, dst, glob, copy_mode)
 
 
 def install_config_filtered(clis: Set[str], scope: str, copy_mode: bool = False,
@@ -161,15 +162,16 @@ def _execute_install(
     if _cmd_names:
         print(f"  {Color.GREEN}✓{Color.NC} Commands   {', '.join(sorted(_cmd_names))}")
 
-    # SessionStart hook (Claude Code only)
+    # SessionStart hooks — for every backend with features.session_hook == true
     from ...services.installer import _install_session_hook
-    try:
-        _claude = _registry.get("claude")
-        if _claude.name in clis:
-            _claude_eff = _apply_overrides(_claude, folder_overrides, global_home_override or None)
-            _install_session_hook(_claude_eff, scope, memory_backend=memory_backend, memory_path=memory_path or "")
-    except (KeyError, Exception):
-        pass
+    for _hook_backend in _registry.with_feature("session_hook"):
+        if _hook_backend.name not in clis:
+            continue
+        try:
+            _hook_eff = _apply_overrides(_hook_backend, folder_overrides, global_home_override or None)
+            _install_session_hook(_hook_eff, scope, memory_backend=memory_backend, memory_path=memory_path or "")
+        except Exception:
+            pass
 
     _fs.silent_file_ops = False
 

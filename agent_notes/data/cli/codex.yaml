@@ -1,0 +1,29 @@
+name: codex
+label: Codex CLI
+global_home: ~/.codex
+local_dir: .codex
+layout:
+  agents: agents/
+  skills: skills/
+  config: AGENTS.md
+  hooks: hooks.json
+  agent_extension: toml
+features:
+  agents: true
+  skills: true
+  rules: false
+  commands: false
+  memory: false
+  frontmatter: codex
+  config_style: inline
+  settings_template: false
+  supports_symlink: true
+  session_hook: true
+  stop_hook: false
+  allow_entries: false
+global_template: global-codex.md
+exclude_flag: codex_exclude
+strip_memory_section: true
+accepted_providers: [openai]
+use_model_class: false
+preferred_family: gpt

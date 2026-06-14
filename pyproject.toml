@@ -10,7 +10,7 @@ readme = "README.md"
 authors = [{ name = "Eugene Naumov", email = "min.verkligheten@gmail.com" }]
 license = "MIT"
 requires-python = ">=3.10"
-dependencies = ["pyyaml>=6.0", "tomli>=1.1.0; python_version < '3.11'"]
+dependencies = ["pyyaml>=6.0", "tomli>=1.1.0; python_version < '3.11'", "tomli-w>=1.0.0"]
 keywords = ["claude", "claude-code", "opencode", "ai-agent", "agent", "configuration", "claude-cli", "github-copilot"]
 classifiers = [
     "Development Status :: 4 - Beta",

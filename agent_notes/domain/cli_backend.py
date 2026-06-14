@@ -22,6 +22,7 @@ class CLIBackend:
     settings_template: Optional[str] = None
     accepted_providers: tuple[str, ...] = ()   # new
     use_model_class: bool = False
+    preferred_family: Optional[str] = None     # "claude", "gpt", etc. — preferred model family for step-2 fallback
 
     def supports(self, feature: str) -> bool:
         """Return True if the backend has that feature enabled."""

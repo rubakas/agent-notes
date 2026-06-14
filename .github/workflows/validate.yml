@@ -19,7 +19,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          pip install pyyaml pytest
+          pip install -e .
+          pip install pytest
           export PYTHONPATH=.
       - name: Run tests
         run: PYTHONPATH=. python3 -m pytest tests/ -v
