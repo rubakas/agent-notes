@@ -4,9 +4,11 @@ import tomli_w
 
 
 _EFFORT_MAP = {
-    "low":    "low",
-    "medium": "medium",
-    "high":   "high",
+    "minimal": "minimal",
+    "low":     "low",
+    "medium":  "medium",
+    "high":    "high",
+    "xhigh":   "xhigh",
 }
 
 _STRIP_PREFIXES = ("## Memory", "## Cost reporting")

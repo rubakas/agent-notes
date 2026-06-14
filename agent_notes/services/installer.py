@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from typing import List, NamedTuple, Optional
 
@@ -486,10 +487,7 @@ def _session_hook_paths(backend, scope: str):
     hooks_file = _hooks_filename(backend)
     settings_path = home / hooks_file
     context_file = home / "agent-notes-context.md"
-    if scope == "global":
-        hook_command = f"cat {home}/agent-notes-context.md 2>/dev/null || true"
-    else:
-        hook_command = f"cat {backend.local_dir}/agent-notes-context.md 2>/dev/null || true"
+    hook_command = f"cat {shlex.quote(str(context_file))} 2>/dev/null || true"
     return settings_path, context_file, hook_command
 
 
@@ -602,7 +600,10 @@ def _install_codex_session_hook(backend, scope: str) -> None:
     if agents_dist.exists():
         agents = sorted(p.stem for p in agents_dist.glob("*.toml"))
 
-    skills = default_skill_registry().all()
+    state = load_state()
+    memory_backend = state.memory.backend if state else "local"
+
+    skills = _filter_skills_by_backend(default_skill_registry().all(), memory_backend)
 
     version = config.get_version()
     print(f"Installing Codex CLI SessionStart hook ...")

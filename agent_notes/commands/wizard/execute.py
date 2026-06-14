@@ -178,7 +178,7 @@ def _execute_install(
         if _codex.name in clis:
             _codex_eff = _apply_overrides(_codex, folder_overrides, global_home_override or None)
             _install_codex_session_hook(_codex_eff, scope)
-    except (KeyError, Exception):
+    except KeyError:
         pass
 
     _fs.silent_file_ops = False

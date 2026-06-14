@@ -316,6 +316,20 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
                 full_content = f"{frontmatter}\n\n{body}"
                 agent_file = agents_dir / f'{agent_name}.md'
 
+            if agent_file.exists() and not agent_file.is_symlink():
+                from ..services.fs import handle_existing as _handle_existing
+                import tempfile as _tempfile
+                _fd, _tmp_path = _tempfile.mkstemp(suffix=agent_file.suffix)
+                try:
+                    import os as _os
+                    _os.close(_fd)
+                    Path(_tmp_path).write_text(full_content)
+                    _proceed = _handle_existing(Path(_tmp_path), agent_file)
+                finally:
+                    Path(_tmp_path).unlink(missing_ok=True)
+                if not _proceed:
+                    generated_files.append(agent_file)
+                    continue
             agent_file.write_text(full_content)
             generated_files.append(agent_file)
     
