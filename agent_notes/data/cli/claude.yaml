@@ -10,6 +10,7 @@ layout:
   config: CLAUDE.md
   memory: agent-memory/
   settings: settings.json
+  agent_extension: md
 features:
   agents: true
   skills: true
@@ -20,7 +21,11 @@ features:
   config_style: inline
   settings_template: false
   supports_symlink: true
+  session_hook: true
+  stop_hook: true
+  allow_entries: true
 global_template: global-claude.md
 exclude_flag: claude_exclude
 accepted_providers: [anthropic, bedrock, vertex]
 use_model_class: true
+preferred_family: claude

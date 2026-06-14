@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from typing import List, NamedTuple, Optional
 
@@ -37,13 +38,24 @@ def _apply_overrides(
     folder_overrides: Optional[dict] = None,
     global_home_override: Optional[str] = None,
 ) -> CLIBackend:
-    """Return a backend with folder/global_home overrides applied."""
+    """Return a backend with folder/global_home overrides applied.
+
+    global_home_override and folder_overrides are Claude-profile features.
+    They are applied only to the claude backend so that codex/opencode/copilot
+    global homes are never silently redirected.
+    """
     effective = backend
     if folder_overrides and backend.name in folder_overrides:
         effective = effective.with_local_dir(folder_overrides[backend.name])
     if global_home_override and backend.name == "claude":
         effective = effective.with_global_home(Path(global_home_override).expanduser())
     return effective
+
+
+def _agent_glob(backend: CLIBackend) -> str:
+    """Return the glob pattern for agent files in the dist agents directory."""
+    ext = backend.layout.get("agent_extension", "md")
+    return f"*.{ext}"
 
 
 def dist_source_for(backend: CLIBackend, component: str) -> Optional[Path]:
@@ -127,13 +139,14 @@ def install_component_for_backend(
         print(f"Installing {backend.label} config to {dst} ...")
         place_file(src_file, dst / filename, copy_mode)
     elif component in ("agents", "rules", "commands"):
-        # Directory of *.md files — flat copy
+        # Directory of agent/rule/command files — flat copy
         # Only print if there are files to install
-        files = list(src.glob("*.md"))
+        glob = _agent_glob(backend) if component == "agents" else "*.md"
+        files = list(src.glob(glob))
         if not files:
             return
         print(f"Installing {backend.label} {component} to {dst} ...")
-        place_dir_contents(src, dst, "*.md", copy_mode)
+        place_dir_contents(src, dst, glob, copy_mode)
     elif component == "skills":
         # Each top-level subdir of src is a skill — install each as a directory
         # Only print if there are skills to install
@@ -206,7 +219,8 @@ def _plan_component(
             return []
         actions.append(_plan_file(src_file, dst / filename, copy_mode))
     elif component in ("agents", "rules", "commands"):
-        for src_file in sorted(src.glob("*.md")):
+        glob = _agent_glob(backend) if component == "agents" else "*.md"
+        for src_file in sorted(src.glob(glob)):
             if src_file.exists():
                 actions.append(_plan_file(src_file, dst / src_file.name, copy_mode))
     elif component == "skills":
@@ -307,14 +321,12 @@ def plan_install(
                     if skill_dir:
                         actions.append(_plan_file(skill_dir, target / name, copy_mode))
 
-    # SessionStart hook for Claude Code — always planned when claude backend is selected
-    try:
-        claude_backend = registry.get("claude")
-        if selected_clis is None or claude_backend.name in selected_clis:
-            claude_backend = _apply_overrides(claude_backend, folder_overrides, global_home_override)
-            actions.extend(_plan_session_hook(claude_backend, scope))
-    except KeyError:
-        pass
+    # SessionStart hooks — planned for every backend with features.session_hook == true
+    for _hook_backend in registry.with_feature("session_hook"):
+        if selected_clis is not None and _hook_backend.name not in selected_clis:
+            continue
+        _hook_backend = _apply_overrides(_hook_backend, folder_overrides, global_home_override)
+        actions.extend(_plan_session_hook(_hook_backend, scope))
 
     return actions
 
@@ -336,13 +348,10 @@ def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = N
     if scope == "global":
         _install_universal_skills(copy_mode, registry)
 
-    # SessionStart hook for Claude Code only
-    try:
-        claude_backend = registry.get("claude")
-        claude_backend = _apply_overrides(claude_backend, folder_overrides, global_home_override)
-        _install_session_hook(claude_backend, scope)
-    except KeyError:
-        pass
+    # SessionStart hooks — installed for every backend with features.session_hook == true
+    for _hook_backend in registry.with_feature("session_hook"):
+        _hook_backend = _apply_overrides(_hook_backend, folder_overrides, global_home_override)
+        _install_session_hook(_hook_backend, scope)
 
 
 def _install_universal_skills(copy_mode: bool, registry: CLIRegistry) -> None:
@@ -412,13 +421,10 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
         display = path_str.replace(str(home), "~")
         print(f"  Cleaned: {display}/ ({count} files)")
 
-    # Remove SessionStart hook for Claude Code only
-    try:
-        claude_backend = registry.get("claude")
-        claude_backend = _apply_overrides(claude_backend, folder_overrides, global_home_override)
-        _uninstall_session_hook(claude_backend, scope)
-    except KeyError:
-        pass
+    # Remove SessionStart hooks — for every backend with features.session_hook == true
+    for _hook_backend in registry.with_feature("session_hook"):
+        _hook_backend = _apply_overrides(_hook_backend, folder_overrides, global_home_override)
+        _uninstall_session_hook(_hook_backend, scope)
 
 
 def _uninstall_universal_skills(copy_mode: bool = False) -> int:
@@ -431,15 +437,23 @@ def _uninstall_universal_skills(copy_mode: bool = False) -> int:
     return count
 
 
+def _hooks_filename(backend) -> str:
+    """Return the hooks/settings filename for a given backend.
+
+    Claude uses 'settings.json' (stored in layout["settings"]).
+    Codex uses 'hooks.json' (stored in layout["hooks"]).
+    Falls back to 'settings.json' for unknown backends.
+    """
+    return backend.layout.get("hooks") or backend.layout.get("settings") or "settings.json"
+
+
 def _session_hook_paths(backend, scope: str):
     """Return (settings_path, context_file, hook_command) for the given scope."""
     home = backend.global_home if scope == "global" else Path(backend.local_dir)
-    settings_path = home / "settings.json"
+    hooks_file = _hooks_filename(backend)
+    settings_path = home / hooks_file
     context_file = home / "agent-notes-context.md"
-    if scope == "global":
-        hook_command = f"cat {home}/agent-notes-context.md 2>/dev/null || true"
-    else:
-        hook_command = f"cat {backend.local_dir}/agent-notes-context.md 2>/dev/null || true"
+    hook_command = f"cat {shlex.quote(str(context_file))} 2>/dev/null || true"
     return settings_path, context_file, hook_command
 
 
@@ -456,7 +470,12 @@ def _filter_skills_by_backend(skills, memory_backend: str):
 
 
 def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
-    """Install the SessionStart hook and write the context file for Claude Code."""
+    """Install the SessionStart hook and write the context file.
+
+    Behaviour is driven by the backend's feature flags:
+      stop_hook     — whether to install the Stop/cost-report hook (claude: true, codex: false)
+      allow_entries — whether to install Bash permission allow-list entries (claude: true, codex: false)
+    """
     from .settings_writer import install_hook, install_allow_entry, remove_allow_entry, remove_matching_allow_entries, remove_hook
     from ..constants import Hooks
     from .session_context import write_context
@@ -466,11 +485,11 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
 
     settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
 
-    # Gather installed agent names from dist directory
+    # Gather installed agent names from dist directory using the backend's agent extension
     agents: list[str] = []
     agents_dist = config.DIST_DIR / backend.name / backend.layout.get("agents", "agents")
     if agents_dist.exists():
-        agents = sorted(p.stem for p in agents_dist.glob("*.md"))
+        agents = sorted(p.stem for p in agents_dist.glob(_agent_glob(backend)))
 
     if not memory_backend:
         state = load_state()
@@ -480,80 +499,92 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
     skills = _filter_skills_by_backend(default_skill_registry().all(), memory_backend)
 
     version = config.get_version()
-    print(f"Installing Claude Code SessionStart hook ...")
+    print(f"Installing {backend.label} SessionStart hook ...")
     write_context(context_file, agents, version, skills)
     install_hook(settings_path, "SessionStart", hook_command)
 
-    # Memory-bridge hook: load agent-notes index at session start.
-    # Only useful for Obsidian-backed modes (obsidian, wiki).
-    if memory_backend in ("obsidian", "wiki"):
-        install_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
-    else:
-        remove_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
+    # Memory-bridge hook and allow entries — only for backends that support them
+    if backend.supports("stop_hook"):
+        # Memory-bridge hook: load agent-notes index at session start.
+        # Only useful for Obsidian-backed modes (obsidian, wiki).
+        if memory_backend in ("obsidian", "wiki"):
+            install_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
+        else:
+            remove_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
 
-    # Stop hook: emit cost report at end of session
-    install_hook(settings_path, "Stop", Hooks.COST_REPORT)
+        # Stop hook: emit cost report at end of session
+        install_hook(settings_path, "Stop", Hooks.COST_REPORT)
 
-    # Clean up stale PostToolUse hooks from previous versions
-    remove_hook(settings_path, "PostToolUse", Hooks.MEMORY_BRIDGE)
+        # Clean up stale PostToolUse hooks from previous versions
+        remove_hook(settings_path, "PostToolUse", Hooks.MEMORY_BRIDGE)
 
-    # Remove ALL agent-notes Bash permission entries (covers stale entries from
-    # any previous install, not just the immediately preceding one)
-    remove_matching_allow_entries(settings_path, "Bash(agent-notes")
-    remove_allow_entry(settings_path, "Bash(cost-report)")
-    install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
-    install_allow_entry(settings_path, "Bash(agent-notes memory *)")
-    if memory_backend in ("obsidian", "wiki"):
-        install_allow_entry(settings_path, f"Bash({Hooks.MEMORY_BRIDGE})")
+    if backend.supports("allow_entries"):
+        # Remove ALL agent-notes Bash permission entries (covers stale entries from
+        # any previous install, not just the immediately preceding one)
+        remove_matching_allow_entries(settings_path, "Bash(agent-notes")
+        remove_allow_entry(settings_path, "Bash(cost-report)")
+        install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
+        install_allow_entry(settings_path, "Bash(agent-notes memory *)")
+        if memory_backend in ("obsidian", "wiki"):
+            install_allow_entry(settings_path, f"Bash({Hooks.MEMORY_BRIDGE})")
 
-    # Remove memory path permissions for all known backend default paths so that
-    # stale entries from previous installs (even ones before the last state save)
-    # are cleaned up before adding fresh entries.
-    for bk in ("wiki", "obsidian"):
-        default_path = memory_dir_for_backend(bk, "")
-        if default_path:
-            p = str(default_path) + "/**"
-            remove_allow_entry(settings_path, f"Read({p})")
-            remove_allow_entry(settings_path, f"Write({p})")
-            remove_allow_entry(settings_path, f"Edit({p})")
+        # Remove memory path permissions for all known backend default paths so that
+        # stale entries from previous installs (even ones before the last state save)
+        # are cleaned up before adding fresh entries.
+        for bk in ("wiki", "obsidian"):
+            default_path = memory_dir_for_backend(bk, "")
+            if default_path:
+                p = str(default_path) + "/**"
+                remove_allow_entry(settings_path, f"Read({p})")
+                remove_allow_entry(settings_path, f"Write({p})")
+                remove_allow_entry(settings_path, f"Edit({p})")
 
-    # Also remove any custom path recorded in old state
-    old_state = load_state()
-    if old_state and old_state.memory.backend in ("wiki", "obsidian") and old_state.memory.path:
-        old_resolved = memory_dir_for_backend(old_state.memory.backend, old_state.memory.path)
-        if old_resolved:
-            old_pattern = str(old_resolved) + "/**"
-            remove_allow_entry(settings_path, f"Read({old_pattern})")
-            remove_allow_entry(settings_path, f"Write({old_pattern})")
-            remove_allow_entry(settings_path, f"Edit({old_pattern})")
+        # Also remove any custom path recorded in old state
+        old_state = load_state()
+        if old_state and old_state.memory.backend in ("wiki", "obsidian") and old_state.memory.path:
+            old_resolved = memory_dir_for_backend(old_state.memory.backend, old_state.memory.path)
+            if old_resolved:
+                old_pattern = str(old_resolved) + "/**"
+                remove_allow_entry(settings_path, f"Read({old_pattern})")
+                remove_allow_entry(settings_path, f"Write({old_pattern})")
+                remove_allow_entry(settings_path, f"Edit({old_pattern})")
 
-    # Add read/write/edit permissions for the new memory vault path
-    if memory_backend in ("wiki", "obsidian"):
-        resolved_path = memory_dir_for_backend(memory_backend, memory_path)
-        if resolved_path:
-            path_pattern = str(resolved_path) + "/**"
-            install_allow_entry(settings_path, f"Read({path_pattern})")
-            install_allow_entry(settings_path, f"Write({path_pattern})")
-            install_allow_entry(settings_path, f"Edit({path_pattern})")
+        # Add read/write/edit permissions for the new memory vault path
+        if memory_backend in ("wiki", "obsidian"):
+            resolved_path = memory_dir_for_backend(memory_backend, memory_path)
+            if resolved_path:
+                path_pattern = str(resolved_path) + "/**"
+                install_allow_entry(settings_path, f"Read({path_pattern})")
+                install_allow_entry(settings_path, f"Write({path_pattern})")
+                install_allow_entry(settings_path, f"Edit({path_pattern})")
 
 
 def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
-    """Remove the SessionStart hook and context file for Claude Code."""
+    """Remove the SessionStart hook and context file.
+
+    Behaviour is driven by the backend's feature flags:
+      stop_hook     — whether to remove the Stop/cost-report hook (claude: true, codex: false)
+      allow_entries — whether to remove Bash permission allow-list entries (claude: true, codex: false)
+    """
     from .settings_writer import remove_hook, remove_allow_entry, remove_matching_allow_entries
     from ..constants import Hooks
 
     settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
 
-    print(f"Removing Claude Code SessionStart hook ...")
+    print(f"Removing {backend.label} SessionStart hook ...")
     context_file.unlink(missing_ok=True)
     remove_hook(settings_path, "SessionStart", hook_command)
-    remove_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
-    remove_hook(settings_path, "Stop", Hooks.COST_REPORT)
-    remove_hook(settings_path, "PostToolUse", Hooks.MEMORY_BRIDGE)
-    # Remove ALL agent-notes Bash permission entries (covers old naming too)
-    remove_matching_allow_entries(settings_path, "Bash(agent-notes")
-    remove_allow_entry(settings_path, "Bash(cost-report)")
-    # Read/Write/Edit entries for memory vault paths are intentionally kept —
-    # the user may still want Claude to access their vault without agent-notes.
+
+    if backend.supports("stop_hook"):
+        remove_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
+        remove_hook(settings_path, "Stop", Hooks.COST_REPORT)
+        remove_hook(settings_path, "PostToolUse", Hooks.MEMORY_BRIDGE)
+
+    if backend.supports("allow_entries"):
+        # Remove ALL agent-notes Bash permission entries (covers old naming too)
+        remove_matching_allow_entries(settings_path, "Bash(agent-notes")
+        remove_allow_entry(settings_path, "Bash(cost-report)")
+        # Read/Write/Edit entries for memory vault paths are intentionally kept —
+        # the user may still want Claude to access their vault without agent-notes.
 
 

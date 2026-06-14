@@ -71,7 +71,8 @@ def load_registry(cli_dir: Optional[Path] = None) -> CLIRegistry:
             strip_memory_section=data.get("strip_memory_section", False),
             settings_template=data.get("settings_template"),
             accepted_providers=tuple(data.get("accepted_providers", [])),
-            use_model_class=data.get("use_model_class", False)
+            use_model_class=data.get("use_model_class", False),
+            preferred_family=data.get("preferred_family"),
         )
         backends.append(backend)
     
