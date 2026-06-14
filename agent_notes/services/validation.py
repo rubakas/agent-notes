@@ -7,11 +7,7 @@ from typing import Optional
 
 def has_field(file_path: Path, field: str) -> bool:
     """Check if file has frontmatter field."""
-    try:
-        content = file_path.read_text()
-        return f"{field}:" in content
-    except (FileNotFoundError, OSError):
-        return False
+    return get_field(file_path, field) is not None
 
 
 def get_field(file_path: Path, field: str) -> Optional[str]:

@@ -1,6 +1,7 @@
 """Filesystem primitives."""
 
 import shutil
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -9,6 +10,21 @@ from .ui import Color as _Color
 
 # Set to True to suppress per-file LINKED/COPIED/SKIP output (e.g. during wizard)
 silent_file_ops = False
+
+
+@contextmanager
+def silent_ops():
+    """Context manager that suppresses per-file output for the duration of the block.
+
+    Saves and restores the previous value of silent_file_ops so nesting is safe.
+    """
+    global silent_file_ops
+    previous = silent_file_ops
+    silent_file_ops = True
+    try:
+        yield
+    finally:
+        silent_file_ops = previous
 
 
 def _info(msg: str) -> None:
@@ -180,7 +196,4 @@ def symlink_target_exists(path: Path) -> bool:
 
 def files_differ(file1: Path, file2: Path) -> bool:
     """Compare file contents."""
-    try:
-        return file1.read_bytes() != file2.read_bytes()
-    except (OSError, FileNotFoundError):
-        return True
+    return not files_identical(file1, file2)

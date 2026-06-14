@@ -8,9 +8,8 @@ import hashlib
 from pathlib import Path
 from dataclasses import asdict
 from typing import Optional
-from datetime import datetime, timezone
-
 from ..domain.state import State, ScopeState, BackendState, InstalledItem, MemoryConfig
+from ._memory_utils import _now_iso as _memory_now_iso
 
 
 def state_dir() -> Path:
@@ -178,7 +177,7 @@ def sha256_of(path: Path) -> str:
 
 def now_iso() -> str:
     """Current UTC ISO 8601 timestamp, seconds precision, trailing Z."""
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return _memory_now_iso()
 
 
 def _state_to_dict(s: State) -> dict:

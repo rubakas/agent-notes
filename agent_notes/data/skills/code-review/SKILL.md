@@ -61,6 +61,12 @@ APPROVED (state explicitly when there are no blocking findings)
 
 A BLOCKING finding must be resolved before merge. A SUGGESTION is optional.
 
+## Lens 6 — Test integrity / anti-gaming
+
+- Does each test actually falsify what it claims to cover — would it fail without the change?
+- Watch for gamed fixes: hardcoded expected values, weakened or deleted assertions, special-cased inputs that only work for the exact test data.
+- Watch for behavior changes disguised as refactors (suite stays green because the test was weakened, not because behavior was preserved).
+
 ## Scope discipline
 
 Do not flag cosmetic changes unless they create real ambiguity. A review that lists 20 nits trains authors to ignore reviews entirely.

@@ -51,6 +51,7 @@ Return to Step 2 for the next extraction.
 ## Hard rules
 
 - **Structure OR behavior in one commit, never both.** If you find a bug while refactoring: stash the refactor, fix the bug in a separate commit, then resume. Mixing them makes the change impossible to review and risky to revert.
+- **Never achieve green by weakening the tests.** Do not weaken, skip, delete, or rewrite a test to make it pass after a refactor. If a test breaks, the refactor changed behavior by definition — fix or revert the refactor, not the test. The test suite is the invariant the refactor must preserve.
 - **Do not optimize during refactor.** Performance tuning is a separate session with its own measurement baseline.
 - **Do not add features during refactor.** If you notice a missing edge case: note it, address it in a separate commit after the refactor is complete.
 - **Stop when the smell is gone.** Over-refactoring is as harmful as under-refactoring.

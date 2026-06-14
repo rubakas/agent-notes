@@ -59,7 +59,8 @@ Test with the smallest possible change — one that confirms or disproves the hy
 ## Phase 4 — Fix
 
 Apply the minimal fix for the root cause:
-- Fix the root cause, not the symptom.
+- Fix the root cause, not the symptom. Do not make the symptom disappear by swallowing or catching the error, loosening an assertion, adding a retry that hides a race, or special-casing the failing input. Those game the symptom check without fixing the bug.
+- Before touching the fix, confirm the reproduction actually fails on the current code. A repro that never truly failed proves nothing. After fixing, confirm it now passes AND would have failed without the change.
 - Remove all instrumentation from Phase 1.
 - Run the full test suite.
 - Confirm the original failure is gone and nothing else regressed.

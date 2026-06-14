@@ -48,12 +48,15 @@ def _atomic_write(path: Path, content: str) -> None:
     """Write content to path atomically (temp file + rename)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    fd_closed = False
     try:
         os.write(fd, content.encode())
         os.close(fd)
+        fd_closed = True
         os.replace(tmp_path, path)
     except Exception:
-        os.close(fd)
+        if not fd_closed:
+            os.close(fd)
         try:
             os.unlink(tmp_path)
         except OSError:

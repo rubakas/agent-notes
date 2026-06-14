@@ -1,5 +1,6 @@
 """Destructive subcommand: reset."""
 
+import sys
 import shutil
 from typing import Optional
 
@@ -54,7 +55,7 @@ def do_reset(name: Optional[str] = None) -> None:
         agent_dir = path / name
         if not agent_dir.exists():
             print(f"No memory found for agent '{name}'")
-            exit(1)
+            sys.exit(1)
 
         print(f"{Color.YELLOW}This will delete all memory for agent '{name}'.{Color.NC}")
         confirm = input("Continue? [y/N] ")

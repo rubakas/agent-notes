@@ -1,7 +1,6 @@
 """Frontmatter and agent file rendering."""
 
 import yaml
-import shutil
 import importlib
 import re
 from pathlib import Path
@@ -88,7 +87,122 @@ def _load_frontmatter_template(template_name):
         ) from e
 
 
-def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any], 
+def _resolve_model_str(
+    agent_name: str,
+    agent_config: Dict[str, Any],
+    backend,
+    scope_state,
+    model_registry,
+    user_config: Dict[str, Any],
+    tiers: Dict[str, Any],
+):
+    """Resolve the model string for a given agent+backend combination.
+
+    Returns (model_str, model_registry) where model_registry may have been
+    lazily loaded inside and is returned so the caller can cache it.
+    """
+    from ..registries.model_registry import load_model_registry
+    from ..services.user_config import resolve_agent_role, resolve_role_model
+
+    agent_role = resolve_agent_role(agent_name, agent_config.get('role'), user_config)
+    model_str = None
+
+    if (scope_state is not None and
+            agent_role is not None and
+            backend.name in scope_state.clis and
+            agent_role in scope_state.clis[backend.name].role_models):
+
+        # Step 1: state-driven resolution
+        model_id = scope_state.clis[backend.name].role_models[agent_role]
+
+        if model_registry is None:
+            model_registry = load_model_registry()
+
+        try:
+            model = model_registry.get(model_id)
+            resolved = model.resolve_for_providers(list(backend.accepted_providers))
+            if resolved is not None:
+                _provider, alias_str = resolved
+                model_str = model.model_class if backend.use_model_class else alias_str
+        except KeyError:
+            pass  # fall through to class/tier fallback
+
+    # User config override: explicit model for this role+backend
+    if model_str is None:
+        user_model = resolve_role_model(agent_role, backend.name, user_config)
+        if user_model:
+            model_str = user_model
+
+    # Step 2: role.typical_class fallback — the "works from shipped YAMLs
+    # with zero state" path. Loads the role and picks any model whose
+    # class matches role.typical_class and which has an alias for one
+    # of this backend's accepted providers.
+    if model_str is None and agent_role is not None:
+        if model_registry is None:
+            model_registry = load_model_registry()
+        try:
+            from ..registries.role_registry import load_role_registry
+            role_registry = load_role_registry()
+            role = role_registry.get(agent_role)
+        except (KeyError, FileNotFoundError, ValueError):
+            role = None
+
+        if role is not None:
+            # Prefer newer model IDs when multiple match the class.
+            # Registries are sorted ascending by id, so iterate reversed
+            # to pick e.g. claude-opus-4-7 over claude-opus-4-6.
+            #
+            # When preferred_family is set, first try to find a model
+            # whose class matches AND whose family matches preferred_family.
+            # Only fall back to any-family if no preferred-family match found.
+            # This prevents gpt models (openai-aliased) from hijacking
+            # opencode's step-2 fallback, since opencode has preferred_family=claude.
+            all_models_reversed = list(reversed(model_registry.all()))
+            preferred_family = backend.preferred_family
+
+            def _find_class_match(models, family_filter=None):
+                for model in models:
+                    if model.model_class != role.typical_class:
+                        continue
+                    if family_filter is not None and model.family != family_filter:
+                        continue
+                    resolved = model.resolve_for_providers(list(backend.accepted_providers))
+                    if resolved is not None:
+                        return model, resolved
+                return None, None
+
+            if preferred_family is not None:
+                matched_model, resolved = _find_class_match(all_models_reversed, preferred_family)
+                if matched_model is None:
+                    matched_model, resolved = _find_class_match(all_models_reversed)
+            else:
+                matched_model, resolved = _find_class_match(all_models_reversed)
+
+            if matched_model is not None and resolved is not None:
+                _provider, alias_str = resolved
+                model_str = matched_model.model_class if backend.use_model_class else alias_str
+
+    # Step 3: legacy tier fallback (for pre-v1.1 agents.yaml files that
+    # still declare `tier:` instead of `role:`).
+    if model_str is None:
+        if 'tier' not in agent_config:
+            raise ValueError(
+                f"Agent '{agent_name}' has role='{agent_role}' but no model could be "
+                f"resolved for backend '{backend.name}'. Tried: state.role_models, "
+                f"role.typical_class->model.class matching, and legacy 'tier' fallback. "
+                f"Check that data/roles/{agent_role}.yaml exists and that at least one "
+                f"model in data/models/*.yaml has class={role.typical_class if 'role' in locals() and role else '?'} "
+                f"with an alias for one of {list(backend.accepted_providers)}."
+            )
+        tier = agent_config['tier']
+        if backend.name not in tiers[tier]:
+            raise ValueError(f"tier '{tier}' missing model for CLI '{backend.name}' in agents.yaml")
+        model_str = tiers[tier][backend.name]
+
+    return model_str, model_registry
+
+
+def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
                          state=None, scope='global', project_path=None) -> list[Path]:
     """Generate agent files for all CLI backends.
     
@@ -103,21 +217,19 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     If state is provided, tries state-driven resolution first, falls back to tiers on miss.
     """
     from ..registries.cli_registry import load_registry
-    from ..registries.model_registry import load_model_registry
     from ..services.state_store import load_state as _load_state_fn, get_scope as _get_scope
     from ..config import AGENTS_DIR, DIST_DIR
-    
+
     generated_files = []
 
-    from ..services.user_config import load_user_config, resolve_agent_role, resolve_role_model, get_patch, merge_configs
+    from ..services.user_config import load_user_config, get_patch, merge_configs
 
     user_config = load_user_config()
     # Merge project-level config if provided
     if project_path is not None:
         project_config_file = Path(project_path) / ".claude" / "agent-notes.yaml"
         if project_config_file.exists():
-            from ..services.user_config import load_user_config as _load
-            project_config = _load(project_config_file)
+            project_config = load_user_config(project_config_file)
             user_config = merge_configs(user_config, project_config)
 
     registry = load_registry()
@@ -128,13 +240,15 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     if state is not None:
         scope_state = _get_scope(state, scope, project_path)
     
+    _st = _load_state_fn()
+
     for agent_name, agent_config in agents_config.items():
         # Read the source prompt
         prompt_file = AGENTS_DIR / f'{agent_name}.md'
         if not prompt_file.exists():
             print(f"Warning: Missing source file {prompt_file}")
             continue
-        
+
         prompt_content = prompt_file.read_text()
 
         # Expand shared-content include directives (<!-- include: NAME -->)
@@ -143,7 +257,6 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
         prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared", skip=_agent_include_skip)
 
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
-        _st = _load_state_fn()
         prompt_content = prompt_content.replace("{{MEMORY_PATH}}", _memory_path(_st))
         prompt_content = prompt_content.replace("{{MEMORY_READING_GUIDE}}", _memory_reading_guide(_st))
 
@@ -185,101 +298,9 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
             #   2. Role-class fallback: role.typical_class matched against
             #      any model's class, with a compatible provider for this backend
             #   3. Legacy tier fallback: agent_config['tier'] -> tiers[tier][backend.name]
-            model_str = None
-            agent_role = resolve_agent_role(agent_name, agent_config.get('role'), user_config)
-            
-            if (scope_state is not None and 
-                agent_role is not None and 
-                backend.name in scope_state.clis and
-                agent_role in scope_state.clis[backend.name].role_models):
-                
-                # Step 1: state-driven resolution
-                model_id = scope_state.clis[backend.name].role_models[agent_role]
-                
-                # Lazy load model registry
-                if model_registry is None:
-                    model_registry = load_model_registry()
-                
-                try:
-                    model = model_registry.get(model_id)
-                    resolved = model.resolve_for_providers(list(backend.accepted_providers))
-                    if resolved is not None:
-                        _provider, alias_str = resolved
-                        model_str = model.model_class if backend.use_model_class else alias_str
-                except KeyError:
-                    pass  # fall through to class/tier fallback
-            
-            # User config override: explicit model for this role+backend
-            if model_str is None:
-                user_model = resolve_role_model(agent_role, backend.name, user_config)
-                if user_model:
-                    model_str = user_model
-
-            # Step 2: role.typical_class fallback — the "works from shipped YAMLs
-            # with zero state" path. Loads the role and picks any model whose
-            # class matches role.typical_class and which has an alias for one
-            # of this backend's accepted providers.
-            if model_str is None and agent_role is not None:
-                if model_registry is None:
-                    model_registry = load_model_registry()
-                try:
-                    from ..registries.role_registry import load_role_registry
-                    role_registry = load_role_registry()
-                    role = role_registry.get(agent_role)
-                except (KeyError, FileNotFoundError, ValueError):
-                    role = None
-                
-                if role is not None:
-                    # Prefer newer model IDs when multiple match the class.
-                    # Registries are sorted ascending by id, so iterate reversed
-                    # to pick e.g. claude-opus-4-7 over claude-opus-4-6.
-                    #
-                    # When preferred_family is set, first try to find a model
-                    # whose class matches AND whose family matches preferred_family.
-                    # Only fall back to any-family if no preferred-family match found.
-                    # This prevents gpt models (openai-aliased) from hijacking
-                    # opencode's step-2 fallback, since opencode has preferred_family=claude.
-                    all_models_reversed = list(reversed(model_registry.all()))
-                    preferred_family = backend.preferred_family
-
-                    def _find_class_match(models, family_filter=None):
-                        for model in models:
-                            if model.model_class != role.typical_class:
-                                continue
-                            if family_filter is not None and model.family != family_filter:
-                                continue
-                            resolved = model.resolve_for_providers(list(backend.accepted_providers))
-                            if resolved is not None:
-                                return model, resolved
-                        return None, None
-
-                    if preferred_family is not None:
-                        matched_model, resolved = _find_class_match(all_models_reversed, preferred_family)
-                        if matched_model is None:
-                            matched_model, resolved = _find_class_match(all_models_reversed)
-                    else:
-                        matched_model, resolved = _find_class_match(all_models_reversed)
-
-                    if matched_model is not None and resolved is not None:
-                        _provider, alias_str = resolved
-                        model_str = matched_model.model_class if backend.use_model_class else alias_str
-            
-            # Step 3: legacy tier fallback (for pre-v1.1 agents.yaml files that
-            # still declare `tier:` instead of `role:`).
-            if model_str is None:
-                if 'tier' not in agent_config:
-                    raise ValueError(
-                        f"Agent '{agent_name}' has role='{agent_role}' but no model could be "
-                        f"resolved for backend '{backend.name}'. Tried: state.role_models, "
-                        f"role.typical_class->model.class matching, and legacy 'tier' fallback. "
-                        f"Check that data/roles/{agent_role}.yaml exists and that at least one "
-                        f"model in data/models/*.yaml has class={role.typical_class if 'role' in locals() and role else '?'} "
-                        f"with an alias for one of {list(backend.accepted_providers)}."
-                    )
-                tier = agent_config['tier']
-                if backend.name not in tiers[tier]:
-                    raise ValueError(f"tier '{tier}' missing model for CLI '{backend.name}' in agents.yaml")
-                model_str = tiers[tier][backend.name]
+            model_str, model_registry = _resolve_model_str(
+                agent_name, agent_config, backend, scope_state, model_registry, user_config, tiers
+            )
             
             # Build context for template
             ctx = {
@@ -336,45 +357,48 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     return generated_files
 
 
-def _memory_path(st) -> str:
-    """Return the vault/memory path string for {{MEMORY_PATH}} substitution in agent prompts."""
+def _resolve_memory_path(st) -> Optional[str]:
+    """Return the resolved memory directory path as a string, or None if memory is disabled/absent."""
     from ..config import memory_dir_for_backend
 
     if st is None:
-        return "disabled"
+        return None
 
     backend = st.memory.backend
     custom_path = st.memory.path
 
     if backend == "none":
-        return "disabled"
+        return None
 
     resolved = memory_dir_for_backend(backend, custom_path)
     if resolved is None:
-        return "disabled"
+        return None
 
     return str(resolved)
 
 
+def _memory_path(st) -> str:
+    """Return the vault/memory path string for {{MEMORY_PATH}} substitution in agent prompts."""
+    resolved = _resolve_memory_path(st)
+    if resolved is None:
+        return "disabled"
+    return resolved
+
+
 def _memory_reading_guide(st) -> str:
     """Return backend-appropriate reading instructions for {{MEMORY_READING_GUIDE}} substitution."""
-    from ..config import memory_dir_for_backend
     from ..constants import Wiki, Obsidian
 
     if st is None:
         return "Memory is not configured. Proceed without reading any shared state."
 
     backend = st.memory.backend
-    custom_path = st.memory.path
 
-    if backend == "none":
-        return "Memory is disabled. Proceed without reading any shared state."
-
-    resolved = memory_dir_for_backend(backend, custom_path)
+    resolved = _resolve_memory_path(st)
     if resolved is None:
         return "Memory is disabled. Proceed without reading any shared state."
 
-    path = str(resolved)
+    path = resolved
 
     if backend == "wiki":
         _sessions, _concepts, _entities = Wiki.PAGE_TYPES[4], Wiki.PAGE_TYPES[1], Wiki.PAGE_TYPES[2]
@@ -416,8 +440,6 @@ def _memory_reading_guide(st) -> str:
 
 def _memory_instructions(st) -> str:
     """Return memory instructions text based on the configured backend."""
-    from ..config import memory_dir_for_backend
-
     if st is None:
         return (
             "Save memories using the `agent-notes memory add` CLI.\n\n"
@@ -426,12 +448,8 @@ def _memory_instructions(st) -> str:
         )
 
     backend = st.memory.backend
-    custom_path = st.memory.path
 
-    if backend == "none":
-        return "Memory is disabled for this installation."
-
-    resolved = memory_dir_for_backend(backend, custom_path)
+    resolved = _resolve_memory_path(st)
     if resolved is None:
         return "Memory is disabled for this installation."
 
