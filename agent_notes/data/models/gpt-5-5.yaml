@@ -1,0 +1,14 @@
+id: gpt-5-5
+label: GPT-5.5
+family: gpt
+class: opus
+aliases:
+  openai: gpt-5.5
+pricing:
+  input: 10.00
+  output: 40.00
+  cache: 1.00
+capabilities:
+  vision: true
+  long_context: true
+  tool_use: true

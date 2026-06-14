@@ -37,13 +37,25 @@ def _apply_overrides(
     folder_overrides: Optional[dict] = None,
     global_home_override: Optional[str] = None,
 ) -> CLIBackend:
-    """Return a backend with folder/global_home overrides applied."""
+    """Return a backend with folder/global_home overrides applied.
+
+    global_home_override and folder_overrides are Claude-profile features.
+    They are applied only to the claude backend so that codex/opencode/copilot
+    global homes are never silently redirected.
+    """
     effective = backend
     if folder_overrides and backend.name in folder_overrides:
         effective = effective.with_local_dir(folder_overrides[backend.name])
     if global_home_override and backend.name == "claude":
         effective = effective.with_global_home(Path(global_home_override).expanduser())
     return effective
+
+
+def _agent_glob(backend: CLIBackend) -> str:
+    """Return the glob pattern for agent files in the dist agents directory."""
+    if backend.name == "codex":
+        return "*.toml"
+    return "*.md"
 
 
 def dist_source_for(backend: CLIBackend, component: str) -> Optional[Path]:
@@ -127,13 +139,14 @@ def install_component_for_backend(
         print(f"Installing {backend.label} config to {dst} ...")
         place_file(src_file, dst / filename, copy_mode)
     elif component in ("agents", "rules", "commands"):
-        # Directory of *.md files — flat copy
+        # Directory of agent/rule/command files — flat copy
         # Only print if there are files to install
-        files = list(src.glob("*.md"))
+        glob = _agent_glob(backend) if component == "agents" else "*.md"
+        files = list(src.glob(glob))
         if not files:
             return
         print(f"Installing {backend.label} {component} to {dst} ...")
-        place_dir_contents(src, dst, "*.md", copy_mode)
+        place_dir_contents(src, dst, glob, copy_mode)
     elif component == "skills":
         # Each top-level subdir of src is a skill — install each as a directory
         # Only print if there are skills to install
@@ -206,7 +219,8 @@ def _plan_component(
             return []
         actions.append(_plan_file(src_file, dst / filename, copy_mode))
     elif component in ("agents", "rules", "commands"):
-        for src_file in sorted(src.glob("*.md")):
+        glob = _agent_glob(backend) if component == "agents" else "*.md"
+        for src_file in sorted(src.glob(glob)):
             if src_file.exists():
                 actions.append(_plan_file(src_file, dst / src_file.name, copy_mode))
     elif component == "skills":
@@ -316,6 +330,15 @@ def plan_install(
     except KeyError:
         pass
 
+    # SessionStart hook for Codex CLI — always planned when codex backend is selected
+    try:
+        codex_backend = registry.get("codex")
+        if selected_clis is None or codex_backend.name in selected_clis:
+            codex_backend = _apply_overrides(codex_backend, folder_overrides, global_home_override)
+            actions.extend(_plan_codex_session_hook(codex_backend, scope))
+    except KeyError:
+        pass
+
     return actions
 
 
@@ -341,6 +364,14 @@ def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = N
         claude_backend = registry.get("claude")
         claude_backend = _apply_overrides(claude_backend, folder_overrides, global_home_override)
         _install_session_hook(claude_backend, scope)
+    except KeyError:
+        pass
+
+    # SessionStart hook for Codex CLI
+    try:
+        codex_backend = registry.get("codex")
+        codex_backend = _apply_overrides(codex_backend, folder_overrides, global_home_override)
+        _install_codex_session_hook(codex_backend, scope)
     except KeyError:
         pass
 
@@ -420,6 +451,14 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
     except KeyError:
         pass
 
+    # Remove SessionStart hook for Codex CLI
+    try:
+        codex_backend = registry.get("codex")
+        codex_backend = _apply_overrides(codex_backend, folder_overrides, global_home_override)
+        _uninstall_codex_session_hook(codex_backend, scope)
+    except KeyError:
+        pass
+
 
 def _uninstall_universal_skills(copy_mode: bool = False) -> int:
     """Remove universal skills. Returns count of files removed."""
@@ -431,10 +470,21 @@ def _uninstall_universal_skills(copy_mode: bool = False) -> int:
     return count
 
 
+def _hooks_filename(backend) -> str:
+    """Return the hooks/settings filename for a given backend.
+
+    Claude uses 'settings.json' (stored in layout["settings"]).
+    Codex uses 'hooks.json' (stored in layout["hooks"]).
+    Falls back to 'settings.json' for unknown backends.
+    """
+    return backend.layout.get("hooks") or backend.layout.get("settings") or "settings.json"
+
+
 def _session_hook_paths(backend, scope: str):
     """Return (settings_path, context_file, hook_command) for the given scope."""
     home = backend.global_home if scope == "global" else Path(backend.local_dir)
-    settings_path = home / "settings.json"
+    hooks_file = _hooks_filename(backend)
+    settings_path = home / hooks_file
     context_file = home / "agent-notes-context.md"
     if scope == "global":
         hook_command = f"cat {home}/agent-notes-context.md 2>/dev/null || true"
@@ -535,6 +585,55 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
             install_allow_entry(settings_path, f"Read({path_pattern})")
             install_allow_entry(settings_path, f"Write({path_pattern})")
             install_allow_entry(settings_path, f"Edit({path_pattern})")
+
+
+def _install_codex_session_hook(backend, scope: str) -> None:
+    """Install the SessionStart hook and context file for Codex CLI."""
+    from .settings_writer import install_hook
+    from .session_context import write_context
+    from ..registries.skill_registry import default_skill_registry
+    from .. import config
+
+    settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
+
+    # Gather installed agent names from dist directory (*.toml for codex)
+    agents: list[str] = []
+    agents_dist = config.DIST_DIR / backend.name / backend.layout.get("agents", "agents")
+    if agents_dist.exists():
+        agents = sorted(p.stem for p in agents_dist.glob("*.toml"))
+
+    skills = default_skill_registry().all()
+
+    version = config.get_version()
+    print(f"Installing Codex CLI SessionStart hook ...")
+    write_context(context_file, agents, version, skills)
+    install_hook(settings_path, "SessionStart", hook_command)
+
+
+def _uninstall_codex_session_hook(backend, scope: str) -> None:
+    """Remove the SessionStart hook and context file for Codex CLI."""
+    from .settings_writer import remove_hook
+
+    settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
+
+    print(f"Removing Codex CLI SessionStart hook ...")
+    context_file.unlink(missing_ok=True)
+    remove_hook(settings_path, "SessionStart", hook_command)
+
+
+def _plan_codex_session_hook(backend, scope: str) -> List[InstallAction]:
+    """Return InstallActions for the Codex hooks.json SessionStart hook write."""
+    from .settings_writer import has_hook
+
+    settings_path, _context_file, hook_command = _session_hook_paths(backend, scope)
+
+    if not settings_path.exists():
+        return [InstallAction(action="install", src=settings_path, dst=settings_path, backup_path=None)]
+
+    if has_hook(settings_path, "SessionStart", hook_command):
+        return [InstallAction(action="skip", src=settings_path, dst=settings_path, backup_path=None)]
+
+    return [InstallAction(action="modify", src=settings_path, dst=settings_path, backup_path=None)]
 
 
 def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:

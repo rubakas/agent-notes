@@ -24,3 +24,4 @@ global_template: global-claude.md
 exclude_flag: claude_exclude
 accepted_providers: [anthropic, bedrock, vertex]
 use_model_class: true
+preferred_family: claude

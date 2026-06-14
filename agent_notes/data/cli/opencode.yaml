@@ -20,3 +20,4 @@ global_template: global-opencode.md
 exclude_flag: opencode_exclude
 strip_memory_section: true
 accepted_providers: [github-copilot, anthropic, openrouter, openai, google, moonshot]
+preferred_family: claude

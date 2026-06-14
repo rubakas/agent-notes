@@ -233,14 +233,36 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
                     # Prefer newer model IDs when multiple match the class.
                     # Registries are sorted ascending by id, so iterate reversed
                     # to pick e.g. claude-opus-4-7 over claude-opus-4-6.
-                    for model in reversed(model_registry.all()):
-                        if model.model_class != role.typical_class:
-                            continue
-                        resolved = model.resolve_for_providers(list(backend.accepted_providers))
-                        if resolved is not None:
-                            _provider, alias_str = resolved
-                            model_str = model.model_class if backend.use_model_class else alias_str
-                            break
+                    #
+                    # When preferred_family is set, first try to find a model
+                    # whose class matches AND whose family matches preferred_family.
+                    # Only fall back to any-family if no preferred-family match found.
+                    # This prevents gpt models (openai-aliased) from hijacking
+                    # opencode's step-2 fallback, since opencode has preferred_family=claude.
+                    all_models_reversed = list(reversed(model_registry.all()))
+                    preferred_family = backend.preferred_family
+
+                    def _find_class_match(models, family_filter=None):
+                        for model in models:
+                            if model.model_class != role.typical_class:
+                                continue
+                            if family_filter is not None and model.family != family_filter:
+                                continue
+                            resolved = model.resolve_for_providers(list(backend.accepted_providers))
+                            if resolved is not None:
+                                return model, resolved
+                        return None, None
+
+                    if preferred_family is not None:
+                        matched_model, resolved = _find_class_match(all_models_reversed, preferred_family)
+                        if matched_model is None:
+                            matched_model, resolved = _find_class_match(all_models_reversed)
+                    else:
+                        matched_model, resolved = _find_class_match(all_models_reversed)
+
+                    if matched_model is not None and resolved is not None:
+                        _provider, alias_str = resolved
+                        model_str = matched_model.model_class if backend.use_model_class else alias_str
             
             # Step 3: legacy tier fallback (for pre-v1.1 agents.yaml files that
             # still declare `tier:` instead of `role:`).
@@ -268,28 +290,32 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
                 'backend': backend,
             }
             
-            # Generate frontmatter using template
-            frontmatter = template.render(ctx)
-            
             # Apply post-processing transformation (e.g., strip memory section)
-            content = template.post_process(prompt_content, ctx)
+            body = template.post_process(prompt_content, ctx)
 
             # Apply user patch if present
             patch = get_patch(agent_name, user_config)
             if patch:
-                content = content.rstrip() + "\n\n" + patch.strip()
+                body = body.rstrip() + "\n\n" + patch.strip()
 
-            # Combine and write
-            full_content = f"{frontmatter}\n\n{content}"
-            
             # Write to backend's agents directory
             from ..services import installer
             agents_dir = installer.dist_source_for(backend, "agents")
             if agents_dir is None:
                 agents_dir = DIST_DIR / backend.name / "agents"
-            
-            agent_file = agents_dir / f'{agent_name}.md'
-            agent_file.parent.mkdir(parents=True, exist_ok=True)
+            agents_dir.mkdir(parents=True, exist_ok=True)
+
+            if hasattr(template, 'emit_file'):
+                # Whole-file emitters (e.g. Codex TOML): filename and content
+                # are determined entirely by the template.
+                filename, full_content = template.emit_file(ctx, body)
+                agent_file = agents_dir / filename
+            else:
+                # Standard frontmatter+markdown path (claude, opencode, …)
+                frontmatter = template.render(ctx)
+                full_content = f"{frontmatter}\n\n{body}"
+                agent_file = agents_dir / f'{agent_name}.md'
+
             agent_file.write_text(full_content)
             generated_files.append(agent_file)
     
@@ -450,7 +476,30 @@ def render_globals() -> list[Path]:
     copilot_global.parent.mkdir(parents=True, exist_ok=True)
     copilot_global.write_text(copilot_content)
     copied_files.append(copilot_global)
-    
+
+    # Render global templates for any additional registry-driven backends that
+    # have a global_template and a config layout entry (e.g. codex -> AGENTS.md).
+    # Claude, opencode, and copilot are handled explicitly above; skip them here.
+    _handled = {"claude", "opencode", "copilot"}
+    from ..registries.cli_registry import load_registry as _load_cli_registry
+    from ..config import global_template_path, global_output_path, DATA_DIR as _DATA_DIR
+    for _backend in _load_cli_registry().all():
+        if _backend.name in _handled:
+            continue
+        _tmpl_path = global_template_path(_backend)
+        _out_path = global_output_path(_backend)
+        if _tmpl_path is None or _out_path is None:
+            continue
+        if not _tmpl_path.exists():
+            continue
+        _content = expand_includes(_tmpl_path.read_text(), AGENTS_DIR / "shared", skip=_include_skip)
+        # Substitute {{MEMORY_INSTRUCTIONS}} to empty string for memory-less backends
+        # (e.g. codex has features.memory=false) so no literal placeholder leaks.
+        _content = _content.replace("{{MEMORY_INSTRUCTIONS}}", "")
+        _out_path.parent.mkdir(parents=True, exist_ok=True)
+        _out_path.write_text(_content)
+        copied_files.append(_out_path)
+
     return copied_files
 
 
