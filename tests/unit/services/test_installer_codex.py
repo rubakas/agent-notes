@@ -7,9 +7,9 @@ from unittest.mock import patch, MagicMock
 from agent_notes.services.installer import (
     _agent_glob,
     _hooks_filename,
-    _install_codex_session_hook,
-    _uninstall_codex_session_hook,
-    _plan_codex_session_hook,
+    _install_session_hook,
+    _uninstall_session_hook,
+    _plan_session_hook,
     plan_install,
     InstallAction,
 )
@@ -36,6 +36,7 @@ def _make_codex_backend(tmp_path: Path) -> CLIBackend:
             "skills": "skills/",
             "config": "AGENTS.md",
             "hooks": "hooks.json",
+            "agent_extension": "toml",
         },
         features={
             "agents": True,
@@ -44,6 +45,9 @@ def _make_codex_backend(tmp_path: Path) -> CLIBackend:
             "commands": False,
             "memory": False,
             "frontmatter": "codex",
+            "session_hook": True,
+            "stop_hook": False,
+            "allow_entries": False,
         },
         global_template="global-codex.md",
         accepted_providers=("openai",),
@@ -71,10 +75,40 @@ def patch_session_deps(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# _agent_glob
+# _agent_glob — layout-driven extension
 # ---------------------------------------------------------------------------
 
 class TestAgentGlob:
+    def test_toml_backend_returns_toml_glob(self, codex_backend):
+        """Backend with layout.agent_extension=toml returns *.toml."""
+        assert _agent_glob(codex_backend) == "*.toml"
+
+    def test_md_backend_returns_md_glob(self, tmp_path):
+        """Backend with layout.agent_extension=md returns *.md."""
+        backend = CLIBackend(
+            name="other",
+            label="Other",
+            global_home=tmp_path,
+            local_dir=str(tmp_path),
+            layout={"agent_extension": "md"},
+            features={},
+            global_template=None,
+        )
+        assert _agent_glob(backend) == "*.md"
+
+    def test_missing_agent_extension_defaults_to_md(self, tmp_path):
+        """Backend without layout.agent_extension defaults to *.md."""
+        backend = CLIBackend(
+            name="other",
+            label="Other",
+            global_home=tmp_path,
+            local_dir=str(tmp_path),
+            layout={},
+            features={},
+            global_template=None,
+        )
+        assert _agent_glob(backend) == "*.md"
+
     def test_codex_backend_returns_toml_glob(self, codex_backend):
         assert _agent_glob(codex_backend) == "*.toml"
 
@@ -121,7 +155,7 @@ class TestHooksFilename:
 
 
 # ---------------------------------------------------------------------------
-# _install_codex_session_hook
+# _install_session_hook (unified — codex path: no stop_hook, no allow_entries)
 # ---------------------------------------------------------------------------
 
 class TestInstallCodexSessionHook:
@@ -129,12 +163,12 @@ class TestInstallCodexSessionHook:
         hooks_path = codex_backend.global_home / "hooks.json"
         assert not hooks_path.exists()
 
-        _install_codex_session_hook(codex_backend, "global")
+        _install_session_hook(codex_backend, "global")
 
         assert hooks_path.exists()
 
     def test_hooks_json_has_session_start_entry(self, codex_backend, tmp_path):
-        _install_codex_session_hook(codex_backend, "global")
+        _install_session_hook(codex_backend, "global")
 
         hooks_path = codex_backend.global_home / "hooks.json"
         data = json.loads(hooks_path.read_text())
@@ -143,7 +177,7 @@ class TestInstallCodexSessionHook:
         )
 
     def test_session_start_command_cats_context_file(self, codex_backend):
-        _install_codex_session_hook(codex_backend, "global")
+        _install_session_hook(codex_backend, "global")
 
         hooks_path = codex_backend.global_home / "hooks.json"
         data = json.loads(hooks_path.read_text())
@@ -158,8 +192,8 @@ class TestInstallCodexSessionHook:
         )
 
     def test_install_is_idempotent(self, codex_backend):
-        _install_codex_session_hook(codex_backend, "global")
-        _install_codex_session_hook(codex_backend, "global")
+        _install_session_hook(codex_backend, "global")
+        _install_session_hook(codex_backend, "global")
 
         hooks_path = codex_backend.global_home / "hooks.json"
         data = json.loads(hooks_path.read_text())
@@ -175,21 +209,41 @@ class TestInstallCodexSessionHook:
             f"Expected exactly 1 SessionStart hook after idempotent install, got {len(matching)}"
         )
 
+    def test_codex_does_not_install_stop_hook(self, codex_backend):
+        """Codex has stop_hook=false — Stop hook must NOT be installed."""
+        from agent_notes.constants import Hooks
+        _install_session_hook(codex_backend, "global")
+        hooks_path = codex_backend.global_home / "hooks.json"
+        assert not has_hook(hooks_path, "Stop", Hooks.COST_REPORT), (
+            "Codex backend must not install the Stop/cost-report hook"
+        )
+
+    def test_codex_does_not_install_allow_entries(self, codex_backend, tmp_path):
+        """Codex has allow_entries=false — permissions block must NOT appear."""
+        _install_session_hook(codex_backend, "global")
+        hooks_path = codex_backend.global_home / "hooks.json"
+        data = json.loads(hooks_path.read_text())
+        # permissions block is at top-level or under 'permissions' key in settings.json
+        # For codex using hooks.json, there should be no permissions key at all
+        assert "permissions" not in data, (
+            "Codex backend must not write a permissions block"
+        )
+
 
 # ---------------------------------------------------------------------------
-# _uninstall_codex_session_hook
+# _uninstall_session_hook (unified — codex path)
 # ---------------------------------------------------------------------------
 
 class TestUninstallCodexSessionHook:
     def test_removes_session_start_hook(self, codex_backend):
-        _install_codex_session_hook(codex_backend, "global")
+        _install_session_hook(codex_backend, "global")
         hooks_path = codex_backend.global_home / "hooks.json"
 
         # Verify it's installed first
         data = json.loads(hooks_path.read_text())
         assert "SessionStart" in data.get("hooks", {})
 
-        _uninstall_codex_session_hook(codex_backend, "global")
+        _uninstall_session_hook(codex_backend, "global")
 
         data_after = json.loads(hooks_path.read_text())
         session_hooks = data_after.get("hooks", {}).get("SessionStart", [])
@@ -208,16 +262,16 @@ class TestUninstallCodexSessionHook:
         hooks_path = codex_backend.global_home / "hooks.json"
         assert not hooks_path.exists()
         # Should not raise
-        _uninstall_codex_session_hook(codex_backend, "global")
+        _uninstall_session_hook(codex_backend, "global")
 
 
 # ---------------------------------------------------------------------------
-# _plan_codex_session_hook
+# _plan_session_hook (unified — codex path)
 # ---------------------------------------------------------------------------
 
 class TestPlanCodexSessionHook:
     def test_install_action_when_hooks_json_absent(self, codex_backend):
-        actions = _plan_codex_session_hook(codex_backend, "global")
+        actions = _plan_session_hook(codex_backend, "global")
         assert len(actions) == 1
         assert actions[0].action == "install"
 
@@ -225,17 +279,104 @@ class TestPlanCodexSessionHook:
         hooks_path = codex_backend.global_home / "hooks.json"
         hooks_path.write_text(json.dumps({"hooks": {}}))
 
-        actions = _plan_codex_session_hook(codex_backend, "global")
+        actions = _plan_session_hook(codex_backend, "global")
         assert len(actions) == 1
         assert actions[0].action in ("install", "modify")
 
     def test_skip_action_when_hook_already_present(self, codex_backend):
         # Actually install it, then plan again
-        _install_codex_session_hook(codex_backend, "global")
+        _install_session_hook(codex_backend, "global")
 
-        actions = _plan_codex_session_hook(codex_backend, "global")
+        actions = _plan_session_hook(codex_backend, "global")
         assert len(actions) == 1
         assert actions[0].action == "skip"
+
+
+# ---------------------------------------------------------------------------
+# Unified hook loop — feature flag driven
+# ---------------------------------------------------------------------------
+
+class TestSessionHookFeatureFlags:
+    def test_backend_with_session_hook_false_gets_no_hook(self, tmp_path):
+        """Backend with session_hook=false must not have hooks installed via the loop."""
+        from agent_notes.registries.cli_registry import CLIRegistry
+        backend = CLIBackend(
+            name="nohook",
+            label="No Hook Backend",
+            global_home=tmp_path / "nohook_global",
+            local_dir=str(tmp_path / ".nohook"),
+            layout={"hooks": "hooks.json", "agent_extension": "md"},
+            features={"session_hook": False, "stop_hook": False, "allow_entries": False},
+            global_template=None,
+        )
+        (tmp_path / "nohook_global").mkdir(parents=True, exist_ok=True)
+        registry = CLIRegistry([backend])
+        # with_feature("session_hook") must return empty for this backend
+        assert registry.with_feature("session_hook") == []
+
+    def test_backend_without_memory_feature_does_not_emit_memory_entries(self, tmp_path):
+        """A backend with stop_hook=false and allow_entries=false emits no memory/allow entries."""
+        from agent_notes.constants import Hooks
+        codex = _make_codex_backend(tmp_path)
+        _install_session_hook(codex, "global", memory_backend="obsidian")
+        hooks_path = codex.global_home / "hooks.json"
+        # No Stop hook
+        assert not has_hook(hooks_path, "Stop", Hooks.COST_REPORT)
+        # No memory bridge
+        assert not has_hook(hooks_path, "SessionStart", Hooks.MEMORY_BRIDGE)
+
+    def test_registry_missing_backend_does_not_crash_plan(self, tmp_path):
+        """A registry with no session_hook backends must not crash plan_install."""
+        from agent_notes.registries.cli_registry import CLIRegistry
+        backend = CLIBackend(
+            name="nohook",
+            label="No Hook",
+            global_home=tmp_path / "g",
+            local_dir=str(tmp_path / ".nohook"),
+            layout={"agent_extension": "md"},
+            features={"session_hook": False},
+            global_template=None,
+        )
+        (tmp_path / "g").mkdir(parents=True, exist_ok=True)
+        registry = CLIRegistry([backend])
+        # Must not raise
+        actions = plan_install(scope="global", registry=registry)
+        # No hook actions expected
+        hook_actions = [a for a in actions if "hooks.json" in str(a.dst) or "settings.json" in str(a.dst)]
+        assert hook_actions == []
+
+    def test_registry_missing_claude_does_not_crash_install(self, tmp_path):
+        """install_all with a registry containing only codex must not crash."""
+        from agent_notes.services.installer import install_all
+        from agent_notes.registries.cli_registry import CLIRegistry
+        codex = _make_codex_backend(tmp_path)
+        registry = CLIRegistry([codex])
+        # Should not raise
+        with patch("agent_notes.services.installer._install_universal_skills"):
+            install_all(scope="global", copy_mode=True, registry=registry)
+
+    def test_registry_missing_codex_does_not_crash_install(self, tmp_path):
+        """install_all with a registry containing only claude must not crash."""
+        from agent_notes.services.installer import install_all
+        from agent_notes.registries.cli_registry import CLIRegistry
+        claude_home = tmp_path / "claude_global"
+        claude_home.mkdir(parents=True, exist_ok=True)
+        claude = CLIBackend(
+            name="claude",
+            label="Claude Code",
+            global_home=claude_home,
+            local_dir=str(tmp_path / ".claude"),
+            layout={"agents": "agents/", "settings": "settings.json", "agent_extension": "md"},
+            features={
+                "agents": True, "skills": False, "rules": False, "commands": False,
+                "memory": False, "session_hook": True, "stop_hook": True, "allow_entries": True,
+            },
+            global_template=None,
+        )
+        registry = CLIRegistry([claude])
+        # Should not raise
+        with patch("agent_notes.services.installer._install_universal_skills"):
+            install_all(scope="global", copy_mode=True, registry=registry)
 
 
 # ---------------------------------------------------------------------------

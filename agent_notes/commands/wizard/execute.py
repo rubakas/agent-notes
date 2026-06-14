@@ -162,24 +162,16 @@ def _execute_install(
     if _cmd_names:
         print(f"  {Color.GREEN}✓{Color.NC} Commands   {', '.join(sorted(_cmd_names))}")
 
-    # SessionStart hook (Claude Code only)
-    from ...services.installer import _install_session_hook, _install_codex_session_hook
-    try:
-        _claude = _registry.get("claude")
-        if _claude.name in clis:
-            _claude_eff = _apply_overrides(_claude, folder_overrides, global_home_override or None)
-            _install_session_hook(_claude_eff, scope, memory_backend=memory_backend, memory_path=memory_path or "")
-    except (KeyError, Exception):
-        pass
-
-    # SessionStart hook (Codex CLI)
-    try:
-        _codex = _registry.get("codex")
-        if _codex.name in clis:
-            _codex_eff = _apply_overrides(_codex, folder_overrides, global_home_override or None)
-            _install_codex_session_hook(_codex_eff, scope)
-    except KeyError:
-        pass
+    # SessionStart hooks — for every backend with features.session_hook == true
+    from ...services.installer import _install_session_hook
+    for _hook_backend in _registry.with_feature("session_hook"):
+        if _hook_backend.name not in clis:
+            continue
+        try:
+            _hook_eff = _apply_overrides(_hook_backend, folder_overrides, global_home_override or None)
+            _install_session_hook(_hook_eff, scope, memory_backend=memory_backend, memory_path=memory_path or "")
+        except Exception:
+            pass
 
     _fs.silent_file_ops = False
 
