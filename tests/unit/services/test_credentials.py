@@ -85,3 +85,77 @@ def test_load_warns_on_loose_permissions(tmp_creds):
         credentials.load()
     # On normal filesystems chmod will succeed silently. Assert no crash.
     assert credentials.load()["providers"]["openrouter"]["api_key"] == "x"
+
+
+# ---------------------------------------------------------------------------
+# tomli_w integration tests
+# ---------------------------------------------------------------------------
+
+def test_roundtrip_multiple_providers(tmp_creds):
+    """Write multiple providers then read back; dict must be identical."""
+    credentials.set_value("openrouter", "api_key", "fake-key-123")
+    credentials.set_value("anthropic", "api_key", "fake-key-456")
+    data = credentials.load()
+    assert data["providers"]["openrouter"]["api_key"] == "fake-key-123"
+    assert data["providers"]["anthropic"]["api_key"] == "fake-key-456"
+    assert data["providers"]["openrouter"]["enabled"] is True
+    assert data["providers"]["anthropic"]["enabled"] is True
+
+
+def test_roundtrip_special_chars_in_value(tmp_creds):
+    """Values with double-quotes, backslashes, newlines, and unicode survive round-trip."""
+    tricky = 'back\\slash "quoted"\nnewline éclair'
+    credentials.set_value("openrouter", "api_key", tricky)
+    assert credentials.get("openrouter") == tricky
+
+
+def test_dump_toml_filters_none_values(tmp_creds):
+    """_dump_toml must silently drop None values (TOML has no null type).
+
+    Contract: a provider block with a None field produces valid TOML that
+    omits the None key entirely. The None is NOT written as a Python repr.
+    """
+    data = {
+        "providers": {
+            "openrouter": {
+                "api_key": "fake-key-123",
+                "base_url": None,
+                "enabled": True,
+            }
+        }
+    }
+    toml_str = credentials._dump_toml(data)
+    assert "None" not in toml_str
+    assert "base_url" not in toml_str
+    # Verify the TOML is parseable
+    try:
+        import tomllib
+    except ImportError:
+        import tomli as tomllib  # type: ignore[no-redef]
+    parsed = tomllib.loads(toml_str)
+    assert "base_url" not in parsed["providers"]["openrouter"]
+    assert parsed["providers"]["openrouter"]["enabled"] is True
+
+
+def test_empty_providers_produces_parseable_toml(tmp_creds):
+    """An empty providers dict must not crash and must produce valid TOML."""
+    data: dict = {"providers": {}}
+    toml_str = credentials._dump_toml(data)
+    try:
+        import tomllib
+    except ImportError:
+        import tomli as tomllib  # type: ignore[no-redef]
+    parsed = tomllib.loads(toml_str)
+    assert parsed == {"providers": {}}
+
+
+def test_write_to_unwritable_directory_raises(tmp_path, monkeypatch):
+    """If the temp directory is unwritable, _write must propagate the OSError."""
+    path = tmp_path / "credentials.toml"
+    monkeypatch.setattr(credentials, "CONFIG_PATH", path)
+    tmp_path.chmod(0o444)
+    try:
+        with pytest.raises(OSError):
+            credentials.set_value("openrouter", "api_key", "fake-key-123")
+    finally:
+        tmp_path.chmod(0o755)  # restore so pytest can clean up

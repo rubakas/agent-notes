@@ -21,6 +21,8 @@ except ImportError:
             "tomli is required on Python < 3.11. Install it: pip install tomli"
         ) from exc
 
+import tomli_w
+
 CONFIG_PATH = Path.home() / ".agent-notes" / "credentials.toml"
 SAFE_MODE = 0o600
 
@@ -95,7 +97,7 @@ def _write(data: dict) -> None:
     tmp_pathobj = Path(tmp_path)
     try:
         with os.fdopen(fd, "w") as fh:
-            _dump_toml(data, fh)
+            fh.write(_dump_toml(data))
         tmp_pathobj.chmod(SAFE_MODE)
         tmp_pathobj.replace(CONFIG_PATH)
     finally:
@@ -103,22 +105,18 @@ def _write(data: dict) -> None:
             tmp_pathobj.unlink()
 
 
-def _dump_toml(data: dict, fh) -> None:
-    """Minimal TOML writer for the credentials schema."""
+def _dump_toml(data: dict) -> str:
+    """Serialize credentials dict to TOML using tomli_w.
+
+    None values are filtered out before serialization — TOML has no null type.
+    The hand-rolled predecessor would have written Python's ``None`` repr, which
+    is not valid TOML and would fail on read-back anyway.
+    """
     providers = data.get("providers", {})
-    for name in sorted(providers):
-        block = providers[name]
-        fh.write(f"[providers.{name}]\n")
-        for k in sorted(block):
-            v = block[k]
-            if isinstance(v, bool):
-                fh.write(f"{k} = {'true' if v else 'false'}\n")
-            elif isinstance(v, str):
-                escaped = v.replace('\\', '\\\\').replace('"', '\\"')
-                fh.write(f'{k} = "{escaped}"\n')
-            else:
-                fh.write(f"{k} = {v!r}\n")
-        fh.write("\n")
+    clean: dict = {"providers": {}}
+    for name, block in providers.items():
+        clean["providers"][name] = {k: v for k, v in block.items() if v is not None}
+    return tomli_w.dumps(clean)
 
 
 def list_providers() -> list:
