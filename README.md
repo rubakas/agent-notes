@@ -416,12 +416,15 @@ agent-notes config provider <name>      # check if configured (without exposing 
 
 ### Building and testing
 
-Python 3.10+ required. Build from source and run tests:
+Python 3.10+ required. Create an isolated environment and run tests:
 
 ```bash
-python -m build && pipx install dist/*.whl
-python3 -m pytest tests/ -q
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"      # installs runtime deps + pytest
+pytest -q
 ```
+
+The test suite automatically builds `dist/` before collection (via the `pytest_sessionstart` hook in `tests/conftest.py`), so you do not need to run `python -m build` manually before testing.
 
 ### Development workflow
 
@@ -429,7 +432,7 @@ python3 -m pytest tests/ -q
 2. Run `python -m build` to rebuild the wheel
 3. Run `pipx reinstall dist/*.whl` to install the updated version
 4. Run `agent-notes validate` to lint configuration files
-5. Run tests: `python3 -m pytest tests/ -q`
+5. Run tests: `pytest -q` (the suite auto-builds `dist/` first via the conftest hook — no manual build needed)
 
 ### Test structure
 
@@ -443,7 +446,7 @@ When adding new content:
 
 1. **Edit source files** — all changes go in `agent_notes/data/` directory
 2. **Run build** — `python -m build` to generate platform configs
-3. **Run tests** — `python3 -m pytest tests/ -q` before committing
+3. **Run tests** — `pytest -q` before committing
 4. **Validate** — `agent-notes validate` before committing
 5. **Keep it generic** — remove app-specific references
 6. **Show examples** — include code samples with explanations
