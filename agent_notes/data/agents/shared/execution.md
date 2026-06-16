@@ -88,6 +88,14 @@ Skip agents for: simple questions (answer directly), single-file edits (coder al
 
 Give each agent a specific task with all context (paths, criteria).
 
+### Decompose before delegating
+
+Before dispatching `coder` / `refactorer` / `test-writer`, convert investigation output into an ordered execution checklist. Each item is one concrete change: `file path → exact edit → reason`, ordered by dependency. The lead owns decomposition; the agent owns execution.
+
+- Pass the investigation's concrete findings (`file:line` + the precise change) into the brief VERBATIM. Never re-summarize them into vague prose that forces the agent to re-discover what was already mapped.
+- The agent EXECUTES the checklist as a batch and must NOT re-read or re-explore code the checklist already specifies. It stops and reports only if a chunk's premise turns out wrong.
+- Calibrate chunk size: avoid both extremes — many one-edit micro-dispatches AND a single vague monolith task. Prefer medium, pre-chunked batches.
+
 ### Permission pre-check (HARD RULE)
 
 Before dispatching writing agents (`coder`, `test-writer`, `devops`, `refactorer`, `tech-writer`) in background: confirm Write/Edit/Bash permissions are granted. Background agents cannot surface permission prompts — they fail silently. Prefer foreground for writing agents, or ask the user to pre-approve. If a background agent fails on permissions, explain the blocker — do NOT write files yourself.
