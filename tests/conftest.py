@@ -1,5 +1,6 @@
 """Shared test fixtures."""
 import subprocess
+import sys
 import pytest
 from pathlib import Path
 
@@ -11,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 def pytest_sessionstart(session):
     """Build dist before collection so module-level discovery in test files works."""
     result = subprocess.run(
-        ["python3", "-m", "agent_notes", "build"],
+        [sys.executable, "-m", "agent_notes", "build"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
