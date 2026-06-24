@@ -60,14 +60,14 @@ Create the bus dir on demand: `mkdir -p "${BUS_DIR}"`.
 Use when you want continuous browser feedback as code evolves. Multiple requests with different UUIDs can run in parallel on the same bus.
 
 1. **Dev session** mints a new `<uuid>` and writes `request-<uuid>.md` to the bus with initial scenarios.
-2. **Operator** starts ONE `claude --chrome` session manually — the dev session cannot launch it (it needs the real, visible Chrome). The dev session gives the operator only the request-file PATH to read (no copy/paste of request content).
+2. **Operator** starts ONE `claude --chrome` session manually — the dev session cannot launch it (it needs the real, visible Chrome). The dev session prints numbered operator instructions (see Leg A) with the request-file path to relay; the operator copies the one-line read command into the chrome session.
 3. **Chrome session** reads `request-<uuid>.md`, runs scenarios, and writes progress to `progress-<uuid>.md` after each step.
 4. **Dev session** polls for `report-<uuid>.md` via a background/scheduled check (run via `run_in_background` or a periodic wake-up — not a blocking foreground loop). While waiting, the lead may check `progress-<uuid>.md` to track a long run. Example check:
    ```bash
    # run this as a background or scheduled check, not inline
    test -f /absolute/path/to/bus/report-<uuid>.md && cat /absolute/path/to/bus/report-<uuid>.md
    ```
-   When `report-<uuid>.md` appears, the lead reads it directly from the bus (no paste-back).
+   The chrome session also relays completion verbally — the operator will say "report `<uuid>` ready" — at which point the dev session reads `report-<uuid>.md` directly from the bus (no paste-back).
 5. On each report arrival, dev session triages failures, fixes, mints a NEW `<uuid>`, updates scenarios, and writes a new `request-<uuid>.md` — the loop continues with a fresh correlation id.
 
 ### Mode 2 — End-State Quality Check (default)
@@ -75,9 +75,9 @@ Use when you want continuous browser feedback as code evolves. Multiple requests
 Use once — after linters and tests pass, before committing.
 
 1. Dev session mints a `<uuid>`, generates scenarios, and writes `request-<uuid>.md` to the bus.
-2. Operator reads the request file at the PATH the dev session provides (no copy/paste of request content).
-3. Chrome session runs scenarios and writes `report-<uuid>.md` to the bus (no paste-back to dev session).
-4. Dev session reads `report-<uuid>.md` directly from the bus, triages, fixes failures, optionally mints a NEW `<uuid>` and repeats for only the fixed scenarios.
+2. Operator follows the numbered instructions the dev session prints (see Leg A): opens a chrome session, copies in the one-line read command, and waits.
+3. Chrome session runs scenarios, writes `report-<uuid>.md` to the bus automatically, then tells the operator to relay "report `<uuid>` ready" back to the dev session.
+4. Dev session reads `report-<uuid>.md` directly from the bus when the operator relays the trigger, triages, fixes failures, optionally mints a NEW `<uuid>` and repeats for only the fixed scenarios.
 5. All scenarios PASS → gate closes, commit proceeds.
 
 **This is the default mode the lead uses at end of a frontend feature.**
@@ -88,7 +88,7 @@ User runs `/chrome-test` with a specific prompt (e.g., "check the login redirect
 
 1. Skill mints a `<uuid>` and generates a focused handoff prompt for the described scenario, writing it to `request-<uuid>.md`.
 2. If a live chrome session is running on this bus, it picks it up automatically.
-3. If no live session: skill emits the request-file PATH for the operator to read, plus a reminder to start `claude --chrome`.
+3. If no live session: skill prints the numbered operator instructions (see Leg A) with the request-file path and a reminder to start `claude --chrome`.
 4. Ingest leg runs as normal when `report-<uuid>.md` appears.
 
 ---
@@ -198,18 +198,26 @@ Request-ID: <uuid>
 <!-- repeat per scenario -->
 
 **Overall summary:** <one paragraph — what passed, what failed, anything surprising>
+
+### WHEN DONE
+1. Write your completed report to report-<uuid>.md at the path above automatically — do not wait to be asked.
+2. Then print this for the operator:
+   "Browser test <uuid> complete. Return to your first Claude session and say: report <uuid> ready."
 ```
 
 Replace all occurrences of `/Users/alice/.claude-work/chrome-test/myapp`, `<uuid>`, and `N` with the real resolved values before writing.
 
-After writing the file, emit ONE short handoff line in chat for the operator:
+After writing the file, print numbered operator instructions in chat (substitute the real resolved absolute path and real 8-char uuid — no `<uuid>` tokens or shell variables may survive into this output):
 
 ```
-Paste into a separate `claude --chrome` session:
-Read and execute the browser test at /Users/alice/.claude-work/chrome-test/myapp/request-<uuid>.md
+Browser test ready (a1b2c3d4). To run it:
+1. Open a new terminal tab and start a chrome session:  claude --chrome
+2. Copy/paste this line into that chrome session:
+   Read and execute the browser test at /Users/alice/.claude-work/chrome-test/myapp/request-a1b2c3d4.md
+3. When it finishes it will tell you to come back here — then say "report a1b2c3d4 ready" and I'll read the results.
 ```
 
-That is the operator's only interaction — they read that one path, and the request file contains all further instructions.
+That is the operator's only interaction with the dev session — the request file contains all further instructions for the chrome session.
 
 ---
 
@@ -217,7 +225,7 @@ That is the operator's only interaction — they read that one path, and the req
 
 ### 1. Fetch the report
 
-The dev session knows the `<uuid>` it minted. Read `report-<uuid>.md` directly from the bus — no paste-back needed. The chrome session writes it there and your work is to consume it from the file, not from the operator's chat.
+The dev session knows the `<uuid>` it minted. When the operator relays "report `<uuid>` ready" (or when a background/scheduled poll detects the file), read `report-<uuid>.md` directly from the bus — no paste-back needed. The chrome session writes it there automatically when done; consume it from the file, not from the operator's chat.
 
 ### 2. Parse
 
