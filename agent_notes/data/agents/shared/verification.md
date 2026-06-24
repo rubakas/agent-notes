@@ -36,6 +36,10 @@ When specialist agents give contradictory recommendations: (1) `security-auditor
 - If anything is missing, loop back: re-delegate to coder → review again (Phase 3) → re-verify.
 - If Phase 4 rejects committed changes, dispatch `coder` to create a `git revert` commit (not `reset --hard` or force-push).
 
+### 4.5 Browser test (frontend changes only)
+
+For any change that touches the UI and can be exercised locally: run a `chrome-test` cycle (load the `chrome-test` skill) before closing the gate. Default: end-state Mode 2, after linters and tests pass, before commit. Live/parallel Mode 1 is optional during iterative frontend work. Act on every FAIL in the report before the gate closes — do NOT commit with open browser-test failures.
+
 Only after all checks pass and all agents are APPROVED, present the final result to the user.
 
 ### Post-phase self-check gate (multi-phase work only)

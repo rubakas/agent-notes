@@ -4,6 +4,7 @@
 vendored_skills:
   - brainstorming
   - caveman
+  - chrome-test
   - code-review
   - debugging-protocol
   - grill-me
