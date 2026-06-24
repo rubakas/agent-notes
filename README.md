@@ -24,9 +24,9 @@ agent-notes doctor
 
 ### PyPI (recommended)
 
+**pipx (isolated environment, no manual venv needed):**
+
 ```bash
-pip install agent-notes
-# or
 pipx install agent-notes
 agent-notes install
 ```
@@ -34,9 +34,21 @@ agent-notes install
 Update anytime:
 
 ```bash
-pip install --upgrade agent-notes && agent-notes install
-# or
 pipx upgrade agent-notes && agent-notes install
+```
+
+**venv + pip (if you prefer to manage your own environment):**
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install agent-notes
+agent-notes install
+```
+
+Update anytime:
+
+```bash
+pip install --upgrade agent-notes && agent-notes install
 ```
 
 ### Local build (developers)
@@ -44,12 +56,13 @@ pipx upgrade agent-notes && agent-notes install
 ```bash
 git clone https://github.com/rubakas/agent-notes.git
 cd agent-notes
-python -m build                    # produces dist/*.whl
-pipx install dist/*.whl            # or pip install --user dist/*.whl
+pipx install -e .        # editable: CLI runs live from the working tree
 agent-notes install
 ```
 
-Iteration loop: edit source → `python -m build` → `pipx reinstall dist/*.whl`. Not editable mode. Not `pip install -e .`.
+With editable mode, the CLI runs directly from your source files. After edits, run `agent-notes install` to rebuild `dist/` and reinstall into your Claude config. No rebuild command needed between iterations.
+
+To produce a release artifact (wheel for distribution), use `python -m build` + `pipx reinstall dist/*.whl` — this is separate from local development.
 
 ### Plugin (limited functionality)
 
@@ -428,11 +441,32 @@ The test suite automatically builds `dist/` before collection (via the `pytest_s
 
 ### Development workflow
 
-1. Edit source files in `agent_notes/data/` or Python modules
-2. Run `python -m build` to rebuild the wheel
-3. Run `pipx reinstall dist/*.whl` to install the updated version
+**One-time setup (choose one):**
+
+- Inside a venv: `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"`
+- Or expose the CLI globally via pipx (editable): `pipx install -e .`
+
+**Iteration loop:**
+
+1. Edit source in `agent_notes/data/` (skills, rules, agents, etc.) or Python modules
+2. Run `agent-notes install` to rebuild `dist/` and reinstall into your Claude config
+3. For a clean reset, run `agent-notes uninstall && agent-notes install`
 4. Run `agent-notes validate` to lint configuration files
-5. Run tests: `pytest -q` (the suite auto-builds `dist/` first via the conftest hook — no manual build needed)
+5. Run tests: `pytest -q` (the suite auto-builds `dist/` first via the conftest hook)
+
+**Full local reset (one-liner):**
+
+```bash
+pipx uninstall agent-notes && pipx install -e . && agent-notes uninstall && agent-notes install
+```
+
+This command swaps any wheel install for an editable one and clears your Claude config. After this, future edits only need `agent-notes install` (or `agent-notes uninstall && agent-notes install` for a clean wipe).
+
+**Profiles:**
+
+By default, `agent-notes install` re-runs the interactive wizard and prompts for an optional profile label. To reinstall non-interactively into the same profile, use `agent-notes install --profile <label>` (e.g. `work` → installs into `~/.claude-work`).
+
+The plugin build scripts (`scripts/build-claude-plugin.sh`, `scripts/build-opencode-plugin.sh`) automatically use `.venv/bin/python` when present, fall back to system `python3`, and honor a `PYTHON=` override.
 
 ### Test structure
 
@@ -445,13 +479,14 @@ The test suite automatically builds `dist/` before collection (via the `pytest_s
 When adding new content:
 
 1. **Edit source files** — all changes go in `agent_notes/data/` directory
-2. **Run build** — `python -m build` to generate platform configs
-3. **Run tests** — `pytest -q` before committing
-4. **Validate** — `agent-notes validate` before committing
-5. **Keep it generic** — remove app-specific references
-6. **Show examples** — include code samples with explanations
-7. **Stay modular** — each skill should be independently usable
-8. **Stay concise** — agent prompts under 60 lines
+2. **Rebuild and test** — `agent-notes install` rebuilds `dist/` and reinstalls; `pytest -q` auto-builds first
+3. **Validate** — `agent-notes validate` before committing
+4. **Keep it generic** — remove app-specific references
+5. **Show examples** — include code samples with explanations
+6. **Stay modular** — each skill should be independently usable
+7. **Stay concise** — agent prompts under 60 lines
+
+(Note: `python -m build` is only needed to produce a release wheel for distribution, not for local development.)
 
 ### Architecture
 
