@@ -145,148 +145,57 @@ Specialized subagents with hierarchical model strategy: **Opus 4.6 reasons, Sonn
 <details>
 <summary>Memory Storage</summary>
 
-Agents accumulate knowledge across sessions using one of three storage options, chosen during `agent-notes install`.
+Agents accumulate knowledge across sessions. Choose a backend during `agent-notes install`:
 
-### Storage comparison
+**Backends:**
+- **`default - Claude Code built-in md files`** (default) — Plain markdown in `~/.claude/agent-memory/<agent>/`. No external tools. Simple, portable.
+- **`Obsidian - session`** — Per-project session notes in Obsidian vault. Auto-creates `<vault>/<project>/` with categories: `Patterns/`, `Decisions/`, `Mistakes/`, `Context/`, `Sessions/`. Includes YAML frontmatter and `[[wikilinks]]`.
+- **`Obsidian - brain`** — Karpathy's LLM Wiki pattern. Per-project knowledge brain in `<vault>/<project>/raw/` and `wiki/` (sources, concepts, entities, synthesis, sessions). Supports ingest/query/lint operations.
+- **`None`** — Disables memory.
 
-| Feature | Local | Obsidian | Wiki |
-|---|---|---|---|
-| Location | `~/.claude/agent-memory/` | Obsidian vault | Obsidian vault |
-| Project scoping | No | Yes (per CWD) | Yes (per CWD) |
-| Organization | Per-agent folders | Categories (Patterns, Decisions, etc.) | Wiki pages (sources, concepts, entities) |
-| Best for | Simple setup | Process memory, visual browsing | Domain knowledge, team knowledge bases |
+**To reconfigure after install:**
+```bash
+agent-notes install --reconfigure        # switch storage
+agent-notes config memory               # interactive backend selector
+```
 
 ### Local (default)
 
-Plain markdown storage in `~/.claude/agent-memory/<agent>/` — one folder per agent, no project scoping or cross-referencing. Simplest setup, no external tools needed.
+**Storage:** `~/.claude/agent-memory/<agent>/`
 
-**Commands:**
 ```bash
-agent-notes memory list                  # list all notes by agent
-agent-notes memory show <agent>          # show one agent's notes
-agent-notes memory size                  # disk usage
-agent-notes memory reset [agent]         # clear memory (confirmation required)
-agent-notes memory export                # back up to memory-backup/
-agent-notes memory import                # restore from memory-backup/
+agent-notes memory list               # list all notes by agent
+agent-notes memory show <agent>       # show one agent's notes
+agent-notes memory size               # disk usage
+agent-notes memory reset [agent]      # clear memory (confirmation required)
+agent-notes memory export             # back up to memory-backup/
+agent-notes memory import             # restore from memory-backup/
 ```
 
-### Obsidian (per-project sessions)
+### Obsidian (session or brain mode)
 
-Category vault with YAML frontmatter and `[[wikilinks]]`. Auto-creates a folder per project (derived from current working directory name) and organizes notes into categories: `Patterns/`, `Decisions/`, `Mistakes/`, `Context/`, `Sessions/`.
+**Storage:** `<vault-root>/<project-name>/` (auto-created per CWD)
 
-**Structure:**
-```
-<vault-root>/<project-name>/
-├── Patterns/
-├── Decisions/
-├── Mistakes/
-├── Context/
-├── Sessions/
-└── Index.md
-```
-
-**Note types:** pattern, decision, mistake, context, session
-
-**Key features:**
-- YAML frontmatter for filtering and Dataview queries (created_at, type, agent, project, tags)
-- Auto-linking: when you write a non-session note during an active session, the CLI auto-appends a wikilink to the session note via `[[note-name]]`
-- Plan mirroring: plans created during a session are automatically mirrored as Decision notes
-- Visual browsing in Obsidian with backlinks and Dataview queries
-
-**Commands:**
+**Session mode commands:**
 ```bash
-agent-notes memory init                  # create folder structure and Index.md
-agent-notes memory list                  # list all notes (by category or agent)
-agent-notes memory vault                 # show storage, path, and init status
-agent-notes memory index                 # regenerate Index.md
+agent-notes memory init               # create folder structure and Index.md
+agent-notes memory list               # list all notes (by category or agent)
+agent-notes memory vault              # show storage path and init status
+agent-notes memory index              # regenerate Index.md
 agent-notes memory add <title> <body> [type] [agent]  # type: pattern|decision|mistake|context|session
-agent-notes memory show <agent>          # show one agent's notes
-agent-notes memory reset [agent]         # clear memory (confirmation required)
-agent-notes memory export                # back up to memory-backup/
-agent-notes memory import                # restore from memory-backup/
-agent-notes install --reconfigure        # switch storage
+agent-notes memory reset [agent]      # clear memory (confirmation required)
+agent-notes memory export             # back up to memory-backup/
+agent-notes memory import             # restore from memory-backup/
 ```
 
-**Note format example:**
-```markdown
----
-created_at: 2026-04-28T19:30:35Z
-type: pattern
-agent: coder
-project: rubakas
-tags: [rails, models]
----
-
-# Rails Enum Prefix
-
-Always use `_prefix: true` with Rails enums to avoid method name collisions.
-```
-
-### Wiki (per-project knowledge brain)
-
-Implements Karpathy's LLM Wiki pattern (v1). Auto-creates a folder per project (derived from current working directory name) with immutable source material and LLM-maintained wiki pages.
-
-**Structure:**
-```
-<vault-root>/<project-name>/
-├── raw/                # immutable source material
-└── wiki/
-    ├── sources/        # ingested source pages
-    ├── concepts/       # domain concepts
-    ├── entities/       # external tools/services
-    ├── synthesis/      # cross-cutting themes
-    ├── sessions/       # session logs
-    ├── index.md
-    └── log.md
-```
-
-**Key operations:**
-
-- **Ingest** — Process source material (URLs, files, folders), extract key info, update entity/concept pages, append to log. Feeds external knowledge into the wiki brain for persistent, queryable knowledge.
-  
-  Use during Claude Code sessions: `/ingest https://docs.example.com/api` or `/ingest ./path/to/file.py`
-  
-  CLI fallback: `agent-notes memory ingest "<title>" "<body>" "<concepts>" "<entities>" "<tags>"`
-
-- **Query** — Search wiki pages, synthesize answers with citations, optionally file answers back as new pages
-
-- **Lint** — Health-check for contradictions, stale pages, data gaps, orphan pages, missing cross-references
-
-**Commands:**
+**Brain mode adds:**
 ```bash
-agent-notes memory init                  # create folder structure and Index.md
-agent-notes memory list                  # list all notes
-agent-notes memory vault                 # show storage, path, and init status
-agent-notes memory index                 # regenerate Index.md
-agent-notes memory add <title> <body> [type]          # type: source|concept|entity|synthesis|session
 agent-notes memory ingest <title> <body> <concepts> <entities> <tags>  # manual ingest
-agent-notes memory query <question>      # search wiki pages
-agent-notes memory lint                  # health-check
-agent-notes memory reset                 # clear memory (confirmation required)
-agent-notes memory export                # back up to memory-backup/
-agent-notes memory import                # restore from memory-backup/
-agent-notes install --reconfigure        # switch storage
+agent-notes memory query <question>   # search wiki pages
+agent-notes memory lint               # health-check
 ```
 
-### Project scoping (Obsidian + Wiki only)
-
-Both Obsidian and Wiki storage modes auto-create a folder named after the current working directory, isolating different projects' memory.
-
-**Example:**
-- Working in `~/code/my-app/` → memory stored at `<vault>/my-app/`
-- Working in `~/code/another-project/` → memory stored at `<vault>/another-project/`
-
-The vault root is configured once during `agent-notes install`; the project path is resolved at runtime from the current working directory.
-
-### Obsidian setup
-
-Run `agent-notes install` and pick Obsidian when prompted. The wizard auto-detects existing vaults under `~/Documents`, `~/Desktop`, and `~`. To initialize the vault structure:
-
-```bash
-agent-notes memory init
-```
-
-The installed `CLAUDE.md` already points agents to your vault. At the start of a session Claude reads `Index.md`; at the end it can save insights with `agent-notes memory add`.
+**Setup:** Run `agent-notes install` and choose `Obsidian - session` or `Obsidian - brain`. The wizard auto-detects vaults under `~/Documents`, `~/Desktop`, and `~`. Then run `agent-notes memory init`.
 
 </details>
 
