@@ -27,15 +27,27 @@ BUS_DIR="${BUS_BASE}/chrome-test/${PROJECT_SLUG}"
 
 This respects whichever Claude profile launched the session (personal `~/.claude`, work profile `~/.claude-work`, etc.). Do NOT read agent-notes state.json.
 
-**Bus files:**
+**Bus files (UUID-correlated for parallel requests):**
+
+For each handoff, mint a short UUID and use three files in the bus dir:
 
 | File | Writer | Purpose |
 |------|--------|---------|
-| `request.md` | dev session | scenarios + full handoff prompt |
-| `report.md` | chrome session | PASS/FAIL results per scenario |
-| `run-id` | dev session | short correlation id (e.g. `abc1234-main`) |
+| `request-<uuid>.md` | dev session | scenarios + full handoff prompt |
+| `progress-<uuid>.md` | chrome session | progress updates (NEW) |
+| `report-<uuid>.md` | chrome session | PASS/FAIL results per scenario |
 
-Derive `run-id` from git short SHA + branch name: `$(git rev-parse --short HEAD)-$(git rev-parse --abbrev-ref HEAD)`. Use an incrementing counter (`run-001`, `run-002`, …) if git is unavailable.
+The `<uuid>` is an 8-character hex string that correlates all three files and allows multiple requests to coexist in parallel.
+
+**UUID generation:**
+
+```bash
+# Preferred: uuidgen
+REQUEST_ID=$(uuidgen | tr 'A-Z' 'a-z' | cut -c1-8)
+
+# Fallback if uuidgen is missing:
+REQUEST_ID=$(python3 -c "import uuid;print(uuid.uuid4().hex[:8])")
+```
 
 Create the bus dir on demand: `mkdir -p "${BUS_DIR}"`.
 
@@ -45,27 +57,27 @@ Create the bus dir on demand: `mkdir -p "${BUS_DIR}"`.
 
 ### Mode 1 — Live / Parallel (during iterative development)
 
-Use when you want continuous browser feedback as code evolves.
+Use when you want continuous browser feedback as code evolves. Multiple requests with different UUIDs can run in parallel on the same bus.
 
-1. **Dev session** writes `request.md` and `run-id` to the bus with initial scenarios.
-2. **Operator** starts ONE `claude --chrome` session manually — the dev session cannot launch it (it needs the real, visible Chrome). Give the operator the bus path to paste in.
-3. **Chrome session** watches the bus, runs scenarios, writes `report.md`.
-4. **Dev session** polls for `report.md` via a background/scheduled check (run via `run_in_background` or a periodic wake-up — not a blocking foreground loop). Example check the lead runs on a schedule:
+1. **Dev session** mints a new `<uuid>` and writes `request-<uuid>.md` to the bus with initial scenarios.
+2. **Operator** starts ONE `claude --chrome` session manually — the dev session cannot launch it (it needs the real, visible Chrome). The dev session gives the operator only the request-file PATH to read (no copy/paste of request content).
+3. **Chrome session** reads `request-<uuid>.md`, runs scenarios, and writes progress to `progress-<uuid>.md` after each step.
+4. **Dev session** polls for `report-<uuid>.md` via a background/scheduled check (run via `run_in_background` or a periodic wake-up — not a blocking foreground loop). While waiting, the lead may check `progress-<uuid>.md` to track a long run. Example check:
    ```bash
    # run this as a background or scheduled check, not inline
-   test -f /absolute/path/to/bus/report.md && cat /absolute/path/to/bus/report.md
+   test -f /absolute/path/to/bus/report-<uuid>.md && cat /absolute/path/to/bus/report-<uuid>.md
    ```
-   Substitute the real resolved bus path. When `report.md` appears, the lead reads and triages it.
-5. On each `report.md` arrival, dev session triages failures, fixes, updates `request.md` with revised/new scenarios and a new `run-id`, and the loop continues.
+   When `report-<uuid>.md` appears, the lead reads it directly from the bus (no paste-back).
+5. On each report arrival, dev session triages failures, fixes, mints a NEW `<uuid>`, updates scenarios, and writes a new `request-<uuid>.md` — the loop continues with a fresh correlation id.
 
 ### Mode 2 — End-State Quality Check (default)
 
 Use once — after linters and tests pass, before committing.
 
-1. Dev session generates scenarios and writes them to the bus.
-2. Operator pastes the handoff prompt into `claude --chrome`.
-3. Chrome session writes one `report.md` to the absolute bus path.
-4. Dev session reads `report.md`, triages, fixes failures, optionally repeats for only the fixed scenarios.
+1. Dev session mints a `<uuid>`, generates scenarios, and writes `request-<uuid>.md` to the bus.
+2. Operator reads the request file at the PATH the dev session provides (no copy/paste of request content).
+3. Chrome session runs scenarios and writes `report-<uuid>.md` to the bus (no paste-back to dev session).
+4. Dev session reads `report-<uuid>.md` directly from the bus, triages, fixes failures, optionally mints a NEW `<uuid>` and repeats for only the fixed scenarios.
 5. All scenarios PASS → gate closes, commit proceeds.
 
 **This is the default mode the lead uses at end of a frontend feature.**
@@ -74,10 +86,10 @@ Use once — after linters and tests pass, before committing.
 
 User runs `/chrome-test` with a specific prompt (e.g., "check the login redirect").
 
-1. Skill generates a focused handoff prompt for the described scenario and writes it to `request.md`.
+1. Skill mints a `<uuid>` and generates a focused handoff prompt for the described scenario, writing it to `request-<uuid>.md`.
 2. If a live chrome session is running on this bus, it picks it up automatically.
-3. If no live session: skill prints the fenced handoff block for copy-paste, plus a reminder to start `claude --chrome` and paste the report back.
-4. Ingest leg runs as normal when the report arrives.
+3. If no live session: skill emits the request-file PATH for the operator to read, plus a reminder to start `claude --chrome`.
+4. Ingest leg runs as normal when `report-<uuid>.md` appears.
 
 ---
 
@@ -116,15 +128,25 @@ Cover: happy path + key validation / edge cases for the changed area.
 
 ### 5. Emit the handoff prompt
 
-**Before printing:** resolve the bus dir to a real absolute path (e.g. `/Users/alice/.claude-work/chrome-test/myapp`) and substitute it into every location reference in the block below. No shell variables (`${...}`) or angle-bracket tokens (`<BUS_DIR>`) may survive into the emitted prompt — the chrome session has no shell context.
+**Before writing:** resolve the bus dir to a real absolute path (e.g. `/Users/alice/.claude-work/chrome-test/myapp`), mint a `<uuid>` (e.g. `a1b2c3d4`), and compute the TOTAL number of steps `N` across all scenarios. Substitute these into the block below. No shell variables (`${...}`) or angle-bracket tokens may survive into the file — the chrome session has no shell context.
 
-Write the complete prompt (with all paths resolved) to `<resolved-bus-dir>/request.md` AND print it as ONE fenced `text` block in chat. The block must be fully self-contained.
+Write the complete prompt (with all paths and the uuid resolved) to `<resolved-bus-dir>/request-<uuid>.md`.
 
 ```text
 ## chrome-test handoff
-Run-ID: abc1234-main
+Request-ID: <uuid>
 Bus path: /Users/alice/.claude-work/chrome-test/myapp
-Write your report to: /Users/alice/.claude-work/chrome-test/myapp/report.md
+Write your report to: /Users/alice/.claude-work/chrome-test/myapp/report-<uuid>.md
+Write progress to: /Users/alice/.claude-work/chrome-test/myapp/progress-<uuid>.md
+Total steps: N
+
+---
+
+### PROGRESS PROTOCOL
+After completing each step, overwrite progress-<uuid>.md with:
+
+    X/N — Scenario <#>: <name> (step: <short description>)
+Also print the same `X/N` progress line in chat so the operator watching the chrome session sees movement.
 
 ---
 
@@ -146,7 +168,7 @@ Write your report to: /Users/alice/.claude-work/chrome-test/myapp/report.md
      2. <action>
      3. <action>
    Expect: <concrete observable outcome — exact text/state/redirect>
-   Screenshot: save to /Users/alice/.claude-work/chrome-test/myapp/screenshots/abc1234-main-scenario-1.png
+   Screenshot: save to /Users/alice/.claude-work/chrome-test/myapp/screenshots/<uuid>-scenario-1.png
 
 2. <Scenario name>
    ...
@@ -161,9 +183,9 @@ Write your report to: /Users/alice/.claude-work/chrome-test/myapp/report.md
 - JS modal dialogs (alert/confirm/prompt) freeze this session — dismiss by hand if one appears.
 
 ### REPORT FORMAT
-Write report.md to: /Users/alice/.claude-work/chrome-test/myapp/report.md
+Write report-<uuid>.md to: /Users/alice/.claude-work/chrome-test/myapp/report-<uuid>.md
 
-Run-ID: abc1234-main
+Request-ID: <uuid>
 
 **Scenario results:**
 1. <name>: PASS|FAIL
@@ -178,21 +200,30 @@ Run-ID: abc1234-main
 **Overall summary:** <one paragraph — what passed, what failed, anything surprising>
 ```
 
-Replace all occurrences of `/Users/alice/.claude-work/chrome-test/myapp` and `abc1234-main` with the real resolved values before emitting.
+Replace all occurrences of `/Users/alice/.claude-work/chrome-test/myapp`, `<uuid>`, and `N` with the real resolved values before writing.
 
-After printing the block:
-- Offer (don't assume) to copy via `pbcopy`.
-- One-line reminder: "Paste into a separate `claude --chrome` session. Paste the report back here when done."
+After writing the file, emit ONE short handoff line in chat for the operator:
+
+```
+Paste into a separate `claude --chrome` session:
+Read and execute the browser test at /Users/alice/.claude-work/chrome-test/myapp/request-<uuid>.md
+```
+
+That is the operator's only interaction — they read that one path, and the request file contains all further instructions.
 
 ---
 
-## Leg B — Ingest (consume report.md / pasted report)
+## Leg B — Ingest (consume report-<uuid>.md)
 
-### 1. Parse
+### 1. Fetch the report
+
+The dev session knows the `<uuid>` it minted. Read `report-<uuid>.md` directly from the bus — no paste-back needed. The chrome session writes it there and your work is to consume it from the file, not from the operator's chat.
+
+### 2. Parse
 
 For each scenario, extract: PASS/FAIL, expected, observed, console errors, network errors, screenshot path.
 
-### 2. Triage failures
+### 3. Triage failures
 
 For each FAIL:
 - Reproduce locally using the exact steps from the scenario.
@@ -200,15 +231,15 @@ For each FAIL:
 - Fix.
 - Re-verify: run relevant unit/integration tests; confirm locally before re-testing in browser.
 
-### 3. Offer focused re-test
+### 4. Offer focused re-test
 
-If failures were fixed and are UI-observable, offer a targeted re-handoff for only those scenarios (new `run-id`, same bus).
+If failures were fixed and are UI-observable, offer a targeted re-handoff for only those scenarios. Mint a NEW `<uuid>`, write a new `request-<uuid>.md` to the same bus with those scenarios, and hand off by path (same as Leg A, step 5).
 
-### 4. Surface surprises
+### 5. Surface surprises
 
 Treat unexpected observations that are unrelated to the current feature as findings — surface them explicitly even if the scenario itself passed.
 
-### 5. Summarize
+### 6. Summarize
 
 Report: what failed, the fix applied, what passed, what (if anything) remains open.
 
