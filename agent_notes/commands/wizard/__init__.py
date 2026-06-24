@@ -282,8 +282,9 @@ def _detect_obsidian_vaults() -> List[Path]:
 def _select_memory(step: int, total: int, version: str = '') -> tuple:
     """Step N: choose memory backend. Returns (backend, path)."""
     storage_options = [
-        ("Local markdown files  (~/.claude/agent-memory/)", "local"),
-        ("Obsidian vault", "obsidian"),
+        ("default - Claude Code built-in md files", "local"),
+        ("Obsidian - session", "obsidian"),
+        ("Obsidian - brain", "wiki"),
         ("None  (disable memory)", "none"),
     ]
 
@@ -297,18 +298,7 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
     backend = storage
     path = ""
 
-    if storage == "obsidian":
-        mode_options = [
-            ("Session-oriented  (decisions, patterns, session logs)", "obsidian"),
-            ("Wiki  (structured knowledge base)", "wiki"),
-        ]
-        if _can_interactive():
-            backend = _radio_select("Obsidian mode", mode_options, default=0,
-                                    step=step, total=total, version=version)
-        else:
-            backend = _radio_select_fallback("Obsidian mode", mode_options, default=0,
-                                             step=step, total=total, version=version)
-
+    if backend in ("obsidian", "wiki"):
         subfolder = Obsidian.SUBFOLDER if backend == "obsidian" else Wiki.SUBFOLDER
         candidates = _detect_obsidian_vaults()
         default_vault = str(candidates[0]) if candidates else str(Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME)

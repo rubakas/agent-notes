@@ -318,9 +318,10 @@ def _wizard_memory(state, before: str) -> bool:
     from ..services.ui import _safe_input, _path_input
 
     storage_options = {
-        "1": ("local", "Local files"),
-        "2": ("obsidian", "Obsidian vault"),
-        "3": ("none", "Disabled"),
+        "1": ("local", "default - Claude Code built-in md files"),
+        "2": ("obsidian", "Obsidian - session"),
+        "3": ("wiki", "Obsidian - brain"),
+        "4": ("none", "None"),
     }
 
     print("\nMemory storage options:")
@@ -335,18 +336,7 @@ def _wizard_memory(state, before: str) -> bool:
     backend, label = storage_options[choice]
     path = ""
 
-    if backend == "obsidian":
-        mode_options = {
-            "1": ("obsidian", "Session notes — project-scoped decisions, patterns, mistakes"),
-            "2": ("wiki", "Knowledge wiki — Karpathy compile-once pattern with concepts, entities, sources"),
-        }
-        print("\n  Obsidian mode:")
-        for key, (_, mlabel) in mode_options.items():
-            print(f"    {key}) {mlabel}")
-        mode_choice = _safe_input("  Choice [1]: ", "1").strip()
-        if mode_choice in mode_options:
-            backend, label = mode_options[mode_choice]
-
+    if backend in ("obsidian", "wiki"):
         subfolder = Obsidian.SUBFOLDER if backend == "obsidian" else Wiki.SUBFOLDER
         default_vault = str(Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME)
         print(f"  Folder name: {subfolder}")
