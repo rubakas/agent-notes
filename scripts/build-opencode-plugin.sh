@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+PYTHON="${PYTHON:-$([ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)}"
 
 mkdir -p .opencode-plugin
 
 # Generate index.js from template by substituting placeholders.
-python3 - <<'PYEOF'
+"$PYTHON" - <<'PYEOF'
 import pathlib
 import re
 
@@ -58,7 +59,7 @@ print(f"OpenCode plugin generated: {name} v{version}, vault={vault_path}")
 PYEOF
 
 # Generate package.json so Bun's npm-style loader can find the plugin.
-python3 - <<'PYEOF'
+"$PYTHON" - <<'PYEOF'
 import json, pathlib
 
 try:

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-python3 -m agent_notes.commands.build
+PYTHON="${PYTHON:-$([ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)}"
+"$PYTHON" -m agent_notes.commands.build
 rm -rf .claude-plugin/agents
 mkdir -p .claude-plugin/agents
 for f in agent_notes/dist/claude/agents/*.md; do
@@ -14,7 +15,7 @@ echo "Plugin agents rebuilt."
 
 # Sync vendored skills from the explicit allow-list in data/plugin/claude.yaml.
 # Only skills listed there are included; add to that file to vendor a new skill.
-python3 - <<'PYEOF'
+"$PYTHON" - <<'PYEOF'
 import yaml, pathlib, shutil
 
 config = yaml.safe_load(pathlib.Path("agent_notes/data/plugin/claude.yaml").read_text())
@@ -35,7 +36,7 @@ PYEOF
 
 # Generate plugin.json fully from pyproject.toml + VERSION + claude.yaml.
 # This file is auto-generated — hand-edits will be overwritten on next build.
-python3 - <<'PYEOF'
+"$PYTHON" - <<'PYEOF'
 import json, pathlib
 
 try:
