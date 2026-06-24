@@ -383,6 +383,25 @@ The plugin build scripts (`scripts/build-claude-plugin.sh`, `scripts/build-openc
 - `tests/integration/` — Build output and artifact validation
 - `tests/plugins/` — Plugin artifact validation
 
+### Releasing
+
+The release process is automated via `scripts/release`, which runs **exclusively against the project `.venv`** (invoking `.venv/bin/python` directly, never system `python3`). The pre-flight phase aborts with a clear error if `.venv` does not exist or cannot import `agent_notes`, `tomli_w`, `build`, and `twine`.
+
+**Provision the release environment once:**
+
+```bash
+pip install -e ".[dev]" twine
+```
+
+**Run the release:**
+
+```bash
+scripts/release              # Full release: tests, build, PyPI upload, git tag, marketplace bundle
+scripts/release --dry-run    # Check-only: tests, build, twine check, smoke install; skip upload
+```
+
+The `--dry-run` flag is useful to validate the entire workflow before committing tags and pushing to PyPI.
+
 ### Contributing guidelines
 
 When adding new content:
