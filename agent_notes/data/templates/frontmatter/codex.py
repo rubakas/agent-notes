@@ -1,7 +1,5 @@
 """Codex CLI agent file generator — emits whole-file TOML, not frontmatter+markdown."""
 
-import tomli_w
-
 
 _EFFORT_MAP = {
     "minimal": "minimal",
@@ -43,6 +41,8 @@ def emit_file(ctx: dict, body: str) -> tuple[str, str]:
     doc["model_reasoning_effort"] = _EFFORT_MAP.get(effort_key, "medium")
 
     doc["sandbox_mode"] = _sandbox_mode(agent_config)
+
+    import tomli_w  # lazy import — only needed when emitting Codex TOML files
 
     filename = f"{agent_name}.toml"
     content = tomli_w.dumps(doc)
