@@ -13,6 +13,8 @@ def hook(subaction: str) -> None:
     """Handle hook subactions."""
     if subaction == "memory-bridge":
         _memory_bridge()
+    elif subaction == "precompact-memory-bridge":
+        _precompact_memory_bridge()
     elif subaction == "session-discover":
         _session_discover()
     elif subaction == "guard-credentials":
@@ -408,11 +410,11 @@ def evaluate_credential_access(
     return None
 
 
-def _memory_bridge() -> None:
-    """SessionStart hook that prints the agent-notes memory index.
+def _load_memory_index() -> Optional[str]:
+    """Load the agent-notes memory index content, or return None if unavailable.
 
-    Unconditionally loads and prints the memory index so it is visible in
-    context at the start of every Claude Code session.
+    Shared renderer used by both the SessionStart memory-bridge hook and the
+    PreCompact memory-bridge hook so both emit from one source of truth.
     """
     try:
         from .memory._common import _load_memory_config
@@ -421,7 +423,7 @@ def _memory_bridge() -> None:
         backend, path = _load_memory_config()
 
         if backend == "none" or backend is None:
-            return
+            return None
 
         if backend == "obsidian":
             index_file = Path(path) / Obsidian.INDEX
@@ -432,10 +434,46 @@ def _memory_bridge() -> None:
             index_file = Path(path) / "Index.md"
 
         if not index_file.exists():
-            return
+            return None
 
-        content = index_file.read_text(encoding="utf-8")
-        print("<!-- agent-notes memory index (auto-loaded) -->")
-        print(content)
+        return index_file.read_text(encoding="utf-8")
     except Exception:
+        return None
+
+
+def _memory_bridge() -> None:
+    """SessionStart hook that prints the agent-notes memory index.
+
+    Unconditionally loads and prints the memory index so it is visible in
+    context at the start of every Claude Code session.
+    """
+    content = _load_memory_index()
+    if content is None:
         return
+    print("<!-- agent-notes memory index (auto-loaded) -->")
+    print(content)
+
+
+def _precompact_memory_bridge() -> None:
+    """PreCompact hook that re-emits the memory index before context compaction.
+
+    When Claude Code compacts a long conversation the SessionStart context
+    injected by memory-bridge can be summarised away, losing the pointer to
+    durable memory.  This hook fires immediately before compaction and returns
+    the index via the `additionalContext` field in the hook JSON output schema
+    (see docs/CLI_CAPABILITIES.md §Hooks → "JSON output schema").  Claude Code
+    merges `additionalContext` into the compacted context, keeping the memory
+    pointer alive.
+
+    Contract: exit 0, emit a single JSON object to stdout:
+        {"additionalContext": "<header>\\n<index content>"}
+    If the memory index is unavailable (no backend configured, no index file)
+    the hook exits silently with no output so compaction proceeds normally.
+    """
+    content = _load_memory_index()
+    if content is None:
+        return
+    payload = {
+        "additionalContext": "<!-- agent-notes memory index (auto-loaded) -->\n" + content,
+    }
+    print(json.dumps(payload))

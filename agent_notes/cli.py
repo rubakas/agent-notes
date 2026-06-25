@@ -291,7 +291,7 @@ def main():
 
     # hook
     p_hook = subparsers.add_parser("hook", help="Claude Code hook integrations")
-    p_hook.add_argument("subaction", choices=["memory-bridge", "session-discover", "guard-credentials"],
+    p_hook.add_argument("subaction", choices=["memory-bridge", "precompact-memory-bridge", "session-discover", "guard-credentials"],
         help="Hook to run")
 
     # cost-report

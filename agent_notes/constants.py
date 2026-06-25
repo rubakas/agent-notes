@@ -29,6 +29,7 @@ class Obsidian:
 class Hooks:
     """Hook command strings used in Claude Code settings.json."""
     MEMORY_BRIDGE = "agent-notes hook memory-bridge"
+    PRECOMPACT_MEMORY_BRIDGE = "agent-notes hook precompact-memory-bridge"
     COST_REPORT = "agent-notes cost-report"
     GUARD_CREDENTIALS = "agent-notes hook guard-credentials"
     # Matcher scopes the credential guard to Read, Bash, and Grep tool calls only.

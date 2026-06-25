@@ -179,8 +179,12 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         # Only useful for Obsidian-backed modes (obsidian, wiki).
         if memory_backend in ("obsidian", "wiki"):
             install_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
+            # PreCompact hook: re-emit the memory index before context compaction
+            # so the durable-memory pointer survives into the compacted context.
+            install_hook(settings_path, "PreCompact", Hooks.PRECOMPACT_MEMORY_BRIDGE)
         else:
             remove_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
+            remove_hook(settings_path, "PreCompact", Hooks.PRECOMPACT_MEMORY_BRIDGE)
 
         # Stop hook: emit cost report at end of session
         install_hook(settings_path, "Stop", Hooks.COST_REPORT)
@@ -255,6 +259,7 @@ def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memor
 
     if backend.supports("stop_hook"):
         remove_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
+        remove_hook(settings_path, "PreCompact", Hooks.PRECOMPACT_MEMORY_BRIDGE)
         remove_hook(settings_path, "Stop", Hooks.COST_REPORT)
         remove_hook(settings_path, "PreToolUse", Hooks.GUARD_CREDENTIALS)
         remove_hook(settings_path, "PostToolUse", Hooks.MEMORY_BRIDGE)
