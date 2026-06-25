@@ -1,5 +1,10 @@
 """Codex CLI agent file generator — emits whole-file TOML, not frontmatter+markdown."""
 
+from .base import strip_sections
+
+# Backward-compatible alias — tests import this private name directly.
+_strip_sections = strip_sections
+
 
 _EFFORT_MAP = {
     "minimal": "minimal",
@@ -8,8 +13,6 @@ _EFFORT_MAP = {
     "high":    "high",
     "xhigh":   "xhigh",
 }
-
-_STRIP_PREFIXES = ("## Memory", "## Cost reporting")
 
 
 def render(ctx: dict) -> str:
@@ -56,7 +59,7 @@ def post_process(prompt: str, ctx: dict) -> str:
     - ## Memory* sections (Codex has no agent memory)
     - ## Cost reporting section (Claude Code CLI tool, not available in Codex)
     """
-    return _strip_sections(prompt, _STRIP_PREFIXES)
+    return strip_sections(prompt)
 
 
 # --- helpers ---
@@ -84,23 +87,3 @@ def _sandbox_mode(agent_config: dict) -> str:
     return "read-only"
 
 
-def _strip_sections(content: str, strip_prefixes: tuple) -> str:
-    """Strip ## sections whose heading starts with any of the given prefixes."""
-    lines = content.split('\n')
-    result_lines = []
-    in_stripped_section = False
-
-    for line in lines:
-        if any(line.startswith(prefix) for prefix in strip_prefixes):
-            in_stripped_section = True
-            continue
-        elif line.startswith('## ') and in_stripped_section:
-            in_stripped_section = False
-            result_lines.append(line)
-        elif not in_stripped_section:
-            result_lines.append(line)
-
-    while result_lines and result_lines[-1].strip() == '':
-        result_lines.pop()
-
-    return '\n'.join(result_lines)
