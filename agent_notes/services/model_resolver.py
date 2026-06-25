@@ -24,8 +24,10 @@ Role resolution:
   user_config["agent_roles"][agent_name] (override) falling back to
   agent_config["role"] (declared). This mirrors resolve_agent_role().
 
-Note: Role.default_model is present on the Role dataclass but is NOT part
-of the active resolution chain. It exists as a hint in the YAML data only.
+Note: Role.typical_class drives both the wizard default pre-selection and
+Branch 3 of this resolver. The wizard selects the newest non-deprecated
+model of the matching class; this resolver picks newest (any deprecation
+status) when serving a live build.
 """
 from __future__ import annotations
 
