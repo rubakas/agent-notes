@@ -31,12 +31,6 @@ pipx install agent-notes
 agent-notes install
 ```
 
-Update anytime:
-
-```bash
-pipx upgrade agent-notes && agent-notes install
-```
-
 **venv + pip (if you prefer to manage your own environment):**
 
 ```bash
@@ -45,10 +39,32 @@ pip install agent-notes
 agent-notes install
 ```
 
-Update anytime:
+### Upgrade from a previous version
 
+**Update in place (normal upgrade):**
+
+With pipx:
+```bash
+pipx upgrade agent-notes && agent-notes install
+```
+
+With venv:
 ```bash
 pip install --upgrade agent-notes && agent-notes install
+```
+
+**Clean reinstall (from an older version, fresh slate):**
+
+If you are on a significantly older version or want a fresh configuration, uninstall completely and reinstall:
+
+With pipx:
+```bash
+agent-notes uninstall && pipx uninstall agent-notes && pipx install agent-notes && agent-notes install
+```
+
+With venv:
+```bash
+agent-notes uninstall && pip uninstall agent-notes && pip install agent-notes && agent-notes install
 ```
 
 ### Local build (developers)
@@ -84,6 +100,36 @@ The wizard prompts for the key with hidden input; agent-notes never logs or prin
 ```bash
 agent-notes config provider openrouter   # prints "configured" or "no key"
 ```
+
+</details>
+
+<details>
+<summary>Uninstall</summary>
+
+To fully remove agent-notes:
+
+**pipx:**
+
+```bash
+agent-notes uninstall
+pipx uninstall agent-notes
+```
+
+Run `agent-notes uninstall` first — it removes agent files, hooks, settings.json entries, context file, and state that agent-notes installed. Then `pipx uninstall` removes the package itself. The `agent-notes uninstall` command must run while the CLI is still installed.
+
+**venv:**
+
+```bash
+agent-notes uninstall
+deactivate
+rm -rf .venv
+```
+
+Run `agent-notes uninstall` first to clean up installed components, then deactivate the environment and delete the `.venv` directory.
+
+**Note on memory and vault permissions:**
+
+If you configured agent-notes to access your memory vault (Obsidian or local), those read/write permissions are intentionally left in place after uninstalling so Claude Code and other tools can still access your notes. To remove them, edit `~/.claude/settings.json` and delete the entries under `permissions.allow` that reference your vault path (e.g. `Read(/path/to/your/vault/**)`, `Write(/path/to/your/vault/**)`, `Edit(/path/to/your/vault/**)`).
 
 </details>
 
@@ -376,6 +422,8 @@ This command swaps any wheel install for an editable one and clears your Claude 
 By default, `agent-notes install` re-runs the interactive wizard and prompts for an optional profile label. To reinstall non-interactively into the same profile, use `agent-notes install --profile <label>` (e.g. `work` → installs into `~/.claude-work`).
 
 The plugin build scripts (`scripts/build-claude-plugin.sh`, `scripts/build-opencode-plugin.sh`) automatically use `.venv/bin/python` when present, fall back to system `python3`, and honor a `PYTHON=` override.
+
+**Note:** `uv` is used only in the local development and release workflow (see `scripts/release`). It is not required to install or use agent-notes — end users should use `pipx` or `pip` / `venv`.
 
 ### Test structure
 
