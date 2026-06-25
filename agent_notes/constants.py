@@ -30,3 +30,8 @@ class Hooks:
     """Hook command strings used in Claude Code settings.json."""
     MEMORY_BRIDGE = "agent-notes hook memory-bridge"
     COST_REPORT = "agent-notes cost-report"
+    GUARD_CREDENTIALS = "agent-notes hook guard-credentials"
+    # Matcher scopes the credential guard to Read, Bash, and Grep tool calls only.
+    # Edit/Write/WebFetch are intentionally excluded — writing is not a read threat;
+    # WebFetch is not path-based. Both are left to the prompt-level prose rule.
+    GUARD_CREDENTIALS_MATCHER = "Read|Bash|Grep"

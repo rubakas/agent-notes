@@ -185,6 +185,15 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         # Stop hook: emit cost report at end of session
         install_hook(settings_path, "Stop", Hooks.COST_REPORT)
 
+        # PreToolUse credential guard: deny Read/Bash attempts to read credential files.
+        # Scoped to Read|Bash tools via the matcher field (defense-in-depth).
+        install_hook(
+            settings_path,
+            "PreToolUse",
+            Hooks.GUARD_CREDENTIALS,
+            matcher=Hooks.GUARD_CREDENTIALS_MATCHER,
+        )
+
         # Clean up stale PostToolUse hooks from previous versions
         remove_hook(settings_path, "PostToolUse", Hooks.MEMORY_BRIDGE)
 
@@ -247,6 +256,7 @@ def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memor
     if backend.supports("stop_hook"):
         remove_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
         remove_hook(settings_path, "Stop", Hooks.COST_REPORT)
+        remove_hook(settings_path, "PreToolUse", Hooks.GUARD_CREDENTIALS)
         remove_hook(settings_path, "PostToolUse", Hooks.MEMORY_BRIDGE)
 
     if backend.supports("allow_entries"):
