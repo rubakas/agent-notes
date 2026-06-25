@@ -94,12 +94,19 @@ fi
 # Verify the .venv has the full toolchain (project deps + build/publish tools).
 # tomli_w is the canary: a non-stdlib runtime dep imported at module load by
 # agent_notes/data/templates/frontmatter/codex.py during build/test.
-for mod in agent_notes tomli_w build twine; do
+for mod in agent_notes tomli_w twine; do
   if ! "$PY" -c "import $mod" 2>/dev/null; then
     error "Module '$mod' is not importable by $PY.
   Provision the venv: .venv/bin/pip install -e . build twine"
   fi
 done
+
+# 'build' must be the PyPA build tool runnable as a module. A bare `import build`
+# can be satisfied by a stale local build/ namespace dir, so check executability.
+if ! "$PY" -m build --version >/dev/null 2>&1; then
+  error "PyPA 'build' is not runnable via '$PY -m build'.
+  Provision the venv: .venv/bin/pip install -e . build twine"
+fi
 ok "Release toolchain available in $VENV_DIR"
 
 # Check if on develop branch
