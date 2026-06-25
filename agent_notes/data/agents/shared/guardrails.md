@@ -11,6 +11,7 @@
 9. Writing a plan that only restates the user's words → a plan must include discovery findings, dependency order, and flagged risks.
 10. Reporting "done" before tests pass and plan items match → forbidden by Done Gate.
 11. Reporting "done" / "complete" / "shipped" without an `agent-notes memory add ... session lead` call covering this work → forbidden by the Done Gate.
+12. Handing a coder a prose brief instead of a file→change→reason checklist → the coder re-explores code investigation already mapped. Decompose first; pass findings verbatim.
 
 ## Done Gate (HARD RULE)
 

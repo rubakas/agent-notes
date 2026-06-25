@@ -24,9 +24,9 @@ agent-notes doctor
 
 ### PyPI (recommended)
 
+**pipx (isolated environment, no manual venv needed):**
+
 ```bash
-pip install agent-notes
-# or
 pipx install agent-notes
 agent-notes install
 ```
@@ -34,9 +34,21 @@ agent-notes install
 Update anytime:
 
 ```bash
-pip install --upgrade agent-notes && agent-notes install
-# or
 pipx upgrade agent-notes && agent-notes install
+```
+
+**venv + pip (if you prefer to manage your own environment):**
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install agent-notes
+agent-notes install
+```
+
+Update anytime:
+
+```bash
+pip install --upgrade agent-notes && agent-notes install
 ```
 
 ### Local build (developers)
@@ -44,12 +56,13 @@ pipx upgrade agent-notes && agent-notes install
 ```bash
 git clone https://github.com/rubakas/agent-notes.git
 cd agent-notes
-python -m build                    # produces dist/*.whl
-pipx install dist/*.whl            # or pip install --user dist/*.whl
+pipx install -e .        # editable: CLI runs live from the working tree
 agent-notes install
 ```
 
-Iteration loop: edit source → `python -m build` → `pipx reinstall dist/*.whl`. Not editable mode. Not `pip install -e .`.
+With editable mode, the CLI runs directly from your source files. After edits, run `agent-notes install` to rebuild `dist/` and reinstall into your Claude config. No rebuild command needed between iterations.
+
+To produce a release artifact (wheel for distribution), use `python -m build` + `pipx reinstall dist/*.whl` — this is separate from local development.
 
 ### Plugin (limited functionality)
 
@@ -132,148 +145,57 @@ Specialized subagents with hierarchical model strategy: **Opus 4.6 reasons, Sonn
 <details>
 <summary>Memory Storage</summary>
 
-Agents accumulate knowledge across sessions using one of three storage options, chosen during `agent-notes install`.
+Agents accumulate knowledge across sessions. Choose a backend during `agent-notes install`:
 
-### Storage comparison
+**Backends:**
+- **`default - Claude Code built-in md files`** (default) — Plain markdown in `~/.claude/agent-memory/<agent>/`. No external tools. Simple, portable.
+- **`Obsidian - session`** — Per-project session notes in Obsidian vault. Auto-creates `<vault>/<project>/` with categories: `Patterns/`, `Decisions/`, `Mistakes/`, `Context/`, `Sessions/`. Includes YAML frontmatter and `[[wikilinks]]`.
+- **`Obsidian - brain`** — Karpathy's LLM Wiki pattern. Per-project knowledge brain in `<vault>/<project>/raw/` and `wiki/` (sources, concepts, entities, synthesis, sessions). Supports ingest/query/lint operations.
+- **`None`** — Disables memory.
 
-| Feature | Local | Obsidian | Wiki |
-|---|---|---|---|
-| Location | `~/.claude/agent-memory/` | Obsidian vault | Obsidian vault |
-| Project scoping | No | Yes (per CWD) | Yes (per CWD) |
-| Organization | Per-agent folders | Categories (Patterns, Decisions, etc.) | Wiki pages (sources, concepts, entities) |
-| Best for | Simple setup | Process memory, visual browsing | Domain knowledge, team knowledge bases |
+**To reconfigure after install:**
+```bash
+agent-notes install --reconfigure        # switch storage
+agent-notes config memory               # interactive backend selector
+```
 
 ### Local (default)
 
-Plain markdown storage in `~/.claude/agent-memory/<agent>/` — one folder per agent, no project scoping or cross-referencing. Simplest setup, no external tools needed.
+**Storage:** `~/.claude/agent-memory/<agent>/`
 
-**Commands:**
 ```bash
-agent-notes memory list                  # list all notes by agent
-agent-notes memory show <agent>          # show one agent's notes
-agent-notes memory size                  # disk usage
-agent-notes memory reset [agent]         # clear memory (confirmation required)
-agent-notes memory export                # back up to memory-backup/
-agent-notes memory import                # restore from memory-backup/
+agent-notes memory list               # list all notes by agent
+agent-notes memory show <agent>       # show one agent's notes
+agent-notes memory size               # disk usage
+agent-notes memory reset [agent]      # clear memory (confirmation required)
+agent-notes memory export             # back up to memory-backup/
+agent-notes memory import             # restore from memory-backup/
 ```
 
-### Obsidian (per-project sessions)
+### Obsidian (session or brain mode)
 
-Category vault with YAML frontmatter and `[[wikilinks]]`. Auto-creates a folder per project (derived from current working directory name) and organizes notes into categories: `Patterns/`, `Decisions/`, `Mistakes/`, `Context/`, `Sessions/`.
+**Storage:** `<vault-root>/<project-name>/` (auto-created per CWD)
 
-**Structure:**
-```
-<vault-root>/<project-name>/
-├── Patterns/
-├── Decisions/
-├── Mistakes/
-├── Context/
-├── Sessions/
-└── Index.md
-```
-
-**Note types:** pattern, decision, mistake, context, session
-
-**Key features:**
-- YAML frontmatter for filtering and Dataview queries (created_at, type, agent, project, tags)
-- Auto-linking: when you write a non-session note during an active session, the CLI auto-appends a wikilink to the session note via `[[note-name]]`
-- Plan mirroring: plans created during a session are automatically mirrored as Decision notes
-- Visual browsing in Obsidian with backlinks and Dataview queries
-
-**Commands:**
+**Session mode commands:**
 ```bash
-agent-notes memory init                  # create folder structure and Index.md
-agent-notes memory list                  # list all notes (by category or agent)
-agent-notes memory vault                 # show storage, path, and init status
-agent-notes memory index                 # regenerate Index.md
+agent-notes memory init               # create folder structure and Index.md
+agent-notes memory list               # list all notes (by category or agent)
+agent-notes memory vault              # show storage path and init status
+agent-notes memory index              # regenerate Index.md
 agent-notes memory add <title> <body> [type] [agent]  # type: pattern|decision|mistake|context|session
-agent-notes memory show <agent>          # show one agent's notes
-agent-notes memory reset [agent]         # clear memory (confirmation required)
-agent-notes memory export                # back up to memory-backup/
-agent-notes memory import                # restore from memory-backup/
-agent-notes install --reconfigure        # switch storage
+agent-notes memory reset [agent]      # clear memory (confirmation required)
+agent-notes memory export             # back up to memory-backup/
+agent-notes memory import             # restore from memory-backup/
 ```
 
-**Note format example:**
-```markdown
----
-created_at: 2026-04-28T19:30:35Z
-type: pattern
-agent: coder
-project: rubakas
-tags: [rails, models]
----
-
-# Rails Enum Prefix
-
-Always use `_prefix: true` with Rails enums to avoid method name collisions.
-```
-
-### Wiki (per-project knowledge brain)
-
-Implements Karpathy's LLM Wiki pattern (v1). Auto-creates a folder per project (derived from current working directory name) with immutable source material and LLM-maintained wiki pages.
-
-**Structure:**
-```
-<vault-root>/<project-name>/
-├── raw/                # immutable source material
-└── wiki/
-    ├── sources/        # ingested source pages
-    ├── concepts/       # domain concepts
-    ├── entities/       # external tools/services
-    ├── synthesis/      # cross-cutting themes
-    ├── sessions/       # session logs
-    ├── index.md
-    └── log.md
-```
-
-**Key operations:**
-
-- **Ingest** — Process source material (URLs, files, folders), extract key info, update entity/concept pages, append to log. Feeds external knowledge into the wiki brain for persistent, queryable knowledge.
-  
-  Use during Claude Code sessions: `/ingest https://docs.example.com/api` or `/ingest ./path/to/file.py`
-  
-  CLI fallback: `agent-notes memory ingest "<title>" "<body>" "<concepts>" "<entities>" "<tags>"`
-
-- **Query** — Search wiki pages, synthesize answers with citations, optionally file answers back as new pages
-
-- **Lint** — Health-check for contradictions, stale pages, data gaps, orphan pages, missing cross-references
-
-**Commands:**
+**Brain mode adds:**
 ```bash
-agent-notes memory init                  # create folder structure and Index.md
-agent-notes memory list                  # list all notes
-agent-notes memory vault                 # show storage, path, and init status
-agent-notes memory index                 # regenerate Index.md
-agent-notes memory add <title> <body> [type]          # type: source|concept|entity|synthesis|session
 agent-notes memory ingest <title> <body> <concepts> <entities> <tags>  # manual ingest
-agent-notes memory query <question>      # search wiki pages
-agent-notes memory lint                  # health-check
-agent-notes memory reset                 # clear memory (confirmation required)
-agent-notes memory export                # back up to memory-backup/
-agent-notes memory import                # restore from memory-backup/
-agent-notes install --reconfigure        # switch storage
+agent-notes memory query <question>   # search wiki pages
+agent-notes memory lint               # health-check
 ```
 
-### Project scoping (Obsidian + Wiki only)
-
-Both Obsidian and Wiki storage modes auto-create a folder named after the current working directory, isolating different projects' memory.
-
-**Example:**
-- Working in `~/code/my-app/` → memory stored at `<vault>/my-app/`
-- Working in `~/code/another-project/` → memory stored at `<vault>/another-project/`
-
-The vault root is configured once during `agent-notes install`; the project path is resolved at runtime from the current working directory.
-
-### Obsidian setup
-
-Run `agent-notes install` and pick Obsidian when prompted. The wizard auto-detects existing vaults under `~/Documents`, `~/Desktop`, and `~`. To initialize the vault structure:
-
-```bash
-agent-notes memory init
-```
-
-The installed `CLAUDE.md` already points agents to your vault. At the start of a session Claude reads `Index.md`; at the end it can save insights with `agent-notes memory add`.
+**Setup:** Run `agent-notes install` and choose `Obsidian - session` or `Obsidian - brain`. The wizard auto-detects vaults under `~/Documents`, `~/Desktop`, and `~`. Then run `agent-notes memory init`.
 
 </details>
 
@@ -416,20 +338,44 @@ agent-notes config provider <name>      # check if configured (without exposing 
 
 ### Building and testing
 
-Python 3.10+ required. Build from source and run tests:
+Python 3.10+ required. Create an isolated environment and run tests:
 
 ```bash
-python -m build && pipx install dist/*.whl
-python3 -m pytest tests/ -q
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"      # installs runtime deps + pytest
+pytest -q
 ```
+
+The test suite automatically builds `dist/` before collection (via the `pytest_sessionstart` hook in `tests/conftest.py`), so you do not need to run `python -m build` manually before testing.
 
 ### Development workflow
 
-1. Edit source files in `agent_notes/data/` or Python modules
-2. Run `python -m build` to rebuild the wheel
-3. Run `pipx reinstall dist/*.whl` to install the updated version
+**One-time setup (choose one):**
+
+- Inside a venv: `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"`
+- Or expose the CLI globally via pipx (editable): `pipx install -e .`
+
+**Iteration loop:**
+
+1. Edit source in `agent_notes/data/` (skills, rules, agents, etc.) or Python modules
+2. Run `agent-notes install` to rebuild `dist/` and reinstall into your Claude config
+3. For a clean reset, run `agent-notes uninstall && agent-notes install`
 4. Run `agent-notes validate` to lint configuration files
-5. Run tests: `python3 -m pytest tests/ -q`
+5. Run tests: `pytest -q` (the suite auto-builds `dist/` first via the conftest hook)
+
+**Full local reset (one-liner):**
+
+```bash
+pipx uninstall agent-notes && pipx install -e . && agent-notes uninstall && agent-notes install
+```
+
+This command swaps any wheel install for an editable one and clears your Claude config. After this, future edits only need `agent-notes install` (or `agent-notes uninstall && agent-notes install` for a clean wipe).
+
+**Profiles:**
+
+By default, `agent-notes install` re-runs the interactive wizard and prompts for an optional profile label. To reinstall non-interactively into the same profile, use `agent-notes install --profile <label>` (e.g. `work` → installs into `~/.claude-work`).
+
+The plugin build scripts (`scripts/build-claude-plugin.sh`, `scripts/build-opencode-plugin.sh`) automatically use `.venv/bin/python` when present, fall back to system `python3`, and honor a `PYTHON=` override.
 
 ### Test structure
 
@@ -437,18 +383,38 @@ python3 -m pytest tests/ -q
 - `tests/integration/` — Build output and artifact validation
 - `tests/plugins/` — Plugin artifact validation
 
+### Releasing
+
+The release process is automated via `scripts/release`, which runs **exclusively against the project `.venv`** (invoking `.venv/bin/python` directly, never system `python3`). The pre-flight phase aborts with a clear error if `.venv` does not exist or cannot import `agent_notes`, `tomli_w`, `build`, and `twine`.
+
+**Provision the release environment once:**
+
+```bash
+pip install -e ".[dev]" twine
+```
+
+**Run the release:**
+
+```bash
+scripts/release              # Full release: tests, build, PyPI upload, git tag, marketplace bundle
+scripts/release --dry-run    # Check-only: tests, build, twine check, smoke install; skip upload
+```
+
+The `--dry-run` flag is useful to validate the entire workflow before committing tags and pushing to PyPI.
+
 ### Contributing guidelines
 
 When adding new content:
 
 1. **Edit source files** — all changes go in `agent_notes/data/` directory
-2. **Run build** — `python -m build` to generate platform configs
-3. **Run tests** — `python3 -m pytest tests/ -q` before committing
-4. **Validate** — `agent-notes validate` before committing
-5. **Keep it generic** — remove app-specific references
-6. **Show examples** — include code samples with explanations
-7. **Stay modular** — each skill should be independently usable
-8. **Stay concise** — agent prompts under 60 lines
+2. **Rebuild and test** — `agent-notes install` rebuilds `dist/` and reinstalls; `pytest -q` auto-builds first
+3. **Validate** — `agent-notes validate` before committing
+4. **Keep it generic** — remove app-specific references
+5. **Show examples** — include code samples with explanations
+6. **Stay modular** — each skill should be independently usable
+7. **Stay concise** — agent prompts under 60 lines
+
+(Note: `python -m build` is only needed to produce a release wheel for distribution, not for local development.)
 
 ### Architecture
 

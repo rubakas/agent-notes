@@ -32,7 +32,7 @@ Issues = "https://github.com/rubakas/agent-notes/issues"
 Documentation = "https://github.com/rubakas/agent-notes/tree/main/docs"
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
 
 [project.scripts]
 agent-notes = "agent_notes.cli:main"

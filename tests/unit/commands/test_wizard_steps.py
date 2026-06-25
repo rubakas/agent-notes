@@ -383,15 +383,14 @@ class TestSelectMemory:
         assert path.endswith("/projects")
 
     def test_select_memory_obsidian_wiki_backend(self, monkeypatch):
-        """'obsidian' storage + wiki mode returns ('wiki', path ending in /knowledge)."""
+        """Selecting 'wiki' from the flat menu returns ('wiki', path ending in /knowledge)."""
         self._patch_non_interactive(monkeypatch)
         self._patch_detect_vaults(monkeypatch, [])
         self._patch_path_input(monkeypatch, "/tmp/MyVault")
 
-        calls = iter(["obsidian", "wiki"])
         monkeypatch.setattr(
             "agent_notes.commands.wizard._radio_select_fallback",
-            lambda title, options, default=0, **kw: next(calls),
+            lambda title, options, default=0, **kw: "wiki",
         )
 
         backend, path = wizard_mod._select_memory(step=6, total=7)
@@ -422,10 +421,9 @@ class TestSelectMemory:
         self._patch_detect_vaults(monkeypatch, [])
         self._patch_path_input(monkeypatch, str(vault_dir))
 
-        calls = iter(["obsidian", "wiki"])
         monkeypatch.setattr(
             "agent_notes.commands.wizard._radio_select_fallback",
-            lambda title, options, default=0, **kw: next(calls),
+            lambda title, options, default=0, **kw: "wiki",
         )
 
         backend, path = wizard_mod._select_memory(step=6, total=7)

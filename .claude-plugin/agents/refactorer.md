@@ -39,6 +39,7 @@ Golden rule: behavior must not change. If tests pass before, they must pass afte
 - Keep commits atomic — one refactoring per commit
 - If tests don't exist, create them before refactoring
 - Never make the suite green by weakening, skipping, or deleting tests — if a test breaks under a refactor, the refactor changed behavior; fix the refactor, not the test.
+- Execute the lead's checklist in order; do not re-explore what it already specifies. Stop and report if a step's premise turns out wrong.
 
 ## Red-Green-Refactor
 
@@ -56,7 +57,16 @@ When done, report:
 
 ## Memory (read-before-work, write-on-discovery)
 
-Memory is disabled. Proceed without reading any shared state.
+You are part of a team that shares state via a local memory store at `/Users/en3e/.claude/agent-memory`.
+
+### Read before working
+
+If the task references an in-flight initiative, prior decision, or session progress, read the relevant memory files BEFORE you start:
+
+1. `/Users/en3e/.claude/agent-memory/MEMORY.md` — index of saved memories
+2. `/Users/en3e/.claude/agent-memory/` — individual memory files by topic
+
+If `/Users/en3e/.claude/agent-memory` is "disabled", skip this — proceed without memory context.
 
 Do not duplicate effort. If a recent note already answers the question you'd be investigating, cite it in your report rather than re-deriving.
 

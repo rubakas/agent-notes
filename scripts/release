@@ -2,6 +2,8 @@
 set -euo pipefail
 
 AGENT_NOTES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+VENV_DIR="$AGENT_NOTES_DIR/.venv"
+PY="$VENV_DIR/bin/python"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 LOG_FILE="/tmp/agent-notes-release-${TIMESTAMP}.log"
 SMOKE_VENV="/tmp/agent-notes-release-test"
@@ -83,13 +85,29 @@ bump_version() {
 # ─── PHASE: PRE-FLIGHT ───────────────────────────────────────────────────────
 phase "PRE-FLIGHT"
 
-# Check required tools
-for tool in build twine; do
-  if ! python3 -c "import $tool" 2>/dev/null; then
-    error "'$tool' is not installed. Install with: pip install build twine"
+# Release runs exclusively against the project .venv — never system python.
+if [[ ! -x "$PY" ]]; then
+  error "Project virtualenv not found at $VENV_DIR.
+  Create it: python3 -m venv .venv && .venv/bin/pip install -e . build twine"
+fi
+
+# Verify the .venv has the full toolchain (project deps + build/publish tools).
+# tomli_w is the canary: a non-stdlib runtime dep imported at module load by
+# agent_notes/data/templates/frontmatter/codex.py during build/test.
+for mod in agent_notes tomli_w twine; do
+  if ! "$PY" -c "import $mod" 2>/dev/null; then
+    error "Module '$mod' is not importable by $PY.
+  Provision the venv: .venv/bin/pip install -e . build twine"
   fi
 done
-ok "build and twine are available"
+
+# 'build' must be the PyPA build tool runnable as a module. A bare `import build`
+# can be satisfied by a stale local build/ namespace dir, so check executability.
+if ! "$PY" -m build --version >/dev/null 2>&1; then
+  error "PyPA 'build' is not runnable via '$PY -m build'.
+  Provision the venv: .venv/bin/pip install -e . build twine"
+fi
+ok "Release toolchain available in $VENV_DIR"
 
 # Check if on develop branch
 current_branch=$(git branch --show-current)
@@ -112,7 +130,7 @@ ok "GitHub CLI available"
 
 # Run validate
 info "Running validation..."
-if ! python3 -m agent_notes validate > /dev/null 2>&1; then
+if ! "$PY" -m agent_notes validate > /dev/null 2>&1; then
   error "Validation failed. Run 'agent-notes validate' to see details."
 fi
 ok "Validation passed"
@@ -121,7 +139,7 @@ ok "Validation passed"
 phase "TESTS"
 
 info "Running full pytest suite..."
-if ! python3 -m pytest tests/ -x -q; then
+if ! "$PY" -m pytest tests/ -x -q; then
   error "Tests failed — aborting release."
 fi
 ok "All tests passed"
@@ -201,21 +219,21 @@ phase "BUILD"
 
 info "Building wheel and sdist..."
 rm -rf dist/
-python3 -m build --outdir dist/
+"$PY" -m build --outdir dist/
 ok "Package built: $(ls dist/)"
 
 # ─── PHASE: TWINE CHECK ──────────────────────────────────────────────────────
 phase "TWINE CHECK"
 
 info "Checking package metadata and description rendering..."
-python3 -m twine check dist/*
+"$PY" -m twine check dist/*
 ok "twine check passed"
 
 # ─── PHASE: SMOKE TESTS ──────────────────────────────────────────────────────
 phase "SMOKE TESTS"
 
 info "Creating fresh virtualenv at $SMOKE_VENV..."
-python3 -m venv "$SMOKE_VENV"
+"$PY" -m venv "$SMOKE_VENV"
 ok "Virtualenv created"
 
 info "Installing wheel into test venv..."
@@ -299,7 +317,7 @@ fi
 
 # Publish to PyPI
 info "Publishing to PyPI..."
-if python3 -m twine upload dist/*; then
+if "$PY" -m twine upload dist/*; then
   ok "Published to PyPI"
 else
   warn "PyPI upload failed. Run 'python3 -m twine upload dist/*' manually."
