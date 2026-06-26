@@ -3,8 +3,20 @@ set -euo pipefail
 
 AGENT_NOTES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENV_DIR="$AGENT_NOTES_DIR/.venv"
-PY="$VENV_DIR/bin/python"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+
+# Prefer uv run for the managed environment; fall back to .venv if uv is absent.
+if command -v uv &> /dev/null; then
+  PY_RUN() { uv run --project "$AGENT_NOTES_DIR" python "$@"; }
+  PY_MOD() { uv run --project "$AGENT_NOTES_DIR" python -m "$@"; }
+elif [[ -x "$VENV_DIR/bin/python" ]]; then
+  PY_RUN() { "$VENV_DIR/bin/python" "$@"; }
+  PY_MOD() { "$VENV_DIR/bin/python" -m "$@"; }
+else
+  echo "Error: neither uv nor a .venv at $VENV_DIR is available." >&2
+  echo "Install uv (brew install uv) or create the venv manually." >&2
+  exit 1
+fi
 LOG_FILE="/tmp/agent-notes-release-${TIMESTAMP}.log"
 SMOKE_VENV="/tmp/agent-notes-release-test"
 DRY_RUN=false
@@ -85,29 +97,20 @@ bump_version() {
 # ─── PHASE: PRE-FLIGHT ───────────────────────────────────────────────────────
 phase "PRE-FLIGHT"
 
-# Release runs exclusively against the project .venv — never system python.
-if [[ ! -x "$PY" ]]; then
-  error "Project virtualenv not found at $VENV_DIR.
-  Create it: python3 -m venv .venv && .venv/bin/pip install -e . build twine"
+# Ensure deps are current — uv sync is idempotent and fast.
+if command -v uv &> /dev/null; then
+  uv sync --project "$AGENT_NOTES_DIR" --quiet
+  ok "Dependencies synced via uv"
 fi
 
-# Verify the .venv has the full toolchain (project deps + build/publish tools).
-# tomli_w is the canary: a non-stdlib runtime dep imported at module load by
-# agent_notes/data/templates/frontmatter/codex.py during build/test.
-for mod in agent_notes tomli_w twine; do
-  if ! "$PY" -c "import $mod" 2>/dev/null; then
-    error "Module '$mod' is not importable by $PY.
-  Provision the venv: .venv/bin/pip install -e . build twine"
-  fi
-done
-
-# 'build' must be the PyPA build tool runnable as a module. A bare `import build`
-# can be satisfied by a stale local build/ namespace dir, so check executability.
-if ! "$PY" -m build --version >/dev/null 2>&1; then
-  error "PyPA 'build' is not runnable via '$PY -m build'.
-  Provision the venv: .venv/bin/pip install -e . build twine"
+# Verify the toolchain is present (agent_notes importable, build module runnable).
+if ! PY_MOD agent_notes --version >/dev/null 2>&1; then
+  error "agent_notes is not importable. Run: uv sync  (or: .venv/bin/pip install -e . build twine)"
 fi
-ok "Release toolchain available in $VENV_DIR"
+if ! PY_MOD build --version >/dev/null 2>&1; then
+  error "PyPA 'build' is not runnable. Run: uv sync  (or: .venv/bin/pip install build)"
+fi
+ok "Release toolchain available"
 
 # Check if on develop branch
 current_branch=$(git branch --show-current)
@@ -130,7 +133,7 @@ ok "GitHub CLI available"
 
 # Run validate
 info "Running validation..."
-if ! "$PY" -m agent_notes validate > /dev/null 2>&1; then
+if ! PY_MOD agent_notes validate > /dev/null 2>&1; then
   error "Validation failed. Run 'agent-notes validate' to see details."
 fi
 ok "Validation passed"
@@ -139,7 +142,7 @@ ok "Validation passed"
 phase "TESTS"
 
 info "Running full pytest suite..."
-if ! "$PY" -m pytest tests/ -x -q; then
+if ! PY_MOD pytest tests/ -x -q; then
   error "Tests failed — aborting release."
 fi
 ok "All tests passed"
@@ -219,21 +222,21 @@ phase "BUILD"
 
 info "Building wheel and sdist..."
 rm -rf dist/
-"$PY" -m build --outdir dist/
+PY_MOD build --outdir dist/
 ok "Package built: $(ls dist/)"
 
 # ─── PHASE: TWINE CHECK ──────────────────────────────────────────────────────
 phase "TWINE CHECK"
 
 info "Checking package metadata and description rendering..."
-"$PY" -m twine check dist/*
+PY_MOD twine check dist/*
 ok "twine check passed"
 
 # ─── PHASE: SMOKE TESTS ──────────────────────────────────────────────────────
 phase "SMOKE TESTS"
 
 info "Creating fresh virtualenv at $SMOKE_VENV..."
-"$PY" -m venv "$SMOKE_VENV"
+PY_MOD venv "$SMOKE_VENV"
 ok "Virtualenv created"
 
 info "Installing wheel into test venv..."
@@ -317,7 +320,7 @@ fi
 
 # Publish to PyPI
 info "Publishing to PyPI..."
-if "$PY" -m twine upload dist/*; then
+if PY_MOD twine upload dist/*; then
   ok "Published to PyPI"
 else
   warn "PyPI upload failed. Run 'python3 -m twine upload dist/*' manually."

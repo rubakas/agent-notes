@@ -23,7 +23,7 @@ def _load_settings(path: Path) -> dict:
         return {}
 
 
-def install_hook(settings_path: Path, hook_event: str, command: str) -> None:
+def install_hook(settings_path: Path, hook_event: str, command: str, matcher: str = "") -> None:
     """Add a hook entry to settings.json. Idempotent — does not duplicate."""
     data = _load_settings(settings_path)
 
@@ -37,7 +37,7 @@ def install_hook(settings_path: Path, hook_event: str, command: str) -> None:
     hooks_dict = data.setdefault("hooks", {})
     event_list = hooks_dict.setdefault(hook_event, [])
     event_list.append(
-        {"matcher": "", "hooks": [{"type": "command", "command": command}]}
+        {"matcher": matcher, "hooks": [{"type": "command", "command": command}]}
     )
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(json.dumps(data, indent=2) + "\n")
