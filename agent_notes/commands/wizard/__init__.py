@@ -120,19 +120,13 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
             if backend_name == "claude" and role.name == "orchestrator":
                 continue
 
-            if role.default_model:
-                default_model = next(
-                    (m for m in compatible if m.id == role.default_model),
-                    next(
-                        (m for m in reversed(compatible) if m.model_class == role.typical_class),
-                        compatible[0],
-                    ),
-                )
-            else:
-                default_model = next(
+            default_model = next(
+                (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.deprecated),
+                next(
                     (m for m in reversed(compatible) if m.model_class == role.typical_class),
                     compatible[0],
-                )
+                ),
+            )
             default_idx = compatible.index(default_model)
 
             options = []

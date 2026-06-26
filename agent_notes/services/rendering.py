@@ -100,106 +100,21 @@ def _resolve_model_str(
 
     Returns (model_str, model_registry) where model_registry may have been
     lazily loaded inside and is returned so the caller can cache it.
+
+    Delegates all resolution logic to ModelResolver; this function is kept
+    as a thin shim so existing callers (tests, generate_agent_files) continue
+    to work unchanged.
     """
-    from ..registries.model_registry import load_model_registry
-    from ..services.user_config import resolve_agent_role, resolve_role_model
+    from ..services.model_resolver import ModelResolver
 
-    agent_role = resolve_agent_role(agent_name, agent_config.get('role'), user_config)
-    model_str = None
-
-    if (scope_state is not None and
-            agent_role is not None and
-            backend.name in scope_state.clis and
-            agent_role in scope_state.clis[backend.name].role_models):
-
-        # Step 1: state-driven resolution
-        model_id = scope_state.clis[backend.name].role_models[agent_role]
-
-        if model_registry is None:
-            model_registry = load_model_registry()
-
-        try:
-            model = model_registry.get(model_id)
-            resolved = model.resolve_for_providers(list(backend.accepted_providers))
-            if resolved is not None:
-                _provider, alias_str = resolved
-                model_str = model.model_class if backend.use_model_class else alias_str
-        except KeyError:
-            pass  # fall through to class/tier fallback
-
-    # User config override: explicit model for this role+backend
-    if model_str is None:
-        user_model = resolve_role_model(agent_role, backend.name, user_config)
-        if user_model:
-            model_str = user_model
-
-    # Step 2: role.typical_class fallback — the "works from shipped YAMLs
-    # with zero state" path. Loads the role and picks any model whose
-    # class matches role.typical_class and which has an alias for one
-    # of this backend's accepted providers.
-    if model_str is None and agent_role is not None:
-        if model_registry is None:
-            model_registry = load_model_registry()
-        try:
-            from ..registries.role_registry import load_role_registry
-            role_registry = load_role_registry()
-            role = role_registry.get(agent_role)
-        except (KeyError, FileNotFoundError, ValueError):
-            role = None
-
-        if role is not None:
-            # Prefer newer model IDs when multiple match the class.
-            # Registries are sorted ascending by id, so iterate reversed
-            # to pick e.g. claude-opus-4-7 over claude-opus-4-6.
-            #
-            # When preferred_family is set, first try to find a model
-            # whose class matches AND whose family matches preferred_family.
-            # Only fall back to any-family if no preferred-family match found.
-            # This prevents gpt models (openai-aliased) from hijacking
-            # opencode's step-2 fallback, since opencode has preferred_family=claude.
-            all_models_reversed = list(reversed(model_registry.all()))
-            preferred_family = backend.preferred_family
-
-            def _find_class_match(models, family_filter=None):
-                for model in models:
-                    if model.model_class != role.typical_class:
-                        continue
-                    if family_filter is not None and model.family != family_filter:
-                        continue
-                    resolved = model.resolve_for_providers(list(backend.accepted_providers))
-                    if resolved is not None:
-                        return model, resolved
-                return None, None
-
-            if preferred_family is not None:
-                matched_model, resolved = _find_class_match(all_models_reversed, preferred_family)
-                if matched_model is None:
-                    matched_model, resolved = _find_class_match(all_models_reversed)
-            else:
-                matched_model, resolved = _find_class_match(all_models_reversed)
-
-            if matched_model is not None and resolved is not None:
-                _provider, alias_str = resolved
-                model_str = matched_model.model_class if backend.use_model_class else alias_str
-
-    # Step 3: legacy tier fallback (for pre-v1.1 agents.yaml files that
-    # still declare `tier:` instead of `role:`).
-    if model_str is None:
-        if 'tier' not in agent_config:
-            raise ValueError(
-                f"Agent '{agent_name}' has role='{agent_role}' but no model could be "
-                f"resolved for backend '{backend.name}'. Tried: state.role_models, "
-                f"role.typical_class->model.class matching, and legacy 'tier' fallback. "
-                f"Check that data/roles/{agent_role}.yaml exists and that at least one "
-                f"model in data/models/*.yaml has class={role.typical_class if 'role' in locals() and role else '?'} "
-                f"with an alias for one of {list(backend.accepted_providers)}."
-            )
-        tier = agent_config['tier']
-        if backend.name not in tiers[tier]:
-            raise ValueError(f"tier '{tier}' missing model for CLI '{backend.name}' in agents.yaml")
-        model_str = tiers[tier][backend.name]
-
-    return model_str, model_registry
+    resolver = ModelResolver(
+        scope_state=scope_state,
+        user_config=user_config,
+        tiers=tiers,
+        model_registry=model_registry,
+    )
+    model_str = resolver.resolve(agent_name, agent_config, backend)
+    return model_str, resolver._model_registry
 
 
 def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],

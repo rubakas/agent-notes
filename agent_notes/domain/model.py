@@ -14,6 +14,7 @@ class Model:
     aliases: dict[str, str]          # {"anthropic": "claude-opus-4-7", ...}
     pricing: dict[str, float] = field(default_factory=dict)
     capabilities: dict[str, bool] = field(default_factory=dict)
+    deprecated: bool = False
 
     def has_alias_for(self, provider: str) -> bool:
         return provider in self.aliases

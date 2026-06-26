@@ -21,8 +21,6 @@ except ImportError:
             "tomli is required on Python < 3.11. Install it: pip install tomli"
         ) from exc
 
-import tomli_w
-
 CONFIG_PATH = Path.home() / ".agent-notes" / "credentials.toml"
 SAFE_MODE = 0o600
 
@@ -112,6 +110,8 @@ def _dump_toml(data: dict) -> str:
     The hand-rolled predecessor would have written Python's ``None`` repr, which
     is not valid TOML and would fail on read-back anyway.
     """
+    import tomli_w  # lazy import — only needed when writing credentials
+
     providers = data.get("providers", {})
     clean: dict = {"providers": {}}
     for name, block in providers.items():

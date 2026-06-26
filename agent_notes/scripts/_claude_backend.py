@@ -251,23 +251,38 @@ def run(since: float | None = None, session_id: str | None = None) -> int:
             continue
         inp = usage.get("input_tokens", 0) or 0
         outp = usage.get("output_tokens", 0) or 0
-        cache = usage.get("cache_read_input_tokens", 0) or 0
+        cache_read = usage.get("cache_read_input_tokens", 0) or 0
+
+        # Extract cache write tokens, preferring the 5m/1h split when available.
+        cache_creation_obj = usage.get("cache_creation") or {}
+        write_5m = (cache_creation_obj.get("ephemeral_5m_input_tokens") or 0)
+        write_1h = (cache_creation_obj.get("ephemeral_1h_input_tokens") or 0)
+        # Flat fallback: if no split present but flat total exists, treat as 5m writes.
+        if not (write_5m or write_1h):
+            flat_creation = usage.get("cache_creation_input_tokens", 0) or 0
+            write_5m = flat_creation
 
         key = (agent_label, model)
         if key not in groups:
-            groups[key] = {"inp": 0, "outp": 0, "cache": 0}
+            groups[key] = {"inp": 0, "outp": 0, "cache_read": 0, "write_5m": 0, "write_1h": 0}
         groups[key]["inp"] += inp
         groups[key]["outp"] += outp
-        groups[key]["cache"] += cache
+        groups[key]["cache_read"] += cache_read
+        groups[key]["write_5m"] += write_5m
+        groups[key]["write_1h"] += write_1h
 
     if not groups:
         print("No assistant messages found in current session.")
         return 0
 
     costs = [
-        (agent, model, g["inp"], g["outp"], g["cache"],
-         _pricing.calculate_cost(model, g["inp"], g["outp"], g["cache"]),
-         _pricing.baseline_cost(g["inp"], g["outp"], g["cache"]))
+        (agent, model, g["inp"], g["outp"], g["cache_read"], g["write_5m"], g["write_1h"],
+         _pricing.calculate_cost(
+             model, g["inp"], g["outp"], g["cache_read"], g["write_5m"], g["write_1h"]
+         ),
+         _pricing.baseline_cost(
+             g["inp"], g["outp"], g["cache_read"], g["write_5m"], g["write_1h"]
+         ))
         for (agent, model), g in groups.items()
     ]
 
@@ -285,8 +300,9 @@ def run(since: float | None = None, session_id: str | None = None) -> int:
     total_time_str = fmt_time(total_time_ms / 1000) if total_time_ms > 0 else "n/a"
 
     rows = [
-        (f"{agent}({model})", model, inp, outp, cache, _time_str_for(agent), actual, vs)
-        for agent, model, inp, outp, cache, actual, vs in costs
+        (f"{agent}({model})", model, inp, outp, cache_read + write_5m + write_1h,
+         _time_str_for(agent), actual, vs)
+        for agent, model, inp, outp, cache_read, write_5m, write_1h, actual, vs in costs
     ]
     render_cost_table(rows, total_time_str, _pricing.baseline_label())
     return 0

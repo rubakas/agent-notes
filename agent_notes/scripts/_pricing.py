@@ -40,18 +40,50 @@ def get_price(model_id: str) -> dict:
         if any(fnmatch(model_id, p) for p in patterns):
             return price
     sys.stderr.write(f"Warning: no pricing entry for model '{model_id}', falling back to Sonnet rates\n")
-    return {"in": 3.00, "out": 15.00, "cache": 0.30}
+    return {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write_5m": 3.75, "cache_write_1h": 6.00}
 
 
-def calculate_cost(model_id: str, inp: int, outp: int, cache: int) -> float:
+def calculate_cost(
+    model_id: str,
+    inp: int,
+    outp: int,
+    cache_read: int = 0,
+    cache_write_5m: int = 0,
+    cache_write_1h: int = 0,
+) -> float:
     p = get_price(model_id)
-    return (inp * p["in"] + outp * p["out"] + cache * p["cache"]) / 1_000_000
+    # Support old pricing entries that still have a flat "cache" key
+    read_rate = p.get("cache_read", p.get("cache", 0.0))
+    write_5m_rate = p.get("cache_write_5m", p.get("cache", 0.0))
+    write_1h_rate = p.get("cache_write_1h", p.get("cache", 0.0))
+    return (
+        inp * p["in"]
+        + outp * p["out"]
+        + cache_read * read_rate
+        + cache_write_5m * write_5m_rate
+        + cache_write_1h * write_1h_rate
+    ) / 1_000_000
 
 
-def baseline_cost(inp: int, outp: int, cache: int) -> float:
+def baseline_cost(
+    inp: int,
+    outp: int,
+    cache_read: int = 0,
+    cache_write_5m: int = 0,
+    cache_write_1h: int = 0,
+) -> float:
     pricing = _load()
     p = pricing["baseline"]["price"]
-    return (inp * p["in"] + outp * p["out"] + cache * p["cache"]) / 1_000_000
+    read_rate = p.get("cache_read", p.get("cache", 0.0))
+    write_5m_rate = p.get("cache_write_5m", p.get("cache", 0.0))
+    write_1h_rate = p.get("cache_write_1h", p.get("cache", 0.0))
+    return (
+        inp * p["in"]
+        + outp * p["out"]
+        + cache_read * read_rate
+        + cache_write_5m * write_5m_rate
+        + cache_write_1h * write_1h_rate
+    ) / 1_000_000
 
 
 def baseline_label() -> str:
