@@ -80,7 +80,7 @@ Use once — after linters and tests pass, before committing.
 4. Dev session reads `report-<uuid>.md` directly from the bus when the operator relays the trigger, triages, fixes failures, optionally mints a NEW `<uuid>` and repeats for only the fixed scenarios.
 5. All scenarios PASS → gate closes, commit proceeds.
 
-**This is the default mode the lead uses at end of a frontend feature.**
+**This is the mode the lead uses when the browser-test gate fires at the end of a frontend feature.**
 
 ### Mode 3 — Manual Ad-Hoc
 
