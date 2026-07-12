@@ -1,73 +1,37 @@
 ---
 name: tdd
-description: "RED-GREEN-REFACTOR via vertical slices: one failing test, one implementation, repeat. Use when user wants TDD, test-first development, or says 'red-green-refactor'."
+description: Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions "red-green-refactor", or wants integration tests.
 group: process
 ---
 
 # Test-Driven Development
 
-## The contract
+TDD is the red → green loop. This skill is the reference that makes that loop produce tests worth keeping: what a good test is, where tests go, the anti-patterns, and the rules of the loop. Every section applies on every cycle — consult them before and during the loop, not after.
 
-1. No production code before a failing test.
-2. The minimum code to pass the test — nothing more.
-3. Refactor only while tests are green.
+When exploring the codebase, read `CONTEXT.md` (if it exists) so test names and interface vocabulary match the project's domain language, and respect ADRs in the area you're touching.
 
-## Anti-pattern: Horizontal slicing
+## What a good test is
 
-**Do not write all tests first, then all implementation.** This is horizontal slicing — treating RED as "write all tests" and GREEN as "write all code."
+Tests verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't. A good test reads like a specification — "user can checkout with valid cart" tells you exactly what capability exists — and survives refactors because it doesn't care about internal structure.
 
-This produces bad tests: written in bulk against imagined behavior, testing the shape of things (data structures, function signatures) rather than user-facing behavior. Tests become insensitive to real changes.
+See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking guidelines.
 
-**Correct approach: vertical slices via tracer bullets.** One test → one implementation → repeat. Each test responds to what you learned from the previous cycle.
+## Seams — where tests go
 
-```
-WRONG: RED: test1, test2, test3, test4 → GREEN: impl1, impl2, impl3, impl4
-RIGHT: RED→GREEN: test1→impl1, RED→GREEN: test2→impl2, RED→GREEN: test3→impl3
-```
+A **seam** is the public boundary you test at: the interface where you observe behavior without reaching inside. Tests live at seams, never against internals.
 
-Because you just wrote the code, you know exactly what behavior matters and how to verify it.
+**Test only at pre-agreed seams.** Before writing any test, write down the seams under test and confirm them with the user. No test is written at an unconfirmed seam. You can't test everything — agreeing the seams up front is how testing effort lands on the critical paths and complex logic instead of every edge case.
 
-## RED — write a failing test
+Ask: "What's the public interface, and which seams should we test?"
 
-- Identify the smallest behavior to verify.
-- Name the test as a specification: `test_returns_empty_list_when_no_results`, not `test_search`.
-- Run it. Confirm it fails for the **right reason** — the assertion fails, not a syntax error or import problem.
-- Do not write production code yet.
+## Anti-patterns
 
-## GREEN — make it pass
+- **Implementation-coupled** — mocks internal collaborators, tests private methods, or verifies through a side channel (querying the database instead of using the interface). The tell: the test breaks when you refactor but behavior hasn't changed.
+- **Tautological** — the assertion recomputes the expected value the way the code does (`expect(add(a, b)).toBe(a + b)`, a snapshot derived by hand the same way, a constant asserted equal to itself), so it passes by construction and can never disagree with the code. Expected values must come from an independent source of truth — a known-good literal, a worked example, the spec.
+- **Horizontal slicing** — writing all tests first, then all implementation. Bulk tests verify _imagined_ behavior: you test the _shape_ of things rather than user-facing behavior, the tests go insensitive to real changes, and you commit to test structure before understanding the implementation. Work in **vertical slices** instead — one test → one implementation → repeat, each test a **tracer bullet** that responds to what the last cycle taught you.
 
-- Write the minimum code to pass the test. Hardcode values if that's all it takes — you'll triangulate with the next test. A hardcoded return is only valid as a transient step toward a general implementation; if it stays in permanently to satisfy the test, that is reward-hacking, not TDD.
-- Do not reach GREEN by gaming the test: no special-casing the test's specific inputs, no weakening the assertion, no deleting the assertion. The test must pass because the behavior is implemented, not because the check was neutered.
-- Run the test. Confirm green.
-- If still failing: read the failure output carefully before changing anything else.
+## Rules of the loop
 
-## REFACTOR — clean up
-
-- Eliminate duplication.
-- Improve names.
-- Extract where it improves clarity, not just to reduce line count.
-- Run tests after every change. If they go red: undo the refactor, don't push through.
-
-## Test scope rules
-
-- Test **behavior** from the outside, not implementation details.
-- Do not test private methods directly — test through the public interface.
-- Prefer fewer, meaningful assertions over many trivial ones.
-- If a test requires more than three mocks to set up: it is testing too much. Split the unit.
-
-## When NOT to apply
-
-- Exploratory spikes where you're learning an unfamiliar API — spike first, then write tests for what you keep.
-- Tests that require so much mocking the mock becomes the thing being tested — write an integration test instead.
-- Throwaway scripts with no expected lifetime.
-
-## Flaky tests
-
-If a new test passes sometimes and fails other times: stop and fix it before continuing. A flaky test is worse than no test — it trains you to ignore failures.
-
-## Done means
-
-- All new tests pass.
-- No existing tests regressed.
-- Test names describe the behavior they verify.
-- No dead code or commented-out experiments remain.
+- **Red before green.** Write the failing test first, then only enough code to pass it. Don't anticipate future tests or add speculative features.
+- **One slice at a time.** One seam, one test, one minimal implementation per cycle.
+- **Refactoring is not part of the loop.** It belongs to the review stage (see the `code-review` skill), not the red → green implementation cycle.

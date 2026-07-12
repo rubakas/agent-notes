@@ -235,7 +235,7 @@ For each scenario, extract: PASS/FAIL, expected, observed, console errors, netwo
 
 For each FAIL:
 - Reproduce locally using the exact steps from the scenario.
-- Root-cause (apply the `debugging-protocol` skill).
+- Root-cause (apply the `diagnosing-bugs` skill).
 - Fix.
 - Re-verify: run relevant unit/integration tests; confirm locally before re-testing in browser.
 
