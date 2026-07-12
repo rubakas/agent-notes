@@ -22,14 +22,18 @@ config = yaml.safe_load(pathlib.Path("agent_notes/data/plugin/claude.yaml").read
 vendored = config.get("vendored_skills", [])
 skills_dst = pathlib.Path(".claude-plugin/skills")
 
+# Rebuild from scratch so retired/renamed skills are pruned, not left stale.
+if skills_dst.exists():
+    shutil.rmtree(skills_dst)
+skills_dst.mkdir(parents=True, exist_ok=True)
+
 for skill in vendored:
-    src = pathlib.Path(f"agent_notes/dist/skills/{skill}/SKILL.md")
-    dst_dir = skills_dst / skill
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    if src.exists():
-        shutil.copy(src, dst_dir / "SKILL.md")
+    src_dir = pathlib.Path(f"agent_notes/dist/skills/{skill}")
+    # Copy the whole skill directory (SKILL.md + any bundled reference files).
+    if src_dir.is_dir() and (src_dir / "SKILL.md").exists():
+        shutil.copytree(src_dir, skills_dst / skill)
     else:
-        print(f"  Warning: skill source not found: {src}")
+        print(f"  Warning: skill source not found: {src_dir}")
 
 print(f"Plugin skills synced ({len(vendored)} vendored).")
 PYEOF

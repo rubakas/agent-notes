@@ -11,7 +11,7 @@ Config command in plugin: **missing** — `.claude-plugin/plugin.json` only ship
 | Plugin file | Source under `data/` | Generated? |
 |---|---|---|
 | `.claude-plugin/agents/*.md` (17 files) | `data/agents/*.md` → `dist/claude/agents/` | Yes — `build-plugin.sh` lines 5-13 wipe and copy from `dist/claude/agents/` (excluding `lead.md`). |
-| `.claude-plugin/skills/<skill>/SKILL.md` (5: brainstorming, code-review, debugging-protocol, refactoring-protocol, tdd) | `data/skills/<skill>/SKILL.md` → `dist/skills/` | Bodies generated (lines 15-22); the *set* of vendored dirs is hand-curated (5 of 36). |
+| `.claude-plugin/skills/<skill>/` (21 skills, full directories incl. reference files) | `data/skills/<skill>/` → `dist/skills/` | Yes — `build-claude-plugin.sh` wipes `.claude-plugin/skills/` and copies each vendored skill directory from `dist/skills/`; the *set* of vendored dirs is the hand-curated allow-list in `data/plugin/claude.yaml` (21 of 28). |
 | `.claude-plugin/plugin.json` | partial | Only `version` is generated (lines 24-31); `name`, `description`, `author`, `repository`, `license`, `keywords`, `hooks` are hand-edited. |
 | `.claude-plugin/README.md` | none | Hand-maintained (separate marketplace copy). |
 

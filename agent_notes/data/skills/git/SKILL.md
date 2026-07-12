@@ -45,6 +45,7 @@ git commit -m "#<ticket> type(scope): short description"
 - **Short** — under 72 characters
 - **Lowercase** — no capital letters after the colon
 - Extract ticket number from branch name when available
+- **No AI attribution** — never add `Co-Authored-By`, "Generated with", `🤖`, or any model/tool signature to commit messages or PR descriptions (see the no-ai-attribution rule)
 
 ### 5. Extract ticket from branch
 

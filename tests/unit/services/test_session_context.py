@@ -105,7 +105,7 @@ class TestRenderContext:
         assert "Explore multiple approaches" in result
 
     def test_skills_placeholder_replaced_when_skills_provided(self):
-        skills = [_skill("caveman", "Ultra-compressed communication")]
+        skills = [_skill("grill-me", "Relentless interview to sharpen a plan")]
         result = render_context(agents=[], version="1.0", skills=skills)
         assert "{{skills_catalog}}" not in result
 
@@ -118,12 +118,12 @@ class TestRenderContext:
 
     def test_full_render_contains_all_three_sections(self):
         """version, agents, and skills all appear together in a full render."""
-        skills = [_skill("caveman", "Compressed comms")]
+        skills = [_skill("grill-me", "Relentless interview to sharpen a plan")]
         result = render_context(agents=["coder"], version="3.1.4", skills=skills)
         assert "3.1.4" in result
         assert "- coder" in result
-        assert "/caveman" in result
-        assert "Compressed comms" in result
+        assert "/grill-me" in result
+        assert "Relentless interview to sharpen a plan" in result
 
     def test_default_skills_param_is_none(self):
         """render_context(agents, version) with no skills kwarg must not raise."""

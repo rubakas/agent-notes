@@ -3,14 +3,23 @@
 # Add a skill name (matching data/skills/<name>/) to vendor it with the plugin.
 vendored_skills:
   - brainstorming
-  - caveman
   - chrome-test
   - code-review
-  - debugging-protocol
+  - codebase-design
+  - diagnosing-bugs
+  - domain-modeling
   - grill-me
   - grill-with-docs
+  - grilling
+  - handoff
   - improve-codebase-architecture
+  - prototype
   - refactoring-protocol
-  - setup-project-context
+  - research
+  - setup-agent-tracker
   - tdd
-  - zoom-out
+  - to-spec
+  - to-tickets
+  - triage
+  - wayfinder
+  - writing-great-skills
