@@ -100,7 +100,7 @@ def do_migrate() -> None:
                 continue
             dst_cat = vault / cat
             dst_cat.mkdir(exist_ok=True)
-            for note in src_cat.glob("*.md"):
+            for note in sorted(src_cat.glob("*.md")):
                 dst = dst_cat / note.name
                 if dst.exists():
                     errors.append(f"collision: {note} -> {dst}")
@@ -126,7 +126,10 @@ def do_migrate() -> None:
         cat_dir = vault / cat
         if not cat_dir.exists():
             continue
-        for note in list(cat_dir.glob("*.md")):
+        # Sort for deterministic ordering: on a same-date collision the
+        # earliest-named file keeps the clean base name and later ones get the
+        # HHMMSS suffix, regardless of filesystem glob order.
+        for note in sorted(cat_dir.glob("*.md")):
             new_stem = _new_stem(note.stem, cat_dir, note)
             if new_stem is None:
                 skipped += 1
