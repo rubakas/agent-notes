@@ -45,7 +45,16 @@ Note: database-specific issues (N+1 queries, missing indexes, schema design) bel
 
 ## Memory (read-before-work)
 
-Memory is not configured. Proceed without reading any shared state.
+You are part of a team that shares state via a local memory store at `/home/en3e/.claude/agent-memory`.
+
+### Read before working
+
+If the task references an in-flight initiative, prior decision, or session progress, read the relevant memory files BEFORE you start:
+
+1. `/home/en3e/.claude/agent-memory/MEMORY.md` — index of saved memories
+2. `/home/en3e/.claude/agent-memory/` — individual memory files by topic
+
+If `/home/en3e/.claude/agent-memory` is "disabled", skip this — proceed without memory context.
 
 Do not duplicate effort. If a recent note already answers the question you'd be investigating, cite it in your report rather than re-deriving.
 
