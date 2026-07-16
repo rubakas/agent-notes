@@ -45,3 +45,40 @@ def test_copy_global_files_returns_list_of_paths(tmp_path):
     assert isinstance(result, list)
     for item in result:
         assert isinstance(item, Path)
+
+
+# --- One-line build summary (replaces the per-file listing) ---
+
+class TestFormatBuildSummary:
+    def test_basic_summary(self):
+        assert _build_mod.format_build_summary(96, 13748, 4) == \
+            "Generated 96 files (13,748 lines) across 4 CLIs"
+
+    def test_singular_forms(self):
+        assert _build_mod.format_build_summary(1, 340, 1) == \
+            "Generated 1 file (340 lines) across 1 CLI"
+
+    def test_thousands_separator(self):
+        assert "(1,000,000 lines)" in _build_mod.format_build_summary(2, 1_000_000, 2)
+
+
+class TestCountDistClis:
+    def test_counts_distinct_cli_dirs_only(self, tmp_path):
+        dist = tmp_path / "dist"
+        files = [
+            dist / "claude" / "agents" / "coder.md",
+            dist / "claude" / "CLAUDE.md",
+            dist / "opencode" / "AGENTS.md",
+            dist / "rules" / "safety.md",    # not a CLI dir
+            dist / "skills" / "git" / "SKILL.md",  # not a CLI dir
+        ]
+        cli_names = {"claude", "opencode", "codex", "copilot"}
+        assert _build_mod.count_dist_clis(files, dist, cli_names) == 2
+
+    def test_ignores_files_outside_dist(self, tmp_path):
+        dist = tmp_path / "dist"
+        files = [tmp_path / "elsewhere" / "claude" / "x.md"]
+        assert _build_mod.count_dist_clis(files, dist, {"claude"}) == 0
+
+    def test_empty_file_list(self, tmp_path):
+        assert _build_mod.count_dist_clis([], tmp_path / "dist", {"claude"}) == 0

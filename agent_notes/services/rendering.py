@@ -117,17 +117,151 @@ def _resolve_model_str(
     return model_str, resolver._model_registry
 
 
+def _effective_role(agent_name: str, agent_config: Dict[str, Any], user_config: Dict[str, Any]) -> Optional[str]:
+    """Return the effective role for agent_name (user override > declared).
+
+    Mirrors ModelResolver._effective_role so role_efforts pins line up with
+    the same role key that role_models pins use.
+    """
+    default_role = agent_config.get("role")
+    return user_config.get("agent_roles", {}).get(agent_name, default_role)
+
+
+def _resolve_provider_for_model_str(model_str: Optional[str], backend, model_registry) -> Optional[str]:
+    """Reverse-lookup: given the already-resolved model_str for this backend, find
+    which provider (from backend.accepted_providers) produced it, by scanning the
+    model registry. Returns None if model_str isn't traceable to a registry model
+    (e.g. legacy tier fallback, which isn't provider-registry-aware).
+
+    Models are scanned in registry order and the scan returns on the first
+    model that either matches model_str exactly by alias (state-pinned models
+    render exact alias strings on every backend) or — on use_model_class
+    backends, where the UNPINNED fallback still renders model_class — matches
+    by class with family equal to backend.preferred_family. A class alone can
+    be ambiguous across families (e.g. claude-sonnet-* vs gpt-* both class
+    'sonnet'), so a class match on a non-preferred family is only remembered
+    as the fallback, returned when the scan finishes with no exact-alias or
+    preferred-family class match."""
+    if not model_str or model_registry is None:
+        return None
+
+    class_match_provider = None
+    for model in model_registry.all():
+        resolved = model.resolve_for_providers(list(backend.accepted_providers))
+        if resolved is None:
+            continue
+        provider, alias = resolved
+        if alias == model_str:
+            return provider
+        if backend.use_model_class and model.model_class == model_str:
+            if model.family == backend.preferred_family:
+                return provider
+            if class_match_provider is None:
+                class_match_provider = provider
+    return class_match_provider
+
+
+def _resolve_effort(
+    agent_name: str,
+    agent_config: Dict[str, Any],
+    backend,
+    scope_state,
+    user_config: Dict[str, Any],
+    model_str: Optional[str],
+    model_registry,
+) -> Optional[str]:
+    """Resolve the effective effort for an agent+backend, validated against the
+    resolved model's provider effort vocabulary.
+
+    Precedence (USER DECISION: pin wins):
+      1. State-driven pin — scope_state.clis[backend].role_efforts[role]
+      2. Agent's own 'effort' (agents.yaml)
+      3. Role's 'typical_effort'
+      4. None
+
+    The raw value from that chain is then validated against the provider's
+    effort list (resolved via the agent's model on this backend): if the
+    provider has a registry entry and the raw value isn't in its vocabulary,
+    the provider's own default_effort is used instead (NO cross-provider
+    mapping/translation). If the provider has no registry entry at all,
+    resolves to None (nothing is emitted).
+    """
+    from ..registries.role_registry import default_role_registry
+
+    agent_role = _effective_role(agent_name, agent_config, user_config)
+
+    raw_effort = None
+    if scope_state is not None and agent_role is not None and backend.name in scope_state.clis:
+        pin = scope_state.clis[backend.name].role_efforts.get(agent_role)
+        if pin:
+            raw_effort = pin
+
+    if raw_effort is None:
+        raw_effort = agent_config.get("effort")
+
+    if raw_effort is None and agent_role is not None:
+        try:
+            role = default_role_registry().get(agent_role)
+            raw_effort = role.typical_effort or None
+        except (KeyError, FileNotFoundError, ValueError):
+            raw_effort = None
+
+    if not raw_effort:
+        return None
+
+    provider_name = _resolve_provider_for_model_str(model_str, backend, model_registry)
+    if provider_name is None:
+        return None
+
+    from ..registries.provider_registry import default_provider_registry
+
+    try:
+        provider = default_provider_registry().get(provider_name)
+    except (KeyError, FileNotFoundError, ValueError):
+        return None  # provider has no effort registry entry — emit nothing
+
+    if raw_effort in provider.efforts:
+        return raw_effort
+    return provider.default_effort
+
+
+def _overlay_selection_pins(scope_state, role_models, role_efforts):
+    """Return a copy of scope_state with explicit role_models/role_efforts pins
+    layered on top (both shaped {cli_name: {role_name: value}}).
+
+    Used by the wizard: its selections exist only in memory until state.json is
+    written AFTER install, so the pre-install render must receive them
+    explicitly. Explicit pins win over anything persisted; persisted pins for
+    roles/CLIs not mentioned are preserved. scope_state may be None."""
+    from copy import deepcopy
+    from ..domain.state import ScopeState, BackendState
+
+    merged = deepcopy(scope_state) if scope_state is not None else ScopeState()
+    for pins, attr in ((role_models, "role_models"), (role_efforts, "role_efforts")):
+        for cli_name, role_pins in (pins or {}).items():
+            backend_state = merged.clis.setdefault(cli_name, BackendState())
+            getattr(backend_state, attr).update(role_pins)
+    return merged
+
+
 def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
-                         state=None, scope='global', project_path=None) -> list[Path]:
+                         state=None, scope='global', project_path=None,
+                         role_models: Optional[Dict[str, Dict[str, str]]] = None,
+                         role_efforts: Optional[Dict[str, Dict[str, str]]] = None,
+                         profile_label: str = "") -> list[Path]:
     """Generate agent files for all CLI backends.
-    
+
     Args:
         agents_config: Dict of agent configurations from agents.yaml
         tiers: Dict mapping tiers to model names per backend (legacy fallback)
         state: Optional State object for role-based model resolution
         scope: 'global' or 'local' (only used if state is provided)
         project_path: Path for local scope (only used if state is provided and scope='local')
-    
+        role_models: Optional explicit {cli: {role: model_id}} pins that override
+            the persisted state (wizard selections not yet written to state.json)
+        role_efforts: Optional explicit {cli: {role: effort}} pins, same semantics
+        profile_label: Named profile whose pins drive the render ("" = default profile)
+
     If state is None, behaves exactly as before (uses tiers dict).
     If state is provided, tries state-driven resolution first, falls back to tiers on miss.
     """
@@ -150,11 +284,15 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     registry = load_registry()
     model_registry = None  # Lazy load only if needed
     scope_state = None
-    
+
     # Get scope state if state is provided
     if state is not None:
-        scope_state = _get_scope(state, scope, project_path)
-    
+        scope_state = _get_scope(state, scope, project_path, profile_label=profile_label)
+
+    # Explicit selection pins (wizard) override whatever state.json holds
+    if role_models or role_efforts:
+        scope_state = _overlay_selection_pins(scope_state, role_models, role_efforts)
+
     _st = _load_state_fn()
 
     for agent_name, agent_config in agents_config.items():
@@ -222,6 +360,9 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
                 'agent_name': agent_name,
                 'agent_config': agent_config,
                 'model_str': model_str,
+                'resolved_effort': _resolve_effort(
+                    agent_name, agent_config, backend, scope_state, user_config, model_str, model_registry
+                ),
                 'backend_name': backend.name,
                 'backend': backend,
             }
@@ -252,20 +393,9 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
                 full_content = f"{frontmatter}\n\n{body}"
                 agent_file = agents_dir / f'{agent_name}.md'
 
-            if agent_file.exists() and not agent_file.is_symlink():
-                from ..services.fs import handle_existing as _handle_existing
-                import tempfile as _tempfile
-                _fd, _tmp_path = _tempfile.mkstemp(suffix=agent_file.suffix)
-                try:
-                    import os as _os
-                    _os.close(_fd)
-                    Path(_tmp_path).write_text(full_content)
-                    _proceed = _handle_existing(Path(_tmp_path), agent_file)
-                finally:
-                    Path(_tmp_path).unlink(missing_ok=True)
-                if not _proceed:
-                    generated_files.append(agent_file)
-                    continue
+            # dist/ is a derived, regenerable artifact — overwrite in place.
+            # Backups belong to user-facing install targets (fs.handle_existing
+            # via installer.place_file), never to the build output itself.
             agent_file.write_text(full_content)
             generated_files.append(agent_file)
     

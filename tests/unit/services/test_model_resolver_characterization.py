@@ -120,8 +120,11 @@ class TestStateDrivenPin:
         )
         assert model_str == "my-opus-alias"
 
-    def test_state_pin_returns_model_class_when_flag_set(self):
-        """When use_model_class=True the model.model_class string is returned."""
+    def test_state_pin_returns_exact_alias_even_when_use_model_class(self):
+        """A state pin is an explicit version choice: it must render the exact
+        alias string even on use_model_class backends (claude), never be
+        flattened to the class ('opus'), which would let the harness pick its
+        own default version."""
         opus = _make_model("claude-opus-4-8", model_class="opus",
                            aliases={"anthropic": "my-opus-alias"})
         registry = ModelRegistry([opus])
@@ -134,7 +137,7 @@ class TestStateDrivenPin:
             scope_state=scope_state,
             model_registry=registry,
         )
-        assert model_str == "opus"
+        assert model_str == "my-opus-alias"
 
     def test_state_pin_falls_through_on_unknown_model_id(self):
         """If the pinned model id is not in the registry, falls through to next branch."""
@@ -453,7 +456,7 @@ class TestRealRegistryResolution:
                 resolved = m.resolve_for_providers(list(backend.accepted_providers))
                 if resolved is not None:
                     _, alias = resolved
-                    expected = alias
+                    expected = m.model_class if backend.use_model_class else alias
                     break
 
         assert expected is not None, "No opus model found for claude backend"
@@ -485,7 +488,7 @@ class TestRealRegistryResolution:
                 resolved = m.resolve_for_providers(list(backend.accepted_providers))
                 if resolved is not None:
                     _, alias = resolved
-                    expected = alias
+                    expected = m.model_class if backend.use_model_class else alias
                     break
 
         assert expected is not None, "No sonnet model found for claude backend"
@@ -517,7 +520,7 @@ class TestRealRegistryResolution:
                 resolved = m.resolve_for_providers(list(backend.accepted_providers))
                 if resolved is not None:
                     _, alias = resolved
-                    expected = alias
+                    expected = m.model_class if backend.use_model_class else alias
                     break
 
         assert expected is not None, "No haiku model found for claude backend"
