@@ -25,6 +25,7 @@ A **Model** is defined by these fields (all stored in YAML):
   - `"haiku"` → fast models (scout role)
   - `"flash"` → ultra-fast (new tier for fast models)
   - `"pro"` → specialty (future)
+  - `"fable"` → premium tier (no role's `typical_class` maps to it; available only via explicit user pin)
   
 - **`aliases`** is critical: maps **provider names** (e.g., `"openrouter"`, `"openai"`, `"anthropic"`) to that provider's **model ID**. A model must have at least one alias for a CLI to use it.
   - Anthropic Direct: `anthropic: "claude-opus-4-7"`
@@ -81,6 +82,8 @@ capabilities:
 - **`class: opus`** — Model capability tier. Sets default role assignments in wizard:
   - Wizard shows this model as the `[*]` default for any role with `typical_class: opus`
   - Example: Role "orchestrator" has `typical_class: opus`, so Kimi K2 (with `class: opus`) is checked by default for that role
+
+- **`typical_effort`** (role field, not a model field) — each `data/roles/*.yaml` may declare a `typical_effort` (`low`, `medium`, `high`) parallel to `typical_class`. It's the fallback reasoning-effort value written to agent frontmatter (`effort:` for Claude, `model_reasoning_effort` for Codex, `reasoningEffort` for OpenCode) when the agent doesn't declare its own `effort` in `agents.yaml`. An agent's explicit `effort` always wins over its role's `typical_effort`.
 
 - **`aliases`** — Provider-to-model-id mapping. At install time, agent-notes:
   1. Reads CLI's `accepted_providers` (e.g., `[openrouter, moonshot]`)
@@ -196,6 +199,10 @@ Understanding the resolution chain helps verify your model works end-to-end.
 #     * model_id = aliases["openrouter"] = "moonshotai/kimi-k2"
 #     * Frontmatter: model: moonshotai/kimi-k2
 ```
+
+### Known limitation: one shared `dist/` across scopes
+
+`dist/` is a single shared render target: global and local installs (and named profiles) all re-render the same `dist/<cli>/agents/` files, and the last build wins. Installed symlinks point into `dist/`, so divergent per-scope pins cannot coexist — a healthy `agent-notes install` in one scope re-renders `dist/` from that scope's pins and can silently flip the agents another scope's symlinks serve. Workaround: keep role/model pins consistent across scopes, or re-run `agent-notes install` (or `agent-notes build`) in the affected scope to re-render its pins.
 
 ---
 
@@ -362,6 +369,32 @@ pricing, capabilities
 **Solution:** No automated solution yet. This is why `docs/CLI_CAPABILITIES.md` exists — to document provider-specific formats. If the format changes:
 1. Update the model YAML
 2. Re-run `agent-notes regenerate` to rebuild agents with new aliases
+
+### Pitfall 6: Bare provider aliases that equal a class name
+
+**Problem:** You set `anthropic: sonnet` (or `opus`, `haiku`) instead of a version-pinned id like `anthropic: claude-sonnet-4-6`.
+
+**Symptom (silent drift):** Anthropic resolves bare aliases like `sonnet` server-side to whatever they currently consider their newest Sonnet model. When Anthropic ships a new Sonnet release, your pinned agent silently starts running a different model — no error, no changelog entry in this repo, just different behavior.
+
+**Symptom (test fragility):** A bare alias that happens to equal its `class` value (e.g. `anthropic: sonnet` on a model with `class: sonnet`) makes it easy to write a resolver test that checks against `model.model_class` instead of the actual resolved alias — the two strings match by coincidence, and the test stays green even if the resolution logic is broken. This bit `test_model_resolver_characterization.py`: fixing a bare `sonnet` alias to `claude-sonnet-4-6` immediately surfaced a latent bug in the "expected value" computation of three tests, because the coincidence had been hiding it.
+
+**Solution:** Alias values must always be version-pinned ids (`claude-sonnet-4-6`, `claude-opus-4-8`), never bare class names. As of 2026-07 every lineage (Haiku, Opus, Sonnet, Fable) uses exact ids, and `tests/unit/registries/test_registries.py::test_model_aliases_are_exact_version_strings_not_class_names` enforces `alias != class` for every model/provider pair — a bare alias will fail the suite. Do not add a bare alias to any model file, current or future.
+
+---
+
+## Section 6: Providers registry (effort vocabularies)
+
+`agent_notes/data/providers/*.yaml` declares, per provider, the reasoning-effort values it accepts and its own default:
+
+```yaml
+name: anthropic
+efforts: [low, medium, high, xhigh, max]
+default_effort: high
+```
+
+**Hard rule: no cross-provider mapping or translation, anywhere.** Each provider's effort vocabulary is independent — `anthropic`'s `xhigh` is not translated to `openai`'s `xhigh` or anything else; they're just two providers that both happen to define a value with that name. If a resolved effort value isn't in the target provider's `efforts` list, the fallback is that provider's own `default_effort` — never another provider's value, never a translated/mapped equivalent.
+
+Providers with no YAML file here (`github-copilot`, `openrouter`, `google`, `moonshot` as of this writing) deliberately have no effort support: `agent_notes/registries/provider_registry.py`'s `.get()` raises `KeyError` for them, and the rendering seam (`rendering.py::_resolve_effort`) treats that as "emit nothing" rather than guessing a default. Adding effort support for a new provider means adding its YAML file with its own accurate `efforts`/`default_effort` — not reusing another provider's list.
 
 ---
 
