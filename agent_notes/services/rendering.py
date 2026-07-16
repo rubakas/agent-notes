@@ -184,7 +184,9 @@ def _resolve_effort(
     provider has a registry entry and the raw value isn't in its vocabulary,
     the provider's own default_effort is used instead (NO cross-provider
     mapping/translation). If the provider has no registry entry at all,
-    resolves to None (nothing is emitted).
+    falls back to the model's other alias-providers (preferring the canonical
+    one whose alias value equals the model's own id); resolves to None only
+    if no alias-provider is in the registry either (nothing is emitted).
     """
     from ..registries.role_registry import default_role_registry
 
@@ -216,9 +218,33 @@ def _resolve_effort(
     from ..registries.provider_registry import default_provider_registry
 
     try:
-        provider = default_provider_registry().get(provider_name)
-    except (KeyError, FileNotFoundError, ValueError):
-        return None  # provider has no effort registry entry — emit nothing
+        pr = default_provider_registry()
+    except (FileNotFoundError, ValueError):
+        return None
+
+    try:
+        provider = pr.get(provider_name)
+    except KeyError:
+        # Routing provider has no effort registry entry; walk the model's
+        # aliases to find a provider that does (e.g. github-copilot -> anthropic).
+        provider = None
+        if model_registry is not None:
+            for model in model_registry.all():
+                if model_str in model.aliases.values():
+                    # Prefer the alias whose value equals model.id (canonical/
+                    # family provider); fall back to insertion order.
+                    candidates = sorted(
+                        model.aliases.items(), key=lambda kv: kv[1] != model.id
+                    )
+                    for alias_provider, _ in candidates:
+                        try:
+                            provider = pr.get(alias_provider)
+                            break
+                        except KeyError:
+                            continue
+                    break
+        if provider is None:
+            return None
 
     if raw_effort in provider.efforts:
         return raw_effort

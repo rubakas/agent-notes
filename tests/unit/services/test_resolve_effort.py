@@ -80,6 +80,7 @@ def _patch_provider_registry(monkeypatch, providers):
 
 
 ANTHROPIC = Provider(name="anthropic", efforts=("low", "medium", "high", "xhigh", "max"), default_effort="high")
+OPENAI = Provider(name="openai", efforts=("low", "medium", "high"), default_effort="medium")
 
 
 class TestResolveEffort:
@@ -249,6 +250,119 @@ class TestResolveProviderForModelStrClassAmbiguity:
 
         result = _resolve_provider_for_model_str("claude-sonnet-4-6", backend, registry)
         assert result == "anthropic"
+
+
+class TestResolveEffortAliasWalkFallback:
+    """_resolve_effort falls back to alias-provider effort vocabulary when the
+    routing provider (from accepted_providers) has no entry in the provider
+    registry — e.g. OpenCode + Claude where routing goes via github-copilot
+    but only anthropic has an effort registry entry."""
+
+    def test_opencode_claude_resolves_effort_via_anthropic_alias(self, monkeypatch):
+        """OpenCode backend routes Claude via github-copilot; model_str is the
+        github-copilot alias value. The routing provider has no effort registry
+        entry, but the model's anthropic alias does — effort must be resolved."""
+        _patch_role_registry(monkeypatch, typical_effort="medium")
+        _patch_provider_registry(monkeypatch, [ANTHROPIC])  # no github-copilot entry
+
+        backend = _make_backend(
+            name="opencode",
+            accepted_providers=("github-copilot",),
+        )
+        model = _make_model(
+            model_id="claude-sonnet-4-6",
+            model_class="sonnet",
+            family="claude",
+            aliases={
+                "anthropic": "claude-sonnet-4-6",
+                "github-copilot": "github-copilot/claude-sonnet-4.6",
+            },
+        )
+        model_registry = ModelRegistry([model])
+        # model_str is the resolved alias for github-copilot (the routing provider)
+        model_str = "github-copilot/claude-sonnet-4.6"
+
+        agent_config = {"effort": "high", "role": "worker"}
+        result = _resolve_effort("coder", agent_config, backend, None, {}, model_str, model_registry)
+        assert result == "high"
+
+    def test_opencode_claude_role_effort_pin_resolves_via_anthropic_alias(self, monkeypatch):
+        """State-driven effort pin still lands when routing provider is github-copilot
+        but effort vocabulary comes from the anthropic alias fallback."""
+        _patch_role_registry(monkeypatch, typical_effort="low")
+        _patch_provider_registry(monkeypatch, [ANTHROPIC])
+
+        backend = _make_backend(
+            name="opencode",
+            accepted_providers=("github-copilot",),
+        )
+        model = _make_model(
+            model_id="claude-sonnet-4-6",
+            model_class="sonnet",
+            family="claude",
+            aliases={
+                "anthropic": "claude-sonnet-4-6",
+                "github-copilot": "github-copilot/claude-sonnet-4.6",
+            },
+        )
+        model_registry = ModelRegistry([model])
+        scope_state = _make_scope_state("opencode", {"worker": "max"})
+        model_str = "github-copilot/claude-sonnet-4.6"
+
+        result = _resolve_effort("coder", {"role": "worker"}, backend, scope_state, {}, model_str, model_registry)
+        assert result == "max"
+
+    def test_canonical_alias_preferred_over_insertion_order(self, monkeypatch):
+        """When multiple alias-providers are in the registry, the one whose alias
+        value equals model.id (canonical/family provider) is preferred over the
+        one listed first in the aliases dict — guards the family-preference logic."""
+        _patch_role_registry(monkeypatch, typical_effort="medium")
+        # Both openai and anthropic are present; openai is listed first in aliases.
+        _patch_provider_registry(monkeypatch, [ANTHROPIC, OPENAI])
+
+        backend = _make_backend(
+            name="opencode",
+            accepted_providers=("github-copilot",),
+        )
+        model = _make_model(
+            model_id="claude-sonnet-4-6",
+            model_class="sonnet",
+            family="claude",
+            aliases={
+                "github-copilot": "github-copilot/claude-sonnet-4.6",
+                "openai": "openai-claude-alias",          # insertion-order first, non-canonical
+                "anthropic": "claude-sonnet-4-6",         # canonical: value == model.id
+            },
+        )
+        model_registry = ModelRegistry([model])
+        model_str = "github-copilot/claude-sonnet-4.6"
+
+        # "xhigh" is valid in ANTHROPIC but not in OPENAI — if anthropic is
+        # selected the effort is returned as-is; if openai is selected it falls
+        # back to openai's default_effort ("medium").
+        agent_config = {"effort": "xhigh", "role": "worker"}
+        result = _resolve_effort("coder", agent_config, backend, None, {}, model_str, model_registry)
+        assert result == "xhigh"  # only possible if anthropic vocabulary was used
+
+    def test_no_alias_in_registry_still_returns_none(self, monkeypatch):
+        """When no alias-provider for the model is in the effort registry,
+        the fallback returns None — same as before the fix."""
+        _patch_role_registry(monkeypatch, typical_effort="medium")
+        _patch_provider_registry(monkeypatch, [ANTHROPIC])  # only anthropic
+
+        backend = _make_backend(
+            name="opencode",
+            accepted_providers=("openrouter",),
+        )
+        model = _make_model(
+            model_id="some-openrouter-model",
+            aliases={"openrouter": "some-openrouter-model"},  # no anthropic alias
+        )
+        model_registry = ModelRegistry([model])
+
+        agent_config = {"effort": "high", "role": "worker"}
+        result = _resolve_effort("coder", agent_config, backend, None, {}, "some-openrouter-model", model_registry)
+        assert result is None
 
 
 class TestResolveEffortWithExactPinnedModelStr:
