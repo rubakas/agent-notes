@@ -141,6 +141,69 @@ def test_role_model_per_cli(tmp_path):
     assert result["global"]["clis"]["opencode"]["role_models"]["orchestrator"] == "claude-opus-4-7"
 
 
+def test_role_effort_scriptable_updates_state(state_file):
+    from agent_notes.commands.config import role_effort
+
+    captured = {}
+
+    def fake_apply(state, *args, **kwargs):
+        captured["state"] = state
+
+    with _patch_state_file(state_file), \
+         patch("agent_notes.commands.config._apply_and_regenerate", side_effect=fake_apply):
+        role_effort("orchestrator", "high")
+
+    assert "state" in captured
+    cli_state = captured["state"].global_install.clis["claude"]
+    assert cli_state.role_efforts["orchestrator"] == "high"
+
+
+def test_role_effort_updates_state_file(state_file):
+    from agent_notes.commands.config import role_effort
+
+    with _patch_state_file(state_file):
+        def _fake_apply(state, before):
+            from agent_notes.services.state_store import record_install_state
+            record_install_state(state)
+
+        with patch("agent_notes.commands.config._apply_and_regenerate", side_effect=_fake_apply):
+            role_effort("orchestrator", "medium")
+
+    data = json.loads(state_file.read_text())
+    assert data["global"]["clis"]["claude"]["role_efforts"]["orchestrator"] == "medium"
+
+
+def test_role_effort_rejects_unknown_role(state_file):
+    from agent_notes.commands.config import role_effort
+
+    with _patch_state_file(state_file), pytest.raises(SystemExit) as exc_info:
+        role_effort("not-a-real-role", "high")
+
+    assert exc_info.value.code != 0
+
+
+def test_role_effort_rejects_invalid_effort_for_provider(state_file):
+    """claude-sonnet-4-6 resolves to the anthropic provider, whose valid efforts
+    are low/medium/high/xhigh/max — 'super-ultra' isn't one of them."""
+    from agent_notes.commands.config import role_effort
+
+    with _patch_state_file(state_file), pytest.raises(SystemExit) as exc_info:
+        role_effort("orchestrator", "super-ultra")
+
+    assert exc_info.value.code != 0
+
+
+def test_role_effort_prints_provider_and_valid_list_on_invalid_value(state_file, capsys):
+    from agent_notes.commands.config import role_effort
+
+    with _patch_state_file(state_file), pytest.raises(SystemExit):
+        role_effort("orchestrator", "super-ultra")
+
+    out = capsys.readouterr().out
+    assert "anthropic" in out
+    assert "high" in out
+
+
 def test_apply_then_regenerate_called(state_file):
     """_apply_and_regenerate calls regenerate() when user confirms."""
     from agent_notes.commands.config import _apply_and_regenerate
