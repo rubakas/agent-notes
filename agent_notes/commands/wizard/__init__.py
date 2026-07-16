@@ -2,7 +2,7 @@
 
 import sys
 from pathlib import Path
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Optional
 
 from ...config import Color
 from ...constants import DEFAULT_VAULT_DIR, DEFAULT_VAULT_NAME, Wiki, Obsidian
@@ -10,7 +10,7 @@ from ...services.ui import (
     _can_interactive, _safe_input, _path_input, _checkbox_select, _radio_select,
     _checkbox_select_fallback, _radio_select_fallback,
 )
-from ._common import _ROLE_ANSI, _get_skill_groups, _count_rules
+from ._common import _ROLE_ANSI, _get_skill_groups, _count_rules, _role_sort_key
 from .execute import (
     install_skills_filtered,
     install_agents_filtered,
@@ -81,22 +81,47 @@ def _select_cli(step: int = 0, total: int = 0, version: str = '') -> Set[str]:
     return result
 
 
-def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, version: str = '') -> Dict[str, Dict[str, str]]:
-    """For each CLI that supports agents, ask user to pick a model per role.
+def _effort_provider_for_model(backend, model) -> Optional[str]:
+    """Pure helper: return the provider name resolved for model on backend, or None."""
+    resolved = backend.first_alias_for(model.aliases)
+    return resolved[0] if resolved else None
 
-    Returns: {cli_name: {role_name: model_id}}. Config-only CLIs are skipped (no entry).
+
+def _effort_default_choice(role, provider) -> str:
+    """Pure helper: default effort to preselect for a role given its provider.
+
+    role.typical_effort wins if it's a valid value for this provider's effort
+    vocabulary; otherwise falls back to the provider's own default_effort.
+    NO cross-provider mapping/translation — the value is used as-is or not at all.
+    """
+    if role.typical_effort and role.typical_effort in provider.efforts:
+        return role.typical_effort
+    return provider.default_effort
+
+
+def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, version: str = ''
+                            ) -> tuple[Dict[str, Dict[str, str]], Dict[str, Dict[str, str]]]:
+    """For each CLI that supports agents, ask user to pick a model per role, then
+    (if the picked model's provider has a provider-registry entry) an effort.
+
+    Returns: (role_models, role_efforts), each shaped {cli_name: {role_name: value}}.
+    Config-only CLIs are skipped (no entry). Roles/CLIs whose provider has no
+    effort registry entry are skipped for effort selection (not present in role_efforts).
     """
     from ...registries.cli_registry import load_registry
     from ...registries.model_registry import load_model_registry
     from ...registries.role_registry import load_role_registry
+    from ...registries.provider_registry import default_provider_registry
 
     registry = load_registry()
     models = load_model_registry().all()
     roles = load_role_registry().all()
+    provider_registry = default_provider_registry()
 
-    roles_sorted = sorted(roles, key=lambda r: r.name)
+    roles_sorted = sorted(roles, key=_role_sort_key)
 
     result = {}
+    effort_result = {}
     for backend_name in sorted(clis):
         backend = registry.get(backend_name)
         if backend is None or not backend.supports("agents"):
@@ -113,6 +138,7 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
             continue
 
         cli_role_models = {}
+        cli_role_efforts = {}
         for role in roles_sorted:
             # Claude Code controls its own lead model via `/model` — configuring
             # the orchestrator role here would be misleading and create a stale
@@ -153,8 +179,36 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
             picked_label = next(label for label, mid in options if mid == picked)
             print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored}: {picked_label}")
 
+            picked_model = next(m for m in compatible if m.id == picked)
+            provider_name = _effort_provider_for_model(backend, picked_model)
+            provider = None
+            if provider_name is not None:
+                try:
+                    provider = provider_registry.get(provider_name)
+                except KeyError:
+                    provider = None
+
+            if provider is not None:
+                effort_options = [(e, e) for e in provider.efforts]
+                default_effort = _effort_default_choice(role, provider)
+                default_effort_idx = provider.efforts.index(default_effort)
+                effort_title = (
+                    f"{Color.DIM}CLI{Color.NC}          {Color.YELLOW}{backend.label}{Color.NC}\n"
+                    f"  {Color.DIM}Role{Color.NC}         {role_label_colored}\n"
+                    f"  {Color.DIM}Effort{Color.NC}       for {picked_label} (via {provider_name})"
+                )
+                if _can_interactive():
+                    picked_effort = _radio_select(effort_title, effort_options, default=default_effort_idx,
+                                                   step=step, total=total, version=version)
+                else:
+                    picked_effort = _radio_select_fallback(effort_title, effort_options, default=default_effort_idx,
+                                                            step=step, total=total, version=version)
+                cli_role_efforts[role.name] = picked_effort
+                print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored} effort: {picked_effort}")
+
         result[backend_name] = cli_role_models
-    return result
+        effort_result[backend_name] = cli_role_efforts
+    return result, effort_result
 
 
 def _select_scope(clis: Set[str] = None, step: int = 0, total: int = 0, version: str = '') -> str:
@@ -312,7 +366,24 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
     return backend, path
 
 
-def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], skill_groups: Dict, registry, memory_backend: str = '', memory_path: str = '') -> None:
+def _format_role_model_display(role, model_id: str, models_registry, picked_effort: Optional[str] = None) -> str:
+    """Pure helper: the 'Label · effort' display string for one role's model-map
+    row (no color codes — caller applies those). Falls back to the raw model_id
+    when the registry has no entry for it (user-config overrides can be
+    arbitrary strings). The user's picked effort (when present) wins over the
+    role's typical_effort; falls back to just the label when neither exists."""
+    try:
+        model = models_registry.get(model_id)
+        display = model.label
+    except KeyError:
+        display = model_id
+    effort = picked_effort or (role.typical_effort if role and role.typical_effort else None)
+    if effort:
+        display = f"{display} · {effort}"
+    return display
+
+
+def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], skill_groups: Dict, registry, memory_backend: str = '', memory_path: str = '', role_efforts: Optional[Dict[str, Dict[str, str]]] = None) -> None:
     """Print the confirmation summary in per-CLI format with role colors."""
     from ...services.installer import config_filename_for as _cfg_filename
     from ...registries.model_registry import load_model_registry
@@ -357,19 +428,18 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
 
         if backend.name in role_models and role_models[backend.name]:
             print(f"    {Color.DIM}Agent roles:{Color.NC}")
-            for role_name, model_id in sorted(role_models[backend.name].items()):
+            cli_efforts = (role_efforts or {}).get(backend.name, {})
+            role_items = sorted(role_models[backend.name].items(),
+                                key=lambda kv: _role_sort_key(role_map.get(kv[0]), kv[0]))
+            for role_name, model_id in role_items:
                 role = role_map.get(role_name)
                 role_label = role.label if role else role_name
                 role_ansi = (_ROLE_ANSI.get(role.color, "") if role and role.color else "") if Color.CYAN else ""
                 colored_role = f"{role_ansi}{role_label}{Color.NC}" if role_ansi else role_label
                 padding = " " * max(0, 28 - len(role_label))
-                try:
-                    model = models_registry.get(model_id)
-                    prov_alias = backend.first_alias_for(model.aliases)
-                    alias = prov_alias[1] if prov_alias else model_id
-                except KeyError:
-                    alias = model_id
-                print(f"      {colored_role}{padding} {Color.DIM}{alias}{Color.NC}")
+                display = _format_role_model_display(role, model_id, models_registry,
+                                                     picked_effort=cli_efforts.get(role_name))
+                print(f"      {colored_role}{padding} {Color.DIM}{display}{Color.NC}")
 
         if backend.supports("agents"):
             n_agents = count_agents(backend)
@@ -385,42 +455,45 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     print("")
 
 
-def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], version: str = '', memory_backend: str = 'local', memory_path: str = '', step: int = 0, total: int = 0) -> bool:
+def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], role_efforts: Optional[Dict[str, Dict[str, str]]] = None, version: str = '', memory_backend: str = 'local', memory_path: str = '', step: int = 0, total: int = 0, folder_overrides: Optional[dict] = None, global_home_override: str = '') -> bool:
     """Step: Confirmation — shows pre-flight summary including files to be backed up."""
     import logging
     from ...services.ui import _clear_screen, _render_step_header
     from ...registries.cli_registry import load_registry
-    from ...services.installer import plan_install
+    from ...services.installer import plan_install, summarize_plan
     _clear_screen()
     _render_step_header(step, total, version)
     skill_groups = _get_skill_groups()
     registry = load_registry()
 
     _render_install_summary(clis, scope, copy_mode, selected_skills, role_models, skill_groups, registry,
-                            memory_backend=memory_backend, memory_path=memory_path)
+                            memory_backend=memory_backend, memory_path=memory_path, role_efforts=role_efforts)
 
     try:
+        # selected_skills is passed as-is: an empty selection must plan zero
+        # skills (None would mean "all skills", which the install won't write).
         manifest = plan_install(
             scope=scope,
             registry=registry,
             selected_clis=set(clis),
-            selected_skills=selected_skills if selected_skills else None,
+            selected_skills=selected_skills,
             copy_mode=copy_mode,
+            folder_overrides=folder_overrides,
+            global_home_override=global_home_override or None,
         )
-        overwrites = [a for a in manifest if a.action == "overwrite"]
-        to_install = [a for a in manifest if a.action != "skip"]
+        summary = summarize_plan(manifest)
 
-        print(f"  {Color.DIM}Files to install:{Color.NC}  {len(to_install)}")
-        if overwrites:
-            print(f"  {Color.YELLOW}Files to back up ({len(overwrites)}):{Color.NC}")
-            for a in overwrites:
+        print(f"  {Color.DIM}Files to install:{Color.NC}  {len(summary.to_install)}")
+        if summary.overwrites:
+            print(f"  {Color.YELLOW}Files to back up ({len(summary.overwrites)}):{Color.NC}")
+            for a in summary.overwrites:
                 print(f"    {Color.DIM}{a.dst}{Color.NC}  →  {a.backup_path}")
         print("")
     except Exception:
         logging.getLogger(__name__).debug("plan_install failed during pre-flight", exc_info=True)
 
-    choice = _safe_input("Proceed? [Y/n]: ", "Y").lower()
-    return choice != "n"
+    choice = _safe_input("Proceed? [Y/n]: ", "Y").strip().lower()
+    return choice not in ("n", "no")
 
 
 __all__ = [
@@ -441,4 +514,5 @@ __all__ = [
     "_execute_install",
     "_get_skill_groups",
     "_count_rules",
+    "_role_sort_key",
 ]

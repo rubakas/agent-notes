@@ -20,6 +20,16 @@ _ROLE_ANSI = {
 }
 
 
+def _role_sort_key(role, name: str = "") -> tuple:
+    """Canonical wizard display order for roles (orchestrator → reasoner →
+    worker → scout): the role's declared `order` first, name as alphabetical
+    tiebreak. Accepts role=None (unknown role name) which sorts last."""
+    from ...domain.role import DEFAULT_ROLE_ORDER
+    if role is None:
+        return (DEFAULT_ROLE_ORDER, name)
+    return (role.order, role.name)
+
+
 def _get_skill_groups() -> Dict[str, List[str]]:
     """Get skill names grouped by technology."""
     if os.environ.get('_WIZARD_TEST_MODE'):

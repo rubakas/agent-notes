@@ -16,6 +16,23 @@ def interactive_install() -> None:
         print(f"\n\n  {Color.YELLOW}Cancelled.{Color.NC}")
 
 
+def _restore_persisted_render(scope: str, profile_label: str) -> None:
+    """Re-render dist/ from persisted state pins (no in-memory selection overlays).
+
+    The pre-confirm build bakes this run's selections into dist/; if the user
+    declines (or the build aborts half-written), existing symlink installs would
+    keep serving the rejected picks. Rebuilding without overlays restores the
+    persisted-pin rendering."""
+    from pathlib import Path
+    from ...services.fs import silent_ops
+    try:
+        with silent_ops():
+            build(scope=scope, project_path=Path.cwd() if scope == "local" else None,
+                  profile_label=profile_label)
+    except Exception as e:
+        print(f"{Color.YELLOW}Warning: could not restore rendered files: {e}{Color.NC}")
+
+
 def _interactive_install() -> None:
     """Inner implementation — called by interactive_install() with KeyboardInterrupt guard."""
     # Import step functions at call time to avoid circular import with __init__
@@ -47,8 +64,8 @@ def _interactive_install() -> None:
         print("No CLI selected. Installation cancelled.")
         return
 
-    # Step 2: Model selection per role (for CLIs that support agents)
-    role_models = _wiz._select_models_per_role(clis, step=2, total=TOTAL_STEPS, version=version)
+    # Step 2: Model (and, where the provider supports it, effort) selection per role
+    role_models, role_efforts = _wiz._select_models_per_role(clis, step=2, total=TOTAL_STEPS, version=version)
 
     # Step 3: Install scope
     scope = _wiz._select_scope(clis=clis, step=3, total=TOTAL_STEPS, version=version)
@@ -70,19 +87,37 @@ def _interactive_install() -> None:
     from .cost_report import _select_cost_report
     cost_report_enabled = _select_cost_report(step=8, total=TOTAL_STEPS, version=version)
 
-    # Step 9: Confirmation
-    if not _wiz._confirm_install(clis, scope, copy_mode, selected_skills, role_models, version=version,
-                                 memory_backend=memory_backend, memory_path=memory_path,
-                                 step=9, total=TOTAL_STEPS):
-        print("Installation cancelled.")
-        return
-
-    # Build first
+    # Build BEFORE the confirmation step: the pre-flight file count is computed
+    # from the rendered dist/ directory, so it must reflect exactly what this
+    # install will write (a stale or missing dist would show a wrong number).
+    # The wizard's model/effort selections exist only in memory at this point
+    # (state.json is written AFTER install), so they are passed to build()
+    # explicitly — otherwise dist would render from stale/absent state pins and
+    # the install would symlink/copy frontmatter that ignores this run's choices.
+    # silent_ops: suppress per-file SKIP/LINKED noise inside the wizard flow
+    # (standalone `agent-notes build` keeps it).
     print("\nBuilding from source...")
     try:
-        build()
+        from pathlib import Path
+        from ...services.fs import silent_ops
+        with silent_ops():
+            build(role_models=role_models, role_efforts=role_efforts,
+                  scope=scope, project_path=Path.cwd() if scope == "local" else None,
+                  profile_label=profile_label)
     except Exception as e:
         print(f"{Color.RED}Build failed: {e}{Color.NC}")
+        _restore_persisted_render(scope, profile_label)
+        return
+
+    # Step 9: Confirmation
+    if not _wiz._confirm_install(clis, scope, copy_mode, selected_skills, role_models, role_efforts=role_efforts,
+                                 version=version,
+                                 memory_backend=memory_backend, memory_path=memory_path,
+                                 step=9, total=TOTAL_STEPS,
+                                 folder_overrides=folder_overrides,
+                                 global_home_override=global_home_override):
+        print("Installation cancelled.")
+        _restore_persisted_render(scope, profile_label)
         return
 
     _execute_install(
@@ -91,6 +126,7 @@ def _interactive_install() -> None:
         copy_mode=copy_mode,
         selected_skills=selected_skills,
         role_models=role_models,
+        role_efforts=role_efforts,
         memory_backend=memory_backend,
         memory_path=memory_path,
         profile_label=profile_label,

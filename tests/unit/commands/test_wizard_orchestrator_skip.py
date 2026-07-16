@@ -25,7 +25,7 @@ class TestSelectModelsPerRole:
 
         from agent_notes.commands.wizard import _select_models_per_role
 
-        result = _select_models_per_role({"claude"})
+        result, _ = _select_models_per_role({"claude"})
 
         # The result dict should not contain orchestrator for claude
         assert "claude" in result
@@ -55,7 +55,7 @@ class TestSelectModelsPerRole:
 
         from agent_notes.commands.wizard import _select_models_per_role
 
-        result = _select_models_per_role({backend_name})
+        result, _ = _select_models_per_role({backend_name})
 
         if backend_name in result:
             assert "orchestrator" in result[backend_name], (
@@ -75,7 +75,7 @@ class TestSelectModelsPerRole:
         from agent_notes.commands.wizard import _select_models_per_role
         from agent_notes.registries.role_registry import load_role_registry
 
-        result = _select_models_per_role({"claude"})
+        result, _ = _select_models_per_role({"claude"})
         all_roles = {r.name for r in load_role_registry().all()}
         non_orchestrator_roles = all_roles - {"orchestrator"}
 

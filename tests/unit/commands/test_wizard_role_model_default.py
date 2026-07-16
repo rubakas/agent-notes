@@ -39,7 +39,7 @@ class TestWizardRoleModelDefault:
 
         from agent_notes.commands.wizard import _select_models_per_role
 
-        result = _select_models_per_role({"claude"})
+        result, _ = _select_models_per_role({"claude"})
 
         assert "claude" in result
         assert "reasoner" in result["claude"], "reasoner role should be configured"
