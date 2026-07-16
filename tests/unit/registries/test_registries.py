@@ -32,6 +32,18 @@ def test_model_registry_includes_haiku():
     assert "claude-haiku-4-5" in ids
 
 
+def test_model_registry_includes_sonnet_5():
+    registry = load_model_registry()
+    ids = registry.ids()
+    assert "claude-sonnet-5" in ids
+
+
+def test_model_registry_includes_fable_5():
+    registry = load_model_registry()
+    ids = registry.ids()
+    assert "claude-fable-5" in ids
+
+
 def test_model_has_required_fields():
     registry = load_model_registry()
     for model in registry.all():
@@ -40,6 +52,19 @@ def test_model_has_required_fields():
         assert model.family, f"Model {model.id} missing family"
         assert model.model_class, f"Model {model.id} missing model_class"
         assert model.aliases is not None, f"Model {model.id} missing aliases"
+
+
+def test_model_aliases_are_exact_version_strings_not_class_names():
+    """Guard: an alias like anthropic: 'haiku' would render a pinned model as a
+    bare class name in frontmatter, letting the harness substitute its own
+    default version. Every alias must differ from the bare model_class."""
+    registry = load_model_registry()
+    for model in registry.all():
+        for provider, alias in model.aliases.items():
+            assert alias != model.model_class, (
+                f"Model {model.id}: alias for provider '{provider}' is the bare "
+                f"class name {alias!r} — use the exact model version string"
+            )
 
 
 # --- Role registry ---
@@ -72,6 +97,33 @@ def test_role_has_required_fields():
     for role in registry.all():
         assert role.name, f"Role missing name"
         assert role.label, f"Role {role.name} missing label"
+
+
+def test_role_registry_loads_typical_effort():
+    registry = load_role_registry()
+    assert registry.get("orchestrator").typical_effort == "high"
+    assert registry.get("reasoner").typical_effort == "high"
+    assert registry.get("worker").typical_effort == "medium"
+    assert registry.get("scout").typical_effort == "low"
+
+
+def test_role_registry_loads_order():
+    """Canonical display order: orchestrator → reasoner → worker → scout."""
+    registry = load_role_registry()
+    assert registry.get("orchestrator").order == 1
+    assert registry.get("reasoner").order == 2
+    assert registry.get("worker").order == 3
+    assert registry.get("scout").order == 4
+
+
+def test_role_order_defaults_to_last_when_missing(tmp_path):
+    """Roles without an explicit order sort after all ordered roles."""
+    from agent_notes.domain.role import DEFAULT_ROLE_ORDER
+    (tmp_path / "custom.yaml").write_text(
+        "name: custom\nlabel: Custom\ndescription: d\ntypical_class: sonnet\n"
+    )
+    registry = load_role_registry(tmp_path)
+    assert registry.get("custom").order == DEFAULT_ROLE_ORDER
 
 
 # --- Skill registry ---

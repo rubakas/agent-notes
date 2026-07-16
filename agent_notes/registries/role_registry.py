@@ -6,7 +6,7 @@ from typing import Optional
 from functools import lru_cache
 
 from ..config import DATA_DIR
-from ..domain.role import Role
+from ..domain.role import Role, DEFAULT_ROLE_ORDER
 from ._base import load_yaml_file, require_fields
 
 
@@ -54,6 +54,8 @@ def load_role_registry(roles_dir: Optional[Path] = None) -> RoleRegistry:
             description=data["description"],
             typical_class=data["typical_class"],
             color=data.get("color", ""),
+            typical_effort=data.get("typical_effort", ""),
+            order=int(data.get("order", DEFAULT_ROLE_ORDER)),
         ))
     
     return RoleRegistry(roles)
