@@ -209,6 +209,7 @@ def _scope_to_dict(s: ScopeState) -> dict:
 def _backend_to_dict(b: BackendState) -> dict:
     d = {
         "role_models": dict(b.role_models),
+        "role_efforts": dict(b.role_efforts),
         "installed": {
             component: {name: asdict(item) for name, item in items.items()}
             for component, items in b.installed.items()
@@ -266,6 +267,7 @@ def _scope_from_dict(data: dict) -> ScopeState:
 def _backend_from_dict(data: dict) -> BackendState:
     """Load BackendState from JSON dict."""
     role_models = data.get("role_models", {})
+    role_efforts = data.get("role_efforts", {})
 
     installed_data = data.get("installed", {})
     installed = {}
@@ -275,6 +277,7 @@ def _backend_from_dict(data: dict) -> BackendState:
 
     return BackendState(
         role_models=role_models,
+        role_efforts=role_efforts,
         installed=installed,
         local_dir_override=data.get("local_dir_override", ""),
         global_home_override=data.get("global_home_override", ""),

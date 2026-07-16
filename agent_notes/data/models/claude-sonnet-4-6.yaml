@@ -3,7 +3,7 @@ label: Claude Sonnet 4.6
 family: claude
 class: sonnet
 aliases:
-  anthropic:      sonnet
+  anthropic:      claude-sonnet-4-6
   github-copilot: github-copilot/claude-sonnet-4.6
 pricing:
   input:  3.00

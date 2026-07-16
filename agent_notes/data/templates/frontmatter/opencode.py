@@ -15,11 +15,19 @@ def render(ctx: dict) -> str:
     """
     agent_config = ctx['agent_config']
     model_str = ctx['model_str']
-    
+    resolved_effort = ctx.get('resolved_effort')
+
     frontmatter = ['---']
     frontmatter.append(f'description: {agent_config["description"]}')
     frontmatter.append(f'mode: {agent_config["mode"]}')
     frontmatter.append(f'model: {model_str}')
+
+    # reasoningEffort is not a first-class OpenCode agent-config key; OpenCode
+    # passes unrecognized keys through as provider model options (see
+    # opencode.ai/docs/agents "Additional"), and reasoningEffort is its
+    # documented example for that pass-through.
+    if resolved_effort:
+        frontmatter.append(f'reasoningEffort: {resolved_effort}')
     
     # Handle permissions
     opencode_config = agent_config.get('opencode', {})

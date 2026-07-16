@@ -6,15 +6,6 @@ from .base import strip_sections
 _strip_sections = strip_sections
 
 
-_EFFORT_MAP = {
-    "minimal": "minimal",
-    "low":     "low",
-    "medium":  "medium",
-    "high":    "high",
-    "xhigh":   "xhigh",
-}
-
-
 def render(ctx: dict) -> str:
     """Not used for Codex — emit_file supersedes render.
     Kept so the module is consistent with other frontmatter templates."""
@@ -40,8 +31,11 @@ def emit_file(ctx: dict, body: str) -> tuple[str, str]:
     if model_str:
         doc["model"] = model_str
 
-    effort_key = agent_config.get("effort", "medium")
-    doc["model_reasoning_effort"] = _EFFORT_MAP.get(effort_key, "medium")
+    # ctx['resolved_effort'] is already validated against the openai provider's
+    # effort vocabulary upstream (rendering.py's _resolve_effort) — emitted verbatim,
+    # no cross-provider mapping. "medium" is the openai provider's own default_effort,
+    # used here only when nothing resolved at all, to preserve prior behavior.
+    doc["model_reasoning_effort"] = ctx.get("resolved_effort") or "medium"
 
     doc["sandbox_mode"] = _sandbox_mode(agent_config)
 

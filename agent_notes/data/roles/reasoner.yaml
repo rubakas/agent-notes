@@ -1,5 +1,7 @@
 name: reasoner
 label: Reasoner
+order: 2
 description: Deep debugging and architecture analysis. Low volume, max reasoning needed.
 typical_class: opus
+typical_effort: high
 color: red

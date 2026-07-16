@@ -89,10 +89,43 @@ def count_lines(file_path: Path) -> int:
         return 0
 
 
-def build() -> None:
-    """Build agent configuration files from source."""
+def count_dist_clis(files: list[Path], dist_dir: Path, cli_names: set[str]) -> int:
+    """Count distinct CLI backends among generated files (dist/<cli>/... paths).
+
+    Files outside dist_dir or under non-CLI top-level dirs (rules/, skills/)
+    are ignored."""
+    found = set()
+    for f in files:
+        try:
+            rel = f.relative_to(dist_dir)
+        except ValueError:
+            continue
+        if rel.parts and rel.parts[0] in cli_names:
+            found.add(rel.parts[0])
+    return len(found)
+
+
+def format_build_summary(n_files: int, n_lines: int, n_clis: int) -> str:
+    """One-line build summary, e.g. 'Generated 96 files (13,748 lines) across 4 CLIs'."""
+    file_word = "file" if n_files == 1 else "files"
+    cli_word = "CLI" if n_clis == 1 else "CLIs"
+    return f"Generated {n_files} {file_word} ({n_lines:,} lines) across {n_clis} {cli_word}"
+
+
+def build(role_models=None, role_efforts=None, scope='global', project_path=None,
+          profile_label: str = "") -> None:
+    """Build agent configuration files from source.
+
+    Args:
+        role_models: Optional explicit {cli: {role: model_id}} pins that override
+            persisted state (e.g. wizard selections not yet written to state.json)
+        role_efforts: Optional explicit {cli: {role: effort}} pins, same semantics
+        scope: which state.json scope's pins drive the render ('global' or 'local')
+        project_path: project path for scope='local'
+        profile_label: named profile whose pins drive the render ("" = default profile)
+    """
     from ..services.state_store import load_state
-    from ..config import ROOT
+    from ..registries.cli_registry import load_registry
 
     # Read configuration
     try:
@@ -103,10 +136,13 @@ def build() -> None:
 
     # Load state if present (no error if missing)
     state = load_state()
-    
+
     # Generate agent files (state=None is backward compatible)
     print("Generating agent files...")
-    agent_files = generate_agent_files(agents_config, tiers, state=state)
+    agent_files = generate_agent_files(agents_config, tiers, state=state,
+                                       scope=scope, project_path=project_path,
+                                       role_models=role_models, role_efforts=role_efforts,
+                                       profile_label=profile_label)
     
     # Copy global files
     print("Copying global files...")
@@ -120,21 +156,12 @@ def build() -> None:
     print("Copying commands...")
     command_files = copy_commands()
 
-    # Report results
+    # Report results — one-line summary (per-file listing was too noisy)
     all_files = agent_files + global_files + skill_files + command_files
-    print(f"\nGenerated {len(all_files)} files:")
-    
-    total_lines = 0
-    for file_path in sorted(all_files):
-        try:
-            rel_path = file_path.relative_to(ROOT)
-        except ValueError:
-            rel_path = file_path  # absolute path if outside the package tree
-        lines = count_lines(file_path)
-        total_lines += lines
-        print(f"  {rel_path} ({lines} lines)")
-    
-    print(f"\nTotal: {total_lines} lines across {len(all_files)} files")
+    total_lines = sum(count_lines(f) for f in all_files)
+    cli_names = {b.name for b in load_registry().all()}
+    n_clis = count_dist_clis(all_files, DIST_DIR, cli_names)
+    print(f"\n{format_build_summary(len(all_files), total_lines, n_clis)}")
 
 
 if __name__ == '__main__':

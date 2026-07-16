@@ -14,6 +14,14 @@ providers:
         match: "*haiku*"
         price: {in: 1.00, out: 5.00, cache_read: 0.10, cache_write_5m: 1.25, cache_write_1h: 2.00}
         updated_at: "2026-04"
+      - name: Claude Fable 5
+        match: "*fable*"
+        price: {in: 10.00, out: 50.00, cache_read: 1.00, cache_write_5m: 12.50, cache_write_1h: 20.00}
+        updated_at: "2026-07"
+      - name: Claude Sonnet 5
+        match: "*sonnet-5*"
+        price: {in: 3.00, out: 15.00, cache_read: 0.30, cache_write_5m: 3.75, cache_write_1h: 6.00}
+        updated_at: "2026-07"
       - name: Claude Sonnet
         match: "*sonnet*"
         price: {in: 3.00, out: 15.00, cache_read: 0.30, cache_write_5m: 3.75, cache_write_1h: 6.00}

@@ -29,7 +29,12 @@ def _make_ctx(
     opencode_permission: dict = None,
     model_str: str = "gpt-5.4",
 ) -> tuple[dict, str]:
-    """Return (ctx, body) pair suitable for emit_file / post_process."""
+    """Return (ctx, body) pair suitable for emit_file / post_process.
+
+    'effort' seeds both agent_config["effort"] (source data) and
+    ctx["resolved_effort"] (what rendering.py's _resolve_effort would have
+    produced for an agent with its own effort set) — mirroring production wiring.
+    """
     agent_config = {
         "description": description,
         "effort": effort,
@@ -43,6 +48,7 @@ def _make_ctx(
         "agent_name": name,
         "agent_config": agent_config,
         "model_str": model_str,
+        "resolved_effort": effort,
     }
     body = "You are a coder.\n\n## Process\n\nDo work."
     return ctx, body
@@ -145,38 +151,51 @@ class TestEmitFileSandboxMode:
 
 
 # ---------------------------------------------------------------------------
-# emit_file: model_reasoning_effort mapping
+# emit_file: model_reasoning_effort — verbatim pass-through (no cross-provider
+# mapping — validation now happens upstream in rendering.py's _resolve_effort,
+# see tests/unit/services/test_resolve_effort.py for the validation matrix).
 # ---------------------------------------------------------------------------
 
 class TestEmitFileEffortMapping:
-    def test_low_effort_maps_to_low(self):
+    def test_low_effort_passed_through(self):
         ctx, body = _make_ctx(effort="low")
         _, content = emit_file(ctx, body)
         doc = tomllib.loads(content)
         assert doc["model_reasoning_effort"] == "low"
 
-    def test_medium_effort_maps_to_medium(self):
+    def test_medium_effort_passed_through(self):
         ctx, body = _make_ctx(effort="medium")
         _, content = emit_file(ctx, body)
         doc = tomllib.loads(content)
         assert doc["model_reasoning_effort"] == "medium"
 
-    def test_high_effort_maps_to_high(self):
+    def test_high_effort_passed_through(self):
         ctx, body = _make_ctx(effort="high")
         _, content = emit_file(ctx, body)
         doc = tomllib.loads(content)
         assert doc["model_reasoning_effort"] == "high"
 
-    def test_unknown_effort_defaults_to_medium(self):
-        ctx, body = _make_ctx(effort="super-ultra")
+    def test_emits_resolved_effort_verbatim_without_translation(self):
+        """codex.py no longer maps/translates effort values — that validation
+        moved upstream to rendering.py._resolve_effort. Whatever ctx['resolved_effort']
+        carries is trusted and emitted as-is."""
+        ctx, body = _make_ctx(effort="xhigh")
+        _, content = emit_file(ctx, body)
+        doc = tomllib.loads(content)
+        assert doc["model_reasoning_effort"] == "xhigh"
+
+    def test_absent_effort_defaults_to_medium(self):
+        ctx, body = _make_ctx()
+        # No effort resolved at all (agent effort absent, no role default either)
+        ctx["resolved_effort"] = None
+        del ctx["agent_config"]["effort"]
         _, content = emit_file(ctx, body)
         doc = tomllib.loads(content)
         assert doc["model_reasoning_effort"] == "medium"
 
-    def test_absent_effort_defaults_to_medium(self):
+    def test_missing_resolved_effort_key_defaults_to_medium(self):
         ctx, body = _make_ctx()
-        # Remove effort from agent_config
-        del ctx["agent_config"]["effort"]
+        del ctx["resolved_effort"]
         _, content = emit_file(ctx, body)
         doc = tomllib.loads(content)
         assert doc["model_reasoning_effort"] == "medium"

@@ -1,0 +1,3 @@
+name: openai
+efforts: [none, minimal, low, medium, high, xhigh]
+default_effort: medium

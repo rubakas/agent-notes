@@ -221,6 +221,41 @@ class TestRemovedRespectsSilent:
         assert out == ""
 
 
+class TestBackupPrintRespectsSilent:
+    def _differing_pair(self, tmp_path):
+        src = tmp_path / "src.md"
+        dst = tmp_path / "dst.md"
+        src.write_bytes(b"new content")
+        dst.write_bytes(b"old content")
+        return src, dst
+
+    def test_backup_prints_when_not_silent(self, tmp_path, capsys):
+        src, dst = self._differing_pair(tmp_path)
+        original = fs.silent_file_ops
+        try:
+            fs.silent_file_ops = False
+            handle_existing(src, dst)
+        finally:
+            fs.silent_file_ops = original
+
+        out = capsys.readouterr().out
+        assert "BACKUP" in out
+
+    def test_backup_suppresses_when_silent(self, tmp_path, capsys):
+        src, dst = self._differing_pair(tmp_path)
+        original = fs.silent_file_ops
+        try:
+            fs.silent_file_ops = True
+            handle_existing(src, dst)
+        finally:
+            fs.silent_file_ops = original
+
+        out = capsys.readouterr().out
+        assert out == ""
+        # The backup itself must still happen — only the print is gated
+        assert list(tmp_path.glob("dst.md.bak.*"))
+
+
 class TestRemoveAllSymlinksInDir:
     def test_returns_count_of_removed_symlinks(self, tmp_path):
         src = tmp_path / "src"

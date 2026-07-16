@@ -104,7 +104,8 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
                 {},  # empty tiers - state-driven only
                 state=current_state,
                 scope=scope,
-                project_path=project_path
+                project_path=project_path,
+                profile_label=profile_label
             )
             # Count files for this CLI
             try:
@@ -136,24 +137,27 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
     
     # Update installed manifest to reflect current state
     try:
-        # Get current role_models and overrides from state to preserve them
+        # Get current role_models/role_efforts and overrides from state to preserve them
         existing_role_models = {}
+        existing_role_efforts = {}
         folder_overrides = {}
         global_home_override = None
         for cli_name, backend_state in scope_state.clis.items():
             existing_role_models[cli_name] = backend_state.role_models
+            existing_role_efforts[cli_name] = backend_state.role_efforts
             if backend_state.local_dir_override:
                 folder_overrides[cli_name] = backend_state.local_dir_override
             if backend_state.global_home_override:
                 global_home_override = backend_state.global_home_override
 
-        # Build new state with current files but preserve role_models
+        # Build new state with current files but preserve role_models/role_efforts
         new_state = build_install_state(
             mode=scope_state.mode,
             scope=scope,
             repo_root=PKG_DIR.parent,
             project_path=project_path,
             role_models=existing_role_models,
+            role_efforts=existing_role_efforts,
             profile_label=profile_label,
             folder_overrides=folder_overrides or None,
             global_home_override=global_home_override,

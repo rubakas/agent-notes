@@ -138,7 +138,7 @@ If you configured agent-notes to access your memory vault (Obsidian or local), t
 <details>
 <summary>Agent Team</summary>
 
-Specialized subagents with hierarchical model strategy: **Opus 4.6 reasons, Sonnet 4.6 executes, Haiku 4.5 scouts.**
+Specialized subagents with hierarchical model strategy: **Opus 4.8 reasons (high effort), Sonnet 5 executes (medium effort), Haiku 4.5 scouts (low effort).**
 
 | Agent | Role | Model Tier | Purpose |
 |---|---|---|---|
@@ -162,7 +162,7 @@ Specialized subagents with hierarchical model strategy: **Opus 4.6 reasons, Sonn
 | analyst | scout | haiku | Requirements translation, acceptance criteria |
 | tech-writer | scout | haiku | READMEs, API docs, changelogs |
 
-**4 roles, 19 agents, 3 model tiers.** The tiered model strategy optimizes cost: Opus reasons ($15/1M tokens), Sonnet executes ($3/1M), Haiku scouts ($0.80/1M).
+**4 roles, 19 agents, 3 model tiers.** The tiered model strategy optimizes cost: Opus reasons ($5/$25 per 1M tokens in/out), Sonnet executes ($3/$15), Haiku scouts ($1/$5). A premium `fable` tier ($10/$50) is available for explicit pinning, but no role defaults to it.
 
 ### Delegation rules
 
@@ -183,6 +183,18 @@ Specialized subagents with hierarchical model strategy: **Opus 4.6 reasons, Sonn
 - **analyst** — Requirements and acceptance criteria
 - **tech-writer** — Documentation, READMEs, API docs
 - **devil** — Challenges assumptions and plans
+
+### Reconfiguring roles, models, and effort
+
+During `agent-notes install`, wizard step 2 asks you to pick a model per role, and — for models served by a provider with a known effort vocabulary (currently `anthropic`, `openai`) — a follow-up effort prompt, pre-selected to the role's typical effort when that value is valid for the chosen provider. Providers with no effort registry entry (`github-copilot`, `openrouter`, `google`, `moonshot`) skip the effort prompt entirely.
+
+To change these after install:
+```bash
+agent-notes config role-model [--cli <cli>] <role> <model>    # e.g. role-model worker claude-sonnet-5
+agent-notes config role-effort [--cli <cli>] <role> <effort>  # e.g. role-effort worker high
+agent-notes config wizard                                     # interactive menu for both
+```
+`role-effort` validates the effort against the role's currently-assigned model's provider — an invalid value prints that provider's name and its valid effort list. There's no cross-provider mapping: each provider (anthropic, openai) has its own independent effort vocabulary and default.
 
 </details>
 

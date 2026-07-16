@@ -646,6 +646,51 @@ class TestStateSerializationRoundtrip:
         assert restored.global_install.clis["claude"].global_home_override == ""
         assert restored.global_installs == {}
 
+    def test_roundtrip_with_role_efforts(self):
+        backend_state = BackendState(
+            role_models={"worker": "claude-sonnet-5"},
+            role_efforts={"worker": "high"},
+            installed={},
+        )
+        scope = ScopeState(
+            installed_at="2026-01-01T00:00:00Z",
+            updated_at="2026-01-01T00:00:00Z",
+            mode="symlink",
+            installed_version="2.0.0",
+            clis={"claude": backend_state},
+        )
+        state = State(
+            source_path="/src",
+            source_commit="deadbeef",
+            global_install=scope,
+            local_installs={},
+        )
+        data = _state_to_dict(state)
+        restored = _state_from_dict(data)
+        claude_state = restored.global_install.clis["claude"]
+        assert claude_state.role_efforts == {"worker": "high"}
+
+    def test_backward_compat_old_state_without_role_efforts_key(self):
+        """Old state.json files written before role_efforts existed must still
+        load — missing key defaults to an empty dict, not a crash."""
+        data = {
+            "source_path": "",
+            "source_commit": "",
+            "global": {
+                "installed_at": "2026-01-01T00:00:00Z",
+                "updated_at": "2026-01-01T00:00:00Z",
+                "mode": "symlink",
+                "installed_version": "2.0.0",
+                # No "role_efforts" key at all — pre-existing old-format file.
+                "clis": {"claude": {"role_models": {"worker": "claude-sonnet-5"}, "installed": {}}},
+            },
+            "local": {},
+        }
+        restored = _state_from_dict(data)
+        claude_state = restored.global_install.clis["claude"]
+        assert claude_state.role_efforts == {}
+        assert claude_state.role_models == {"worker": "claude-sonnet-5"}
+
 
 # ---------------------------------------------------------------------------
 # TestLocalKey

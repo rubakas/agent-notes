@@ -1,5 +1,7 @@
 name: worker
 label: Worker
+order: 3
 description: Implements code, writes tests, does focused analysis. Medium volume.
 typical_class: sonnet
+typical_effort: medium
 color: green

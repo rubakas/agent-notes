@@ -80,3 +80,48 @@ class TestRegeneratePerCLIFilter:
         assert exc_info.value.code != 0
         out = capsys.readouterr().out
         assert "unknown_cli_xyz" in out or "cli" in out.lower()
+
+
+class TestRegeneratePreservesPins:
+    """regenerate() rebuilds the state manifest via build_install_state and must
+    carry BOTH role_models and role_efforts forward — dropping role_efforts
+    silently reverted user effort selections on every regenerate/config change."""
+
+    def _write_pinned_state(self, sf: Path) -> None:
+        data = {
+            "source_path": "/tmp/repo",
+            "source_commit": "abc123",
+            "global": {
+                "installed_at": "2025-01-01T00:00:00Z",
+                "updated_at": "2025-01-01T00:00:00Z",
+                "mode": "symlink",
+                "clis": {"claude": {
+                    "role_models": {"worker": "claude-sonnet-4-6"},
+                    "role_efforts": {"worker": "high"},
+                    "installed": {},
+                }},
+            },
+            "local": {},
+            "memory": {"backend": "local", "path": ""},
+        }
+        sf.parent.mkdir(parents=True, exist_ok=True)
+        sf.write_text(json.dumps(data))
+
+    def test_regenerate_passes_role_models_and_efforts_to_state_builder(self, tmp_path, monkeypatch):
+        xdg = tmp_path / "config"
+        xdg.mkdir()
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+        self._write_pinned_state(xdg / "agent-notes" / "state.json")
+
+        mock_builder = MagicMock(side_effect=Exception("stop before state write"))
+
+        with patch("agent_notes.commands.build.generate_agent_files", return_value=[]), \
+             patch("agent_notes.services.installer.install_component_for_backend"), \
+             patch("agent_notes.services.install_state_builder.build_install_state", mock_builder):
+            from agent_notes.commands.regenerate import regenerate
+            regenerate()
+
+        assert mock_builder.call_count == 1
+        kwargs = mock_builder.call_args.kwargs
+        assert kwargs["role_models"] == {"claude": {"worker": "claude-sonnet-4-6"}}
+        assert kwargs["role_efforts"] == {"claude": {"worker": "high"}}

@@ -19,7 +19,8 @@ def _make_install_action(action: str, dst_name: str = "CLAUDE.md", backup: Path 
     return InstallAction(action=action, src=src, dst=dst, backup_path=backup)
 
 
-def _run_confirm_install(monkeypatch, manifest, user_input: str = "Y"):
+def _run_confirm_install(monkeypatch, manifest, user_input: str = "Y",
+                         captures: dict = None, confirm_kwargs: dict = None):
     """Call _confirm_install with all heavy side-effects mocked out.
 
     local imports inside _confirm_install:
@@ -28,13 +29,26 @@ def _run_confirm_install(monkeypatch, manifest, user_input: str = "Y"):
       from ..services.installer import plan_install
 
     We patch the source modules so the local imports pick up the stubs.
+
+    When given, `captures` is filled with:
+      captures["plan_kwargs"]  — kwargs _confirm_install passed to plan_install
+      captures["prompt"]       — the prompt string given to _safe_input
+      captures["default"]      — the default value given to _safe_input
+    `confirm_kwargs` overrides/extends the arguments passed to _confirm_install.
     """
+    if captures is None:
+        captures = {}
+
     # Suppress screen-clearing and step headers (patched at source)
     monkeypatch.setattr("agent_notes.services.ui._clear_screen", lambda: None)
     monkeypatch.setattr("agent_notes.services.ui._render_step_header", lambda *a, **kw: None)
 
     # plan_install is imported from services.installer inside the function
-    monkeypatch.setattr("agent_notes.services.installer.plan_install", lambda **kw: manifest)
+    def fake_plan_install(**kw):
+        captures["plan_kwargs"] = kw
+        return manifest
+
+    monkeypatch.setattr("agent_notes.services.installer.plan_install", fake_plan_install)
 
     # load_registry is imported from registries.cli_registry inside the function
     monkeypatch.setattr(
@@ -46,20 +60,30 @@ def _run_confirm_install(monkeypatch, manifest, user_input: str = "Y"):
     monkeypatch.setattr("agent_notes.commands.wizard._render_install_summary", lambda *a, **kw: None)
     monkeypatch.setattr("agent_notes.commands.wizard._get_skill_groups", lambda: {})
 
-    # Drive _safe_input (module-level import in wizard)
-    monkeypatch.setattr("agent_notes.commands.wizard._safe_input", lambda prompt, default: user_input)
+    # Drive _safe_input (module-level import in wizard) — mirrors the real
+    # helper's contract: empty user input falls back to the default.
+    def fake_safe_input(prompt, default=""):
+        captures["prompt"] = prompt
+        captures["default"] = default
+        return user_input if user_input else default
+
+    monkeypatch.setattr("agent_notes.commands.wizard._safe_input", fake_safe_input)
+
+    kwargs = dict(
+        clis={"claude"},
+        scope="local",
+        copy_mode=False,
+        selected_skills=[],
+        role_models={},
+    )
+    if confirm_kwargs:
+        kwargs.update(confirm_kwargs)
 
     # Redirect stdout to capture prints
     buf = io.StringIO()
     with patch("sys.stdout", buf):
         from agent_notes.commands.wizard import _confirm_install
-        result = _confirm_install(
-            clis={"claude"},
-            scope="local",
-            copy_mode=False,
-            selected_skills=[],
-            role_models={},
-        )
+        result = _confirm_install(**kwargs)
 
     return result, buf.getvalue()
 
@@ -230,3 +254,80 @@ class TestConfirmInstallAbort:
         manifest = [_make_install_action("install", "a.md")]
         result, _output = _run_confirm_install(monkeypatch, manifest, user_input="n")
         assert result is False, "Return value False signals caller should not proceed"
+
+
+class TestConfirmEnterDefaultsToYes:
+    """The final confirmation must treat bare Enter (empty input) as Yes."""
+
+    def test_empty_input_proceeds(self, monkeypatch):
+        manifest = [_make_install_action("install", "a.md")]
+        result, _output = _run_confirm_install(monkeypatch, manifest, user_input="")
+        assert result is True, "Bare Enter must confirm the install (default Yes)"
+
+    def test_safe_input_default_is_yes(self, monkeypatch):
+        """The default handed to _safe_input must be an affirmative value."""
+        manifest = [_make_install_action("install", "a.md")]
+        captures = {}
+        _run_confirm_install(monkeypatch, manifest, user_input="", captures=captures)
+        assert captures["default"].strip().lower() in ("y", "yes")
+
+    def test_prompt_communicates_default(self, monkeypatch):
+        """Prompt text must show Yes as the default, e.g. '[Y/n]'."""
+        manifest = [_make_install_action("install", "a.md")]
+        captures = {}
+        _run_confirm_install(monkeypatch, manifest, user_input="", captures=captures)
+        assert "[Y/n]" in captures["prompt"]
+
+    @pytest.mark.parametrize("decline", ["n", "N", "no", "No", "NO", " no "])
+    def test_explicit_decline_variants_return_false(self, monkeypatch, decline):
+        manifest = [_make_install_action("install", "a.md")]
+        result, _output = _run_confirm_install(monkeypatch, manifest, user_input=decline)
+        assert result is False, f"Input {decline!r} must decline the install"
+
+    @pytest.mark.parametrize("accept", ["y", "Y", "yes", "YES"])
+    def test_explicit_accept_variants_return_true(self, monkeypatch, accept):
+        manifest = [_make_install_action("install", "a.md")]
+        result, _output = _run_confirm_install(monkeypatch, manifest, user_input=accept)
+        assert result is True
+
+
+class TestConfirmInstallPlanArgs:
+    """_confirm_install must plan exactly what the subsequent install will write."""
+
+    def test_empty_skill_selection_plans_zero_skills(self, monkeypatch):
+        """selected_skills=[] must reach plan_install as [] — None would plan ALL
+        skills while the install writes none (the old inflated-count bug)."""
+        manifest = [_make_install_action("install", "a.md")]
+        captures = {}
+        _run_confirm_install(monkeypatch, manifest, user_input="Y", captures=captures)
+        assert captures["plan_kwargs"]["selected_skills"] == []
+
+    def test_selected_skills_forwarded_verbatim(self, monkeypatch):
+        manifest = [_make_install_action("install", "a.md")]
+        captures = {}
+        _run_confirm_install(
+            monkeypatch, manifest, user_input="Y", captures=captures,
+            confirm_kwargs={"selected_skills": ["git", "tdd"]},
+        )
+        assert captures["plan_kwargs"]["selected_skills"] == ["git", "tdd"]
+
+    def test_profile_overrides_forwarded_to_plan(self, monkeypatch):
+        """A named profile changes install targets; the plan must see the overrides."""
+        manifest = [_make_install_action("install", "a.md")]
+        captures = {}
+        _run_confirm_install(
+            monkeypatch, manifest, user_input="Y", captures=captures,
+            confirm_kwargs={
+                "folder_overrides": {"claude": ".claude-work"},
+                "global_home_override": "~/.claude-work",
+            },
+        )
+        assert captures["plan_kwargs"]["folder_overrides"] == {"claude": ".claude-work"}
+        assert captures["plan_kwargs"]["global_home_override"] == "~/.claude-work"
+
+    def test_no_profile_passes_none_override(self, monkeypatch):
+        """Empty global_home_override must reach plan_install as None (no redirect)."""
+        manifest = [_make_install_action("install", "a.md")]
+        captures = {}
+        _run_confirm_install(monkeypatch, manifest, user_input="Y", captures=captures)
+        assert captures["plan_kwargs"]["global_home_override"] is None

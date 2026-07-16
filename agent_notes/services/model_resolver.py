@@ -5,8 +5,11 @@ agent get for this backend?".  All other call sites delegate here.
 
 Resolution precedence (in order):
   1. State-driven pin   — scope_state.clis[backend].role_models[role]
-                          → look up model in registry → provider alias
-                            (or model_class if backend.use_model_class)
+                          → look up model in registry → provider alias.
+                            ALWAYS the exact alias string, never model_class:
+                            a pin is an explicit user choice of a specific
+                            model version, so it must survive into frontmatter
+                            verbatim even on use_model_class backends.
   2. User-config override — user_config["role_models"][backend_name][role]
                             → returned verbatim (no registry lookup)
   3. Role typical_class   — load role registry, match role.typical_class
@@ -124,7 +127,12 @@ class ModelResolver:
         if resolved is None:
             return None  # no alias for this backend's providers — fall through
         _provider, alias_str = resolved
-        return model.model_class if backend.use_model_class else alias_str
+        # DECISION: state pins always render the exact alias string, even on
+        # use_model_class backends (claude). Class-based rendering remains only
+        # for the UNPINNED typical_class fallback (Branch 3) — a pin is an
+        # explicit version choice and flattening it to "sonnet" would let the
+        # harness silently substitute its own default version.
+        return alias_str
 
     def _from_user_config(self, agent_role: Optional[str], backend_name: str) -> Optional[str]:
         """Branch 2: user-config explicit role→model override."""

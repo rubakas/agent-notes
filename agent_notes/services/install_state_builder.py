@@ -33,6 +33,8 @@ def build_install_state(
     project_path: Optional[Path] = None,  # required when scope == "local"
     role_models: Optional[dict[str, dict[str, str]]] = None,
     # ^^ {cli_name: {role_name: model_id}}, optional — empty dict fine for now
+    role_efforts: Optional[dict[str, dict[str, str]]] = None,
+    # ^^ {cli_name: {role_name: effort}}, optional — empty dict fine for now
     selected_clis: Optional[set[str]] = None,
     # ^^ If given, only these backends are recorded as installed. None = all
     # backends with shipped content (legacy behavior, used by the plain
@@ -50,6 +52,8 @@ def build_install_state(
     - Scans dist/ for each backend; fills BackendState.installed.
     - BackendState.role_models comes from the `role_models` arg if provided,
       else empty dict (will be populated by wizard in Phase E).
+    - BackendState.role_efforts comes from the `role_efforts` arg if provided,
+      else empty dict.
     - Returns the updated full State. Caller must call save().
     """
     # Load existing state or create fresh one
@@ -105,7 +109,11 @@ def build_install_state(
         # Set role_models from arg (empty dict for now)
         if role_models and backend.name in role_models:
             backend_state.role_models = role_models[backend.name].copy()
-        
+
+        # Set role_efforts from arg (empty dict for now)
+        if role_efforts and backend.name in role_efforts:
+            backend_state.role_efforts = role_efforts[backend.name].copy()
+
         # Check agents
         if effective_backend.supports("agents"):
             agents_dir = PKG_DIR / "dist" / effective_backend.name / "agents"

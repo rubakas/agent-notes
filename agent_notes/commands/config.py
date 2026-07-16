@@ -68,6 +68,65 @@ def _validate_role(role_name: str):
         sys.exit(1)
 
 
+def _check_effort_valid(scope_state, cli_name: str, role_name: str, effort: str) -> bool:
+    """Check effort against the role's currently-assigned model's provider on
+    cli_name. Prints the provider name and its valid effort list on failure.
+    Returns True/False — does not exit (callers decide fatal vs. non-fatal).
+
+    NO cross-provider mapping/translation — the value is checked against exactly
+    the provider that serves the role's current model, nothing more.
+    """
+    from ..registries.model_registry import load_model_registry
+    from ..registries.cli_registry import load_registry
+    from ..registries.provider_registry import load_provider_registry
+
+    model_id = scope_state.clis[cli_name].role_models.get(role_name)
+    if not model_id:
+        print(f"No model assigned to role '{role_name}' for CLI '{cli_name}'.")
+        print("Set a model first with `agent-notes config role-model`.")
+        return False
+
+    model_registry = load_model_registry()
+    try:
+        model = model_registry.get(model_id)
+    except KeyError:
+        print(f"Unknown model '{model_id}' assigned to role '{role_name}'.")
+        return False
+
+    cli_registry = load_registry()
+    try:
+        backend = cli_registry.get(cli_name)
+    except KeyError:
+        print(f"Unknown CLI '{cli_name}'.")
+        return False
+
+    resolved = backend.first_alias_for(model.aliases)
+    if resolved is None:
+        print(f"Model '{model_id}' has no compatible provider for CLI '{cli_name}'.")
+        return False
+    provider_name, _alias = resolved
+
+    provider_registry = load_provider_registry()
+    try:
+        provider = provider_registry.get(provider_name)
+    except KeyError:
+        print(f"Provider '{provider_name}' does not support effort configuration.")
+        return False
+
+    if effort not in provider.efforts:
+        print(f"Invalid effort '{effort}' for provider '{provider_name}'.")
+        print(f"Valid efforts for {provider_name}: {', '.join(provider.efforts)}")
+        return False
+
+    return True
+
+
+def _validate_effort(scope_state, cli_name: str, role_name: str, effort: str) -> None:
+    """Validate effort, exiting with the printed error on failure."""
+    if not _check_effort_valid(scope_state, cli_name, role_name, effort):
+        sys.exit(1)
+
+
 def _state_snapshot(state) -> str:
     """Return a compact JSON snapshot of state for diffing."""
     from ..services.state_store import _state_to_dict
@@ -152,6 +211,37 @@ def role_model(role_name: str, model_id: str, cli_filter: Optional[str] = None) 
     for cli_name in target_clis:
         scope_state.clis[cli_name].role_models[role_name] = model_id
         print(f"Set {cli_name}: {role_name} -> {model_id}")
+
+    _apply_and_regenerate(state, before)
+
+
+def role_effort(role_name: str, effort: str, cli_filter: Optional[str] = None) -> None:
+    """Set role→effort for one or both CLIs. Validates against the role's current
+    model's provider, diffs, prompts, applies."""
+    state = _load_state()
+    before = _state_snapshot(state)
+
+    _validate_role(role_name)
+
+    scope, project_path, scope_state = _get_scope_state(state)
+
+    if cli_filter and cli_filter not in ("both",):
+        # Single CLI
+        target_clis = [cli_filter]
+        for cli_name in target_clis:
+            if cli_name not in scope_state.clis:
+                print(f"CLI '{cli_name}' not in {scope} installation.")
+                print(f"Installed CLIs: {', '.join(scope_state.clis.keys())}")
+                sys.exit(1)
+    else:
+        target_clis = list(scope_state.clis.keys())
+
+    for cli_name in target_clis:
+        _validate_effort(scope_state, cli_name, role_name, effort)
+
+    for cli_name in target_clis:
+        scope_state.clis[cli_name].role_efforts[role_name] = effort
+        print(f"Set {cli_name}: {role_name} -> {effort}")
 
     _apply_and_regenerate(state, before)
 
@@ -243,6 +333,17 @@ def show(state=None) -> None:
             else:
                 print("      (no role assignments)")
 
+            if backend_state.role_efforts:
+                print("      Effort:")
+                for role_name in sorted(backend_state.role_efforts):
+                    effort = backend_state.role_efforts[role_name]
+                    try:
+                        role = role_registry.get(role_name)
+                        role_label = role.label
+                    except KeyError:
+                        role_label = role_name
+                    print(f"      {role_label:<20} {effort}")
+
 
 # ── Interactive wizard ───────────────────────────────────────────────────────
 
@@ -308,6 +409,68 @@ def _wizard_role_model(state, before: str) -> bool:
     for cli_name in target_clis:
         scope_state.clis[cli_name].role_models[role_choice] = model_choice
         print(f"Set {cli_name}: {role_choice} -> {model_choice}")
+
+    _apply_and_regenerate(state, before)
+    return True
+
+
+def _wizard_role_effort(state, before: str) -> bool:
+    """Branch 7: interactive role→effort reassignment. Returns True if changes were applied."""
+    from ..registries.cli_registry import load_registry
+    from ..registries.role_registry import load_role_registry
+    from ..services.ui import _safe_input
+
+    scope, project_path, scope_state = _get_scope_state(state)
+
+    cli_registry = load_registry()
+    role_registry = load_role_registry()
+
+    # Show current
+    print("\nCurrent effort assignments:")
+    for cli_name, backend_state in sorted(scope_state.clis.items()):
+        try:
+            label = cli_registry.get(cli_name).label
+        except KeyError:
+            label = cli_name
+        print(f"  {label.upper()}:")
+        for role_name in sorted(backend_state.role_efforts):
+            effort = backend_state.role_efforts[role_name]
+            print(f"    {role_name:<20} {effort}")
+
+    cli_names = list(scope_state.clis.keys())
+    if len(cli_names) > 1:
+        cli_choice = _safe_input("\nWhich CLI? (claude / opencode / both) [both]: ", "both").strip().lower()
+        if cli_choice in ("both", ""):
+            target_clis = cli_names
+        elif cli_choice in cli_names:
+            target_clis = [cli_choice]
+        else:
+            print(f"Unknown CLI '{cli_choice}'. No changes made.")
+            return False
+    else:
+        target_clis = cli_names
+
+    role_names = role_registry.names()
+    role_choice = _safe_input(
+        f"Which role? ({'/'.join(role_names)}): ", ""
+    ).strip().lower()
+    if role_choice not in role_names:
+        print(f"Unknown role '{role_choice}'. No changes made.")
+        return False
+
+    effort_choice = _safe_input(f"New effort: ", "").strip().lower()
+    if not effort_choice:
+        print("No effort entered. No changes made.")
+        return False
+
+    for cli_name in target_clis:
+        if not _check_effort_valid(scope_state, cli_name, role_choice, effort_choice):
+            print("No changes made.")
+            return False
+
+    for cli_name in target_clis:
+        scope_state.clis[cli_name].role_efforts[role_choice] = effort_choice
+        print(f"Set {cli_name}: {role_choice} -> {effort_choice}")
 
     _apply_and_regenerate(state, before)
     return True
@@ -427,6 +590,7 @@ def interactive_config() -> None:
     print("  4) Skill bundles")
     print("  5) Show full configuration (read-only)")
     print("  6) API keys / providers")
+    print("  7) Role -> effort assignments")
     print("  q) Quit")
 
     try:
@@ -447,6 +611,8 @@ def interactive_config() -> None:
         show(state)
     elif choice == "6":
         _wizard_providers()
+    elif choice == "7":
+        _wizard_role_effort(state, before)
     elif choice == "q":
         print("Quit.")
     else:
@@ -493,6 +659,12 @@ def config(action: str = "wizard", args: Optional[list] = None, cli_filter: Opti
             print("Usage: agent-notes config role-agent <role> <agent>")
             sys.exit(1)
         role_agent(args[0], args[1], cli_filter=cli_filter)
+    elif action == "role-effort":
+        # args: [role_name, effort]
+        if len(args) < 2:
+            print("Usage: agent-notes config role-effort [--cli <cli>] <role> <effort>")
+            sys.exit(1)
+        role_effort(args[0], args[1], cli_filter=cli_filter)
     elif action == "providers":
         _wizard_providers()
     elif action == "provider":
@@ -510,5 +682,5 @@ def config(action: str = "wizard", args: Optional[list] = None, cli_filter: Opti
         cost_report_toggle(args[0])
     else:
         print(f"Unknown config action: {action}")
-        print("Actions: wizard, show, role-model, role-agent, providers, provider, memory, cost-report")
+        print("Actions: wizard, show, role-model, role-agent, role-effort, providers, provider, memory, cost-report")
         sys.exit(1)
