@@ -10,12 +10,14 @@ def render(ctx: dict) -> str:
       agent_name:  str
       agent_config: dict (from agents.yaml entry)
       model_str:   str (resolved model string)
+      resolved_effort: str or None (agent effort, falling back to role typical_effort)
       backend_name: str
       backend:     CLIBackend object or None
     """
     agent_name = ctx['agent_name']
     agent_config = ctx['agent_config']
     model_str = ctx['model_str']
+    resolved_effort = ctx.get('resolved_effort')
     
     frontmatter = ['---']
     frontmatter.append(f'name: {agent_name}')
@@ -33,7 +35,8 @@ def render(ctx: dict) -> str:
     
     # Add metadata
     frontmatter.append(f'color: {agent_config["color"]}')
-    frontmatter.append(f'effort: {agent_config["effort"]}')
+    if resolved_effort:
+        frontmatter.append(f'effort: {resolved_effort}')
     frontmatter.append('---')
     
     return '\n'.join(frontmatter)
