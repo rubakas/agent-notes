@@ -10,7 +10,7 @@ class Model:
     id: str                          # "claude-opus-4-7"
     label: str                       # "Claude Opus 4.7"
     family: str                      # "claude", "kimi", "gpt"
-    model_class: str                 # "opus" | "sonnet" | "haiku" | "flash" | "pro"
+    model_class: str                 # "opus" | "sonnet" | "haiku" | "flash" | "pro" | "fable"
     aliases: dict[str, str]          # {"anthropic": "claude-opus-4-7", ...}
     pricing: dict[str, float] = field(default_factory=dict)
     capabilities: dict[str, bool] = field(default_factory=dict)
