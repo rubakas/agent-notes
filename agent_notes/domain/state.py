@@ -22,6 +22,7 @@ class InstalledItem:
 class BackendState:
     """Installation manifest for one CLI within one scope."""
     role_models: dict[str, str] = field(default_factory=dict)   # role_name -> model_id
+    role_efforts: dict[str, str] = field(default_factory=dict)  # role_name -> effort
     installed: dict[str, dict[str, InstalledItem]] = field(default_factory=dict)
     # installed is a dict of component_type -> {filename/key -> InstalledItem}
     # e.g. installed["agents"]["lead.md"] = InstalledItem(...)
