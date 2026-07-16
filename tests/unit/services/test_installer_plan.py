@@ -291,3 +291,62 @@ class TestPlanInstallDstPaths:
             after = list(tmp_path.glob("**/*"))
 
         assert before == after, "plan_install must not create or modify any files"
+
+
+# ---------------------------------------------------------------------------
+# summarize_plan tests
+# ---------------------------------------------------------------------------
+
+def _action(action: str, name: str) -> InstallAction:
+    backup = Path(f"/fake/{name}.bak") if action == "overwrite" else None
+    return InstallAction(action=action, src=Path(f"/fake/src/{name}"),
+                         dst=Path(f"/fake/dst/{name}"), backup_path=backup)
+
+
+class TestSummarizePlan:
+    def test_to_install_counts_every_write_action(self):
+        """install, modify, and overwrite all write files; skip does not."""
+        from agent_notes.services.installer import summarize_plan
+
+        manifest = [
+            _action("install", "a.md"),
+            _action("modify", "settings.json"),
+            _action("overwrite", "CLAUDE.md"),
+            _action("skip", "b.md"),
+            _action("skip", "c.md"),
+        ]
+        summary = summarize_plan(manifest)
+
+        assert len(summary.to_install) == 3
+        assert {a.action for a in summary.to_install} == {"install", "modify", "overwrite"}
+
+    def test_overwrites_is_subset_of_to_install(self):
+        from agent_notes.services.installer import summarize_plan
+
+        manifest = [
+            _action("install", "a.md"),
+            _action("overwrite", "CLAUDE.md"),
+            _action("overwrite", "AGENTS.md"),
+            _action("skip", "b.md"),
+        ]
+        summary = summarize_plan(manifest)
+
+        assert len(summary.overwrites) == 2
+        assert all(a in summary.to_install for a in summary.overwrites)
+
+    def test_empty_manifest(self):
+        from agent_notes.services.installer import summarize_plan
+
+        summary = summarize_plan([])
+
+        assert summary.to_install == []
+        assert summary.overwrites == []
+
+    def test_all_skip_manifest_counts_zero(self):
+        from agent_notes.services.installer import summarize_plan
+
+        manifest = [_action("skip", f"{i}.md") for i in range(4)]
+        summary = summarize_plan(manifest)
+
+        assert summary.to_install == []
+        assert summary.overwrites == []

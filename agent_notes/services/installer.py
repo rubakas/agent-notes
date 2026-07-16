@@ -27,6 +27,8 @@ from .state_store import load_state, get_scope
 # ---------------------------------------------------------------------------
 from .install_plan import (
     InstallAction,
+    PlanSummary,
+    summarize_plan,
     COMPONENT_TYPES,
     _apply_overrides,
     _agent_glob,
@@ -169,7 +171,8 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
     skills = _filter_skills_by_backend(default_skill_registry().all(), memory_backend)
 
     version = config.get_version()
-    print(f"Installing {backend.label} SessionStart hook ...")
+    if not _fs.silent_file_ops:
+        print(f"Installing {backend.label} SessionStart hook ...")
     write_context(context_file, agents, version, skills)
     install_hook(settings_path, "SessionStart", hook_command)
 

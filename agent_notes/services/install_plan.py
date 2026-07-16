@@ -30,6 +30,21 @@ COMPONENT_TYPES = ("agents", "skills", "rules", "commands", "config")
 # Note: "scripts" is handled separately, not per-backend.
 
 
+class PlanSummary(NamedTuple):
+    """Counts derived from a plan_install manifest (pure, no I/O)."""
+
+    to_install: List[InstallAction]  # every action that writes: install/modify/overwrite
+    overwrites: List[InstallAction]  # subset replacing an existing file (gets a backup)
+
+
+def summarize_plan(manifest: List[InstallAction]) -> PlanSummary:
+    """Split a manifest into actions that will write files and the overwrites among them."""
+    return PlanSummary(
+        to_install=[a for a in manifest if a.action != "skip"],
+        overwrites=[a for a in manifest if a.action == "overwrite"],
+    )
+
+
 def _apply_overrides(
     backend: CLIBackend,
     folder_overrides: Optional[dict] = None,

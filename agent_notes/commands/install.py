@@ -48,6 +48,20 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
         print(f"  CLIs:      {', '.join(cli_labels)}")
         print(f"  Mode:      {existing.mode}")
         print()
+        # Re-render dist/ from the persisted state pins before verifying.
+        # After a pipx upgrade/reinstall the shipped dist/ carries package
+        # defaults; installed symlinks point into dist/, so without this
+        # rebuild the user's role_models/role_efforts pins would silently
+        # revert to defaults until the next build/regenerate.
+        print("Refreshing rendered files from saved configuration ...")
+        try:
+            from ..commands.build import build
+            from ..services.fs import silent_ops
+            with silent_ops():
+                build(scope=scope, project_path=project_path, profile_label=profile_label)
+        except Exception as e:
+            print(f"{Color.YELLOW}Warning: rebuild failed: {e}{Color.NC}")
+        print()
         print("Verifying ...")
         issues = _verify_install(existing, scope, project_path, registry)
         if not issues:
@@ -78,11 +92,12 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
         print("Global installs always use symlinks.")
         return
 
-    # Build first
+    # Build first — scope-aware so an existing state pin set for this scope
+    # (e.g. local install after a previous local wizard run) drives the render.
     print("Building from source...")
     try:
         from ..commands.build import build
-        build()
+        build(scope=scope, project_path=project_path, profile_label=profile_label)
     except Exception as e:
         print(f"{Color.RED}Build failed: {e}{Color.NC}")
         return

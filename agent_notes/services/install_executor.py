@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..domain.cli_backend import CLIBackend
+from . import fs as _fs
 from .fs import (
     place_file, place_dir_contents,
     remove_symlink, remove_all_symlinks_in_dir, remove_dir_if_empty,
@@ -50,7 +51,8 @@ def install_component_for_backend(
         src_file = src / filename
         if not src_file.exists():
             return
-        print(f"Installing {backend.label} config to {dst} ...")
+        if not _fs.silent_file_ops:
+            print(f"Installing {backend.label} config to {dst} ...")
         place_file(src_file, dst / filename, copy_mode)
     elif component in ("agents", "rules", "commands"):
         # Directory of agent/rule/command files — flat copy
@@ -59,7 +61,8 @@ def install_component_for_backend(
         files = list(src.glob(glob))
         if not files:
             return
-        print(f"Installing {backend.label} {component} to {dst} ...")
+        if not _fs.silent_file_ops:
+            print(f"Installing {backend.label} {component} to {dst} ...")
         place_dir_contents(src, dst, glob, copy_mode)
     elif component == "skills":
         # Each top-level subdir of src is a skill — install each as a directory
@@ -67,7 +70,8 @@ def install_component_for_backend(
         skill_dirs = [d for d in src.iterdir() if d.is_dir()]
         if not skill_dirs:
             return
-        print(f"Installing {backend.label} skills to {dst} ...")
+        if not _fs.silent_file_ops:
+            print(f"Installing {backend.label} skills to {dst} ...")
         for skill_dir in sorted(skill_dirs):
             place_file(skill_dir, dst / skill_dir.name, copy_mode)
 
