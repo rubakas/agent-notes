@@ -42,6 +42,11 @@ def _linked(path: str) -> None:
         print(f"  {_Color.GREEN}LINKED{_Color.NC}  {path}")
 
 
+def _backed_up(path: str) -> None:
+    if not silent_file_ops:
+        print(f"  {_Color.CYAN}BACKUP{_Color.NC}   {path}")
+
+
 def _removed(path: str) -> None:
     if not silent_file_ops:
         print(f"  {_Color.GREEN}REMOVED{_Color.NC}  {path}")
@@ -84,7 +89,7 @@ def handle_existing(src: Path, dst: Path) -> bool:
         shutil.rmtree(dst)
     else:
         dst.rename(backup_path)
-    print(f"  {_Color.CYAN}BACKUP{_Color.NC}   {backup_path}")
+    _backed_up(str(backup_path))
     return True
 
 
