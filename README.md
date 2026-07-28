@@ -12,7 +12,7 @@ agent-notes doctor
 
 **What's Included**
 - 19 specialized AI subagents (Opus reasons, Sonnet executes, Haiku explores)
-- 50+ on-demand skills (Rails, Docker, Git, Kamal, Process)
+- 25 on-demand skills (Rails, Docker, Git, Kamal, Process)
 - Global rules and guardrails (including a ban on AI self-attribution in commits/PRs)
 - Agent memory with 3 storage options (Local, Obsidian, Wiki)
 - Configuration for Claude Code, OpenCode, and GitHub Copilot
@@ -262,7 +262,7 @@ agent-notes memory lint               # health-check
 <details>
 <summary>Skills</summary>
 
-50+ on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`.
+25 on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`. For additional workflows (brainstorming, test-driven development, writing skills), see the complementary [Superpowers](https://github.com/obra/superpowers) plugin.
 
 The session context hook auto-generates a skill index from SKILL.md frontmatter at install time, so agents always know what skills are available without loading full skill content. This keeps context overhead low while maintaining skill discoverability.
 
@@ -279,14 +279,13 @@ Load the docker-compose skill for multi-service setup
 |---|---|---|
 | Misalignment | Claude starts building before the problem is resolved | `/grill-me`, `/grilling`, `/grill-with-docs` |
 | Vague scope | Work starts without a spec or ticketed breakdown | `/to-spec`, `/to-tickets`, `/wayfinder`, `/triage` |
-| Broken code | Claude codes without a feedback loop or evidence trail | `/tdd`, `/diagnosing-bugs` |
+| Broken code | Claude codes without a feedback loop or evidence trail | `/diagnosing-bugs` |
 | Ball of mud | Architecture drifts; modules grow shallow and tangled | `/improve-codebase-architecture`, `/codebase-design`, `/domain-modeling` |
 
 **Skill descriptions:**
 
 - `/grill-me`, `/grilling` — Interview the user relentlessly until the plan is fully resolved before touching code
 - `/grill-with-docs` — Same, but cross-references CONTEXT.md and ADRs and updates them inline
-- `/tdd` — RED-GREEN-REFACTOR with tracer-bullet vertical slices; integration-first testing
 - `/diagnosing-bugs` — Diagnosis loop for hard bugs and performance regressions (build a feedback loop first)
 - `/improve-codebase-architecture` — Scan for deepening opportunities, present a visual HTML report, then grill the chosen one
 - `/codebase-design` — Shared vocabulary for designing deep modules and choosing where seams go
@@ -299,7 +298,6 @@ Load the docker-compose skill for multi-service setup
 - `/research` — Investigate a question against primary sources and capture findings as Markdown
 - `/prototype` — Throwaway prototypes: terminal app for logic or UI variations for visual
 - `/setup-agent-tracker` — One-time per-repo setup of the issue tracker, triage labels, and domain doc layout
-- `/writing-great-skills` — Reference for writing and editing skills well
 
 </details>
 
@@ -492,7 +490,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ADD_CLI.md](docs/ADD_CLI
 ## Inspired by
 
 - [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — The wiki memory backend implements his compile-once, query-forever knowledge pattern with structured page types and three core operations (ingest, query, lint)
-- [Matt Pocock's skills repo](https://github.com/mattpocock/skills) — Skill format (SKILL.md per directory), failure-mode table (misalignment, broken code, architectural degradation), and a set of engineering/productivity skills vendored from the upstream repo (tdd, grill-me, grilling, grill-with-docs, diagnosing-bugs, improve-codebase-architecture, codebase-design, domain-modeling, prototype, handoff, research, to-spec, to-tickets, triage, wayfinder, writing-great-skills). Last synced from upstream commit [`391a270`](https://github.com/mattpocock/skills/commit/391a2701dd948f94f56a39f7533f8eea9a859c87) (2026-07-10), reviewed for prompt-injection before import.
+- [Matt Pocock's skills repo](https://github.com/mattpocock/skills) — Skill format (SKILL.md per directory), failure-mode table (misalignment, broken code, architectural degradation), and a set of engineering/productivity skills vendored from the upstream repo (grill-me, grilling, grill-with-docs, diagnosing-bugs, improve-codebase-architecture, codebase-design, domain-modeling, prototype, handoff, research, to-spec, to-tickets, triage, wayfinder). Last synced from upstream commit [`391a270`](https://github.com/mattpocock/skills/commit/391a2701dd948f94f56a39f7533f8eea9a859c87) (2026-07-10), reviewed for prompt-injection before import.
 
 ## License
 

@@ -897,7 +897,7 @@ Add to Claude Desktop config:
 | Provider | API Endpoint | Model ID Format | Examples | Setup Required |
 |----------|--------------|-----------------|----------|-----------------|
 | **Anthropic** | api.anthropic.com | Model alias or full ID | `sonnet`, `claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5` | Claude subscription or Console API key |
-| **Amazon Bedrock** | bedrock-runtime.*.amazonaws.com | ARN format | `arn:aws:bedrock:us-east-1:123456789:inference-profile/anthropic.claude-3-5-sonnet-20241022-v2:0` | AWS account with model access; IAM credentials; optional VPC endpoint; optional profile-based auth |
+| **Amazon Bedrock** | bedrock-runtime.*.amazonaws.com | ARN or inference-profile ID | `arn:aws:bedrock:us-east-1:123456789:inference-profile/anthropic.claude-3-5-sonnet-20241022-v2:0` or `us.anthropic.claude-sonnet-4-20250514-v1:0` | AWS account with model access; IAM credentials; optional VPC endpoint; optional profile-based auth |
 | **Google Vertex AI** | vertexai.googleapis.com | Model with location suffix | `claude-3-5-sonnet@...` | GCP project with Vertex API enabled; service account with permissions |
 | **Microsoft Foundry** | Azure resource URL | Model deployment ID | Varies by deployment | Azure subscription; Foundry resource; model deployments provisioned |
 | **GitHub Copilot** (third-party) | github-copilot API | Provider alias | `github-copilot/claude-code` | GitHub token from `/connect` |
@@ -911,12 +911,13 @@ Add to Claude Desktop config:
 
 **Bedrock** (AWS):
 - ARN format: `arn:aws:bedrock:<region>:<account-id>:inference-profile/<anthropic-model-id>`
-- Example: `arn:aws:bedrock:us-east-1:123456789:inference-profile/anthropic.claude-3-5-sonnet-20241022-v2:0`
-- Config: Set in `settings.json` `modelOverrides` to map Anthropic ID to ARN
+- Inference-profile ID format: `<region>.anthropic.<model-id>:<version>` (e.g., `us.anthropic.claude-sonnet-4-20250514-v1:0`)
+- Both formats are equally valid as `modelId`
+- Config: Set in `settings.json` `modelOverrides` to map Anthropic ID to ARN or inference-profile ID
 
 **Vertex AI** (Google):
 - Format: `claude-3-5-sonnet@<version>` or similar (location inferred from GCP project)
-- Example: `claude-3-5-sonnet@20250514` (version date)
+- Example: `claude-3-5-sonnet@20241022` (version date; Claude 3.5 Sonnet snapshots are `20240620` and `20241022`)
 - Setup guide required from docs
 
 **Foundry** (Microsoft Azure):

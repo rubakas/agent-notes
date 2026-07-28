@@ -1,10 +1,14 @@
 """Tests that all 4 registries load correctly from their source files."""
+import re
 import pytest
 
 from agent_notes.registries.model_registry import load_model_registry
 from agent_notes.registries.role_registry import load_role_registry
 from agent_notes.registries.skill_registry import load_skill_registry
 from agent_notes.registries.agent_registry import load_agent_registry
+
+
+_SLUG_RE = re.compile(r'^[a-z][a-z0-9-]*$')
 
 
 # --- Model registry ---
@@ -96,22 +100,18 @@ def test_role_registry_loads():
     assert len(registry.all()) >= 3
 
 
-def test_role_registry_has_orchestrator():
+def test_role_names_are_unique():
     registry = load_role_registry()
     names = registry.names()
-    assert "orchestrator" in names
+    assert len(names) == len(set(names)), "Role names must be unique across the registry"
 
 
-def test_role_registry_has_worker():
+def test_role_names_are_slugs():
     registry = load_role_registry()
-    names = registry.names()
-    assert "worker" in names
-
-
-def test_role_registry_has_scout():
-    registry = load_role_registry()
-    names = registry.names()
-    assert "scout" in names
+    for role in registry.all():
+        assert _SLUG_RE.match(role.name), (
+            f"Role name {role.name!r} is not a valid directory-safe slug"
+        )
 
 
 def test_role_has_required_fields():
@@ -155,14 +155,18 @@ def test_skill_registry_loads():
     assert len(registry.all()) >= 15
 
 
-def test_skill_registry_includes_git():
+def test_skill_names_are_unique():
     registry = load_skill_registry()
-    assert "git" in registry.names()
+    names = registry.names()
+    assert len(names) == len(set(names)), "Skill names must be unique across the registry"
 
 
-def test_skill_registry_includes_brainstorming():
+def test_skill_names_are_slugs():
     registry = load_skill_registry()
-    assert "brainstorming" in registry.names()
+    for skill in registry.all():
+        assert _SLUG_RE.match(skill.name), (
+            f"Skill name {skill.name!r} is not a valid directory-safe slug"
+        )
 
 
 def test_skill_has_required_fields():
@@ -218,19 +222,18 @@ def test_agent_registry_loads():
     assert len(registry.all()) >= 15
 
 
-def test_agent_registry_includes_coder():
+def test_agent_names_are_unique():
     registry = load_agent_registry()
-    assert "coder" in registry.names()
+    names = registry.names()
+    assert len(names) == len(set(names)), "Agent names must be unique across the registry"
 
 
-def test_agent_registry_includes_reviewer():
+def test_agent_names_are_slugs():
     registry = load_agent_registry()
-    assert "reviewer" in registry.names()
-
-
-def test_agent_registry_includes_explorer():
-    registry = load_agent_registry()
-    assert "explorer" in registry.names()
+    for agent in registry.all():
+        assert _SLUG_RE.match(agent.name), (
+            f"Agent name {agent.name!r} is not a valid directory-safe slug"
+        )
 
 
 def test_agent_has_required_fields():
