@@ -97,11 +97,27 @@ def _guard_credentials() -> None:
 # Credential patterns (from safety.md "Credentials — ABSOLUTE PROHIBITION")
 # ---------------------------------------------------------------------------
 
-# Non-secret template suffixes — .env.example / .env.sample / .env.template /
-# .env.dist are not real secret files. Allow them explicitly.
-_ENV_TEMPLATE_SUFFIXES = frozenset({
-    ".example", ".sample", ".template", ".dist",
-})
+# Template markers denoting non-secret scaffolding files. A basename is a
+# template when one of these is a dotted component (.env.example,
+# credentials.example.yml, secrets.sample.json, config.template.yml) — these
+# hold placeholders, never real secrets.
+_TEMPLATE_MARKERS = frozenset({"example", "sample", "template", "dist"})
+
+# Extensions that are NEVER exempt, even if a template marker is also present
+# (guards against e.g. foo.example.key). Encrypted stores + key material.
+_HARD_SECRET_EXTS = (
+    ".enc", ".key", ".pem", ".p12", ".pfx", ".jks", ".keystore", ".truststore",
+)
+
+# Source-code extensions. A file of source is code, not a credential store —
+# `credentials.py` is a module, not a secret. Deliberately narrow: every data
+# and config extension (.toml/.yaml/.yml/.json/.ini/.env/...) stays denied,
+# because those are the formats credentials are actually stored in.
+_SOURCE_EXTS = (
+    ".py", ".pyi", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx",
+    ".go", ".rs", ".rb", ".java", ".kt", ".swift", ".c", ".h",
+    ".cc", ".cpp", ".hpp", ".cs", ".php",
+)
 
 # Filename-level patterns: matched against the basename of the path.
 # Order: most specific first; the .env allowlist check runs BEFORE these.
@@ -124,6 +140,10 @@ _CREDENTIAL_BASENAME_PATTERNS: list[re.Pattern[str]] = [
 # Word-boundary separators for keyword matching within a path segment.
 # A keyword only matches when surrounded by start/end of segment or one of these.
 _SEG_SEPS = re.compile(r"[-_.\s]")
+
+# Shell/quote/paren punctuation used to decompose compound tokens (e.g. the
+# single shlex token "cat credentials.toml" inside a -c argument).
+_TOKEN_SPLIT = re.compile(r"""[\s()'"<>|;&`]+""")
 
 # Path-segment keywords: match only as DELIMITED words within a segment.
 # E.g. "token" matches "auth-token.json" and "my_token" but NOT "tokenizer.py"
@@ -149,17 +169,42 @@ _COMMAND_PREFIXES = frozenset({
 })
 
 
-def _is_env_template(basename: str) -> bool:
-    """Return True if the basename is a non-secret .env template file.
+def _is_template_file(basename: str) -> bool:
+    """Return True if basename is a non-secret template/scaffolding file.
 
-    .env.example / .env.sample / .env.template / .env.dist are scaffolding
-    files checked into repos — they contain placeholder values, not real secrets.
+    A template marker (example / sample / template / dist) appearing as a dotted
+    component marks a placeholder file checked into the repo. A file that also
+    ends in a hard-secret extension (.enc / .key / .pem / ...) is never a template.
+
+    A marker appearing BEFORE a `.env` suffix does not make the file a template:
+    `.env.example` is scaffolding (marker is the suffix), but `example.env` and
+    `prod.template.env` are live credential stores (`.env` is the suffix).
     """
     lower = basename.lower()
-    if not lower.startswith(".env"):
+    if lower.endswith(_HARD_SECRET_EXTS):
         return False
-    suffix = lower[4:]  # everything after ".env"
-    return suffix in _ENV_TEMPLATE_SUFFIXES
+    # Marker before .env does not exempt — example.env / prod.template.env are real.
+    if lower.endswith(".env"):
+        return False
+    return bool(set(lower.split(".")) & _TEMPLATE_MARKERS)
+
+
+def _is_path_shaped(token: str) -> bool:
+    """Return True if token looks like a file-system path.
+
+    A token is path-shaped when it contains a `/` (slash-separated path),
+    starts with `.` (hidden file or relative ref), or ends with a file
+    extension (a dot followed by 1-6 alphanumeric characters).
+    Non-path tokens like variable names, option arguments, or issue titles
+    are not path-shaped and are not checked against credential patterns.
+    """
+    if not token:
+        return False
+    if "/" in token:
+        return True
+    if token.startswith("."):
+        return True
+    return bool(re.search(r"\.\w{1,6}$", token))
 
 
 def _keyword_in_segment(keyword: str, segment: str) -> bool:
@@ -193,9 +238,14 @@ def _is_credential_path(path_str: str) -> bool:
     """Return True if path_str refers to a credential file.
 
     Checks (in order):
-    1. Explicit allow: non-secret .env template files (.env.example etc.)
-    2. Basename against known credential file patterns.
-    3. Every path segment for credential-related DELIMITED keywords.
+    1. Explicit allow: non-secret template files (.env.example, credentials.example.yml …)
+    2. Explicit deny: hard-secret extensions (.enc, .key, .pem, …)
+    3. Basename against known credential file patterns (skipped for source files).
+    4. Credential-related DELIMITED keywords in path segments.
+       Source files are only exempt from BASENAME keyword checks, not directory checks.
+       e.g. secret/config.py → denied (directory "secret"); src/apikey.py → allowed.
+    5. Explicit allow: source-code extensions (.py, .js, .ts, …) — runs last so
+       directory-level keywords (step 4) are evaluated first.
 
     This function ONLY inspects the path string — it never reads file contents.
     """
@@ -210,20 +260,39 @@ def _is_credential_path(path_str: str) -> bool:
 
     basename = segments[-1]
 
-    # 1. Allow non-secret .env templates before any deny pattern fires
-    if _is_env_template(basename):
+    # 1. Allow non-secret template files before any deny pattern fires
+    if _is_template_file(basename):
         return False
 
-    # 2. Basename pattern match
-    for pattern in _CREDENTIAL_BASENAME_PATTERNS:
-        if pattern.match(basename):
-            return True
+    lower_basename = basename.lower()
 
-    # 3. Delimited keyword match in any segment
-    for seg in segments:
+    # 2. Hard-secret extensions are always denied (covers .enc and reinforces
+    #    .key/.pem/etc. that are also in the basename patterns below).
+    if lower_basename.endswith(_HARD_SECRET_EXTS):
+        return True
+
+    is_source_file = lower_basename.endswith(_SOURCE_EXTS)
+
+    # 3. Basename pattern match (skipped for source files — credentials.py is a module)
+    if not is_source_file:
+        for pattern in _CREDENTIAL_BASENAME_PATTERNS:
+            if pattern.match(basename):
+                return True
+
+    # 4. Delimited keyword match in path segments.
+    #    Source extensions do NOT exempt from directory-level keyword checks;
+    #    only the basename segment is skipped for source files so that
+    #    secret/config.py is denied while src/apikey.py remains allowed.
+    check_segments = segments[:-1] if is_source_file else segments
+    for seg in check_segments:
         for keyword in _CREDENTIAL_SEGMENT_KEYWORDS:
             if _keyword_in_segment(keyword, seg):
                 return True
+
+    # 5. Source-code files are code, not credential stores — final allow after
+    #    all deny checks have run.
+    if is_source_file:
+        return False
 
     return False
 
@@ -259,14 +328,24 @@ def _strip_token_punctuation(token: str) -> str:
 
 
 def _command_contains_credential_path(command: str) -> bool:
-    """Return True if any path-like token or substring in the command is a credential.
+    """Return True if any path-shaped token in the command is a credential path.
 
-    Two-pass scan:
-    1. shlex tokens (handles quoted paths, explicit < redirections)
-    2. Raw regex scan of the whole command string (catches subshells, backticks,
-       no-space redirections like `<.env`, compound commands)
+    Tokenizes with shlex; on parse error falls back to whitespace splitting.
+    Only tokens that look like file paths (contain /, start with ., or carry a
+    file extension) are checked against credential patterns — option values,
+    issue titles, variable names, and other non-path tokens are skipped.
+
+    Each shlex token is also decomposed using shell/quote/punctuation splits so
+    that a credential path embedded inside a compound argument (e.g. the single
+    token "cat credentials.toml" from `bash -c '...'`) is still detected.
+    The value half of any key=value operand (e.g. `if=credentials.toml`) is also
+    extracted and checked.
+
+    Known non-goals (static string analysis cannot catch):
+      - Variable-built paths: f=.env; cat $f  (path not present as literal)
+      - Glob obfuscation: cat .e*              (glob expands at runtime)
+    These are accepted limitations, not bugs.
     """
-    # Pass 1: shlex tokens
     try:
         import shlex
         tokens = shlex.split(command)
@@ -275,25 +354,26 @@ def _command_contains_credential_path(command: str) -> bool:
 
     for token in tokens:
         cleaned = _strip_token_punctuation(token)
-        if cleaned and _is_credential_path(cleaned):
-            return True
+        if not cleaned:
+            continue
 
-    # Pass 2: raw scan — extract all path-candidate substrings via regex.
-    # Matches sequences that look like a path (optional leading ./ or / or ~/,
-    # then word chars, dots, hyphens, underscores, slashes) and also bare
-    # no-space redirections like `<.env`, `if=.env`, and quoted paths like `'.env'`.
-    #
-    # Known non-goals (static string analysis cannot catch):
-    #   - Variable-built paths: f=.env; cat $f  (path not present as literal)
-    #   - Glob obfuscation: cat .e*              (glob expands at runtime)
-    # These are accepted limitations, not bugs.
-    for match in re.finditer(
-        r"(?:^|(?<=\s)|(?<=[<>|;&()`=']))([~./]?[\w./\-]+)",
-        command,
-    ):
-        candidate = _strip_token_punctuation(match.group(1))
-        if candidate and _is_credential_path(candidate):
-            return True
+        # Build the candidate list: the token itself, plus any pieces obtained by
+        # splitting on shell metacharacters (covers bash -c '...' style args) and
+        # the value half of key=value operands (covers dd if=...).
+        candidates = [cleaned]
+        if _TOKEN_SPLIT.search(cleaned):
+            candidates.extend(_TOKEN_SPLIT.split(cleaned))
+        # Split on "=" unconditionally — this covers both plain key=value
+        # operands (dd if=...) and flag-style tokens (--config=credentials.toml).
+        # The guard against false positives is _is_path_shaped, not startswith("-"):
+        # non-path values such as "json" or "2" are not path-shaped and are ignored.
+        if "=" in cleaned:
+            candidates.append(cleaned.partition("=")[2])
+
+        for cand in candidates:
+            c = _strip_token_punctuation(cand)
+            if c and _is_path_shaped(c) and _is_credential_path(c):
+                return True
 
     return False
 

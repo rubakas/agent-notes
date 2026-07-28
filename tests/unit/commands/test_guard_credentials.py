@@ -152,8 +152,10 @@ class TestIsCredentialPath:
         assert _is_credential_path("~/.token/github")
 
     def test_path_with_apikey_file(self):
-        # File named "apikey.py" — "apikey" is at start+end of basename → match
-        assert _is_credential_path("src/apikey.py")
+        # Change 2: .py is a source extension — exempted even if basename carries
+        # a credential keyword like "apikey". A data file (apikey.json / apikey.yaml)
+        # would still be denied; only source-code extensions are exempt.
+        assert not _is_credential_path("src/apikey.py")
 
     def test_dot_env_with_leading_directory(self):
         assert _is_credential_path("project/.env")
@@ -222,6 +224,74 @@ class TestIsCredentialPath:
 
     def test_empty_string(self):
         assert not _is_credential_path("")
+
+    # --- Change 1: generalised template gate ---
+    def test_credentials_example_yml_allowed(self):
+        # "example" is a dotted component — template, not a real secret store
+        assert not _is_credential_path("credentials.example.yml")
+
+    def test_secrets_sample_json_allowed(self):
+        assert not _is_credential_path("secrets.sample.json")
+
+    def test_config_template_yml_allowed(self):
+        assert not _is_credential_path("config.template.yml")
+
+    def test_env_example_unchanged(self):
+        assert not _is_credential_path(".env.example")
+
+    def test_env_sample_unchanged(self):
+        assert not _is_credential_path(".env.sample")
+
+    def test_foo_example_key_denied(self):
+        # Template marker present, but .key is a hard-secret extension — deny
+        assert _is_credential_path("foo.example.key")
+
+    def test_production_yml_enc_denied(self):
+        # Encrypted store — .enc is a hard-secret extension
+        assert _is_credential_path("production.yml.enc")
+
+    def test_staging_yml_enc_denied(self):
+        assert _is_credential_path("staging.yml.enc")
+
+    # --- Change 2: source-file exemption ---
+    def test_credentials_py_allowed(self):
+        # credentials.py is source code, not a credential store
+        assert not _is_credential_path("agent_notes/services/credentials.py")
+
+    def test_credentials_py_bare_allowed(self):
+        assert not _is_credential_path("credentials.py")
+
+    def test_credentials_sh_denied(self):
+        # .sh is not in SOURCE_EXTS — shell scripts can hold real secrets
+        assert _is_credential_path("credentials.sh")
+
+    def test_secrets_tfvars_denied(self):
+        # .tfvars is not in SOURCE_EXTS
+        assert _is_credential_path("secrets.tfvars")
+
+    def test_credentials_yml_denied(self):
+        # data format — not source code
+        assert _is_credential_path("credentials.yml")
+
+    # --- Security audit bypass fixes ---
+
+    def test_example_env_denied(self):
+        # Template marker BEFORE .env suffix must not exempt — live credential store
+        assert _is_credential_path("example.env")
+
+    def test_prod_template_env_denied(self):
+        # Multiple markers before .env suffix — still a real env file
+        assert _is_credential_path("prod.template.env")
+
+    def test_secret_dir_config_py_denied(self):
+        # Directory keyword must trigger even when basename is a source file
+        assert _is_credential_path("secret/config.py")
+
+    def test_token_dir_app_py_denied(self):
+        assert _is_credential_path("token/app.py")
+
+    def test_credential_dir_loader_py_denied(self):
+        assert _is_credential_path("credential/loader.py")
 
 
 # ---------------------------------------------------------------------------
@@ -414,6 +484,92 @@ class TestBashReadsCredential:
 
     def test_cat_env_sample_allowed(self):
         assert not _bash_reads_credential("cat .env.sample")
+
+    # --- Change 3: keyword in non-path positions must not trigger ---
+    def test_keyword_in_flag_value_allowed(self):
+        # "credential" appears in a commit message, not as a path operand
+        assert not _bash_reads_credential('git commit -m "update credential handling"')
+
+    def test_keyword_in_issue_title_allowed(self):
+        # keyword in a quoted title string — not a path
+        assert not _bash_reads_credential(
+            'gh issue create --title "Credential guard blocks false positives"'
+        )
+
+    def test_grep_variable_name_allowed(self):
+        # keyword is part of a variable name being searched for, not a path
+        assert not _bash_reads_credential(
+            'grep -n "_CREDENTIAL_BASENAME_PATTERNS" hook.py'
+        )
+
+    def test_actual_credential_path_still_denied(self):
+        # sanity: a real credential path operand is still blocked
+        assert _bash_reads_credential("cat credentials.toml")
+
+    def test_cat_credentials_example_yml_allowed(self):
+        # template file — path-shaped but exempt
+        assert not _bash_reads_credential("cat credentials.example.yml")
+
+    def test_cat_credentials_py_allowed(self):
+        # source file — path-shaped but exempt
+        assert not _bash_reads_credential("cat agent_notes/services/credentials.py")
+
+    # --- Security audit bypass fixes ---
+
+    def test_bash_subshell_cat_credentials_toml_denied(self):
+        # Credential path embedded in a -c argument as a single shlex token
+        assert _bash_reads_credential("bash -c 'cat credentials.toml'")
+
+    def test_sh_subshell_cat_credentials_toml_denied(self):
+        assert _bash_reads_credential("sh -c 'cat credentials.toml'")
+
+    def test_dd_if_credentials_toml_denied(self):
+        # key=value operand — value half must be extracted and checked
+        assert _bash_reads_credential("dd if=credentials.toml of=/tmp/out")
+
+    def test_python3_open_credentials_toml_denied(self):
+        # Credential path inside a python one-liner
+        assert _bash_reads_credential("python3 -c \"print(open('credentials.toml').read())\"")
+
+    # --- False positives that must remain ALLOW after bypass fixes ---
+
+    def test_gh_issue_title_credential_word_allowed(self):
+        # "credential" in a quoted title string — not path-shaped, must not trigger
+        assert not _bash_reads_credential(
+            'gh issue create --title "Guard blocks credential files"'
+        )
+
+    def test_grep_credential_pattern_constant_allowed(self):
+        # Constant name being grepped — not a path operand
+        assert not _bash_reads_credential(
+            "grep -n _CREDENTIAL_BASENAME_PATTERNS hook.py"
+        )
+
+    # --- --flag=<credential-path> bypass fix ---
+
+    def test_sops_config_flag_credentials_toml_denied(self):
+        # --config=credentials.toml — flag-style token must be decomposed
+        assert _bash_reads_credential("sops --config=credentials.toml decrypt f.yaml")
+
+    def test_gpg_output_flag_server_key_denied(self):
+        assert _bash_reads_credential("gpg --output=server.key --gen-key")
+
+    def test_tool_config_flag_env_production_denied(self):
+        assert _bash_reads_credential("tool --config=.env.production")
+
+    # --- Regression: flag=non-path values must stay allowed ---
+
+    def test_jq_arg_format_json_allowed(self):
+        # "json" is not path-shaped — must not trigger
+        assert not _bash_reads_credential("jq --arg format=json .")
+
+    def test_pytest_maxfail_number_allowed(self):
+        # "2" is not path-shaped — must not trigger
+        assert not _bash_reads_credential("pytest --maxfail=2 -q")
+
+    def test_git_log_pretty_format_allowed(self):
+        # format string with "%" is not path-shaped
+        assert not _bash_reads_credential("git log --pretty=format:%h")
 
 
 # ---------------------------------------------------------------------------
