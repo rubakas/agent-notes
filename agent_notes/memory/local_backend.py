@@ -3,7 +3,7 @@
 from __future__ import annotations
 from pathlib import Path
 
-from ._memory_utils import _today
+from ..services._memory_utils import _today
 
 
 def local_init(memory_dir: Path) -> None:

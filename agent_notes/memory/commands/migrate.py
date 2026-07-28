@@ -20,8 +20,8 @@ def do_migrate() -> None:
         print("Memory path not configured.")
         return
 
-    from ...services.obsidian_backend import OBSIDIAN_CATEGORIES
-    from ...services.memory_router import memory_regenerate_index
+    from ..obsidian_backend import OBSIDIAN_CATEGORIES
+    from ..memory_router import memory_regenerate_index
     from ...services._memory_utils import _parse_frontmatter
 
     _NEW_FILE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_")

@@ -145,15 +145,16 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
     """Install the SessionStart hook and write the context file.
 
     Behaviour is driven by the backend's feature flags:
-      stop_hook     — whether to install the Stop/cost-report hook (claude: true, codex: false)
-      allow_entries — whether to install Bash permission allow-list entries (claude: true, codex: false)
+      stop_hook        — memory-bridge and Stop/cost-report hook (claude: true, codex: false)
+      pretooluse_hooks — PreToolUse credential guard (claude: true, codex: false)
+      allow_entries    — Bash permission allow-list entries (claude: true, codex: false)
     """
     from .settings_writer import install_hook, install_allow_entry, remove_allow_entry, remove_matching_allow_entries, remove_hook
     from ..constants import Hooks
     from .session_context import write_context
     from ..registries.skill_registry import default_skill_registry
     from .. import config
-    from ..config import memory_dir_for_backend
+    from ..memory.install import install_memory_hooks, install_memory_allow_entries
 
     settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
 
@@ -176,24 +177,15 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
     write_context(context_file, agents, version, skills)
     install_hook(settings_path, "SessionStart", hook_command)
 
-    # Memory-bridge hook and allow entries — only for backends that support them
+    # Memory-bridge hooks and Stop/cost-report — backends that support stop_hook
     if backend.supports("stop_hook"):
-        # Memory-bridge hook: load agent-notes index at session start.
-        # Only useful for Obsidian-backed mode.
-        if memory_backend == "obsidian":
-            install_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
-            # PreCompact hook: re-emit the memory index before context compaction
-            # so the durable-memory pointer survives into the compacted context.
-            install_hook(settings_path, "PreCompact", Hooks.PRECOMPACT_MEMORY_BRIDGE)
-        else:
-            remove_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
-            remove_hook(settings_path, "PreCompact", Hooks.PRECOMPACT_MEMORY_BRIDGE)
-
+        install_memory_hooks(settings_path, memory_backend)
         # Stop hook: emit cost report at end of session
         install_hook(settings_path, "Stop", Hooks.COST_REPORT)
 
-        # PreToolUse credential guard: deny Read/Bash attempts to read credential files.
-        # Scoped to Read|Bash tools via the matcher field (defense-in-depth).
+    # PreToolUse credential guard — backends that support pretooluse_hooks
+    if backend.supports("pretooluse_hooks"):
+        # Scoped to Read|Bash|Grep tools via the matcher field (defense-in-depth).
         install_hook(
             settings_path,
             "PreToolUse",
@@ -201,56 +193,26 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
             matcher=Hooks.GUARD_CREDENTIALS_MATCHER,
         )
 
-        # Clean up stale PostToolUse hooks from previous versions
-        remove_hook(settings_path, "PostToolUse", Hooks.MEMORY_BRIDGE)
-
     if backend.supports("allow_entries"):
         # Remove ALL agent-notes Bash permission entries (covers stale entries from
         # any previous install, not just the immediately preceding one)
         remove_matching_allow_entries(settings_path, "Bash(agent-notes")
         remove_allow_entry(settings_path, "Bash(cost-report)")
         install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
-        install_allow_entry(settings_path, "Bash(agent-notes memory *)")
-        if memory_backend == "obsidian":
-            install_allow_entry(settings_path, f"Bash({Hooks.MEMORY_BRIDGE})")
-
-        # Remove memory path permissions for the obsidian default path so that
-        # stale entries from previous installs are cleaned up before adding fresh ones.
-        default_path = memory_dir_for_backend("obsidian", "")
-        if default_path:
-            p = str(default_path) + "/**"
-            remove_allow_entry(settings_path, f"Read({p})")
-            remove_allow_entry(settings_path, f"Write({p})")
-            remove_allow_entry(settings_path, f"Edit({p})")
-
-        # Also remove any custom path recorded in old state
-        if current_state and current_state.memory.backend == "obsidian" and current_state.memory.path:
-            old_resolved = memory_dir_for_backend(current_state.memory.backend, current_state.memory.path)
-            if old_resolved:
-                old_pattern = str(old_resolved) + "/**"
-                remove_allow_entry(settings_path, f"Read({old_pattern})")
-                remove_allow_entry(settings_path, f"Write({old_pattern})")
-                remove_allow_entry(settings_path, f"Edit({old_pattern})")
-
-        # Add read/write/edit permissions for the new memory vault path
-        if memory_backend == "obsidian":
-            resolved_path = memory_dir_for_backend(memory_backend, memory_path)
-            if resolved_path:
-                path_pattern = str(resolved_path) + "/**"
-                install_allow_entry(settings_path, f"Read({path_pattern})")
-                install_allow_entry(settings_path, f"Write({path_pattern})")
-                install_allow_entry(settings_path, f"Edit({path_pattern})")
+        install_memory_allow_entries(settings_path, memory_backend, memory_path, current_state)
 
 
 def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
     """Remove the SessionStart hook and context file.
 
     Behaviour is driven by the backend's feature flags:
-      stop_hook     — whether to remove the Stop/cost-report hook (claude: true, codex: false)
-      allow_entries — whether to remove Bash permission allow-list entries (claude: true, codex: false)
+      stop_hook        — memory-bridge and Stop/cost-report hook (claude: true, codex: false)
+      pretooluse_hooks — PreToolUse credential guard (claude: true, codex: false)
+      allow_entries    — Bash permission allow-list entries (claude: true, codex: false)
     """
     from .settings_writer import remove_hook, remove_allow_entry, remove_matching_allow_entries
     from ..constants import Hooks
+    from ..memory.install import uninstall_memory_hooks
 
     settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
 
@@ -259,11 +221,11 @@ def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memor
     remove_hook(settings_path, "SessionStart", hook_command)
 
     if backend.supports("stop_hook"):
-        remove_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
-        remove_hook(settings_path, "PreCompact", Hooks.PRECOMPACT_MEMORY_BRIDGE)
+        uninstall_memory_hooks(settings_path)
         remove_hook(settings_path, "Stop", Hooks.COST_REPORT)
+
+    if backend.supports("pretooluse_hooks"):
         remove_hook(settings_path, "PreToolUse", Hooks.GUARD_CREDENTIALS)
-        remove_hook(settings_path, "PostToolUse", Hooks.MEMORY_BRIDGE)
 
     if backend.supports("allow_entries"):
         # Remove ALL agent-notes Bash permission entries (covers old naming too)

@@ -1,4 +1,4 @@
-"""Pure-unit tests for agent_notes.services.memory_backend (no I/O)."""
+"""Pure-unit tests for agent_notes.memory.memory_backend (no I/O)."""
 import re
 import time
 import pytest
@@ -10,7 +10,7 @@ from agent_notes.services._memory_utils import (
     _now_iso,
     _today,
 )
-from agent_notes.services.obsidian_backend import (
+from agent_notes.memory.obsidian_backend import (
     _current_session_id,
 )
 

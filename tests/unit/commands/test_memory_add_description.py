@@ -2,19 +2,19 @@
 import pytest
 from pathlib import Path
 
-from agent_notes.commands.memory.notes import do_add
+from agent_notes.memory.commands.notes import do_add
 
 
 class TestDoAddDescription:
     def test_description_written_to_frontmatter(self, tmp_path, monkeypatch):
         """--description flag value appears in note frontmatter."""
         monkeypatch.setattr(
-            "agent_notes.commands.memory._common._load_memory_config",
+            "agent_notes.memory.commands._common._load_memory_config",
             lambda: ("obsidian", tmp_path),
         )
         # Prevent index regeneration from failing on a bare tmp_path
         monkeypatch.setattr(
-            "agent_notes.services.obsidian_backend.obsidian_regenerate_index",
+            "agent_notes.memory.obsidian_backend.obsidian_regenerate_index",
             lambda vault: None,
         )
 
@@ -28,11 +28,11 @@ class TestDoAddDescription:
     def test_empty_description_does_not_error(self, tmp_path, monkeypatch):
         """Calling do_add without description (default '') succeeds."""
         monkeypatch.setattr(
-            "agent_notes.commands.memory._common._load_memory_config",
+            "agent_notes.memory.commands._common._load_memory_config",
             lambda: ("obsidian", tmp_path),
         )
         monkeypatch.setattr(
-            "agent_notes.services.obsidian_backend.obsidian_regenerate_index",
+            "agent_notes.memory.obsidian_backend.obsidian_regenerate_index",
             lambda vault: None,
         )
 

@@ -29,10 +29,10 @@ def do_init() -> None:
     if path is None:
         print("Memory path not configured.")
         return
-    from ...services.memory_router import memory_init
+    from ..memory_router import memory_init
     memory_init(backend, path)
     if backend == "obsidian":
-        from ...services.obsidian_backend import OBSIDIAN_CATEGORIES
+        from ..obsidian_backend import OBSIDIAN_CATEGORIES
         print(f"{Color.GREEN}Obsidian vault initialised at {path}{Color.NC}")
         print(f"  Folders: {', '.join(OBSIDIAN_CATEGORIES)}")
         print(f"  Index:   {path / 'Index.md'}")
@@ -50,6 +50,6 @@ def do_index() -> None:
     if path is None:
         print("Memory path not configured.")
         return
-    from ...services.memory_router import memory_regenerate_index
+    from ..memory_router import memory_regenerate_index
     memory_regenerate_index(backend, path)
     print(f"{Color.GREEN}Index.md regenerated at {path / 'Index.md'}{Color.NC}")

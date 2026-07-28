@@ -17,7 +17,7 @@ def do_add(title: str, body: str, note_type: str = "context", agent: str = "", p
         print("Memory path not configured.")
         return
     if backend == "obsidian":
-        from ...services.obsidian_backend import obsidian_init, obsidian_write_note
+        from ..obsidian_backend import obsidian_init, obsidian_write_note
         obsidian_init(path)
         note_path = obsidian_write_note(
             path,
@@ -49,7 +49,7 @@ def do_list() -> None:
         if path is None or not path.exists():
             print(f"Obsidian vault not found at {path}")
             return
-        from ...services.obsidian_backend import obsidian_list_notes
+        from ..obsidian_backend import obsidian_list_notes
         notes = obsidian_list_notes(path)
         if not notes:
             print(f"No notes found in vault {path}")

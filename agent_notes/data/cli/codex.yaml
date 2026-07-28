@@ -20,6 +20,7 @@ features:
   supports_symlink: true
   session_hook: true
   stop_hook: false
+  pretooluse_hooks: false
   allow_entries: false
 global_template: global-codex.md
 exclude_flag: codex_exclude

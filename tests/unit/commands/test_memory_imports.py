@@ -26,7 +26,7 @@ class TestMemoryPackageExports:
         assert callable(do_import)
 
     def test_migrate_function_importable(self):
-        from agent_notes.commands.memory.migrate import do_migrate
+        from agent_notes.memory.commands.migrate import do_migrate
         assert callable(do_migrate)
 
     def test_reset_function_importable(self):
@@ -51,19 +51,19 @@ class TestMemorySubmodulesImportable:
 
     @pytest.mark.parametrize("submodule", [
         "agent_notes.commands.memory",
-        "agent_notes.commands.memory._common",
-        "agent_notes.commands.memory.vault",
-        "agent_notes.commands.memory.notes",
-        "agent_notes.commands.memory.transfer",
-        "agent_notes.commands.memory.migrate",
-        "agent_notes.commands.memory.reset",
+        "agent_notes.memory.commands._common",
+        "agent_notes.memory.commands.vault",
+        "agent_notes.memory.commands.notes",
+        "agent_notes.memory.commands.transfer",
+        "agent_notes.memory.commands.migrate",
+        "agent_notes.memory.commands.reset",
     ])
     def test_submodule_importable(self, submodule):
         mod = importlib.import_module(submodule)
         assert mod is not None
 
     def test_common_helpers_accessible(self):
-        from agent_notes.commands.memory._common import (
+        from agent_notes.memory.commands._common import (
             _load_memory_config,
             get_directory_size,
             format_size,
@@ -91,11 +91,11 @@ class TestMemoryNoCircularImports:
         """All memory submodules are importable in sequence without circular-import failure."""
         modules = [
             "agent_notes.commands.memory",
-            "agent_notes.commands.memory.vault",
-            "agent_notes.commands.memory.notes",
-            "agent_notes.commands.memory.transfer",
-            "agent_notes.commands.memory.migrate",
-            "agent_notes.commands.memory.reset",
+            "agent_notes.memory.commands.vault",
+            "agent_notes.memory.commands.notes",
+            "agent_notes.memory.commands.transfer",
+            "agent_notes.memory.commands.migrate",
+            "agent_notes.memory.commands.reset",
         ]
         for mod_name in modules:
             # importlib.import_module is idempotent — repeated calls reuse sys.modules

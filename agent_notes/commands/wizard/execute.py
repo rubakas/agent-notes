@@ -286,7 +286,7 @@ def _execute_install(
     # Initialize memory vault / directory on disk
     if memory_backend != "none":
         from ...config import memory_dir_for_backend
-        from ...services.memory_router import memory_init
+        from ...memory.memory_router import memory_init
         _mem_path = memory_dir_for_backend(memory_backend, memory_path)
         try:
             memory_init(memory_backend, _mem_path)

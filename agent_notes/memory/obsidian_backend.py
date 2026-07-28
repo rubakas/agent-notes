@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from ._memory_utils import _slug, _now_iso, _today, _now_hhmmss, _parse_frontmatter, _yaml_safe
+from ..services._memory_utils import _slug, _now_iso, _today, _now_hhmmss, _parse_frontmatter, _yaml_safe
 from ..constants import Obsidian  # noqa: F401
 
 OBSIDIAN_CATEGORIES = Obsidian.CATEGORIES

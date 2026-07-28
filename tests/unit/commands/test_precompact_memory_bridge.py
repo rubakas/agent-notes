@@ -28,7 +28,7 @@ def _capture_stdout(fn, *args, **kwargs):
 
 # _load_memory_config is imported lazily inside _load_memory_index; patch it
 # at the source module so the local import picks up the mock.
-_MEMORY_CONFIG_PATH = "agent_notes.commands.memory._common._load_memory_config"
+_MEMORY_CONFIG_PATH = "agent_notes.memory.commands._common._load_memory_config"
 
 
 # ---------------------------------------------------------------------------

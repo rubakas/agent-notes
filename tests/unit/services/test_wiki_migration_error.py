@@ -10,27 +10,27 @@ class TestWikiBackendRemovedError:
     """get_backend raises a clear ValueError for the removed 'wiki' backend."""
 
     def test_get_backend_wiki_raises_value_error(self):
-        from agent_notes.services.memory_backend import get_backend
+        from agent_notes.memory.memory_backend import get_backend
         with pytest.raises(ValueError, match="wiki"):
             get_backend("wiki")
 
     def test_get_backend_wiki_error_mentions_config_memory(self):
-        from agent_notes.services.memory_backend import get_backend
+        from agent_notes.memory.memory_backend import get_backend
         with pytest.raises(ValueError, match="agent-notes config memory"):
             get_backend("wiki")
 
     def test_get_backend_wiki_error_mentions_removed(self):
-        from agent_notes.services.memory_backend import get_backend
+        from agent_notes.memory.memory_backend import get_backend
         with pytest.raises(ValueError, match="removed"):
             get_backend("wiki")
 
     def test_get_backend_local_still_works(self):
-        from agent_notes.services.memory_backend import get_backend
+        from agent_notes.memory.memory_backend import get_backend
         backend = get_backend("local")
         assert backend is not None
 
     def test_get_backend_obsidian_still_works(self):
-        from agent_notes.services.memory_backend import get_backend
+        from agent_notes.memory.memory_backend import get_backend
         backend = get_backend("obsidian")
         assert backend is not None
 
@@ -47,7 +47,7 @@ class TestLoadMemoryConfigWikiError:
             memory=MemoryConfig(backend="wiki", path="/some/path"),
         )
 
-        with patch("agent_notes.commands.memory._common._load_memory_config") as mock_fn:
+        with patch("agent_notes.memory.commands._common._load_memory_config") as mock_fn:
             # Simulate what _load_memory_config does when it sees "wiki"
             import sys
             def _raise():
@@ -86,7 +86,7 @@ class TestLoadMemoryConfigWikiError:
             "local": {},
         }))
 
-        from agent_notes.commands.memory._common import _load_memory_config
+        from agent_notes.memory.commands._common import _load_memory_config
         with pytest.raises(SystemExit) as exc_info:
             _load_memory_config()
         assert exc_info.value.code == 1
@@ -105,7 +105,7 @@ class TestLoadMemoryConfigWikiError:
 
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
 
-        from agent_notes.commands.memory._common import _load_memory_config
+        from agent_notes.memory.commands._common import _load_memory_config
         with pytest.raises(SystemExit):
             _load_memory_config()
 

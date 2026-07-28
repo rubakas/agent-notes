@@ -24,7 +24,7 @@ def mock_backend(tmp_path):
         "commands": "commands",
         "settings": "settings.json",
     }
-    backend.supports.side_effect = lambda f: f in ("stop_hook", "allow_entries", "session_hook")
+    backend.supports.side_effect = lambda f: f in ("stop_hook", "pretooluse_hooks", "allow_entries", "session_hook")
     return backend
 
 
