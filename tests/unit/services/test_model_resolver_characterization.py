@@ -381,6 +381,68 @@ class TestTypicalClassFallback:
             )
         assert model_str == "haiku"
 
+    def test_typical_class_prefers_non_deprecated_over_deprecated(self):
+        """When a deprecated and a non-deprecated model share the same class,
+        the non-deprecated model is returned even if it sorts lower."""
+        opus_deprecated = _make_model(
+            "claude-opus-4-9", model_class="opus",
+            aliases={"anthropic": "opus-deprecated-alias"},
+        )
+        # Manually construct with deprecated=True (frozen dataclass — use replace)
+        from dataclasses import replace
+        opus_deprecated = replace(opus_deprecated, deprecated=True)
+
+        opus_current = _make_model(
+            "claude-opus-4-7", model_class="opus",
+            aliases={"anthropic": "opus-current-alias"},
+        )
+        # opus-4-9 sorts higher than opus-4-7 — without deprecated filter it would win
+        registry = ModelRegistry([opus_current, opus_deprecated])
+
+        opus_role = Role(
+            name="orchestrator", label="Orchestrator", description="",
+            typical_class="opus",
+        )
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([opus_role]),
+        ):
+            model_str, _ = _resolve(
+                agent_config={"role": "orchestrator"},
+                model_registry=registry,
+            )
+        assert model_str == "opus-current-alias", (
+            "Expected non-deprecated model, got deprecated one"
+        )
+
+    def test_typical_class_falls_back_to_deprecated_when_only_candidate(self):
+        """When only deprecated models exist for the class, one is still returned
+        rather than falling through to tier and potentially failing."""
+        from dataclasses import replace
+
+        opus_deprecated = _make_model(
+            "claude-opus-4-7", model_class="opus",
+            aliases={"anthropic": "only-opus-alias"},
+        )
+        opus_deprecated = replace(opus_deprecated, deprecated=True)
+        registry = ModelRegistry([opus_deprecated])
+
+        opus_role = Role(
+            name="orchestrator", label="Orchestrator", description="",
+            typical_class="opus",
+        )
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([opus_role]),
+        ):
+            model_str, _ = _resolve(
+                agent_config={"role": "orchestrator"},
+                model_registry=registry,
+            )
+        assert model_str == "only-opus-alias", (
+            "Expected deprecated model to be returned as fallback when it is the only candidate"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Branch 4: Legacy tier fallback

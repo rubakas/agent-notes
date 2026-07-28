@@ -159,11 +159,13 @@ class ModelResolver:
         all_models_reversed = list(reversed(registry.all()))
         preferred_family = backend.preferred_family
 
-        def _find_class_match(models, family_filter=None):
+        def _find_class_match(models, family_filter=None, skip_deprecated=False):
             for model in models:
                 if model.model_class != role.typical_class:
                     continue
                 if family_filter is not None and model.family != family_filter:
+                    continue
+                if skip_deprecated and model.deprecated:
                     continue
                 resolved = model.resolve_for_providers(list(backend.accepted_providers))
                 if resolved is not None:
@@ -171,11 +173,17 @@ class ModelResolver:
             return None, None
 
         if preferred_family is not None:
-            matched_model, resolved = _find_class_match(all_models_reversed, preferred_family)
+            matched_model, resolved = _find_class_match(all_models_reversed, preferred_family, skip_deprecated=True)
+            if matched_model is None:
+                matched_model, resolved = _find_class_match(all_models_reversed, skip_deprecated=True)
+            if matched_model is None:
+                matched_model, resolved = _find_class_match(all_models_reversed, preferred_family)
             if matched_model is None:
                 matched_model, resolved = _find_class_match(all_models_reversed)
         else:
-            matched_model, resolved = _find_class_match(all_models_reversed)
+            matched_model, resolved = _find_class_match(all_models_reversed, skip_deprecated=True)
+            if matched_model is None:
+                matched_model, resolved = _find_class_match(all_models_reversed)
 
         if matched_model is None or resolved is None:
             return None
