@@ -6,10 +6,6 @@ deprecated: true
 aliases:
   anthropic:      claude-opus-4-6
   github-copilot: github-copilot/claude-opus-4.6
-pricing:
-  input:  5.00
-  output: 25.00
-  cache:  0.50
 capabilities:
   vision: true
   long_context: true

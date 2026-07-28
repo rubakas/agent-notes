@@ -129,7 +129,7 @@ def build(role_models=None, role_efforts=None, scope='global', project_path=None
 
     # Read configuration
     try:
-        agents_config, tiers = load_agents_config()
+        agents_config = load_agents_config()
     except FileNotFoundError as e:
         print(f"Error: {e}")
         return
@@ -139,7 +139,7 @@ def build(role_models=None, role_efforts=None, scope='global', project_path=None
 
     # Generate agent files (state=None is backward compatible)
     print("Generating agent files...")
-    agent_files = generate_agent_files(agents_config, tiers, state=state,
+    agent_files = generate_agent_files(agents_config, state=state,
                                        scope=scope, project_path=project_path,
                                        role_models=role_models, role_efforts=role_efforts,
                                        profile_label=profile_label)

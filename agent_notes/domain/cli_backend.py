@@ -18,7 +18,6 @@ class CLIBackend:
     features: dict[str, object]    # {"agents": True, "frontmatter": "claude", ...}
     global_template: Optional[str] # "global-claude.md" or None
     exclude_flag: Optional[str] = None    # "claude_exclude" or None
-    strip_memory_section: bool = False
     settings_template: Optional[str] = None
     accepted_providers: tuple[str, ...] = ()   # new
     use_model_class: bool = False

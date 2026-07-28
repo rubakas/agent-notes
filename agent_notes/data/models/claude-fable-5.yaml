@@ -5,10 +5,6 @@ class: fable
 aliases:
   anthropic:      claude-fable-5
   github-copilot: github-copilot/claude-fable-5
-pricing:
-  input:  10.00
-  output: 50.00
-  cache:  1.00
 capabilities:
   vision: true
   long_context: true

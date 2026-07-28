@@ -94,7 +94,6 @@ def _resolve_model_str(
     scope_state,
     model_registry,
     user_config: Dict[str, Any],
-    tiers: Dict[str, Any],
 ):
     """Resolve the model string for a given agent+backend combination.
 
@@ -110,7 +109,6 @@ def _resolve_model_str(
     resolver = ModelResolver(
         scope_state=scope_state,
         user_config=user_config,
-        tiers=tiers,
         model_registry=model_registry,
     )
     model_str = resolver.resolve(agent_name, agent_config, backend)
@@ -270,7 +268,7 @@ def _overlay_selection_pins(scope_state, role_models, role_efforts):
     return merged
 
 
-def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
+def generate_agent_files(agents_config: Dict[str, Any],
                          state=None, scope='global', project_path=None,
                          role_models: Optional[Dict[str, Dict[str, str]]] = None,
                          role_efforts: Optional[Dict[str, Dict[str, str]]] = None,
@@ -279,7 +277,6 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
 
     Args:
         agents_config: Dict of agent configurations from agents.yaml
-        tiers: Dict mapping tiers to model names per backend (legacy fallback)
         state: Optional State object for role-based model resolution
         scope: 'global' or 'local' (only used if state is provided)
         project_path: Path for local scope (only used if state is provided and scope='local')
@@ -287,9 +284,6 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
             the persisted state (wizard selections not yet written to state.json)
         role_efforts: Optional explicit {cli: {role: effort}} pins, same semantics
         profile_label: Named profile whose pins drive the render ("" = default profile)
-
-    If state is None, behaves exactly as before (uses tiers dict).
-    If state is provided, tries state-driven resolution first, falls back to tiers on miss.
     """
     from ..registries.cli_registry import load_registry
     from ..services.state_store import load_state as _load_state_fn, get_scope as _get_scope
@@ -376,9 +370,9 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
             #   1. State-driven: state.clis[backend].role_models[role] -> model_id
             #   2. Role-class fallback: role.typical_class matched against
             #      any model's class, with a compatible provider for this backend
-            #   3. Legacy tier fallback: agent_config['tier'] -> tiers[tier][backend.name]
+            #   3. Unresolvable: raises ValueError
             model_str, model_registry = _resolve_model_str(
-                agent_name, agent_config, backend, scope_state, model_registry, user_config, tiers
+                agent_name, agent_config, backend, scope_state, model_registry, user_config
             )
             
             # Build context for template
@@ -606,12 +600,12 @@ def render_globals() -> list[Path]:
     return copied_files
 
 
-def load_agents_config() -> tuple[Dict[str, Any], Dict[str, Any]]:
+def load_agents_config() -> Dict[str, Any]:
     """Load agents configuration from agents.yaml."""
     from ..config import AGENTS_YAML
-    
+
     if not AGENTS_YAML.exists():
         raise FileNotFoundError(f"Configuration file not found: {AGENTS_YAML}")
-    
+
     config = yaml.safe_load(AGENTS_YAML.read_text())
-    return config.get('agents', {}), config.get('tiers', {})
+    return config.get('agents', {})

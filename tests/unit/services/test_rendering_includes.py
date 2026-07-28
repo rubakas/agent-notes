@@ -156,7 +156,6 @@ class TestGenerateAgentFilesExpandsIncludes:
         from agent_notes.services.rendering import generate_agent_files, expand_includes
 
         agents_config = {"lead": {}}
-        tiers = {}
 
         # Registry returns no backends — prevents file I/O while still exercising
         # the expand_includes call that happens before the backend loop.
@@ -183,7 +182,7 @@ class TestGenerateAgentFilesExpandsIncludes:
                  "agent_notes.services.rendering.expand_includes",
                  side_effect=spying_expand_includes,
              ):
-            generate_agent_files(agents_config, tiers)
+            generate_agent_files(agents_config)
 
         return captured_calls
 

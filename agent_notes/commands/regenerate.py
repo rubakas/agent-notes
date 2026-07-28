@@ -101,7 +101,6 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
         if backend.supports("agents"):
             files = generate_agent_files(
                 agents_config,
-                {},  # empty tiers - state-driven only
                 state=current_state,
                 scope=scope,
                 project_path=project_path,

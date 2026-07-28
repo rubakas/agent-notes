@@ -23,7 +23,6 @@ features:
   allow_entries: false
 global_template: global-codex.md
 exclude_flag: codex_exclude
-strip_memory_section: true
 accepted_providers: [openai]
 use_model_class: false
 preferred_family: gpt

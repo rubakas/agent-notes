@@ -1,12 +1,11 @@
 """Characterization tests for model resolution — golden-master tests that
-lock in the current behavior of _resolve_model_str before it is refactored
-into ModelResolver.
+lock in the current behavior of _resolve_model_str.
 
 These tests exercise each branch of the resolution chain:
   1. State-driven pin  (scope_state.clis[backend].role_models[role])
   2. User config override  (user_config["role_models"][backend][role])
   3. Role typical_class fallback (newest model whose class matches role.typical_class)
-  4. Legacy tier fallback  (agent_config["tier"])
+  4. Unresolvable — raises ValueError
 
 The tests use lightweight fakes (dataclasses + dicts) rather than disk I/O.
 """
@@ -83,7 +82,6 @@ def _resolve(
     scope_state=None,
     model_registry=None,
     user_config=None,
-    tiers=None,
 ):
     """Thin wrapper around _resolve_model_str to reduce boilerplate."""
     from agent_notes.services.rendering import _resolve_model_str
@@ -95,7 +93,6 @@ def _resolve(
         scope_state=scope_state,
         model_registry=model_registry,
         user_config=user_config or {},
-        tiers=tiers or {},
     )
 
 
@@ -140,42 +137,36 @@ class TestStateDrivenPin:
         assert model_str == "my-opus-alias"
 
     def test_state_pin_falls_through_on_unknown_model_id(self):
-        """If the pinned model id is not in the registry, falls through to next branch."""
+        """If the pinned model id is not in the registry, falls through and raises."""
         registry = ModelRegistry([])  # empty
         scope_state = _make_scope_state("claude", {"orchestrator": "nonexistent-model"})
 
-        # No user config, no role registry matches => falls to tier
-        model_str, _ = _resolve(
-            agent_config={"role": "orchestrator", "tier": "senior"},
-            scope_state=scope_state,
-            model_registry=registry,
-            tiers={"senior": {"claude": "fallback-tier-model"}},
-        )
-        assert model_str == "fallback-tier-model"
+        # No user config, no role registry matches, no tier fallback => ValueError
+        with pytest.raises(ValueError, match="no model could be resolved"):
+            _resolve(
+                agent_config={"role": "orchestrator"},
+                scope_state=scope_state,
+                model_registry=registry,
+            )
 
     def test_state_pin_ignored_when_provider_not_accepted(self):
-        """If model has no alias for any accepted_provider, falls to next branch."""
+        """If model has no alias for any accepted_provider, falls through and raises."""
         opus = _make_model("claude-opus-4-8", aliases={"openai": "gpt4-alias"})
         registry = ModelRegistry([opus])
         backend = _make_backend(accepted_providers=("anthropic",))
         scope_state = _make_scope_state("claude", {"orchestrator": "claude-opus-4-8"})
 
-        # Falls through to tier
-        model_str, _ = _resolve(
-            agent_config={"role": "orchestrator", "tier": "senior"},
-            backend=backend,
-            scope_state=scope_state,
-            model_registry=registry,
-            tiers={"senior": {"claude": "tier-fallback"}},
-        )
-        assert model_str == "tier-fallback"
+        # Falls through to error — no model is compatible with anthropic
+        with pytest.raises(ValueError, match="no model could be resolved"):
+            _resolve(
+                agent_config={"role": "orchestrator"},
+                backend=backend,
+                scope_state=scope_state,
+                model_registry=registry,
+            )
 
     def test_state_pin_missing_role_falls_to_typical_class(self):
-        """Role not in state.role_models falls through to typical_class branch (not tier).
-
-        The typical_class branch runs next — tier is only the final fallback
-        when there is no matching role at all.
-        """
+        """Role not in state.role_models falls through to typical_class branch."""
         opus = _make_model("claude-opus-4-8", model_class="opus",
                            aliases={"anthropic": "opus-alias"})
         registry = ModelRegistry([opus])
@@ -183,10 +174,9 @@ class TestStateDrivenPin:
 
         # orchestrator -> typical_class=opus -> matches claude-opus-4-8 -> alias "opus-alias"
         model_str, _ = _resolve(
-            agent_config={"role": "orchestrator", "tier": "senior"},
+            agent_config={"role": "orchestrator"},
             scope_state=scope_state,
             model_registry=registry,
-            tiers={"senior": {"claude": "tier-fallback"}},
         )
         assert model_str == "opus-alias"
 
@@ -445,36 +435,14 @@ class TestTypicalClassFallback:
 
 
 # ---------------------------------------------------------------------------
-# Branch 4: Legacy tier fallback
+# Branch 4: Unresolvable — raises ValueError
 # ---------------------------------------------------------------------------
 
-class TestLegacyTierFallback:
-    """agent_config["tier"] is the final fallback when no role resolves a model."""
+class TestUnresolvable:
+    """When all branches fail, a descriptive ValueError is raised."""
 
-    def test_tier_fallback_used_when_no_role(self):
-        """Agent with no role and no state uses tier directly."""
-        model_str, _ = _resolve(
-            agent_config={"tier": "standard"},
-            tiers={"standard": {"claude": "tier-model-id"}},
-        )
-        assert model_str == "tier-model-id"
-
-    def test_tier_fallback_raises_when_backend_not_in_tier(self):
-        from agent_notes.services.rendering import _resolve_model_str
-        backend = _make_backend(name="opencode")
-        with pytest.raises(ValueError, match="missing model for CLI 'opencode'"):
-            _resolve_model_str(
-                agent_name="lead",
-                agent_config={"tier": "standard"},
-                backend=backend,
-                scope_state=None,
-                model_registry=None,
-                user_config={},
-                tiers={"standard": {"claude": "some-model"}},
-            )
-
-    def test_raises_when_no_tier_and_no_role_resolves(self):
-        """Error raised when no tier key and resolution fully fails."""
+    def test_raises_when_no_role_resolves(self):
+        """Error raised when resolution fully fails."""
         from agent_notes.services.rendering import _resolve_model_str
         with pytest.raises(ValueError, match="no model could be resolved"):
             _resolve_model_str(
@@ -484,12 +452,11 @@ class TestLegacyTierFallback:
                 scope_state=None,
                 model_registry=ModelRegistry([]),  # empty registry
                 user_config={},
-                tiers={},
             )
 
 
 # ---------------------------------------------------------------------------
-# Integration: real registries — verify concrete agent+tier resolution ids
+# Integration: real registries — verify concrete agent resolution ids
 # ---------------------------------------------------------------------------
 
 class TestRealRegistryResolution:

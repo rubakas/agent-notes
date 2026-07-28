@@ -15,7 +15,6 @@ A **Model** is defined by these fields (all stored in YAML):
 | `family` | string | **Yes** | Brand/family (used for grouping) | `"kimi"`, `"openai"`, `"claude"` |
 | `class` | string | **Yes** | Model tier for role defaults | `"opus"`, `"sonnet"`, `"haiku"` |
 | `aliases` | dict[str, str] | **Yes** | Provider-specific model IDs | `{"openrouter": "moonshotai/kimi-k2"}` |
-| `pricing` | dict[str, float] | No | Cost per token (optional, for reports) | `{"input": 0.05, "output": 0.15}` |
 | `capabilities` | dict[str, bool] | No | Feature flags (optional, for filtering) | `{"vision": true, "long_context": true}` |
 
 **Key concepts:**
@@ -56,10 +55,6 @@ class: opus
 aliases:
   openrouter: moonshotai/kimi-k2
   moonshot:   moonshot/kimi-k2
-pricing:
-  input:  0.0015
-  output: 0.002
-  cache:  0.0003
 capabilities:
   vision: true
   long_context: true
@@ -101,11 +96,6 @@ capabilities:
     openai:         gpt-5                              # OpenAI direct model alias
     openrouter:     openai/gpt-5                       # OpenRouter vendor prefix
   ```
-
-- **`pricing`** (optional) — Cost per million tokens. Used for:
-  - Future cost estimation tools
-  - Informational displays in `list models`
-  - Keys can be: `input`, `output`, `cache` (per-provider pricing not yet supported)
 
 - **`capabilities`** (optional) — Feature flags. Reserved for future filtering:
   - `vision: true/false` — Can process images

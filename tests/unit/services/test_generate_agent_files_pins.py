@@ -34,8 +34,8 @@ CLAUDE_ROLE_EFFORTS = {
 
 
 def _agents_subset(*names):
-    agents_config, tiers = load_agents_config()
-    return {n: agents_config[n] for n in names}, tiers
+    agents_config = load_agents_config()
+    return {n: agents_config[n] for n in names}
 
 
 def _frontmatter(path: Path) -> str:
@@ -44,12 +44,12 @@ def _frontmatter(path: Path) -> str:
     return text.split("---", 2)[1]
 
 
-def _render(tmp_path, monkeypatch, agents_config, tiers, **kwargs):
+def _render(tmp_path, monkeypatch, agents_config, **kwargs):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
     dist = tmp_path / "dist"
     with patch.object(config_mod, "DIST_DIR", dist), \
          patch("agent_notes.services.user_config.load_user_config", return_value={}):
-        generate_agent_files(agents_config, tiers, **kwargs)
+        generate_agent_files(agents_config, **kwargs)
     return dist
 
 
@@ -81,8 +81,8 @@ class TestWizardSelectionsReachFrontmatter:
     rendered/installed agent files. These pins must show up verbatim."""
 
     def test_explicit_selections_render_exact_model_and_effort(self, tmp_path, monkeypatch):
-        agents_config, tiers = _agents_subset("explorer", "coder", "architect")
-        dist = _render(tmp_path, monkeypatch, agents_config, tiers,
+        agents_config = _agents_subset("explorer", "coder", "architect")
+        dist = _render(tmp_path, monkeypatch, agents_config,
                        role_models=CLAUDE_ROLE_MODELS, role_efforts=CLAUDE_ROLE_EFFORTS)
 
         explorer = _frontmatter(dist / "claude" / "agents" / "explorer.md")
@@ -100,8 +100,8 @@ class TestWizardSelectionsReachFrontmatter:
     def test_no_bare_class_aliases_for_pinned_roles(self, tmp_path, monkeypatch):
         """`model: sonnet` etc. would let the harness pick ITS default version,
         defeating the pin."""
-        agents_config, tiers = _agents_subset("explorer", "coder", "architect")
-        dist = _render(tmp_path, monkeypatch, agents_config, tiers,
+        agents_config = _agents_subset("explorer", "coder", "architect")
+        dist = _render(tmp_path, monkeypatch, agents_config,
                        role_models=CLAUDE_ROLE_MODELS, role_efforts=CLAUDE_ROLE_EFFORTS)
 
         for name in ("explorer", "coder", "architect"):
@@ -114,10 +114,10 @@ class TestWizardSelectionsReachFrontmatter:
     def test_explicit_selections_win_over_persisted_state_pins(self, tmp_path, monkeypatch):
         """Wizard-run ordering: dist is built BEFORE the new state.json is
         written, so the in-memory selections must override stale pins."""
-        agents_config, tiers = _agents_subset("coder")
+        agents_config = _agents_subset("coder")
         state = _write_state(tmp_path, monkeypatch, {"worker": "claude-sonnet-4-5"}, {"worker": "low"})
 
-        dist = _render(tmp_path, monkeypatch, agents_config, tiers,
+        dist = _render(tmp_path, monkeypatch, agents_config,
                        state=state, scope="global",
                        role_models={"claude": {"worker": "claude-sonnet-4-6"}},
                        role_efforts={"claude": {"worker": "high"}})
@@ -128,8 +128,8 @@ class TestWizardSelectionsReachFrontmatter:
 
     def test_selections_apply_to_opencode_backend_too(self, tmp_path, monkeypatch):
         """Same overlay drives opencode rendering (exact provider alias)."""
-        agents_config, tiers = _agents_subset("coder")
-        dist = _render(tmp_path, monkeypatch, agents_config, tiers,
+        agents_config = _agents_subset("coder")
+        dist = _render(tmp_path, monkeypatch, agents_config,
                        role_models={"opencode": {"worker": "claude-sonnet-4-6"}})
 
         coder = _frontmatter(dist / "opencode" / "agents" / "coder.md")
@@ -142,12 +142,12 @@ class TestPersistedStatePinsReachFrontmatter:
     from state.json alone and must reproduce the exact pinned strings."""
 
     def test_state_pins_render_exact_strings_without_overlay(self, tmp_path, monkeypatch):
-        agents_config, tiers = _agents_subset("explorer", "coder")
+        agents_config = _agents_subset("explorer", "coder")
         state = _write_state(tmp_path, monkeypatch,
                              {"scout": "claude-haiku-4-5", "worker": "claude-sonnet-4-6"},
                              {"scout": "medium", "worker": "high"})
 
-        dist = _render(tmp_path, monkeypatch, agents_config, tiers,
+        dist = _render(tmp_path, monkeypatch, agents_config,
                        state=state, scope="global")
 
         explorer = _frontmatter(dist / "claude" / "agents" / "explorer.md")
@@ -177,8 +177,8 @@ class TestNamedProfilePinsReachFrontmatter:
         )
 
     def test_profile_label_renders_that_profiles_pins(self, tmp_path, monkeypatch):
-        agents_config, tiers = _agents_subset("coder")
-        dist = _render(tmp_path, monkeypatch, agents_config, tiers,
+        agents_config = _agents_subset("coder")
+        dist = _render(tmp_path, monkeypatch, agents_config,
                        state=self._state_with_profiles(), scope="global",
                        profile_label="work")
 
@@ -187,8 +187,8 @@ class TestNamedProfilePinsReachFrontmatter:
         assert "effort: high" in coder
 
     def test_default_label_still_renders_default_pins(self, tmp_path, monkeypatch):
-        agents_config, tiers = _agents_subset("coder")
-        dist = _render(tmp_path, monkeypatch, agents_config, tiers,
+        agents_config = _agents_subset("coder")
+        dist = _render(tmp_path, monkeypatch, agents_config,
                        state=self._state_with_profiles(), scope="global")
 
         coder = _frontmatter(dist / "claude" / "agents" / "coder.md")
@@ -201,10 +201,10 @@ class TestDistRendersDoNotCreateBackups:
     must overwrite in place, never litter dist/<cli>/ with *.bak.* files."""
 
     def test_two_renders_with_different_content_leave_no_bak_files(self, tmp_path, monkeypatch):
-        agents_config, tiers = _agents_subset("coder")
-        dist = _render(tmp_path, monkeypatch, agents_config, tiers,
+        agents_config = _agents_subset("coder")
+        dist = _render(tmp_path, monkeypatch, agents_config,
                        role_models={"claude": {"worker": "claude-sonnet-4-5"}})
-        _render(tmp_path, monkeypatch, agents_config, tiers,
+        _render(tmp_path, monkeypatch, agents_config,
                 role_models={"claude": {"worker": "claude-sonnet-4-6"}})
 
         baks = sorted(dist.rglob("*.bak.*"))
@@ -219,8 +219,8 @@ class TestUnpinnedRolesKeepClassRendering:
     the class default is only for installs with no recorded selection."""
 
     def test_unpinned_worker_renders_model_class(self, tmp_path, monkeypatch):
-        agents_config, tiers = _agents_subset("coder")
-        dist = _render(tmp_path, monkeypatch, agents_config, tiers)
+        agents_config = _agents_subset("coder")
+        dist = _render(tmp_path, monkeypatch, agents_config)
 
         coder = _frontmatter(dist / "claude" / "agents" / "coder.md")
         assert "model: sonnet" in coder

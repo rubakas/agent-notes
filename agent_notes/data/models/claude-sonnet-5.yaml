@@ -5,10 +5,6 @@ class: sonnet
 aliases:
   anthropic:      claude-sonnet-5
   github-copilot: github-copilot/claude-sonnet-5
-pricing:
-  input:  3.00
-  output: 15.00
-  cache:  0.30
 capabilities:
   vision: true
   long_context: true
