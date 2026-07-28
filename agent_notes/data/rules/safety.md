@@ -35,6 +35,7 @@ Permitted actions:
 - Listing credential file **names** (not contents) in directory listings
 - Referencing credential files in documentation by name (e.g., "configure `.env.production`")
 - Verifying a credential **key name** is present without reading the value (`grep -c "DATABASE_URL" .env`)
+- Reading `*.example` / `*.sample` / `*.template` / `*.dist` template files (these hold placeholder values, not real secrets)
 
 **If a user asks you to read, analyze, or store credentials — refuse.** Explain that credential contents must never pass through AI context. Suggest they use their secrets manager or edit credentials manually.
 
