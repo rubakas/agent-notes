@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Optional
 from functools import lru_cache
@@ -11,12 +12,28 @@ from ..domain.model import Model
 from ._base import load_yaml_file, require_fields
 
 
+def _natural_key(model_id: str) -> tuple:
+    """Sort key that orders version numbers numerically, not lexicographically.
+
+    Without this, `claude-opus-4-10` sorts before `claude-opus-4-8` because "1" < "8".
+    Each chunk is tagged (0, int) or (1, str) so numeric and text chunks never compare
+    against each other and raise TypeError.
+
+    Issue #21 will layer a fetched `created_at` on top of this as the primary key.
+    """
+    return tuple(
+        (0, int(part)) if part.isdigit() else (1, part)
+        for part in re.split(r"(\d+)", model_id)
+        if part
+    )
+
+
 class ModelRegistry:
     def __init__(self, models: list[Model]):
         self._by_id: dict[str, Model] = {m.id: m for m in models}
 
     def all(self) -> list[Model]:
-        return sorted(self._by_id.values(), key=lambda m: m.id)
+        return sorted(self._by_id.values(), key=lambda m: _natural_key(m.id))
 
     def get(self, model_id: str) -> Model:
         if model_id not in self._by_id:

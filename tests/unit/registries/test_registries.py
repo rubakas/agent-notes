@@ -67,6 +67,21 @@ def test_model_aliases_are_exact_version_strings_not_class_names():
             )
 
 
+def test_natural_sort_orders_version_numbers_numerically():
+    """_natural_key must place claude-opus-4-10 after claude-opus-4-8.
+
+    Without natural sort, lexicographic ordering puts '4-10' before '4-8'
+    because '1' < '8', causing the resolver to pick an older model as 'newest'.
+    """
+    from agent_notes.registries.model_registry import _natural_key
+
+    ids = ["claude-opus-4-8", "claude-opus-4-10", "claude-opus-4-6"]
+    result = sorted(ids, key=_natural_key)
+    assert result.index("claude-opus-4-10") > result.index("claude-opus-4-8"), (
+        f"Expected claude-opus-4-10 after claude-opus-4-8 in natural sort, got: {result}"
+    )
+
+
 # --- Role registry ---
 
 def test_role_registry_loads():
