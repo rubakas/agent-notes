@@ -28,9 +28,3 @@ def test_pricing_yaml_loads():
     data = _pricing._load()
     assert "baseline" in data
     assert "providers" in data
-
-
-def test_normalize_model_dashed_to_dotted():
-    from agent_notes.scripts import _pricing
-    assert _pricing.normalize_model("claude-opus-4-7") == "claude-opus-4.7"
-    assert _pricing.normalize_model("claude-sonnet-4-6") == "claude-sonnet-4.6"

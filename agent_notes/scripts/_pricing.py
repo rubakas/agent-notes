@@ -1,5 +1,4 @@
 """Load pricing data and provide cost calculation helpers."""
-import re
 import sys
 from fnmatch import fnmatch
 from importlib import resources
@@ -14,14 +13,6 @@ def _load() -> dict:
         import yaml
         _pricing_cache = yaml.safe_load(text)
     return _pricing_cache
-
-
-def normalize_model(m: str) -> str:
-    """Normalize dash-separated version numbers to dotted form.
-
-    claude-opus-4-7 -> claude-opus-4.7
-    """
-    return re.sub(r"-(\d+)-(\d+)\b", r"-\1.\2", m)
 
 
 def _build_price_table(pricing: dict) -> list:

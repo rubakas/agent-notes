@@ -50,7 +50,7 @@ class TestPricingYamlStructure:
                 assert "cache_write_1h" in p, f"{model['name']} missing cache_write_1h"
 
     def test_opus_cache_rates(self):
-        p = _pricing.get_price("claude-opus-4.8")
+        p = _pricing.get_price("claude-opus-4-8")
         assert p["cache_read"] == 0.50
         assert p["cache_write_5m"] == 6.25
         assert p["cache_write_1h"] == 10.00
@@ -88,21 +88,21 @@ class TestCalculateCostHandCalculated:
     """
 
     def test_opus_cache_read_only(self):
-        cost = _pricing.calculate_cost("claude-opus-4.8", 0, 0, cache_read=1_000_000)
+        cost = _pricing.calculate_cost("claude-opus-4-8", 0, 0, cache_read=1_000_000)
         assert cost == pytest.approx(0.50)
 
     def test_opus_cache_write_5m_only(self):
-        cost = _pricing.calculate_cost("claude-opus-4.8", 0, 0, cache_write_5m=1_000_000)
+        cost = _pricing.calculate_cost("claude-opus-4-8", 0, 0, cache_write_5m=1_000_000)
         assert cost == pytest.approx(6.25)
 
     def test_opus_cache_write_1h_only(self):
-        cost = _pricing.calculate_cost("claude-opus-4.8", 0, 0, cache_write_1h=1_000_000)
+        cost = _pricing.calculate_cost("claude-opus-4-8", 0, 0, cache_write_1h=1_000_000)
         assert cost == pytest.approx(10.00)
 
     def test_opus_combined_cache_buckets(self):
         # 1M read + 2M write_5m + 0.5M write_1h on Opus
         cost = _pricing.calculate_cost(
-            "claude-opus-4.8", 0, 0,
+            "claude-opus-4-8", 0, 0,
             cache_read=1_000_000,
             cache_write_5m=2_000_000,
             cache_write_1h=500_000,
@@ -113,7 +113,7 @@ class TestCalculateCostHandCalculated:
     def test_opus_full_example(self):
         # 500k input, 200k output, 100k cache_read, 50k write_5m, 25k write_1h
         cost = _pricing.calculate_cost(
-            "claude-opus-4.8",
+            "claude-opus-4-8",
             inp=500_000,
             outp=200_000,
             cache_read=100_000,
@@ -338,7 +338,7 @@ class TestWorkedExample:
         # total cache: $7.25
         N, M, K = 500_000, 800_000, 200_000
         cost = _pricing.calculate_cost(
-            "claude-opus-4.8", 0, 0,
+            "claude-opus-4-8", 0, 0,
             cache_read=N,
             cache_write_5m=M,
             cache_write_1h=K,

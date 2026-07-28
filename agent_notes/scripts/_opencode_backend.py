@@ -62,7 +62,7 @@ def run() -> int:
         return 0
 
     records = [
-        (agent, _pricing.normalize_model(model or "unknown"), inp or 0, outp or 0, cache or 0, sec or 0)
+        (agent, model or "unknown", inp or 0, outp or 0, cache or 0, sec or 0)
         for agent, model, inp, outp, cache, sec in rows
     ]
 

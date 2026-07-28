@@ -246,7 +246,7 @@ def run(since: float | None = None, session_id: str | None = None) -> int:
         if not usage:
             continue
 
-        model = _pricing.normalize_model(msg.get("model", "unknown") or "unknown")
+        model = msg.get("model", "unknown") or "unknown"
         if model == "<synthetic>":
             continue
         inp = usage.get("input_tokens", 0) or 0
