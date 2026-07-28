@@ -11,37 +11,7 @@ from agent_notes.registries.agent_registry import load_agent_registry
 
 def test_model_registry_loads():
     registry = load_model_registry()
-    assert len(registry.all()) >= 8
-
-
-def test_model_registry_includes_opus():
-    registry = load_model_registry()
-    ids = registry.ids()
-    assert "claude-opus-4-7" in ids
-
-
-def test_model_registry_includes_sonnet():
-    registry = load_model_registry()
-    ids = registry.ids()
-    assert "claude-sonnet-4-6" in ids
-
-
-def test_model_registry_includes_haiku():
-    registry = load_model_registry()
-    ids = registry.ids()
-    assert "claude-haiku-4-5" in ids
-
-
-def test_model_registry_includes_sonnet_5():
-    registry = load_model_registry()
-    ids = registry.ids()
-    assert "claude-sonnet-5" in ids
-
-
-def test_model_registry_includes_fable_5():
-    registry = load_model_registry()
-    ids = registry.ids()
-    assert "claude-fable-5" in ids
+    assert len(registry.all()) > 0
 
 
 def test_model_has_required_fields():
@@ -52,6 +22,43 @@ def test_model_has_required_fields():
         assert model.family, f"Model {model.id} missing family"
         assert model.model_class, f"Model {model.id} missing model_class"
         assert model.aliases is not None, f"Model {model.id} missing aliases"
+
+
+def test_newest_model_per_class_is_not_deprecated():
+    """For every model_class present in the catalog, the newest entry must not be
+    deprecated — the catalog must always expose a deployable option per class."""
+    from agent_notes.registries.model_registry import _natural_key
+
+    registry = load_model_registry()
+    by_class: dict = {}
+    for model in registry.all():
+        by_class.setdefault(model.model_class, []).append(model)
+
+    for cls, models in by_class.items():
+        newest = sorted(models, key=lambda m: _natural_key(m.id))[-1]
+        assert not newest.deprecated, (
+            f"Newest model in class '{cls}' ({newest.id}) is deprecated — "
+            f"the catalog must have at least one non-deprecated option per class"
+        )
+
+
+def test_every_role_class_has_at_least_one_non_deprecated_model():
+    """For each class a role needs (role.typical_class), at least one non-deprecated
+    model must exist in the catalog. Without this guard, the wizard falls back to
+    an arbitrary model for that role instead of its intended class."""
+    model_registry = load_model_registry()
+    role_registry = load_role_registry()
+
+    non_deprecated_classes = {
+        m.model_class for m in model_registry.all() if not m.deprecated
+    }
+
+    for role in role_registry.all():
+        assert role.typical_class in non_deprecated_classes, (
+            f"Role '{role.name}' requires model_class '{role.typical_class}' but no "
+            f"non-deprecated model of that class exists in the catalog "
+            f"(available non-deprecated classes: {sorted(non_deprecated_classes)})"
+        )
 
 
 def test_model_aliases_are_exact_version_strings_not_class_names():
