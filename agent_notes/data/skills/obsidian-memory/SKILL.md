@@ -2,7 +2,7 @@
 name: obsidian-memory
 description: "Save and retrieve agent memory in the Obsidian vault using agent-notes CLI. Defines the single record format for all memory notes. Use when saving decisions, patterns, or session state to the vault."
 group: process
-requires_memory: obsidian,wiki
+requires_memory: obsidian
 ---
 
 # Obsidian Memory
@@ -201,6 +201,6 @@ Agents do NOT need bash access for this; the vault is plain Markdown readable wi
 
 ## Ingest workflow
 
-For ingesting external sources (URLs, files, folders), use the dedicated `/ingest` skill. It handles both wiki and obsidian backends automatically.
+For ingesting external sources (URLs, files, folders), use the dedicated `/ingest` skill.
 
-See: `/ingest` — adapts the Karpathy ingest → compile → cross-reference flow to whichever backend is active.
+See: `/ingest` — creates category-mapped notes in the Obsidian vault.

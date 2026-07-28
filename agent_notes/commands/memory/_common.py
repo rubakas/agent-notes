@@ -6,21 +6,7 @@ from typing import Optional
 from ...config import MEMORY_DIR
 
 
-_WIKI_TYPE_MAP = {
-    "pattern": "concepts",
-    "decision": "concepts",
-    "mistake": "concepts",
-    "context": "concepts",
-    "concept": "concepts",
-    "concepts": "concepts",
-    "entity": "entities",
-    "entities": "entities",
-    "synthesis": "synthesis",
-    "session": "sessions",
-    "sessions": "sessions",
-    "source": "sources",
-    "sources": "sources",
-}
+_REMOVED_BACKENDS = {"wiki"}
 
 
 def _load_memory_config():
@@ -30,6 +16,15 @@ def _load_memory_config():
     if state is None:
         return "local", MEMORY_DIR
     backend = state.memory.backend
+    if backend in _REMOVED_BACKENDS:
+        import sys
+        print(
+            f"Error: memory backend {backend!r} has been removed.\n"
+            "Run `agent-notes config memory` to switch to a supported backend "
+            "(local or obsidian).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     path = memory_dir_for_backend(backend, state.memory.path)
     return backend, path
 

@@ -72,28 +72,8 @@ class TestMemoryDirForBackendObsidianProjectScoped:
         assert r1 == r2
 
 
-class TestMemoryDirForBackendWiki:
-    """wiki backend returns the knowledge root directly — not project-scoped."""
-
-    def test_wiki_returns_knowledge_root_directly(self):
-        result = memory_dir_for_backend("wiki")
-        expected = Path.home() / "Obsidian" / "agent-notes" / "knowledge"
-        assert result == expected
-
-    def test_wiki_ignores_cwd(self, monkeypatch):
-        monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/repos/agent-notes")))
-        result = memory_dir_for_backend("wiki")
-        assert result.name == "knowledge"
-
-    def test_wiki_custom_path_used_directly(self, tmp_path):
-        custom = tmp_path / "my" / "vault"
-        result = memory_dir_for_backend("wiki", custom_path=str(custom))
-        assert result == custom
-
-    def test_wiki_custom_path_tilde_expanded(self):
-        result = memory_dir_for_backend("wiki", custom_path="~/knowledge")
-        assert "~" not in str(result)
-        assert result == Path("~/knowledge").expanduser()
+class TestMemoryDirForBackendOther:
+    """Miscellaneous memory_dir_for_backend edge cases."""
 
     def test_local_is_not_project_scoped(self, monkeypatch):
         monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/code/my-project")))

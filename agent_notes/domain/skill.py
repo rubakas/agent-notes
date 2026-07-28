@@ -13,4 +13,4 @@ class Skill:
     path: Path             # full path to skill dir
     description: str       # from SKILL.md frontmatter or first line
     group: Optional[str] = None            # from SKILL.md frontmatter (if present)
-    requires_memory: Optional[str] = None  # comma-separated backend names, e.g. "obsidian,wiki"
+    requires_memory: Optional[str] = None  # comma-separated backend names, e.g. "obsidian,local"

@@ -16,38 +16,6 @@ def do_reset(name: Optional[str] = None) -> None:
         print("Memory is disabled.")
         return
 
-    if backend == "wiki":
-        if path is None or not path.exists():
-            print("No wiki found to reset.")
-            return
-        target = f"wiki at {path}" if name is None else f"wiki page type '{name}' at {path}"
-        print(f"{Color.RED}Warning: this will permanently delete the {target}.{Color.NC}")
-        confirm = input("Type 'yes' to confirm: ")
-        if confirm == "yes":
-            from ...services.wiki_backend import WIKI_PAGE_TYPES
-            wiki_dir = path / "wiki"
-            if name is None:
-                for page_type in WIKI_PAGE_TYPES:
-                    type_dir = wiki_dir / page_type
-                    if type_dir.exists():
-                        shutil.rmtree(type_dir)
-                        type_dir.mkdir()
-                print(f"{Color.GREEN}Wiki at {path} cleared.{Color.NC}")
-            else:
-                if name not in WIKI_PAGE_TYPES:
-                    print(f"Page type '{name}' not found. Available types: {', '.join(WIKI_PAGE_TYPES)}")
-                    return
-                type_dir = wiki_dir / name
-                if not type_dir.exists():
-                    print(f"No pages found for type '{name}'.")
-                    return
-                shutil.rmtree(type_dir)
-                type_dir.mkdir()
-                print(f"{Color.GREEN}Wiki pages for type '{name}' cleared.{Color.NC}")
-        else:
-            print("Cancelled.")
-        return
-
     if path is None:
         path = MEMORY_DIR
 

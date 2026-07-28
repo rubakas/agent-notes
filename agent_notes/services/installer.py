@@ -179,8 +179,8 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
     # Memory-bridge hook and allow entries — only for backends that support them
     if backend.supports("stop_hook"):
         # Memory-bridge hook: load agent-notes index at session start.
-        # Only useful for Obsidian-backed modes (obsidian, wiki).
-        if memory_backend in ("obsidian", "wiki"):
+        # Only useful for Obsidian-backed mode.
+        if memory_backend == "obsidian":
             install_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
             # PreCompact hook: re-emit the memory index before context compaction
             # so the durable-memory pointer survives into the compacted context.
@@ -211,22 +211,20 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         remove_allow_entry(settings_path, "Bash(cost-report)")
         install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
         install_allow_entry(settings_path, "Bash(agent-notes memory *)")
-        if memory_backend in ("obsidian", "wiki"):
+        if memory_backend == "obsidian":
             install_allow_entry(settings_path, f"Bash({Hooks.MEMORY_BRIDGE})")
 
-        # Remove memory path permissions for all known backend default paths so that
-        # stale entries from previous installs (even ones before the last state save)
-        # are cleaned up before adding fresh entries.
-        for bk in ("wiki", "obsidian"):
-            default_path = memory_dir_for_backend(bk, "")
-            if default_path:
-                p = str(default_path) + "/**"
-                remove_allow_entry(settings_path, f"Read({p})")
-                remove_allow_entry(settings_path, f"Write({p})")
-                remove_allow_entry(settings_path, f"Edit({p})")
+        # Remove memory path permissions for the obsidian default path so that
+        # stale entries from previous installs are cleaned up before adding fresh ones.
+        default_path = memory_dir_for_backend("obsidian", "")
+        if default_path:
+            p = str(default_path) + "/**"
+            remove_allow_entry(settings_path, f"Read({p})")
+            remove_allow_entry(settings_path, f"Write({p})")
+            remove_allow_entry(settings_path, f"Edit({p})")
 
         # Also remove any custom path recorded in old state
-        if current_state and current_state.memory.backend in ("wiki", "obsidian") and current_state.memory.path:
+        if current_state and current_state.memory.backend == "obsidian" and current_state.memory.path:
             old_resolved = memory_dir_for_backend(current_state.memory.backend, current_state.memory.path)
             if old_resolved:
                 old_pattern = str(old_resolved) + "/**"
@@ -235,7 +233,7 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
                 remove_allow_entry(settings_path, f"Edit({old_pattern})")
 
         # Add read/write/edit permissions for the new memory vault path
-        if memory_backend in ("wiki", "obsidian"):
+        if memory_backend == "obsidian":
             resolved_path = memory_dir_for_backend(memory_backend, memory_path)
             if resolved_path:
                 path_pattern = str(resolved_path) + "/**"

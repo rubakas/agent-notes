@@ -8,6 +8,11 @@ from agent_notes.config import DIST_DIR
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Files that test deleted wiki package functionality — removed with the wiki backend.
+collect_ignore = [
+    "unit/services/test_credential_filter.py",
+]
+
 
 def pytest_sessionstart(session):
     """Build dist before collection so module-level discovery in test files works."""

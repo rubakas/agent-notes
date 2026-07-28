@@ -45,16 +45,6 @@ class TestLoadMemoryIndex:
 
         assert result == "# Memory\n- note A\n"
 
-    def test_returns_content_for_wiki_backend(self, tmp_path):
-        wiki_dir = tmp_path / "wiki"
-        wiki_dir.mkdir()
-        (wiki_dir / "index.md").write_text("wiki index\n")
-
-        with patch(_MEMORY_CONFIG_PATH, return_value=("wiki", str(tmp_path))):
-            result = _load_memory_index()
-
-        assert result == "wiki index\n"
-
     def test_returns_none_for_none_backend(self, tmp_path):
         with patch(_MEMORY_CONFIG_PATH, return_value=("none", str(tmp_path))):
             result = _load_memory_index()

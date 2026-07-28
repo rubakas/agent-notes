@@ -19,11 +19,10 @@ class TestImports:
 # ── memory_init ───────────────────────────────────────────────────────────────
 
 class TestMemoryInit:
-    def test_wiki_backend_calls_wiki_init(self, tmp_path):
+    def test_wiki_backend_raises_removed_error(self, tmp_path):
         from agent_notes.services.memory_router import memory_init
-        with patch("agent_notes.services.wiki_backend.wiki_init") as mock_fn:
+        with pytest.raises(ValueError, match="removed"):
             memory_init("wiki", tmp_path)
-        mock_fn.assert_called_once_with(tmp_path)
 
     def test_obsidian_backend_calls_obsidian_init(self, tmp_path):
         from agent_notes.services.memory_router import memory_init
@@ -61,11 +60,10 @@ class TestMemoryInit:
 # ── memory_regenerate_index ───────────────────────────────────────────────────
 
 class TestMemoryRegenerateIndex:
-    def test_wiki_backend_calls_wiki_regenerate_index(self, tmp_path):
+    def test_wiki_backend_raises_removed_error(self, tmp_path):
         from agent_notes.services.memory_router import memory_regenerate_index
-        with patch("agent_notes.services.wiki_backend.wiki_regenerate_index") as mock_fn:
+        with pytest.raises(ValueError, match="removed"):
             memory_regenerate_index("wiki", tmp_path)
-        mock_fn.assert_called_once_with(tmp_path)
 
     def test_obsidian_backend_calls_obsidian_regenerate_index(self, tmp_path):
         from agent_notes.services.memory_router import memory_regenerate_index

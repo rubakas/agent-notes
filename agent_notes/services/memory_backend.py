@@ -38,25 +38,22 @@ class ObsidianBackend(MemoryBackend):
         obsidian_regenerate_index(path)
 
 
-class WikiBackend(MemoryBackend):
-    def init(self, path: Path) -> None:
-        from .wiki_backend import wiki_init
-        wiki_init(path)
-
-    def regenerate_index(self, path: Path) -> None:
-        from .wiki_backend import wiki_regenerate_index
-        wiki_regenerate_index(path)
-
-
 _REGISTRY: dict[str, MemoryBackend] = {
     "local": LocalBackend(),
     "obsidian": ObsidianBackend(),
-    "wiki": WikiBackend(),
 }
+
+_REMOVED_BACKENDS = {"wiki"}
 
 
 def get_backend(name: str) -> MemoryBackend:
     """Return the backend instance for *name*, raising ValueError if unknown."""
+    if name in _REMOVED_BACKENDS:
+        raise ValueError(
+            f"Memory backend {name!r} has been removed. "
+            "Run `agent-notes config memory` to switch to a supported backend "
+            "(local or obsidian)."
+        )
     try:
         return _REGISTRY[name]
     except KeyError:

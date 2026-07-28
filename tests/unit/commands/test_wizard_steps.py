@@ -382,21 +382,6 @@ class TestSelectMemory:
         assert backend == "obsidian"
         assert path.endswith("/projects")
 
-    def test_select_memory_obsidian_wiki_backend(self, monkeypatch):
-        """Selecting 'wiki' from the flat menu returns ('wiki', path ending in /knowledge)."""
-        self._patch_non_interactive(monkeypatch)
-        self._patch_detect_vaults(monkeypatch, [])
-        self._patch_path_input(monkeypatch, "/tmp/MyVault")
-
-        monkeypatch.setattr(
-            "agent_notes.commands.wizard._radio_select_fallback",
-            lambda title, options, default=0, **kw: "wiki",
-        )
-
-        backend, path = wizard_mod._select_memory(step=6, total=7)
-        assert backend == "wiki"
-        assert path.endswith("/knowledge")
-
     def test_select_memory_vault_path_with_subfolder(self, monkeypatch, tmp_path):
         """Final path is vault + subfolder (notes for session mode)."""
         self._patch_non_interactive(monkeypatch)
@@ -412,22 +397,6 @@ class TestSelectMemory:
 
         backend, path = wizard_mod._select_memory(step=6, total=7)
         expected = str(vault_dir / "projects")
-        assert path == expected
-
-    def test_select_memory_wiki_vault_path_with_knowledge_subfolder(self, monkeypatch, tmp_path):
-        """Wiki mode: final path is vault + 'knowledge'."""
-        self._patch_non_interactive(monkeypatch)
-        vault_dir = tmp_path / "MyVault"
-        self._patch_detect_vaults(monkeypatch, [])
-        self._patch_path_input(monkeypatch, str(vault_dir))
-
-        monkeypatch.setattr(
-            "agent_notes.commands.wizard._radio_select_fallback",
-            lambda title, options, default=0, **kw: "wiki",
-        )
-
-        backend, path = wizard_mod._select_memory(step=6, total=7)
-        expected = str(vault_dir / "knowledge")
         assert path == expected
 
     def test_select_memory_detects_vaults_uses_first_as_default(self, monkeypatch, tmp_path):

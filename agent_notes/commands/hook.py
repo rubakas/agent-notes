@@ -498,7 +498,7 @@ def _load_memory_index() -> Optional[str]:
     """
     try:
         from .memory._common import _load_memory_config
-        from ..constants import Obsidian, Wiki
+        from ..constants import Obsidian
 
         backend, path = _load_memory_config()
 
@@ -507,8 +507,6 @@ def _load_memory_index() -> Optional[str]:
 
         if backend == "obsidian":
             index_file = Path(path) / Obsidian.INDEX
-        elif backend == "wiki":
-            index_file = Path(path) / Wiki.DIR / Wiki.INDEX
         else:
             # local and any unknown backends: use Index.md at root
             index_file = Path(path) / "Index.md"

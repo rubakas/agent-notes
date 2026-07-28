@@ -179,7 +179,6 @@ def test_ingest_skill_has_requires_memory():
     assert ingest.requires_memory is not None, "ingest skill should have requires_memory set"
     backends = {b.strip() for b in ingest.requires_memory.split(",")}
     assert "obsidian" in backends, "ingest skill requires_memory should include obsidian"
-    assert "wiki" in backends, "ingest skill requires_memory should include wiki"
 
 
 def test_requires_memory_normalized_no_spaces():
@@ -192,7 +191,7 @@ def test_requires_memory_normalized_no_spaces():
         name: test-skill
         description: "A test skill."
         group: process
-        requires_memory: obsidian, wiki
+        requires_memory: obsidian, local
         ---
 
         # Test Skill
@@ -207,8 +206,8 @@ def test_requires_memory_normalized_no_spaces():
         registry = load_skill_registry(skills_dir=Path(tmpdir))
         skill = registry.get("test-skill")
 
-    assert skill.requires_memory == "obsidian,wiki", (
-        f"expected 'obsidian,wiki' but got '{skill.requires_memory}'"
+    assert skill.requires_memory == "obsidian,local", (
+        f"expected 'obsidian,local' but got '{skill.requires_memory}'"
     )
 
 

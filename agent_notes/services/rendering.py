@@ -452,7 +452,7 @@ def _memory_path(st) -> str:
 
 def _memory_reading_guide(st) -> str:
     """Return backend-appropriate reading instructions for {{MEMORY_READING_GUIDE}} substitution."""
-    from ..constants import Wiki, Obsidian
+    from ..constants import Obsidian
 
     if st is None:
         return "Memory is not configured. Proceed without reading any shared state."
@@ -464,19 +464,6 @@ def _memory_reading_guide(st) -> str:
         return "Memory is disabled. Proceed without reading any shared state."
 
     path = resolved
-
-    if backend == "wiki":
-        _sessions, _concepts, _entities = Wiki.PAGE_TYPES[4], Wiki.PAGE_TYPES[1], Wiki.PAGE_TYPES[2]
-        return (
-            f"You are part of a team that shares state via a knowledge wiki at `{path}`.\n\n"
-            "### Read before working\n\n"
-            "If the task references an in-flight initiative, prior decision, or session progress, read the relevant wiki files BEFORE you start:\n\n"
-            f"1. `{path}/{Wiki.DIR}/{Wiki.INDEX}` — directory of all wiki pages\n"
-            f"2. `{path}/{Wiki.DIR}/{_sessions}/` — session logs for ongoing work\n"
-            f"3. `{path}/{Wiki.DIR}/{_concepts}/` — decisions, patterns, domain knowledge\n"
-            f"4. `{path}/{Wiki.DIR}/{_entities}/` — key entities and components\n\n"
-            f"If `{path}` is \"disabled\", skip this — proceed without wiki context."
-        )
 
     if backend == "obsidian":
         _sessions_cat, _decisions_cat, _patterns_cat, _mistakes_cat = (
@@ -518,13 +505,6 @@ def _memory_instructions(st) -> str:
     if resolved is None:
         return "Memory is disabled for this installation."
 
-    if backend == "wiki":
-        return (
-            f"Save memories using the `agent-notes memory add` CLI — it writes to the wiki at `{resolved}` automatically. "
-            "Do not write memory files directly.\n\n"
-            "Use: `agent-notes memory add \"<title>\" \"<body>\" [type] [agent]`\n"
-            "Types: `sources`, `concepts`, `entities`, `synthesis`, `sessions`. Agent: `lead`."
-        )
     label = "the configured Obsidian vault at" if backend == "obsidian" else "writes to"
     return (
         f"Save memories using the `agent-notes memory add` CLI — it {label} `{resolved}` automatically. "

@@ -292,8 +292,6 @@ def _execute_install(
             memory_init(memory_backend, _mem_path)
             if memory_backend == "obsidian":
                 memory_label = f"Obsidian (session)  →  {_mem_path}"
-            elif memory_backend == "wiki":
-                memory_label = f"Obsidian (wiki)  →  {_mem_path}"
             else:
                 memory_label = f"Local markdown  →  {_mem_path}"
         except Exception as e:
