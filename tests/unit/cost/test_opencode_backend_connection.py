@@ -17,7 +17,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from agent_notes.scripts import _opencode_backend
+from agent_notes.cost import _opencode_backend
 
 
 def _make_db(tmp_path: Path) -> Path:
@@ -98,7 +98,7 @@ class TestOpencodeBackendConnectionNotLeaked:
                 # (which only commits via __exit__) is correctly detected as a leak.
                 return False
 
-        with patch("agent_notes.scripts._opencode_backend.sqlite3.connect",
+        with patch("agent_notes.cost._opencode_backend.sqlite3.connect",
                    side_effect=lambda path: _SpyConn(path)):
             with patch.object(_opencode_backend, "DB", db):
                 rc = _opencode_backend.run()

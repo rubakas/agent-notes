@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 import pytest
 
-from agent_notes.scripts import _claude_backend
-from agent_notes.scripts import cost_report
+from agent_notes.cost import _claude_backend
+from agent_notes.cost import cost_report
 
 
 # ── fixture builder ───────────────────────────────────────────────────────────
@@ -85,10 +85,10 @@ class TestCostReportScoping:
         slug, _ = _make_session(tmp_path, subagents)
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
-        import agent_notes.scripts._claude_backend as backend
+        import agent_notes.cost._claude_backend as backend
 
         backend.run()
         out = capsys.readouterr().out
@@ -109,14 +109,14 @@ class TestCostReportScoping:
 
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
         # since = just after the 3rd subagent's message (offset=900 => t+900s)
         base_ts = datetime(2026, 4, 30, 10, 0, 0, tzinfo=timezone.utc).timestamp()
         since = base_ts + 950.0  # after offset=900, before offset=1200
 
-        import agent_notes.scripts._claude_backend as backend
+        import agent_notes.cost._claude_backend as backend
         backend.run(since=since)
         out = capsys.readouterr().out
 
@@ -133,10 +133,10 @@ class TestCostReportScoping:
         _, session_uuid = _make_session(tmp_path, [])
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
-        import agent_notes.scripts._claude_backend as backend
+        import agent_notes.cost._claude_backend as backend
         backend.run()
         out = capsys.readouterr().out
 
@@ -166,10 +166,10 @@ class TestCostReportScoping:
 
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
-        import agent_notes.scripts._claude_backend as backend
+        import agent_notes.cost._claude_backend as backend
         backend.run()
         out = capsys.readouterr().out
 
@@ -194,14 +194,14 @@ class TestLoadConfiguredModels:
                 }
             }
         }))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file", lambda: state_file)
 
         result = _claude_backend._load_configured_models()
 
         assert result == {"lead": "claude-opus-4-7", "coder": "claude-sonnet-4-6"}
 
     def test_returns_empty_dict_when_state_json_missing(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent.json")
 
         result = _claude_backend._load_configured_models()
@@ -211,7 +211,7 @@ class TestLoadConfiguredModels:
     def test_returns_empty_dict_when_role_models_key_absent(self, tmp_path, monkeypatch):
         state_file = tmp_path / "state.json"
         state_file.write_text(json.dumps({"global": {}}))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file", lambda: state_file)
 
         result = _claude_backend._load_configured_models()
 
@@ -236,7 +236,7 @@ class TestLoadConfiguredModels:
                 }
             }
         }))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file", lambda: state_file)
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
 
         result = _claude_backend._load_configured_models()
@@ -247,7 +247,7 @@ class TestLoadConfiguredModels:
         """When global is None and local has no entry for cwd, return empty dict."""
         state_file = tmp_path / "state.json"
         state_file.write_text(json.dumps({"global": None, "local": {}}))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file", lambda: state_file)
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
 
         result = _claude_backend._load_configured_models()
@@ -276,7 +276,7 @@ class TestLoadConfiguredModels:
                 }
             }
         }))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file", lambda: state_file)
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
 
         result = _claude_backend._load_configured_models()
@@ -299,7 +299,7 @@ class TestConfiguredHeaderLine:
         self._write_state(state_file, {"lead": "claude-opus-4-7", "coder": "claude-sonnet-4-6"})
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file", lambda: state_file)
 
         _claude_backend.run()
         out = capsys.readouterr().out
@@ -323,7 +323,7 @@ class TestConfiguredHeaderLine:
         })
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file", lambda: state_file)
 
         _claude_backend.run()
         out = capsys.readouterr().out
@@ -346,7 +346,7 @@ class TestConfiguredHeaderLine:
         self._write_state(state_file, {})
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file", lambda: state_file)
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file", lambda: state_file)
 
         _claude_backend.run()
         out = capsys.readouterr().out
@@ -359,7 +359,7 @@ class TestConfiguredHeaderLine:
         _make_session(tmp_path, [])
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
         _claude_backend.run()
@@ -377,7 +377,6 @@ class TestEnvVarSessionAutoPass:
         monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "abc-123")
         monkeypatch.delenv("OPENCODE", raising=False)
         monkeypatch.delenv("OPENCODE_SESSION_ID", raising=False)
-        monkeypatch.setattr(sys, "argv", ["cost-report"])
 
         calls = []
 
@@ -385,7 +384,7 @@ class TestEnvVarSessionAutoPass:
             calls.append({"since": since, "session_id": session_id})
             return 0
 
-        monkeypatch.setattr("agent_notes.scripts._claude_backend.run", fake_run)
+        monkeypatch.setattr("agent_notes.cost._claude_backend.run", fake_run)
 
         with patch(
             "agent_notes.services.user_config.load_user_config",
@@ -397,12 +396,11 @@ class TestEnvVarSessionAutoPass:
         assert calls[0]["session_id"] == "abc-123"
 
     def test_explicit_session_overrides_env_var(self, monkeypatch):
-        """Explicit --session flag wins over CLAUDE_CODE_SESSION_ID."""
+        """Explicit session_id kwarg wins over CLAUDE_CODE_SESSION_ID."""
         monkeypatch.setenv("CLAUDECODE", "1")
         monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "abc-123")
         monkeypatch.delenv("OPENCODE", raising=False)
         monkeypatch.delenv("OPENCODE_SESSION_ID", raising=False)
-        monkeypatch.setattr(sys, "argv", ["cost-report", "--session", "explicit-456"])
 
         calls = []
 
@@ -410,13 +408,13 @@ class TestEnvVarSessionAutoPass:
             calls.append({"since": since, "session_id": session_id})
             return 0
 
-        monkeypatch.setattr("agent_notes.scripts._claude_backend.run", fake_run)
+        monkeypatch.setattr("agent_notes.cost._claude_backend.run", fake_run)
 
         with patch(
             "agent_notes.services.user_config.load_user_config",
             return_value={"cost_report_enabled": True},
         ):
-            cost_report.main()
+            cost_report.main(session_id="explicit-456")
 
         assert len(calls) == 1
         assert calls[0]["session_id"] == "explicit-456"
@@ -477,7 +475,7 @@ class TestRunFallbackSearch:
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         # cwd resolves to a path whose slug will NOT match "some-other-project-slug"
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path / "completely-different"))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
         result = _claude_backend.run(session_id=session_id)
@@ -511,7 +509,7 @@ class TestRunFallbackSearch:
 
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: FakePath()))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
         result = _claude_backend.run(session_id=session_id)

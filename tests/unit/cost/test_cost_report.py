@@ -19,12 +19,12 @@ def test_cost_report_not_standalone_script():
 
 
 def test_cost_report_module_imports():
-    from agent_notes.scripts import cost_report
+    from agent_notes.cost import cost_report
     assert callable(cost_report.main)
 
 
 def test_pricing_yaml_loads():
-    from agent_notes.scripts import _pricing
+    from agent_notes.cost import _pricing
     data = _pricing._load()
     assert "baseline" in data
     assert "providers" in data

@@ -326,7 +326,8 @@ def generate_agent_files(agents_config: Dict[str, Any],
 
         # Expand shared-content include directives (<!-- include: NAME -->)
         # No-op if shared/ directory is absent.
-        _agent_include_skip = set() if user_config.get("cost_report_enabled", False) else {"cost_reporting"}
+        from ..cost.render import include_skip as _cost_include_skip
+        _agent_include_skip = _cost_include_skip(user_config)
         prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared", skip=_agent_include_skip)
 
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
@@ -445,7 +446,8 @@ def render_globals() -> list[Path]:
     from ..config import AGENTS_DIR
     from ..services.user_config import load_user_config as _load_user_config
     _ucfg = _load_user_config()
-    _include_skip = set() if _ucfg.get("cost_report_enabled", False) else {"cost_reporting"}
+    from ..cost.render import include_skip as _cost_include_skip
+    _include_skip = _cost_include_skip(_ucfg)
     claude_global_content = GLOBAL_CLAUDE_MD.read_text()
     claude_global_content = expand_includes(claude_global_content, AGENTS_DIR / "shared", skip=_include_skip)
     claude_global_content = claude_global_content.replace(

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_notes.scripts import _claude_backend
+from agent_notes.cost import _claude_backend
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ class TestTimeAggregation:
 
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
         _claude_backend.run()
@@ -128,7 +128,7 @@ class TestTimeAggregation:
 
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
         _claude_backend.run()
@@ -142,7 +142,7 @@ class TestTimeAggregation:
 
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
         _claude_backend.run()
@@ -174,7 +174,7 @@ class TestTimeAggregation:
 
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
         _claude_backend.run()
@@ -206,7 +206,7 @@ class TestTimeAggregation:
 
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
         # Must not raise AttributeError
@@ -224,7 +224,7 @@ class TestTimeAggregation:
 
         monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
         monkeypatch.setattr("pathlib.Path.cwd", classmethod(lambda cls: tmp_path))
-        monkeypatch.setattr("agent_notes.scripts._claude_backend._state_file",
+        monkeypatch.setattr("agent_notes.cost._claude_backend._state_file",
                             lambda: tmp_path / "nonexistent-state.json")
 
         _claude_backend.run()

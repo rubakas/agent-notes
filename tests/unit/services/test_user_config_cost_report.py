@@ -184,23 +184,21 @@ class TestCostReportMainDisabledGuard:
 
     def test_returns_zero_when_disabled(self, monkeypatch, capsys):
         """main() returns 0 and does not raise when cost_report_enabled is False."""
-        monkeypatch.setattr(sys, "argv", ["x"])
         with patch(
             "agent_notes.services.user_config.load_user_config",
             return_value={"cost_report_enabled": False},
         ):
-            from agent_notes.scripts import cost_report
+            from agent_notes.cost import cost_report
             result = cost_report.main()
         assert result == 0
 
     def test_prints_disabled_message(self, monkeypatch, capsys):
         """main() prints a message mentioning the feature is disabled."""
-        monkeypatch.setattr(sys, "argv", ["x"])
         with patch(
             "agent_notes.services.user_config.load_user_config",
             return_value={"cost_report_enabled": False},
         ):
-            from agent_notes.scripts import cost_report
+            from agent_notes.cost import cost_report
             cost_report.main()
 
         out = capsys.readouterr().out
@@ -208,12 +206,11 @@ class TestCostReportMainDisabledGuard:
 
     def test_disabled_message_suggests_re_enable(self, monkeypatch, capsys):
         """Disabled message hints at how to re-enable cost reporting."""
-        monkeypatch.setattr(sys, "argv", ["x"])
         with patch(
             "agent_notes.services.user_config.load_user_config",
             return_value={"cost_report_enabled": False},
         ):
-            from agent_notes.scripts import cost_report
+            from agent_notes.cost import cost_report
             cost_report.main()
 
         out = capsys.readouterr().out
@@ -222,17 +219,16 @@ class TestCostReportMainDisabledGuard:
 
     def test_enabled_config_does_not_early_return_on_disabled_guard(self, monkeypatch):
         """main() does NOT short-circuit when cost_report_enabled is True."""
-        monkeypatch.setattr(sys, "argv", ["x"])
         # We expect it to proceed past the guard and eventually call backend logic.
         # Intercept at _by_recency to avoid touching real filesystem/DB.
         with patch(
             "agent_notes.services.user_config.load_user_config",
             return_value={"cost_report_enabled": True},
         ), patch(
-            "agent_notes.scripts.cost_report._by_recency",
+            "agent_notes.cost.cost_report._by_recency",
             return_value=0,
         ) as mock_backend:
-            from agent_notes.scripts import cost_report
+            from agent_notes.cost import cost_report
             # Patch env so we fall through to _by_recency branch
             with patch.dict("os.environ", {}, clear=False):
                 import os

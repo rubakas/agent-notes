@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from agent_notes.scripts import _pricing
-from agent_notes.scripts import _claude_backend
+from agent_notes.cost import _pricing
+from agent_notes.cost import _claude_backend
 
 
 # ── pricing unit tests ────────────────────────────────────────────────────────

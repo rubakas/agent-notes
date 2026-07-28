@@ -371,20 +371,10 @@ def main():
         from .commands.hook import hook
         hook(args.subaction)
     elif args.command == "cost-report":
-        # Rebuild sys.argv slice so cost_report.main() can parse it normally
-        argv = []
-        if args.since:
-            argv += ["--since", args.since]
-        if args.session:
-            argv += ["--session", args.session]
-        import sys
-        old_argv = sys.argv
-        sys.argv = ["agent-notes cost-report"] + argv
-        try:
-            from .scripts.cost_report import main as _cost_report_main
-            sys.exit(_cost_report_main())
-        finally:
-            sys.argv = old_argv
+        from .cost.cost_report import main as _cost_report_main, _parse_since
+        since = _parse_since(args.since) if args.since else None
+        session_id = args.session or None
+        sys.exit(_cost_report_main(since=since, session_id=session_id))
 
 if __name__ == "__main__":
     main()

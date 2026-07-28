@@ -4,7 +4,7 @@ import pytest
 
 class TestColorConstantsTTY:
     def test_constants_empty_when_not_tty(self, monkeypatch):
-        import agent_notes.scripts._formatting as fmt
+        import agent_notes.cost._formatting as fmt
         monkeypatch.setattr(fmt, "_USE_COLOR", False)
 
         # Re-evaluate what the constants would be given _USE_COLOR=False.
@@ -16,7 +16,7 @@ class TestColorConstantsTTY:
         assert fmt.tier_color("claude-haiku-3-5") == ""
 
     def test_tier_color_returns_nonempty_when_tty(self, monkeypatch):
-        import agent_notes.scripts._formatting as fmt
+        import agent_notes.cost._formatting as fmt
         monkeypatch.setattr(fmt, "_USE_COLOR", True)
         monkeypatch.setattr(fmt, "YELLOW", "\033[0;33m")
         monkeypatch.setattr(fmt, "CYAN", "\033[0;36m")
@@ -33,7 +33,7 @@ class TestColorConstantsTTY:
 
         # Force reimport to pick up the monkeypatched isatty
         import importlib
-        import agent_notes.scripts._formatting as fmt
+        import agent_notes.cost._formatting as fmt
         importlib.reload(fmt)
 
         assert fmt._USE_COLOR is False
@@ -50,7 +50,7 @@ class TestColorConstantsTTY:
         monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
 
         import importlib
-        import agent_notes.scripts._formatting as fmt
+        import agent_notes.cost._formatting as fmt
         importlib.reload(fmt)
 
         assert fmt._USE_COLOR is True

@@ -8,7 +8,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from agent_notes.scripts import _pricing
+from agent_notes.cost import _pricing
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ class TestOpencodeBackendNormalizesModel:
 
     def test_opencode_run_uses_normalized_model(self, tmp_path, capsys):
         """Integration: _opencode_backend.run() prices opus-4-8 at the Opus rate end-to-end."""
-        from agent_notes.scripts import _opencode_backend
+        from agent_notes.cost import _opencode_backend
 
         db = _make_opencode_db(tmp_path, model="claude-opus-4-8", inp=1_000_000, outp=0)
 
@@ -142,7 +142,7 @@ class TestOpus5Pricing:
         These assertions are regression locks against removing a trailing '*' from a
         pricing glob, which would silently break dated forms.
         """
-        from agent_notes.scripts._pricing import get_price
+        from agent_notes.cost._pricing import get_price
 
         # haiku dated — matches *haiku*
         assert get_price("claude-haiku-4-5-20251001")["in"] == 1.0, (
