@@ -399,7 +399,7 @@ agent-notes config provider <name>      # check if configured (without exposing 
 
 ### Building and testing
 
-Python 3.10+ required. Create an isolated environment and run tests:
+Python 3.11+ required. Create an isolated environment and run tests:
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
