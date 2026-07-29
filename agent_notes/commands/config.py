@@ -482,25 +482,36 @@ def _wizard_memory(state, before: str) -> bool:
     """Branch 3: interactive memory backend change."""
     from ..services.ui import _safe_input, _path_input
 
-    storage_options = {
-        "1": ("local", "default - Claude Code built-in md files"),
-        "2": ("obsidian", "Obsidian - session"),
-        "3": ("none", "None"),
+    provider_options = {
+        "1": ("local", "default — the CLI's native memory / Claude Code built-in md files"),
+        "2": ("obsidian", "external Obsidian vault"),
     }
 
-    print("\nMemory storage options:")
-    for key, (_, label) in storage_options.items():
+    print("\nMemory provider options:")
+    for key, (_, label) in provider_options.items():
         print(f"  {key}) {label}")
 
     choice = _safe_input("Choice [1]: ", "1").strip()
-    if choice not in storage_options:
+    if choice not in provider_options:
         print("Invalid choice. No changes made.")
         return False
 
-    backend, label = storage_options[choice]
+    backend, label = provider_options[choice]
     path = ""
+    strategy = "single-brain"
 
     if backend == "obsidian":
+        strategy_options = {
+            "1": ("single-brain", "one shared vault across all projects"),
+            "2": ("per-project", "memory organized per project"),
+        }
+        print("\nObsidian strategy:")
+        for key, (_, slabel) in strategy_options.items():
+            print(f"  {key}) {slabel}")
+        s_choice = _safe_input("Choice [1]: ", "1").strip()
+        if s_choice in strategy_options:
+            strategy, _ = strategy_options[s_choice]
+
         subfolder = Obsidian.SUBFOLDER
         default_vault = str(Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME)
         print(f"  Folder name: {subfolder}")
@@ -512,9 +523,12 @@ def _wizard_memory(state, before: str) -> bool:
 
     state.memory.backend = backend
     state.memory.path = path
+    state.memory.strategy = strategy
     print(f"Memory set to: {label}")
     if path:
         print(f"  Path: {path}")
+    if backend == "obsidian":
+        print(f"  Strategy: {strategy}")
 
     _apply_and_regenerate(state, before)
     return True

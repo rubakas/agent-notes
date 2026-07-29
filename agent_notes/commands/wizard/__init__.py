@@ -331,24 +331,34 @@ def _detect_obsidian_vaults() -> List[Path]:
 
 
 def _select_memory(step: int, total: int, version: str = '') -> tuple:
-    """Step N: choose memory backend. Returns (backend, path)."""
-    storage_options = [
-        ("default - Claude Code built-in md files", "local"),
-        ("Obsidian - session", "obsidian"),
-        ("None  (disable memory)", "none"),
+    """Step N: choose memory provider and (for obsidian) strategy. Returns (backend, path, strategy)."""
+    provider_options = [
+        ("default — the CLI's native memory / Claude Code built-in md files", "local"),
+        ("Obsidian — external Obsidian vault", "obsidian"),
     ]
 
     if _can_interactive():
-        storage = _radio_select("How should agents store memory?", storage_options, default=0,
+        backend = _radio_select("How should agents store memory?", provider_options, default=0,
                                 step=step, total=total, version=version)
     else:
-        storage = _radio_select_fallback("How should agents store memory?", storage_options, default=0,
+        backend = _radio_select_fallback("How should agents store memory?", provider_options, default=0,
                                          step=step, total=total, version=version)
 
-    backend = storage
     path = ""
+    strategy = "single-brain"
 
     if backend == "obsidian":
+        strategy_options = [
+            ("single-brain — one shared vault across all projects", "single-brain"),
+            ("per-project — memory organized per project", "per-project"),
+        ]
+        if _can_interactive():
+            strategy = _radio_select("Obsidian strategy?", strategy_options, default=0,
+                                     step=step, total=total, version=version)
+        else:
+            strategy = _radio_select_fallback("Obsidian strategy?", strategy_options, default=0,
+                                              step=step, total=total, version=version)
+
         subfolder = Obsidian.SUBFOLDER
         candidates = _detect_obsidian_vaults()
         default_vault = str(candidates[0]) if candidates else str(Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME)
@@ -363,9 +373,12 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
         path = str(Path(vault) / subfolder)
         print(f"  {Color.DIM}→ {path}{Color.NC}")
 
-    label = {"local": "Local markdown", "obsidian": f"Obsidian (session)  ({path})", "none": "Disabled"}[backend]
+    if backend == "obsidian":
+        label = f"Obsidian  →  {path}  ({strategy})" if path else f"Obsidian ({strategy})"
+    else:
+        label = "Local markdown"
     print(f"  {Color.GREEN}✓{Color.NC} Memory: {label}")
-    return backend, path
+    return backend, path, strategy
 
 
 def _format_role_model_display(role, model_id: str, models_registry, picked_effort: Optional[str] = None) -> str:
@@ -414,9 +427,9 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
             parts.append(f"Other ({ungrouped})")
         print(f"  {Color.DIM}Skills{Color.NC}    {', '.join(parts) if parts else 'none'}")
 
-    if memory_backend and memory_backend != "none":
+    if memory_backend:
         if memory_backend == "obsidian":
-            mem_label = f"Obsidian (session)  →  {memory_path}" if memory_path else "Obsidian (session)"
+            mem_label = f"Obsidian  →  {memory_path}" if memory_path else "Obsidian"
         else:
             mem_label = "Local markdown"
         print(f"  {Color.DIM}Memory{Color.NC}    {mem_label}")
@@ -455,7 +468,7 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     print("")
 
 
-def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], role_efforts: Optional[Dict[str, Dict[str, str]]] = None, version: str = '', memory_backend: str = 'local', memory_path: str = '', step: int = 0, total: int = 0, folder_overrides: Optional[dict] = None, global_home_override: str = '') -> bool:
+def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], role_efforts: Optional[Dict[str, Dict[str, str]]] = None, version: str = '', memory_backend: str = 'local', memory_path: str = '', memory_strategy: str = 'single-brain', step: int = 0, total: int = 0, folder_overrides: Optional[dict] = None, global_home_override: str = '') -> bool:
     """Step: Confirmation — shows pre-flight summary including files to be backed up."""
     import logging
     from ...services.ui import _clear_screen, _render_step_header

@@ -81,7 +81,7 @@ def _interactive_install() -> None:
     selected_skills = _wiz._select_skills(step=6, total=TOTAL_STEPS, version=version)
 
     # Step 7: Memory backend
-    memory_backend, memory_path = _wiz._select_memory(step=7, total=TOTAL_STEPS, version=version)
+    memory_backend, memory_path, memory_strategy = _wiz._select_memory(step=7, total=TOTAL_STEPS, version=version)
 
     # Step 8: Cost report
     from .cost_report import _select_cost_report
@@ -113,6 +113,7 @@ def _interactive_install() -> None:
     if not _wiz._confirm_install(clis, scope, copy_mode, selected_skills, role_models, role_efforts=role_efforts,
                                  version=version,
                                  memory_backend=memory_backend, memory_path=memory_path,
+                                 memory_strategy=memory_strategy,
                                  step=9, total=TOTAL_STEPS,
                                  folder_overrides=folder_overrides,
                                  global_home_override=global_home_override):
@@ -129,6 +130,7 @@ def _interactive_install() -> None:
         role_efforts=role_efforts,
         memory_backend=memory_backend,
         memory_path=memory_path,
+        memory_strategy=memory_strategy,
         profile_label=profile_label,
         folder_overrides=folder_overrides,
         global_home_override=global_home_override,

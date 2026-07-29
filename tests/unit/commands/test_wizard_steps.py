@@ -329,7 +329,7 @@ class TestSelectMemory:
         )
 
     def test_select_memory_local_default(self, monkeypatch):
-        """Default selection (index 0 = 'local') returns ('local', '')."""
+        """Default selection (index 0 = 'local') returns ('local', '', 'single-brain')."""
         self._patch_non_interactive(monkeypatch)
 
         monkeypatch.setattr(
@@ -337,24 +337,32 @@ class TestSelectMemory:
             lambda title, options, default=0, **kw: options[default][1],
         )
 
-        backend, path = wizard_mod._select_memory(step=6, total=7)
+        backend, path, strategy = wizard_mod._select_memory(step=6, total=7)
         assert backend == "local"
         assert path == ""
+        assert strategy == "single-brain"
 
-    def test_select_memory_none(self, monkeypatch):
-        """Selecting 'none' returns ('none', '')."""
+    def test_select_memory_no_none_option(self, monkeypatch):
+        """The provider menu must not contain a 'none' option."""
         self._patch_non_interactive(monkeypatch)
+
+        captured_options = {}
+
+        def fake_fallback(title, options, default=0, **kw):
+            captured_options["options"] = options
+            return options[default][1]
 
         monkeypatch.setattr(
             "agent_notes.commands.wizard._radio_select_fallback",
-            lambda title, options, default=0, **kw: "none",
+            fake_fallback,
         )
 
-        backend, path = wizard_mod._select_memory(step=6, total=7)
-        assert backend == "none"
-        assert path == ""
+        wizard_mod._select_memory(step=6, total=7)
+        values = [v for _, v in captured_options.get("options", [])]
+        assert "none" not in values, f"'none' must not appear in provider options: {values}"
 
     def test_select_memory_returns_tuple(self, monkeypatch):
+        """_select_memory returns a 3-tuple: (backend, path, strategy)."""
         self._patch_non_interactive(monkeypatch)
 
         monkeypatch.setattr(
@@ -364,38 +372,76 @@ class TestSelectMemory:
 
         result = wizard_mod._select_memory(step=6, total=7)
         assert isinstance(result, tuple)
-        assert len(result) == 2
+        assert len(result) == 3
 
     def test_select_memory_obsidian_session_backend(self, monkeypatch):
-        """'obsidian' storage + default obsidian mode returns ('obsidian', path ending in /projects)."""
+        """Selecting obsidian returns ('obsidian', path ending in /projects, strategy)."""
         self._patch_non_interactive(monkeypatch)
         self._patch_detect_vaults(monkeypatch, [])
         self._patch_path_input(monkeypatch, "/tmp/MyVault")
 
-        calls = iter(["obsidian", "obsidian"])
+        # First call: provider → "obsidian"; second call: strategy → "single-brain"
+        calls = iter(["obsidian", "single-brain"])
         monkeypatch.setattr(
             "agent_notes.commands.wizard._radio_select_fallback",
             lambda title, options, default=0, **kw: next(calls),
         )
 
-        backend, path = wizard_mod._select_memory(step=6, total=7)
+        backend, path, strategy = wizard_mod._select_memory(step=6, total=7)
         assert backend == "obsidian"
         assert path.endswith("/projects")
+        assert strategy == "single-brain"
+
+    def test_select_memory_obsidian_per_project_strategy(self, monkeypatch, tmp_path):
+        """Selecting obsidian with per-project strategy records the strategy."""
+        self._patch_non_interactive(monkeypatch)
+        self._patch_detect_vaults(monkeypatch, [])
+        self._patch_path_input(monkeypatch, str(tmp_path / "Vault"))
+
+        calls = iter(["obsidian", "per-project"])
+        monkeypatch.setattr(
+            "agent_notes.commands.wizard._radio_select_fallback",
+            lambda title, options, default=0, **kw: next(calls),
+        )
+
+        backend, path, strategy = wizard_mod._select_memory(step=6, total=7)
+        assert backend == "obsidian"
+        assert strategy == "per-project"
+
+    def test_select_memory_local_no_strategy_prompt(self, monkeypatch):
+        """Selecting local must not trigger a strategy radio call (no second radio prompt)."""
+        self._patch_non_interactive(monkeypatch)
+
+        call_count = [0]
+
+        def counting_fallback(title, options, default=0, **kw):
+            call_count[0] += 1
+            return options[default][1]  # always return local (first option)
+
+        monkeypatch.setattr(
+            "agent_notes.commands.wizard._radio_select_fallback",
+            counting_fallback,
+        )
+
+        backend, path, strategy = wizard_mod._select_memory(step=6, total=7)
+        assert backend == "local"
+        assert call_count[0] == 1, f"local must trigger exactly 1 radio call, got {call_count[0]}"
+        assert strategy == "single-brain"
 
     def test_select_memory_vault_path_with_subfolder(self, monkeypatch, tmp_path):
-        """Final path is vault + subfolder (notes for session mode)."""
+        """Final path is vault + subfolder."""
         self._patch_non_interactive(monkeypatch)
         vault_dir = tmp_path / "MyVault"
         self._patch_detect_vaults(monkeypatch, [])
         self._patch_path_input(monkeypatch, str(vault_dir))
 
-        calls = iter(["obsidian", "obsidian"])
+        calls = iter(["obsidian", "single-brain"])
         monkeypatch.setattr(
             "agent_notes.commands.wizard._radio_select_fallback",
             lambda title, options, default=0, **kw: next(calls),
         )
 
-        backend, path = wizard_mod._select_memory(step=6, total=7)
+        backend, path, strategy = wizard_mod._select_memory(step=6, total=7)
         expected = str(vault_dir / "projects")
         assert path == expected
 
@@ -414,7 +460,7 @@ class TestSelectMemory:
 
         monkeypatch.setattr("agent_notes.commands.wizard._path_input", fake_path_input)
 
-        calls = iter(["obsidian", "obsidian"])
+        calls = iter(["obsidian", "single-brain"])
         monkeypatch.setattr(
             "agent_notes.commands.wizard._radio_select_fallback",
             lambda title, options, default=0, **kw: next(calls),
@@ -436,7 +482,7 @@ class TestSelectMemory:
 
         monkeypatch.setattr("agent_notes.commands.wizard._path_input", fake_path_input)
 
-        calls = iter(["obsidian", "obsidian"])
+        calls = iter(["obsidian", "single-brain"])
         monkeypatch.setattr(
             "agent_notes.commands.wizard._radio_select_fallback",
             lambda title, options, default=0, **kw: next(calls),
@@ -457,12 +503,12 @@ class TestSelectMemory:
             lambda prompt, default: "",
         )
 
-        calls = iter(["obsidian", "obsidian"])
+        calls = iter(["obsidian", "single-brain"])
         monkeypatch.setattr(
             "agent_notes.commands.wizard._radio_select_fallback",
             lambda title, options, default=0, **kw: next(calls),
         )
 
-        backend, path = wizard_mod._select_memory(step=6, total=7)
+        backend, path, strategy = wizard_mod._select_memory(step=6, total=7)
         # Empty input → uses default_vault which is vault1
         assert path == str(vault1 / "projects")
