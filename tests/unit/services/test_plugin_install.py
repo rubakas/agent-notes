@@ -109,28 +109,57 @@ def test_unsupported_capability_skips_hook(tmp_path, monkeypatch):
     assert "agent-notes cost-report" not in _stop_hook_commands(data)
 
 
-def test_no_double_install_with_empty_registry(tmp_path):
-    """With no manifests, _apply_plugin_settings must not add any hooks.
+def test_cost_report_disabled_by_default_no_stop_hook(tmp_path):
+    """With default config (cost-report off by default), _apply_plugin_settings installs no Stop hook.
 
-    This guards against double-installing the hardcoded Stop hook that
-    _install_session_hook writes independently.
+    Uses the REAL registry — proves the manifest declares default: off correctly.
     """
-    from agent_notes.services.settings_writer import install_hook
     from agent_notes.constants import Hooks
 
     settings = tmp_path / "settings.json"
     settings.write_text("{}")
-    # Mimic what _install_session_hook's hardcoded line does
-    install_hook(settings, "Stop", Hooks.COST_REPORT)
 
-    # Call with the REAL (empty) registry — must not add a second Stop hook
     installer._apply_plugin_settings(settings, _Backend(), {})
 
     data = json.loads(settings.read_text())
-    count = sum(
-        1
-        for entry in data.get("hooks", {}).get("Stop", [])
-        for h in entry.get("hooks", [])
-        if h.get("command") == Hooks.COST_REPORT
+    commands = _stop_hook_commands(data)
+    assert Hooks.COST_REPORT not in commands, (
+        f"Stop hook must be absent when cost-report is disabled (default), got: {commands}"
     )
-    assert count == 1, f"Stop hook installed {count} times (expected exactly 1)"
+
+
+def test_cost_report_enabled_installs_stop_hook_once(tmp_path):
+    """With cost-report enabled, _apply_plugin_settings installs the Stop hook exactly once.
+
+    Uses the REAL registry — proves the manifest wiring is correct end-to-end.
+    """
+    from agent_notes.constants import Hooks
+
+    settings = tmp_path / "settings.json"
+    settings.write_text("{}")
+
+    installer._apply_plugin_settings(settings, _Backend(), {"enabled_plugins": {"cost-report": True}})
+
+    data = json.loads(settings.read_text())
+    commands = _stop_hook_commands(data)
+    count = commands.count(Hooks.COST_REPORT)
+    assert count == 1, f"Stop hook must appear exactly once when enabled, got count={count}: {commands}"
+
+
+def test_disable_removes_previously_installed_stop_hook(tmp_path):
+    """Disabling cost-report removes the Stop hook even if it was installed in a prior call.
+
+    Simulates an upgrade scenario: old install wrote the hook, new disable cleans it up.
+    Uses the REAL registry.
+    """
+    from agent_notes.constants import Hooks
+
+    settings = tmp_path / "settings.json"
+    settings.write_text("{}")
+    # First enable — installs the hook
+    installer._apply_plugin_settings(settings, _Backend(), {"enabled_plugins": {"cost-report": True}})
+    # Then disable — must remove it
+    installer._apply_plugin_settings(settings, _Backend(), {"enabled_plugins": {"cost-report": False}})
+
+    data = json.loads(settings.read_text())
+    assert Hooks.COST_REPORT not in _stop_hook_commands(data)

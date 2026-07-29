@@ -283,7 +283,11 @@ def show(state=None) -> None:
         mem_label = "Disabled"
 
     from ..services.user_config import load_user_config
-    cost_report_enabled = load_user_config().get("cost_report_enabled", False)
+    from ..registries.plugin_registry import default_plugin_registry
+    _ucfg = load_user_config()
+    cost_report_enabled = any(
+        p.name == "cost-report" for p in default_plugin_registry().enabled(_ucfg)
+    )
     cost_report_label = "enabled" if cost_report_enabled else "disabled"
 
     print("Current configuration:")
@@ -624,14 +628,14 @@ def interactive_config_memory() -> None:
 
 
 def cost_report_toggle(value: str) -> None:
-    """Enable or disable cost reporting in user config."""
+    """Enable or disable cost reporting via the plugin system."""
     from ..services.user_config import load_user_config, save_user_config
     cfg = load_user_config()
-    cfg["cost_report_enabled"] = (value == "on")
+    cfg.setdefault("enabled_plugins", {})["cost-report"] = (value == "on")
     save_user_config(cfg)
     state_label = "enabled" if value == "on" else "disabled"
     print(f"Cost reporting {state_label}.")
-    print("Run 'agent-notes regenerate' to update generated rules.")
+    print("Run 'agent-notes install' to apply hook changes.")
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────

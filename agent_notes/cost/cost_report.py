@@ -64,8 +64,10 @@ def _parse_since(value: str) -> float:
 
 def main(since: float | None = None, session_id: str | None = None) -> int:
     from ..services.user_config import load_user_config
-    if not load_user_config().get("cost_report_enabled", False):
-        print("Cost reporting is disabled. Enable with: agent-notes config cost-report on")
+    from ..registries.plugin_registry import default_plugin_registry
+    cfg = load_user_config()
+    if not any(p.name == "cost-report" for p in default_plugin_registry().enabled(cfg)):
+        print("Cost reporting is disabled. Enable with: agent-notes plugins enable cost-report")
         return 0
 
     if session_id is not None and _opencode_active():

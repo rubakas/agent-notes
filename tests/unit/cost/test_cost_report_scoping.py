@@ -388,7 +388,7 @@ class TestEnvVarSessionAutoPass:
 
         with patch(
             "agent_notes.services.user_config.load_user_config",
-            return_value={"cost_report_enabled": True},
+            return_value={"enabled_plugins": {"cost-report": True}},
         ):
             cost_report.main()
 
@@ -412,7 +412,7 @@ class TestEnvVarSessionAutoPass:
 
         with patch(
             "agent_notes.services.user_config.load_user_config",
-            return_value={"cost_report_enabled": True},
+            return_value={"enabled_plugins": {"cost-report": True}},
         ):
             cost_report.main(session_id="explicit-456")
 

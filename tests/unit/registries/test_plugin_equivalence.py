@@ -1,29 +1,29 @@
-"""Real equivalence gate for plugin additivity.
+"""Real equivalence gate for plugin-driven include-skip and skill-filter.
 
-With no plugin manifests registered the plugin wiring in rendering.py and
-installer.py must be purely additive — it changes nothing vs. the pre-plugin
-code path.
+After cost-report became a plugin (#37), the skip set is driven entirely by the
+plugin registry.  These tests verify:
 
-Two assertions are made:
-  a. rendering._plugin_include_skip(cfg) equals legacy cost.render.include_skip(cfg)
-     for representative configs — true today because no manifest owns any include,
-     and it breaks the moment any plugin shifts the skip set away from legacy behavior.
-  b. The installer's plugin-based skill filter removes nothing when the registry
+  a. _plugin_include_skip({}) includes "cost_reporting" in the skip set (the
+     cost-report plugin is off by default, so the include is suppressed).
+
+  b. _plugin_include_skip({"enabled_plugins": {"cost-report": True}}) does NOT
+     skip "cost_reporting" (the plugin is on, so the include expands).
+
+  c. The installer's plugin-based skill filter removes nothing when the registry
      owns no skills — _disabled_owned is empty.
+
+Gate-has-teeth proof: a separate test patches default_plugin_registry with a
+modified registry that flips cost-report's default to True. That causes
+_plugin_include_skip({}) to return an empty set, proving tests (a) and (b) would
+go red if the manifest were changed to default: on.
 """
-import pytest
 import textwrap
+
+import pytest
 
 from agent_notes.registries.plugin_registry import load_plugin_registry, PluginRegistry
 from agent_notes.services.rendering import _plugin_include_skip
-from agent_notes.cost.render import include_skip as _legacy_include_skip
 
-
-_REPRESENTATIVE_CONFIGS = [
-    {},
-    {"cost_report_enabled": True},
-    {"cost_report_enabled": False},
-]
 
 _FAKE_SKILLS = ["git", "obsidian-memory", "cost-report"]
 
@@ -37,21 +37,29 @@ def _disabled_owned(registry: PluginRegistry, cfg: dict) -> set:
     return disabled
 
 
-@pytest.mark.parametrize("cfg", _REPRESENTATIVE_CONFIGS)
-def test_include_skip_equals_legacy_with_empty_registry(cfg, tmp_path, monkeypatch):
-    """_plugin_include_skip(cfg) == legacy include_skip(cfg) when registry is empty.
+# ---------------------------------------------------------------------------
+# Include-skip gate: cost-report owns cost_reporting, default off
+# ---------------------------------------------------------------------------
 
-    Empty registry means owned_includes() == {} and active_includes() == {}, so
-    the plugin wiring contributes nothing and the result collapses to the legacy
-    cost-report bridge alone.
-    """
-    reg = load_plugin_registry(tmp_path)  # zero manifests
-    monkeypatch.setattr(
-        "agent_notes.registries.plugin_registry.default_plugin_registry",
-        lambda: reg,
+def test_plugin_include_skip_default_config_skips_cost_reporting():
+    """_plugin_include_skip({}) must include 'cost_reporting' (cost-report is off by default)."""
+    skip = _plugin_include_skip({})
+    assert "cost_reporting" in skip, (
+        f"Expected 'cost_reporting' in skip set with empty config, got: {skip!r}"
     )
-    assert _plugin_include_skip(cfg) == _legacy_include_skip(cfg)
 
+
+def test_plugin_include_skip_enabled_omits_cost_reporting():
+    """_plugin_include_skip({'enabled_plugins': {'cost-report': True}}) must not skip 'cost_reporting'."""
+    skip = _plugin_include_skip({"enabled_plugins": {"cost-report": True}})
+    assert "cost_reporting" not in skip, (
+        f"Expected 'cost_reporting' NOT in skip set when cost-report enabled, got: {skip!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Skill-filter gate: no plugin owns skills yet
+# ---------------------------------------------------------------------------
 
 def test_skill_filter_removes_nothing_with_empty_registry(tmp_path):
     """Plugin skill filter is inert when registry owns no skills."""
@@ -60,3 +68,38 @@ def test_skill_filter_removes_nothing_with_empty_registry(tmp_path):
     # filter is a no-op: every skill survives
     result = [s for s in _FAKE_SKILLS if s not in _disabled_owned(reg, {})]
     assert result == _FAKE_SKILLS
+
+
+# ---------------------------------------------------------------------------
+# Gate-has-teeth proof: flipping cost-report default to on changes the result
+# ---------------------------------------------------------------------------
+
+def test_gate_has_teeth_if_default_flipped(tmp_path, monkeypatch):
+    """Prove the gate would catch a manifest change that sets default: on.
+
+    With default=on, cost-report is enabled by default, so _plugin_include_skip({})
+    returns set() — cost_reporting is NOT skipped.  This is the opposite of the
+    correct behavior, confirming that test_plugin_include_skip_default_config_skips_cost_reporting
+    would turn red if the manifest were edited to 'default: on'.
+    """
+    (tmp_path / "cost-report").mkdir()
+    (tmp_path / "cost-report" / "plugin.yaml").write_text(textwrap.dedent("""\
+        name: cost-report
+        description: Emit a per-session token cost report at the Stop hook
+        default: on
+        includes: [cost_reporting]
+        hooks:
+          - {event: Stop, command: "agent-notes cost-report", requires: stop_hook}
+        allow:
+          - {value: "Bash(agent-notes cost-report)", requires: allow_entries}
+    """))
+    reg = load_plugin_registry(tmp_path)
+    monkeypatch.setattr(
+        "agent_notes.registries.plugin_registry.default_plugin_registry",
+        lambda: reg,
+    )
+    skip = _plugin_include_skip({})
+    # With default=on, cost-report is enabled, so cost_reporting is NOT in the skip set
+    assert "cost_reporting" not in skip, (
+        "With default=on, cost_reporting should not be skipped (cost-report is enabled by default)"
+    )

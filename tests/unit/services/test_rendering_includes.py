@@ -77,7 +77,7 @@ class TestRenderGlobalsExpandsIncludes:
              patch.object(config_mod, "DIST_GITHUB_DIR", dist_github_dir), \
              patch(
                  "agent_notes.services.user_config.load_user_config",
-                 return_value={"cost_report_enabled": True},
+                 return_value={"enabled_plugins": {"cost-report": True}},
              ):
             from agent_notes.services.rendering import render_globals
             render_globals()
@@ -124,7 +124,7 @@ class TestRenderGlobalsExpandsIncludes:
              patch.object(config_mod, "DIST_GITHUB_DIR", dist_github_dir), \
              patch(
                  "agent_notes.services.user_config.load_user_config",
-                 return_value={"cost_report_enabled": False},
+                 return_value={"enabled_plugins": {"cost-report": False}},
              ):
             from agent_notes.services.rendering import render_globals
             render_globals()
@@ -176,7 +176,7 @@ class TestGenerateAgentFilesExpandsIncludes:
              ), \
              patch(
                  "agent_notes.services.user_config.load_user_config",
-                 return_value={"cost_report_enabled": cost_report_enabled},
+                 return_value={"enabled_plugins": {"cost-report": cost_report_enabled}},
              ), \
              patch(
                  "agent_notes.services.rendering.expand_includes",

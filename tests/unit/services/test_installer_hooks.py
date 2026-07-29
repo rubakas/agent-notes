@@ -65,12 +65,27 @@ class TestInstallRegistersMemoryBridge:
 
 
 class TestInstallRegistersCostReport:
-    def test_always_registers_stop_hook(self, mock_backend, tmp_path):
+    def test_registers_stop_hook_when_cost_report_enabled(self, mock_backend, tmp_path):
         settings_path = tmp_path / "settings.json"
 
-        _install_session_hook(mock_backend, "global", memory_backend="local")
+        with patch(
+            "agent_notes.services.user_config.load_user_config",
+            return_value={"enabled_plugins": {"cost-report": True}},
+        ):
+            _install_session_hook(mock_backend, "global", memory_backend="local")
 
         assert has_hook(settings_path, "Stop", Hooks.COST_REPORT)
+
+    def test_no_stop_hook_when_cost_report_disabled(self, mock_backend, tmp_path):
+        settings_path = tmp_path / "settings.json"
+
+        with patch(
+            "agent_notes.services.user_config.load_user_config",
+            return_value={},
+        ):
+            _install_session_hook(mock_backend, "global", memory_backend="local")
+
+        assert not has_hook(settings_path, "Stop", Hooks.COST_REPORT)
 
 
 class TestInstallCleansUpStaleHooks:
@@ -107,7 +122,11 @@ class TestUninstallRemovesAllHooks:
 
     def test_removes_cost_report(self, mock_backend, tmp_path):
         settings_path = tmp_path / "settings.json"
-        _install_session_hook(mock_backend, "global", memory_backend="local")
+        with patch(
+            "agent_notes.services.user_config.load_user_config",
+            return_value={"enabled_plugins": {"cost-report": True}},
+        ):
+            _install_session_hook(mock_backend, "global", memory_backend="local")
         assert has_hook(settings_path, "Stop", Hooks.COST_REPORT)
 
         _uninstall_session_hook(mock_backend, "global")

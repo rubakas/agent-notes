@@ -8,23 +8,15 @@ from typing import Dict, Any, Optional
 
 
 def _plugin_include_skip(user_config: dict) -> set:
-    """Return the set of include names to skip, composed from the plugin registry
-    and a legacy bridge for subsystems not yet converted to plugins.
+    """Return the set of include names to skip, driven entirely by the plugin registry.
 
-    Logic:
-      - Any include owned by a plugin but not currently enabled is skipped.
-      - The legacy cost-report bridge is unioned in so cost_reporting stays
-        suppressed by default until Task 5 (#37) converts cost-report to a plugin.
+    Any include owned by a plugin but not currently enabled is skipped.
+    cost-report owns cost_reporting and is off by default, so cost_reporting is
+    suppressed unless the user has enabled the cost-report plugin.
     """
     from ..registries.plugin_registry import default_plugin_registry
-    from ..cost.render import include_skip as _legacy_cost_skip
     reg = default_plugin_registry()
-    # additive: skip any owned include that no enabled plugin activates
-    skip = reg.owned_includes() - reg.active_includes(user_config)
-    # legacy bridge — cost-report is not a plugin yet (#37); honour the old flag
-    # so cost_reporting stays skipped by default.  Removed in #37.
-    skip |= _legacy_cost_skip(user_config)
-    return skip
+    return reg.owned_includes() - reg.active_includes(user_config)
 
 
 def expand_includes(text: str, shared_dir: Path, skip: Optional[set] = None) -> str:

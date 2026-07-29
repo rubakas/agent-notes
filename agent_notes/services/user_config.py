@@ -22,9 +22,15 @@ def load_user_config(path: Optional[Path] = None) -> dict:
         return {}
     try:
         data = yaml.safe_load(p.read_text())
-        return data or {}
+        data = data or {}
     except yaml.YAMLError as e:
         raise ValueError(f"Invalid YAML in {p}: {e}") from e
+    # One-shot migration: cost_report_enabled → enabled_plugins.cost-report (#37)
+    if "cost_report_enabled" in data:
+        data.setdefault("enabled_plugins", {}).setdefault(
+            "cost-report", bool(data.pop("cost_report_enabled"))
+        )
+    return data
 
 
 def resolve_agent_role(agent_name: str, default_role: str, config: dict) -> str:

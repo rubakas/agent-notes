@@ -221,11 +221,9 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
     write_context(context_file, agents, version, skills)
     install_hook(settings_path, "SessionStart", hook_command)
 
-    # Memory-bridge hooks and Stop/cost-report — backends that support stop_hook
+    # Memory-bridge hooks — backends that support stop_hook
     if backend.supports("stop_hook"):
         install_memory_hooks(settings_path, memory_backend)
-        # Stop hook: emit cost report at end of session
-        install_hook(settings_path, "Stop", Hooks.COST_REPORT)
 
     # PreToolUse credential guard — backends that support pretooluse_hooks
     if backend.supports("pretooluse_hooks"):
@@ -242,7 +240,6 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         # any previous install, not just the immediately preceding one)
         remove_matching_allow_entries(settings_path, "Bash(agent-notes")
         remove_allow_entry(settings_path, "Bash(cost-report)")
-        install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
         install_memory_allow_entries(settings_path, memory_backend, memory_path, current_state)
 
     # Plugin-driven hooks and allow-entries (no-op until Task 5 ships manifests)
@@ -269,7 +266,6 @@ def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memor
 
     if backend.supports("stop_hook"):
         uninstall_memory_hooks(settings_path)
-        remove_hook(settings_path, "Stop", Hooks.COST_REPORT)
 
     if backend.supports("pretooluse_hooks"):
         remove_hook(settings_path, "PreToolUse", Hooks.GUARD_CREDENTIALS)
