@@ -7,8 +7,9 @@ from typing import Optional
 
 @dataclass
 class MemoryConfig:
-    backend: str = "local"   # "obsidian" | "local" | "none"
-    path: str = ""           # vault root (obsidian) or memory dir (local). empty = use default
+    backend: str = "local"        # "obsidian" | "local"
+    path: str = ""                # vault root (obsidian) or memory dir (local). empty = use default
+    strategy: str = "single-brain"  # obsidian-only: "single-brain" | "per-project"
 
 
 @dataclass

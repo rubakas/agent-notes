@@ -52,7 +52,7 @@ from ..services.fs import (
 # docker-compose → group: docker).  There is no single source-of-truth
 # constant elsewhere in the codebase, so the full vocabulary is listed here.
 _VALID_GROUPS = {"process", "domain", "rails", "docker", "kamal"}
-_VALID_MEMORY_BACKENDS = {"obsidian", "local", "none"}
+_VALID_MEMORY_BACKENDS = {"obsidian", "local"}
 
 
 def check_skill_frontmatter(scope: str, issues: list, fix_actions: list, profile_label: str = "") -> None:
