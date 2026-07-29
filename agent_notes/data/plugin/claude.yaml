@@ -2,7 +2,6 @@
 # Only skills listed here are included in .claude-plugin/skills/.
 # Add a skill name (matching data/skills/<name>/) to vendor it with the plugin.
 vendored_skills:
-  - brainstorming
   - chrome-test
   - code-review
   - codebase-design
@@ -17,9 +16,7 @@ vendored_skills:
   - refactoring-protocol
   - research
   - setup-agent-tracker
-  - tdd
   - to-spec
   - to-tickets
   - triage
   - wayfinder
-  - writing-great-skills

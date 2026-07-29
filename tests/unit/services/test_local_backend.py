@@ -1,8 +1,8 @@
-"""Unit tests for agent_notes.services.local_backend."""
+"""Unit tests for agent_notes.memory.local_backend."""
 import pytest
 from pathlib import Path
 
-from agent_notes.services.local_backend import (
+from agent_notes.memory.local_backend import (
     local_init,
     local_list_notes,
     local_regenerate_index,

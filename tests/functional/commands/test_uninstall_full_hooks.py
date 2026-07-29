@@ -56,6 +56,7 @@ def _make_claude_backend(home: Path) -> CLIBackend:
             "supports_symlink": True,
             "session_hook": True,
             "stop_hook": True,
+            "pretooluse_hooks": True,
             "allow_entries": True,
         },
         global_template="global-claude.md",
@@ -166,7 +167,7 @@ class TestUninstallRemovesAllHooksAndPermissions:
 
         # Patch memory_init so it doesn't try to create a real Obsidian index on disk
         with patch("agent_notes.services.installer.load_registry", return_value=registry), \
-             patch("agent_notes.services.memory_router.memory_init"), \
+             patch("agent_notes.memory.memory_router.memory_init"), \
              patch("agent_notes.services.installer._install_universal_skills"):
             from agent_notes.services.installer import install_all
             install_all(

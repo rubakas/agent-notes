@@ -2,9 +2,9 @@
 
 ## Overview
 
-AgentNotes is a **hub** that registers and installs AI agent configurations across multiple CLIs (Claude Code, OpenCode, GitHub Copilot, etc.). At its core, the engine reads declarative YAML files from three registries — **CLIs, Models, and Roles** — and orchestrates the build-and-install pipeline. The engine's promise: **adding a new CLI, model, role, agent, skill, or rule requires zero Python changes** — only drop a YAML file in the right data directory.
+AgentNotes is a **hub** that registers and installs AI agent configurations across multiple CLIs (Claude Code, OpenCode, GitHub Copilot, etc.). At its core, the engine reads declarative YAML files from three registries — **CLIs, Models, and Roles** — and orchestrates the build-and-install pipeline. Beyond the core engine, two subsystems handle **agent memory** (session notes, knowledge bases) and **cost tracking** (token/pricing accounting). The engine's promise: **adding a new CLI, model, role, agent, skill, or rule requires zero Python changes** — only drop a YAML file in the right data directory.
 
-This document describes the 4-layer architecture that enforces this promise.
+This document describes the 4-layer core architecture and two subsystems that enforce this promise.
 
 ---
 
@@ -46,6 +46,50 @@ AgentNotes is organized into four strictly layered packages. Dependencies flow *
 - `test_commands_are_thin_orchestrators()` — commands ≤600 lines
 - `test_top_level_shims_are_short()` — shims ≤150 lines
 - `test_no_circular_imports_at_module_load()` — config loads cleanly without circular imports
+
+---
+
+## Subsystems
+
+Beyond the 4-layer core, two independent subsystems handle cross-cutting concerns:
+
+### Memory Subsystem (`agent_notes/memory/`)
+
+Manages persistent agent knowledge across sessions. Supports multiple backends (Local, Obsidian, and future expansions). Provides a backend-agnostic router (`memory_router.py`) that dispatches operations to the active backend.
+
+**Directory structure:**
+```
+agent_notes/memory/
+├── memory_backend.py       # Abstract backend interface
+├── memory_router.py        # Router — dispatches to active backend
+├── local_backend.py        # Local filesystem backend (~/.claude/agent-memory/)
+├── obsidian_backend.py     # Obsidian vault backend
+├── install.py              # Backend install logic
+├── instructions.py         # Memory instruction templates
+├── commands/               # CLI commands for memory operations
+│   ├── notes.py           # memory list/show/add
+│   ├── vault.py           # vault init/config
+│   ├── migrate.py         # migrate between backends
+│   ├── reset.py           # clear memory
+│   └── transfer.py        # export/import
+└── __init__.py
+```
+
+### Cost Subsystem (`agent_notes/cost/`)
+
+Tracks API costs and token usage per agent/model during sessions. Provides per-backend cost accounting and formatted reports for CLI output.
+
+**Directory structure:**
+```
+agent_notes/cost/
+├── cost_report.py         # Main cost tracking interface
+├── render.py              # Format cost report for display
+├── _pricing.py            # Pricing data per model
+├── _formatting.py         # Output formatting utilities
+├── _claude_backend.py     # Claude Code cost backend
+├── _opencode_backend.py   # OpenCode cost backend
+└── __init__.py
+```
 
 ---
 

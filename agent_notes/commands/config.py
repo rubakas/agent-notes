@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from ..constants import DEFAULT_VAULT_DIR, DEFAULT_VAULT_NAME, Wiki, Obsidian
+from ..constants import DEFAULT_VAULT_DIR, DEFAULT_VAULT_NAME, Obsidian
 
 
 def _load_state():
@@ -277,8 +277,6 @@ def show(state=None) -> None:
     mem = state.memory
     if mem.backend == "obsidian":
         mem_label = f"Obsidian session ({mem.path})" if mem.path else "Obsidian session"
-    elif mem.backend == "wiki":
-        mem_label = f"Obsidian wiki ({mem.path})" if mem.path else "Obsidian wiki"
     elif mem.backend == "local":
         mem_label = "Local markdown"
     else:
@@ -483,8 +481,7 @@ def _wizard_memory(state, before: str) -> bool:
     storage_options = {
         "1": ("local", "default - Claude Code built-in md files"),
         "2": ("obsidian", "Obsidian - session"),
-        "3": ("wiki", "Obsidian - brain"),
-        "4": ("none", "None"),
+        "3": ("none", "None"),
     }
 
     print("\nMemory storage options:")
@@ -499,8 +496,8 @@ def _wizard_memory(state, before: str) -> bool:
     backend, label = storage_options[choice]
     path = ""
 
-    if backend in ("obsidian", "wiki"):
-        subfolder = Obsidian.SUBFOLDER if backend == "obsidian" else Wiki.SUBFOLDER
+    if backend == "obsidian":
+        subfolder = Obsidian.SUBFOLDER
         default_vault = str(Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME)
         print(f"  Folder name: {subfolder}")
         print("  Press Tab to autocomplete paths")

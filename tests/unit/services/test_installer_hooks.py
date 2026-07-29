@@ -49,13 +49,6 @@ class TestInstallRegistersMemoryBridge:
 
         assert has_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
 
-    def test_wiki_backend_registers_memory_bridge(self, mock_backend, tmp_path):
-        settings_path = tmp_path / "settings.json"
-
-        _install_session_hook(mock_backend, "global", memory_backend="wiki")
-
-        assert has_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
-
     def test_local_backend_skips_memory_bridge(self, mock_backend, tmp_path):
         settings_path = tmp_path / "settings.json"
 

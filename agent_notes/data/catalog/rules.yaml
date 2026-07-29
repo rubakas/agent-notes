@@ -1,0 +1,67 @@
+families:
+  - {match: "claude-*", family: claude}
+  - {match: "gpt-*",    family: gpt}
+
+# First match wins. Applied to the normalized registry id (dots → dashes).
+classes:
+  - {match: "*fable*",    class: fable}
+  - {match: "*opus*",     class: opus}
+  - {match: "*sonnet*",   class: sonnet}
+  - {match: "*haiku*",    class: haiku}
+  - {match: "gpt-*-mini", class: haiku}
+  - {match: "gpt-5-4",    class: sonnet}
+  - {match: "gpt-*",      class: opus}
+
+# Alias template: {id} = normalized registry id, {seed_id} = original provider id.
+alias_transforms:
+  anthropic: "{id}"
+  openai: "{seed_id}"
+
+# Per-model alias overrides. Indexed by normalized registry id.
+# claude-sonnet-4's anthropic alias is a dated form, not the bare id.
+alias_overrides:
+  anthropic:
+    claude-sonnet-4: claude-sonnet-4-20250514
+
+deprecated:
+  - claude-opus-4-1
+  - claude-opus-4-5
+  - claude-opus-4-6
+  - claude-opus-4-7
+  - claude-sonnet-4
+  - claude-sonnet-4-5
+
+never_default:
+  - claude-fable-5
+
+capabilities:
+  default:
+    vision: true
+    long_context: true
+    tool_use: true
+  # Preserve the inconsistent long_context assignments exactly as they exist today.
+  overrides:
+    claude-haiku-4-5:
+      long_context: false
+    claude-opus-4-1:
+      long_context: false
+    claude-opus-4-5:
+      long_context: false
+    claude-sonnet-4-5:
+      long_context: false
+    gpt-5-4-mini:
+      long_context: false
+
+# Per-provider API filter applied during `models refresh`.
+# Models whose IDs match any exclude pattern are dropped before writing the cache.
+# Build reads seed.json (pre-filtered) and is never affected.
+filter:
+  openai:
+    exclude:
+      - "text-embedding-*"
+      - "tts-*"
+      - "whisper-*"
+      - "dall-e-*"
+      - "*-instruct"
+      - "*search*"
+      - "*realtime*"

@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 
 import agent_notes.commands.memory as mem_mod
-from agent_notes.commands.memory.migrate import do_migrate
+from agent_notes.memory.commands.migrate import do_migrate
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────

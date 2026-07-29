@@ -9,16 +9,7 @@ mkdir -p .opencode-plugin
 "$PYTHON" - <<'PYEOF'
 import pathlib
 import re
-
-try:
-    import tomllib
-except ImportError:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        import subprocess, sys
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "tomli", "--quiet"])
-        import tomli as tomllib
+import tomllib
 
 raw = pathlib.Path("pyproject.toml").read_bytes()
 cfg = tomllib.loads(raw.decode())
@@ -60,17 +51,7 @@ PYEOF
 
 # Generate package.json so Bun's npm-style loader can find the plugin.
 "$PYTHON" - <<'PYEOF'
-import json, pathlib
-
-try:
-    import tomllib
-except ImportError:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        import subprocess, sys
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "tomli", "--quiet"])
-        import tomli as tomllib
+import json, pathlib, tomllib
 
 raw = pathlib.Path("pyproject.toml").read_bytes()
 cfg = tomllib.loads(raw.decode())

@@ -23,6 +23,7 @@ features:
   supports_symlink: true
   session_hook: true
   stop_hook: true
+  pretooluse_hooks: true
   allow_entries: true
 global_template: global-claude.md
 exclude_flag: claude_exclude

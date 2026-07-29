@@ -25,15 +25,8 @@ class TestMemoryPackageExports:
         assert callable(do_export)
         assert callable(do_import)
 
-    def test_wiki_functions_importable(self):
-        from agent_notes.commands.memory import do_ingest, do_query, do_lint, do_scan_raw
-        assert callable(do_ingest)
-        assert callable(do_query)
-        assert callable(do_lint)
-        assert callable(do_scan_raw)
-
     def test_migrate_function_importable(self):
-        from agent_notes.commands.memory.migrate import do_migrate
+        from agent_notes.memory.commands.migrate import do_migrate
         assert callable(do_migrate)
 
     def test_reset_function_importable(self):
@@ -47,7 +40,6 @@ class TestMemoryPackageExports:
             mem.do_vault, mem.do_init, mem.do_index,
             mem.do_add, mem.do_list, mem.do_show, mem.do_size,
             mem.do_export, mem.do_import,
-            mem.do_ingest, mem.do_query, mem.do_lint, mem.do_scan_raw,
             mem.do_reset,
         ]
         for fn in do_functions:
@@ -59,29 +51,26 @@ class TestMemorySubmodulesImportable:
 
     @pytest.mark.parametrize("submodule", [
         "agent_notes.commands.memory",
-        "agent_notes.commands.memory._common",
-        "agent_notes.commands.memory.vault",
-        "agent_notes.commands.memory.notes",
-        "agent_notes.commands.memory.transfer",
-        "agent_notes.commands.memory.wiki",
-        "agent_notes.commands.memory.migrate",
-        "agent_notes.commands.memory.reset",
+        "agent_notes.memory.commands._common",
+        "agent_notes.memory.commands.vault",
+        "agent_notes.memory.commands.notes",
+        "agent_notes.memory.commands.transfer",
+        "agent_notes.memory.commands.migrate",
+        "agent_notes.memory.commands.reset",
     ])
     def test_submodule_importable(self, submodule):
         mod = importlib.import_module(submodule)
         assert mod is not None
 
     def test_common_helpers_accessible(self):
-        from agent_notes.commands.memory._common import (
+        from agent_notes.memory.commands._common import (
             _load_memory_config,
             get_directory_size,
             format_size,
-            _WIKI_TYPE_MAP,
         )
         assert callable(_load_memory_config)
         assert callable(get_directory_size)
         assert callable(format_size)
-        assert isinstance(_WIKI_TYPE_MAP, dict)
 
     def test_common_re_exported_from_package(self):
         """_common helpers are also accessible via the package namespace."""
@@ -89,12 +78,10 @@ class TestMemorySubmodulesImportable:
             _load_memory_config,
             get_directory_size,
             format_size,
-            _WIKI_TYPE_MAP,
         )
         assert callable(_load_memory_config)
         assert callable(get_directory_size)
         assert callable(format_size)
-        assert isinstance(_WIKI_TYPE_MAP, dict)
 
 
 class TestMemoryNoCircularImports:
@@ -104,12 +91,11 @@ class TestMemoryNoCircularImports:
         """All memory submodules are importable in sequence without circular-import failure."""
         modules = [
             "agent_notes.commands.memory",
-            "agent_notes.commands.memory.vault",
-            "agent_notes.commands.memory.notes",
-            "agent_notes.commands.memory.transfer",
-            "agent_notes.commands.memory.wiki",
-            "agent_notes.commands.memory.migrate",
-            "agent_notes.commands.memory.reset",
+            "agent_notes.memory.commands.vault",
+            "agent_notes.memory.commands.notes",
+            "agent_notes.memory.commands.transfer",
+            "agent_notes.memory.commands.migrate",
+            "agent_notes.memory.commands.reset",
         ]
         for mod_name in modules:
             # importlib.import_module is idempotent — repeated calls reuse sys.modules

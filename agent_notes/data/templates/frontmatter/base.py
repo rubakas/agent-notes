@@ -1,6 +1,14 @@
 """Shared helpers for frontmatter generator templates."""
 
-# Sections stripped from prompt bodies by CLI backends that lack these features.
+# Central registry of ## section headings stripped from prompt bodies by CLI
+# backends that lack those features (## Memory for backends without agent memory,
+# ## Cost reporting for backends other than Claude Code).
+#
+# This stays here rather than being contributed by each subsystem because the
+# only consumers are the frontmatter templates in this package — moving the
+# constants into agent_notes/memory/ or agent_notes/cost/ would create a
+# cross-layer import from data/templates into services, which is worse coupling
+# than the current inward reference.
 STRIP_PREFIXES = ("## Memory", "## Cost reporting")
 
 # Named-color → hex mapping used by backends that require hex color values.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Optional
 from functools import lru_cache
@@ -11,12 +12,28 @@ from ..domain.model import Model
 from ._base import load_yaml_file, require_fields
 
 
+def _natural_key(model_id: str) -> tuple:
+    """Sort key that orders version numbers numerically, not lexicographically.
+
+    Without this, `claude-opus-4-10` sorts before `claude-opus-4-8` because "1" < "8".
+    Each chunk is tagged (0, int) or (1, str) so numeric and text chunks never compare
+    against each other and raise TypeError.
+
+    Issue #21 will layer a fetched `created_at` on top of this as the primary key.
+    """
+    return tuple(
+        (0, int(part)) if part.isdigit() else (1, part)
+        for part in re.split(r"(\d+)", model_id)
+        if part
+    )
+
+
 class ModelRegistry:
     def __init__(self, models: list[Model]):
         self._by_id: dict[str, Model] = {m.id: m for m in models}
 
     def all(self) -> list[Model]:
-        return sorted(self._by_id.values(), key=lambda m: m.id)
+        return sorted(self._by_id.values(), key=lambda m: _natural_key(m.id))
 
     def get(self, model_id: str) -> Model:
         if model_id not in self._by_id:
@@ -43,41 +60,50 @@ class ModelRegistry:
         return sorted(result, key=lambda m: m.id)
 
 
-def load_model_registry(models_dir: Optional[Path] = None) -> ModelRegistry:
-    """Load all *.yaml files from models_dir (default: data/models/)."""
-    if models_dir is None:
-        models_dir = DATA_DIR / "models"
-    
+def _load_from_yaml_dir(models_dir: Path) -> ModelRegistry:
+    """Load all *.yaml files from models_dir into a ModelRegistry."""
     if not models_dir.is_dir():
         raise ValueError(f"Models directory not found: {models_dir}")
-    
+
     models: list[Model] = []
     for yaml_file in sorted(models_dir.glob("*.yaml")):
         try:
             data = load_yaml_file(yaml_file)
         except ValueError as e:
-            # Maintain backward compatibility for error messages  
             if "Invalid YAML" in str(e):
                 raise ValueError(f"Invalid YAML in {yaml_file.name}: {str(e).split(': ', 1)[1]}")
             raise
-        
+
         require_fields(
             data, ["id", "label", "family", "class", "aliases"], yaml_file,
             msg_template="Missing field '{field}' in {filename}",
         )
-        
+
         models.append(Model(
             id=data["id"],
             label=data["label"],
             family=data["family"],
             model_class=data["class"],
             aliases=data["aliases"],
-            pricing=data.get("pricing", {}) or {},
             capabilities=data.get("capabilities", {}) or {},
             deprecated=bool(data.get("deprecated", False)),
+            never_default=bool(data.get("never_default", False)),
         ))
-    
+
     return ModelRegistry(models)
+
+
+def load_model_registry(models_dir: Optional[Path] = None) -> ModelRegistry:
+    """Load models from the catalog (seed.json + rules.yaml) by default.
+
+    When models_dir is explicitly provided the legacy YAML-glob path is used
+    instead, which is useful for tests that build fixture registries on disk.
+    """
+    if models_dir is not None:
+        return _load_from_yaml_dir(models_dir)
+
+    from .catalog_loader import load_catalog
+    return ModelRegistry(load_catalog())
 
 
 @lru_cache(maxsize=1)

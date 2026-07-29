@@ -15,7 +15,6 @@ A **Model** is defined by these fields (all stored in YAML):
 | `family` | string | **Yes** | Brand/family (used for grouping) | `"kimi"`, `"openai"`, `"claude"` |
 | `class` | string | **Yes** | Model tier for role defaults | `"opus"`, `"sonnet"`, `"haiku"` |
 | `aliases` | dict[str, str] | **Yes** | Provider-specific model IDs | `{"openrouter": "moonshotai/kimi-k2"}` |
-| `pricing` | dict[str, float] | No | Cost per token (optional, for reports) | `{"input": 0.05, "output": 0.15}` |
 | `capabilities` | dict[str, bool] | No | Feature flags (optional, for filtering) | `{"vision": true, "long_context": true}` |
 
 **Key concepts:**
@@ -56,10 +55,6 @@ class: opus
 aliases:
   openrouter: moonshotai/kimi-k2
   moonshot:   moonshot/kimi-k2
-pricing:
-  input:  0.0015
-  output: 0.002
-  cache:  0.0003
 capabilities:
   vision: true
   long_context: true
@@ -101,11 +96,6 @@ capabilities:
     openai:         gpt-5                              # OpenAI direct model alias
     openrouter:     openai/gpt-5                       # OpenRouter vendor prefix
   ```
-
-- **`pricing`** (optional) — Cost per million tokens. Used for:
-  - Future cost estimation tools
-  - Informational displays in `list models`
-  - Keys can be: `input`, `output`, `cache` (per-provider pricing not yet supported)
 
 - **`capabilities`** (optional) — Feature flags. Reserved for future filtering:
   - `vision: true/false` — Can process images
@@ -347,7 +337,7 @@ id, label, family, class, aliases
 
 Optional fields:
 ```
-pricing, capabilities
+capabilities
 ```
 
 ### Pitfall 4: `class` doesn't match role's `typical_class`
@@ -379,6 +369,12 @@ pricing, capabilities
 **Symptom (test fragility):** A bare alias that happens to equal its `class` value (e.g. `anthropic: sonnet` on a model with `class: sonnet`) makes it easy to write a resolver test that checks against `model.model_class` instead of the actual resolved alias — the two strings match by coincidence, and the test stays green even if the resolution logic is broken. This bit `test_model_resolver_characterization.py`: fixing a bare `sonnet` alias to `claude-sonnet-4-6` immediately surfaced a latent bug in the "expected value" computation of three tests, because the coincidence had been hiding it.
 
 **Solution:** Alias values must always be version-pinned ids (`claude-sonnet-4-6`, `claude-opus-4-8`), never bare class names. As of 2026-07 every lineage (Haiku, Opus, Sonnet, Fable) uses exact ids, and `tests/unit/registries/test_registries.py::test_model_aliases_are_exact_version_strings_not_class_names` enforces `alias != class` for every model/provider pair — a bare alias will fail the suite. Do not add a bare alias to any model file, current or future.
+
+---
+
+## Future: Model Catalog Refresh (#21, #22)
+
+The model registry is evolving. Upcoming work (#21 — model metadata enrichment, #22 — catalog refresh/freeze workflow) will add fields for versioning, release dates, context windows, and cost-per-token metadata. For now, the current YAML schema (id, label, family, class, aliases, capabilities, deprecated) is sufficient. When the new schema lands, this guide will be updated with the additional fields and refresh/freeze workflow. **Do not yet document or implement catalog refresh, model deprecation, or cost-tracking workflows** — these are not yet wired into the engine.
 
 ---
 

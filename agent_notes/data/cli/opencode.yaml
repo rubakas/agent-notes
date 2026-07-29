@@ -19,9 +19,9 @@ features:
   supports_symlink: true
   session_hook: false
   stop_hook: false
+  pretooluse_hooks: false
   allow_entries: false
 global_template: global-opencode.md
 exclude_flag: opencode_exclude
-strip_memory_section: true
-accepted_providers: [github-copilot, anthropic, openrouter, openai, google, moonshot]
+accepted_providers: [anthropic, openai]
 preferred_family: claude

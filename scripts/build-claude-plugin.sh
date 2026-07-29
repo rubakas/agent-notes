@@ -43,16 +43,7 @@ PYEOF
 "$PYTHON" - <<'PYEOF'
 import json, pathlib
 
-try:
-    import tomllib
-except ImportError:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        import subprocess, sys
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "tomli", "--quiet"])
-        import tomli as tomllib
-
+import tomllib
 import yaml
 
 raw = pathlib.Path("pyproject.toml").read_bytes()

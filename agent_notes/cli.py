@@ -283,7 +283,7 @@ def main():
     # memory
     p_memory = subparsers.add_parser("memory", help="Manage agent memory")
     p_memory.add_argument("action", nargs="?", default="list",
-        choices=["init", "list", "vault", "index", "add", "size", "show", "reset", "export", "import", "ingest", "query", "lint"],
+        choices=["init", "list", "vault", "index", "add", "size", "show", "reset", "export", "import"],
         help="Memory action")
     p_memory.add_argument("name", nargs="?", help="Agent name / note title (for show/reset/add)")
     p_memory.add_argument("extra", nargs="*", help="Additional args (for add: body [type] [agent] [project])")
@@ -298,6 +298,16 @@ def main():
     p_cost_report = subparsers.add_parser("cost-report", help="Report token usage and cost for the current AI session")
     p_cost_report.add_argument("--since", help="Only include messages at or after this UTC datetime (ISO 8601)")
     p_cost_report.add_argument("--session", help="Session ID to report on (Claude Code only)")
+
+    # models
+    p_models = subparsers.add_parser("models", help="Manage the model catalog")
+    p_models_sub = p_models.add_subparsers(dest="subaction", metavar="")
+    p_refresh = p_models_sub.add_parser("refresh", help="Fetch latest models from providers and update cache")
+    p_refresh.add_argument("--provider", choices=["anthropic", "openai"],
+        help="Limit to one provider")
+    p_refresh.add_argument("--dry-run", action="store_true", dest="dry_run",
+        help="Print diff but do not write cache")
+    p_models_sub.add_parser("freeze", help="Promote cache to seed.json for committing")
 
     # config
     p_config = subparsers.add_parser("config", help="Reconfigure role/agent/model/memory/skill assignments after install")
@@ -364,6 +374,19 @@ def main():
     elif args.command == "memory":
         from .commands.memory import memory
         memory(args.action, args.name, getattr(args, "extra", None), description=getattr(args, "description", ""))
+    elif args.command == "models":
+        subaction = getattr(args, "subaction", None)
+        if subaction == "refresh":
+            from .commands.models import refresh
+            refresh(
+                provider=getattr(args, "provider", None),
+                dry_run=getattr(args, "dry_run", False),
+            )
+        elif subaction == "freeze":
+            from .commands.models import freeze
+            freeze()
+        else:
+            parser.parse_args(["models", "--help"])
     elif args.command == "config":
         from .commands.config import config
         config(action=args.action, args=getattr(args, "extra", None) or [], cli_filter=args.cli)
@@ -371,20 +394,10 @@ def main():
         from .commands.hook import hook
         hook(args.subaction)
     elif args.command == "cost-report":
-        # Rebuild sys.argv slice so cost_report.main() can parse it normally
-        argv = []
-        if args.since:
-            argv += ["--since", args.since]
-        if args.session:
-            argv += ["--session", args.session]
-        import sys
-        old_argv = sys.argv
-        sys.argv = ["agent-notes cost-report"] + argv
-        try:
-            from .scripts.cost_report import main as _cost_report_main
-            sys.exit(_cost_report_main())
-        finally:
-            sys.argv = old_argv
+        from .cost.cost_report import main as _cost_report_main, _parse_since
+        since = _parse_since(args.since) if args.since else None
+        session_id = args.session or None
+        sys.exit(_cost_report_main(since=since, session_id=session_id))
 
 if __name__ == "__main__":
     main()

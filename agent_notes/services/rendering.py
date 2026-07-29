@@ -94,7 +94,6 @@ def _resolve_model_str(
     scope_state,
     model_registry,
     user_config: Dict[str, Any],
-    tiers: Dict[str, Any],
 ):
     """Resolve the model string for a given agent+backend combination.
 
@@ -110,7 +109,6 @@ def _resolve_model_str(
     resolver = ModelResolver(
         scope_state=scope_state,
         user_config=user_config,
-        tiers=tiers,
         model_registry=model_registry,
     )
     model_str = resolver.resolve(agent_name, agent_config, backend)
@@ -270,7 +268,7 @@ def _overlay_selection_pins(scope_state, role_models, role_efforts):
     return merged
 
 
-def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
+def generate_agent_files(agents_config: Dict[str, Any],
                          state=None, scope='global', project_path=None,
                          role_models: Optional[Dict[str, Dict[str, str]]] = None,
                          role_efforts: Optional[Dict[str, Dict[str, str]]] = None,
@@ -279,7 +277,6 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
 
     Args:
         agents_config: Dict of agent configurations from agents.yaml
-        tiers: Dict mapping tiers to model names per backend (legacy fallback)
         state: Optional State object for role-based model resolution
         scope: 'global' or 'local' (only used if state is provided)
         project_path: Path for local scope (only used if state is provided and scope='local')
@@ -287,9 +284,6 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
             the persisted state (wizard selections not yet written to state.json)
         role_efforts: Optional explicit {cli: {role: effort}} pins, same semantics
         profile_label: Named profile whose pins drive the render ("" = default profile)
-
-    If state is None, behaves exactly as before (uses tiers dict).
-    If state is provided, tries state-driven resolution first, falls back to tiers on miss.
     """
     from ..registries.cli_registry import load_registry
     from ..services.state_store import load_state as _load_state_fn, get_scope as _get_scope
@@ -332,7 +326,8 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
 
         # Expand shared-content include directives (<!-- include: NAME -->)
         # No-op if shared/ directory is absent.
-        _agent_include_skip = set() if user_config.get("cost_report_enabled", False) else {"cost_reporting"}
+        from ..cost.render import include_skip as _cost_include_skip
+        _agent_include_skip = _cost_include_skip(user_config)
         prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared", skip=_agent_include_skip)
 
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
@@ -376,9 +371,9 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
             #   1. State-driven: state.clis[backend].role_models[role] -> model_id
             #   2. Role-class fallback: role.typical_class matched against
             #      any model's class, with a compatible provider for this backend
-            #   3. Legacy tier fallback: agent_config['tier'] -> tiers[tier][backend.name]
+            #   3. Unresolvable: raises ValueError
             model_str, model_registry = _resolve_model_str(
-                agent_name, agent_config, backend, scope_state, model_registry, user_config, tiers
+                agent_name, agent_config, backend, scope_state, model_registry, user_config
             )
             
             # Build context for template
@@ -428,116 +423,12 @@ def generate_agent_files(agents_config: Dict[str, Any], tiers: Dict[str, Any],
     return generated_files
 
 
-def _resolve_memory_path(st) -> Optional[str]:
-    """Return the resolved memory directory path as a string, or None if memory is disabled/absent."""
-    from ..config import memory_dir_for_backend
-
-    if st is None:
-        return None
-
-    backend = st.memory.backend
-    custom_path = st.memory.path
-
-    if backend == "none":
-        return None
-
-    resolved = memory_dir_for_backend(backend, custom_path)
-    if resolved is None:
-        return None
-
-    return str(resolved)
-
-
-def _memory_path(st) -> str:
-    """Return the vault/memory path string for {{MEMORY_PATH}} substitution in agent prompts."""
-    resolved = _resolve_memory_path(st)
-    if resolved is None:
-        return "disabled"
-    return resolved
-
-
-def _memory_reading_guide(st) -> str:
-    """Return backend-appropriate reading instructions for {{MEMORY_READING_GUIDE}} substitution."""
-    from ..constants import Wiki, Obsidian
-
-    if st is None:
-        return "Memory is not configured. Proceed without reading any shared state."
-
-    backend = st.memory.backend
-
-    resolved = _resolve_memory_path(st)
-    if resolved is None:
-        return "Memory is disabled. Proceed without reading any shared state."
-
-    path = resolved
-
-    if backend == "wiki":
-        _sessions, _concepts, _entities = Wiki.PAGE_TYPES[4], Wiki.PAGE_TYPES[1], Wiki.PAGE_TYPES[2]
-        return (
-            f"You are part of a team that shares state via a knowledge wiki at `{path}`.\n\n"
-            "### Read before working\n\n"
-            "If the task references an in-flight initiative, prior decision, or session progress, read the relevant wiki files BEFORE you start:\n\n"
-            f"1. `{path}/{Wiki.DIR}/{Wiki.INDEX}` — directory of all wiki pages\n"
-            f"2. `{path}/{Wiki.DIR}/{_sessions}/` — session logs for ongoing work\n"
-            f"3. `{path}/{Wiki.DIR}/{_concepts}/` — decisions, patterns, domain knowledge\n"
-            f"4. `{path}/{Wiki.DIR}/{_entities}/` — key entities and components\n\n"
-            f"If `{path}` is \"disabled\", skip this — proceed without wiki context."
-        )
-
-    if backend == "obsidian":
-        _sessions_cat, _decisions_cat, _patterns_cat, _mistakes_cat = (
-            Obsidian.CATEGORIES[4], Obsidian.CATEGORIES[1], Obsidian.CATEGORIES[0], Obsidian.CATEGORIES[2]
-        )
-        return (
-            f"You are part of a team that shares state via an Obsidian vault at `{path}`.\n\n"
-            "### Read before working\n\n"
-            "If the task you've been given references an in-flight initiative, prior decision, recent pattern, or session progress, read the relevant vault files BEFORE you start:\n\n"
-            f"1. `{path}/{Obsidian.INDEX}` — what's been written and where\n"
-            f"2. `{path}/{_sessions_cat}/<recent>.md` — current session log if the task is part of an ongoing thread\n"
-            f"3. `{path}/{_decisions_cat}/` or `{_patterns_cat}/` or `{_mistakes_cat}/` — relevant cross-session knowledge\n\n"
-            f"If `{path}` is \"disabled\" (memory backend not configured), skip this — proceed without vault context."
-        )
-
-    # local backend
-    return (
-        f"You are part of a team that shares state via a local memory store at `{path}`.\n\n"
-        "### Read before working\n\n"
-        "If the task references an in-flight initiative, prior decision, or session progress, read the relevant memory files BEFORE you start:\n\n"
-        f"1. `{path}/MEMORY.md` — index of saved memories\n"
-        f"2. `{path}/` — individual memory files by topic\n\n"
-        f"If `{path}` is \"disabled\", skip this — proceed without memory context."
-    )
-
-
-def _memory_instructions(st) -> str:
-    """Return memory instructions text based on the configured backend."""
-    if st is None:
-        return (
-            "Save memories using the `agent-notes memory add` CLI.\n\n"
-            "Use: `agent-notes memory add \"<title>\" \"<body>\" [type] [agent]`\n"
-            "Types: `pattern`, `decision`, `mistake`, `context`. Agent: `lead`."
-        )
-
-    backend = st.memory.backend
-
-    resolved = _resolve_memory_path(st)
-    if resolved is None:
-        return "Memory is disabled for this installation."
-
-    if backend == "wiki":
-        return (
-            f"Save memories using the `agent-notes memory add` CLI — it writes to the wiki at `{resolved}` automatically. "
-            "Do not write memory files directly.\n\n"
-            "Use: `agent-notes memory add \"<title>\" \"<body>\" [type] [agent]`\n"
-            "Types: `sources`, `concepts`, `entities`, `synthesis`, `sessions`. Agent: `lead`."
-        )
-    label = "the configured Obsidian vault at" if backend == "obsidian" else "writes to"
-    return (
-        f"Save memories using the `agent-notes memory add` CLI — it {label} `{resolved}` automatically. "
-        "Do not write memory files directly.\n\n"
-        "Use: `agent-notes memory add \"<title>\" \"<body>\" [type] [agent]`\n"
-        "Types: `pattern`, `decision`, `mistake`, `context`. Agent: `lead`."
-    )
+from ..memory.instructions import (
+    _resolve_memory_path,
+    _memory_path,
+    _memory_reading_guide,
+    _memory_instructions,
+)
 
 
 def render_globals() -> list[Path]:
@@ -555,7 +446,8 @@ def render_globals() -> list[Path]:
     from ..config import AGENTS_DIR
     from ..services.user_config import load_user_config as _load_user_config
     _ucfg = _load_user_config()
-    _include_skip = set() if _ucfg.get("cost_report_enabled", False) else {"cost_reporting"}
+    from ..cost.render import include_skip as _cost_include_skip
+    _include_skip = _cost_include_skip(_ucfg)
     claude_global_content = GLOBAL_CLAUDE_MD.read_text()
     claude_global_content = expand_includes(claude_global_content, AGENTS_DIR / "shared", skip=_include_skip)
     claude_global_content = claude_global_content.replace(
@@ -606,12 +498,12 @@ def render_globals() -> list[Path]:
     return copied_files
 
 
-def load_agents_config() -> tuple[Dict[str, Any], Dict[str, Any]]:
+def load_agents_config() -> Dict[str, Any]:
     """Load agents configuration from agents.yaml."""
     from ..config import AGENTS_YAML
-    
+
     if not AGENTS_YAML.exists():
         raise FileNotFoundError(f"Configuration file not found: {AGENTS_YAML}")
-    
+
     config = yaml.safe_load(AGENTS_YAML.read_text())
-    return config.get('agents', {}), config.get('tiers', {})
+    return config.get('agents', {})

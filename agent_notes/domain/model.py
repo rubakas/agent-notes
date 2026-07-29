@@ -12,9 +12,9 @@ class Model:
     family: str                      # "claude", "kimi", "gpt"
     model_class: str                 # "opus" | "sonnet" | "haiku" | "flash" | "pro" | "fable"
     aliases: dict[str, str]          # {"anthropic": "claude-opus-4-7", ...}
-    pricing: dict[str, float] = field(default_factory=dict)
     capabilities: dict[str, bool] = field(default_factory=dict)
     deprecated: bool = False
+    never_default: bool = False
 
     def has_alias_for(self, provider: str) -> bool:
         return provider in self.aliases

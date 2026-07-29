@@ -28,7 +28,7 @@ def _capture_stdout(fn, *args, **kwargs):
 
 # _load_memory_config is imported lazily inside _load_memory_index; patch it
 # at the source module so the local import picks up the mock.
-_MEMORY_CONFIG_PATH = "agent_notes.commands.memory._common._load_memory_config"
+_MEMORY_CONFIG_PATH = "agent_notes.memory.commands._common._load_memory_config"
 
 
 # ---------------------------------------------------------------------------
@@ -44,16 +44,6 @@ class TestLoadMemoryIndex:
             result = _load_memory_index()
 
         assert result == "# Memory\n- note A\n"
-
-    def test_returns_content_for_wiki_backend(self, tmp_path):
-        wiki_dir = tmp_path / "wiki"
-        wiki_dir.mkdir()
-        (wiki_dir / "index.md").write_text("wiki index\n")
-
-        with patch(_MEMORY_CONFIG_PATH, return_value=("wiki", str(tmp_path))):
-            result = _load_memory_index()
-
-        assert result == "wiki index\n"
 
     def test_returns_none_for_none_backend(self, tmp_path):
         with patch(_MEMORY_CONFIG_PATH, return_value=("none", str(tmp_path))):

@@ -20,10 +20,10 @@ features:
   supports_symlink: true
   session_hook: true
   stop_hook: false
+  pretooluse_hooks: false
   allow_entries: false
 global_template: global-codex.md
 exclude_flag: codex_exclude
-strip_memory_section: true
 accepted_providers: [openai]
 use_model_class: false
 preferred_family: gpt

@@ -131,16 +131,8 @@ def _uninstall_universal_skills(copy_mode: bool = False) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Skill-filtering helper
+# Skill-filtering helper — implementation lives in memory/install.py;
+# re-exported here so existing callers (installer.py, tests) keep working.
 # ---------------------------------------------------------------------------
 
-def _filter_skills_by_backend(skills, memory_backend: str):
-    result = []
-    for skill in skills:
-        if skill.requires_memory is None:
-            result.append(skill)
-        else:
-            allowed = {b.strip() for b in skill.requires_memory.split(",")}
-            if memory_backend in allowed:
-                result.append(skill)
-    return result
+from ..memory.install import filter_skills_by_backend as _filter_skills_by_backend  # noqa: E402

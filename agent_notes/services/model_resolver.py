@@ -18,9 +18,7 @@ Resolution precedence (in order):
                             models of that family; fall back to any-family
                             if no preferred match found.
                             Returns alias (or model_class if use_model_class).
-  4. Legacy tier fallback — agent_config["tier"] → tiers[tier][backend.name]
-                            Raises ValueError if tier key absent or backend
-                            not in tier dict.
+  4. Error — raises ValueError with a diagnostic message.
 
 Role resolution:
   Before any of the above, the effective agent role is determined by
@@ -53,12 +51,10 @@ class ModelResolver:
         self,
         scope_state: Optional["ScopeState"],
         user_config: Dict[str, Any],
-        tiers: Dict[str, Any],
         model_registry: Optional["ModelRegistry"] = None,
     ) -> None:
         self._scope_state = scope_state
         self._user_config = user_config
-        self._tiers = tiers
         self._model_registry = model_registry  # may be None; loaded lazily on first need
 
     # ------------------------------------------------------------------
@@ -94,8 +90,8 @@ class ModelResolver:
             if model_str is not None:
                 return model_str
 
-        # Branch 4: legacy tier fallback
-        return self._from_tier(agent_name, agent_config, backend)
+        # Branch 4: error — no resolution succeeded
+        return self._unresolvable(agent_name, agent_config, backend)
 
     # ------------------------------------------------------------------
     # Internal helpers — one per branch
@@ -159,11 +155,15 @@ class ModelResolver:
         all_models_reversed = list(reversed(registry.all()))
         preferred_family = backend.preferred_family
 
-        def _find_class_match(models, family_filter=None):
+        def _find_class_match(models, family_filter=None, skip_deprecated=False):
             for model in models:
                 if model.model_class != role.typical_class:
                     continue
+                if model.never_default:
+                    continue
                 if family_filter is not None and model.family != family_filter:
+                    continue
+                if skip_deprecated and model.deprecated:
                     continue
                 resolved = model.resolve_for_providers(list(backend.accepted_providers))
                 if resolved is not None:
@@ -171,11 +171,17 @@ class ModelResolver:
             return None, None
 
         if preferred_family is not None:
-            matched_model, resolved = _find_class_match(all_models_reversed, preferred_family)
+            matched_model, resolved = _find_class_match(all_models_reversed, preferred_family, skip_deprecated=True)
+            if matched_model is None:
+                matched_model, resolved = _find_class_match(all_models_reversed, skip_deprecated=True)
+            if matched_model is None:
+                matched_model, resolved = _find_class_match(all_models_reversed, preferred_family)
             if matched_model is None:
                 matched_model, resolved = _find_class_match(all_models_reversed)
         else:
-            matched_model, resolved = _find_class_match(all_models_reversed)
+            matched_model, resolved = _find_class_match(all_models_reversed, skip_deprecated=True)
+            if matched_model is None:
+                matched_model, resolved = _find_class_match(all_models_reversed)
 
         if matched_model is None or resolved is None:
             return None
@@ -183,40 +189,31 @@ class ModelResolver:
         _provider, alias_str = resolved
         return matched_model.model_class if backend.use_model_class else alias_str
 
-    def _from_tier(
+    def _unresolvable(
         self,
         agent_name: str,
         agent_config: Dict[str, Any],
         backend: "CLIBackend",
     ) -> str:
-        """Branch 4: legacy tier fallback. Raises ValueError on failure."""
+        """Branch 4: no model could be resolved. Raises ValueError."""
         agent_role = self._effective_role(agent_name, agent_config)
-        if "tier" not in agent_config:
-            # Provide a helpful error explaining what was tried
-            role_class = "?"
-            if agent_role is not None:
-                try:
-                    from ..registries.role_registry import load_role_registry
-                    role_registry = load_role_registry()
-                    role = role_registry.get(agent_role)
-                    role_class = role.typical_class
-                except (KeyError, FileNotFoundError, ValueError):
-                    pass
-            raise ValueError(
-                f"Agent '{agent_name}' has role='{agent_role}' but no model could be "
-                f"resolved for backend '{backend.name}'. Tried: state.role_models, "
-                f"role.typical_class->model.class matching, and legacy 'tier' fallback. "
-                f"Check that data/roles/{agent_role}.yaml exists and that at least one "
-                f"model in data/models/*.yaml has class={role_class} "
-                f"with an alias for one of {list(backend.accepted_providers)}."
-            )
-
-        tier = agent_config["tier"]
-        if backend.name not in self._tiers.get(tier, {}):
-            raise ValueError(
-                f"tier '{tier}' missing model for CLI '{backend.name}' in agents.yaml"
-            )
-        return self._tiers[tier][backend.name]
+        role_class = "?"
+        if agent_role is not None:
+            try:
+                from ..registries.role_registry import load_role_registry
+                role_registry = load_role_registry()
+                role = role_registry.get(agent_role)
+                role_class = role.typical_class
+            except (KeyError, FileNotFoundError, ValueError):
+                pass
+        raise ValueError(
+            f"Agent '{agent_name}' has role='{agent_role}' but no model could be "
+            f"resolved for backend '{backend.name}'. Tried: state.role_models, "
+            f"role.typical_class->model.class matching, and legacy 'tier' fallback. "
+            f"Check that data/roles/{agent_role}.yaml exists and that at least one "
+            f"model in data/models/*.yaml has class={role_class} "
+            f"with an alias for one of {list(backend.accepted_providers)}."
+        )
 
     # ------------------------------------------------------------------
     # Registry lazy-load

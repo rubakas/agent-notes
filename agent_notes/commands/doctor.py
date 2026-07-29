@@ -52,7 +52,7 @@ from ..services.fs import (
 # docker-compose → group: docker).  There is no single source-of-truth
 # constant elsewhere in the codebase, so the full vocabulary is listed here.
 _VALID_GROUPS = {"process", "domain", "rails", "docker", "kamal"}
-_VALID_MEMORY_BACKENDS = {"obsidian", "wiki", "local", "none"}
+_VALID_MEMORY_BACKENDS = {"obsidian", "local", "none"}
 
 
 def check_skill_frontmatter(scope: str, issues: list, fix_actions: list, profile_label: str = "") -> None:
@@ -61,7 +61,7 @@ def check_skill_frontmatter(scope: str, issues: list, fix_actions: list, profile
     Checks every skill for:
     - non-empty name and description
     - group, if present, is in {"process", "domain"}
-    - requires_memory tokens, if present, are each in {"obsidian", "wiki", "local", "none"}
+    - requires_memory tokens, if present, are each in {"obsidian", "local", "none"}
 
     Violations are printed as advisories and do NOT affect issues/fix_actions or exit code.
     """
@@ -118,7 +118,7 @@ def _check_session_hook(scope: str, issues: list) -> None:
     # Memory bridge check on the default backend only
     settings_path, _, _ = _session_hook_paths(claude_backend, scope)
     from ..constants import Hooks
-    if state and state.memory.backend in ("obsidian", "wiki"):
+    if state and state.memory.backend == "obsidian":
         if settings_path.exists() and not has_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE):
             issues.append(Issue(
                 "missing_hook",

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Dict, Set, Optional
 
 from ...config import Color
-from ...constants import DEFAULT_VAULT_DIR, DEFAULT_VAULT_NAME, Wiki, Obsidian
+from ...constants import DEFAULT_VAULT_DIR, DEFAULT_VAULT_NAME, Obsidian
 from ...services.ui import (
     _can_interactive, _safe_input, _path_input, _checkbox_select, _radio_select,
     _checkbox_select_fallback, _radio_select_fallback,
@@ -147,10 +147,13 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
                 continue
 
             default_model = next(
-                (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.deprecated),
+                (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.deprecated and not m.never_default),
                 next(
-                    (m for m in reversed(compatible) if m.model_class == role.typical_class),
-                    compatible[0],
+                    (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.never_default),
+                    next(
+                        (m for m in reversed(compatible) if not m.never_default),
+                        compatible[0],
+                    ),
                 ),
             )
             default_idx = compatible.index(default_model)
@@ -332,7 +335,6 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
     storage_options = [
         ("default - Claude Code built-in md files", "local"),
         ("Obsidian - session", "obsidian"),
-        ("Obsidian - brain", "wiki"),
         ("None  (disable memory)", "none"),
     ]
 
@@ -346,8 +348,8 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
     backend = storage
     path = ""
 
-    if backend in ("obsidian", "wiki"):
-        subfolder = Obsidian.SUBFOLDER if backend == "obsidian" else Wiki.SUBFOLDER
+    if backend == "obsidian":
+        subfolder = Obsidian.SUBFOLDER
         candidates = _detect_obsidian_vaults()
         default_vault = str(candidates[0]) if candidates else str(Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME)
         if candidates:
@@ -361,7 +363,7 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
         path = str(Path(vault) / subfolder)
         print(f"  {Color.DIM}→ {path}{Color.NC}")
 
-    label = {"local": "Local markdown", "obsidian": f"Obsidian (session)  ({path})", "wiki": f"Obsidian (wiki)  ({path})", "none": "Disabled"}[backend]
+    label = {"local": "Local markdown", "obsidian": f"Obsidian (session)  ({path})", "none": "Disabled"}[backend]
     print(f"  {Color.GREEN}✓{Color.NC} Memory: {label}")
     return backend, path
 
@@ -415,8 +417,6 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     if memory_backend and memory_backend != "none":
         if memory_backend == "obsidian":
             mem_label = f"Obsidian (session)  →  {memory_path}" if memory_path else "Obsidian (session)"
-        elif memory_backend == "wiki":
-            mem_label = f"Obsidian (wiki)  →  {memory_path}" if memory_path else "Obsidian (wiki)"
         else:
             mem_label = "Local markdown"
         print(f"  {Color.DIM}Memory{Color.NC}    {mem_label}")
