@@ -37,7 +37,10 @@ Manifests live at `agent_notes/data/plugins/<name>/plugin.yaml`, not `agent_note
 
 Copied verbatim from epic #32 and the project's standing rules. Every task's requirements implicitly include these.
 
-- **Dist equivalence is the safety mechanism.** Default-enabled plugins must produce a byte-identical `agent_notes/dist/`. Verify with `agent-notes build` under a pinned `XDG_CONFIG_HOME`, diffed against a `git worktree` built at the branch point. An unpinned comparison is noise (`services/rendering.py` reads the developer's live `state.json`).
+- **Dist equivalence is the safety mechanism — but `git diff agent_notes/dist/` is a NO-TEETH GATE. Never use it.** `agent_notes/dist/` is gitignored (`.gitignore:30`, zero tracked files), so `git diff`/`git status` on it is ALWAYS empty and will report "byte-identical" even when the build output changed. This trap already bit this epic once (the first #35 gate). Two real ways to verify, in order of preference:
+  1. **Additive unit gate (fast, CI-safe, committed):** assert the plugin wiring equals the legacy path when no manifest owns the surface — `rendering._plugin_include_skip(cfg) == cost.render.include_skip(cfg)`, and the installer skill filter drops nothing. This is `tests/unit/registries/test_plugin_equivalence.py`. A gate must be proven capable of failing (perturb → red → revert) before it is trusted.
+  2. **End-to-end checksum vs. baseline (manual, at task boundaries):** run `scripts/dev/verify_dist_equiv.sh` — it builds dist from HEAD and from the branch point `7af1310` into a worktree (forcing each source via `PYTHONPATH`), wipes dist and excludes `*.bak*` (install artifacts, not build output), then sha256-compares the trees. Byte-identity = identical checksums. `git diff` is never the check.
+  - An unpinned comparison is also noise for a different reason (`services/rendering.py` reads the developer's live `state.json`); the checksum script pins `XDG_CONFIG_HOME` for both builds.
 - **Installed-contract invariant.** Hook command strings come from `constants.py` (`Hooks.COST_REPORT`, `Hooks.MEMORY_BRIDGE`, `Hooks.GUARD_CREDENTIALS`) — byte-identical. `remove_hook` matches these exact strings in every existing user's `settings.json`; a changed string orphans hooks on upgrade.
 - **Composed capability gate.** A hook/allow-entry installs iff `plugin_enabled AND backend.supports(requires)`. Never replace the `backend.supports(...)` axis — compose with it.
 - **Disable uninstalls.** A disabled plugin's hooks and allow-entries are actively removed from `settings.json`, not skipped.
@@ -280,7 +283,7 @@ Expected: prior count + 4 passed, 0 failures.
 
 - [ ] **Step 8: Verify dist unchanged**
 
-Run: `XDG_CONFIG_HOME=tests/fixtures/state-local agent-notes build && git diff --stat agent_notes/dist/`
+Run: `bash scripts/dev/verify_dist_equiv.sh   # REAL checksum gate vs branch point — NEVER `git diff` dist/ (gitignored, always empty)`
 Expected: no output (byte-identical — nothing wired yet).
 
 - [ ] **Step 9: Commit**
@@ -452,7 +455,7 @@ Run:
 ```bash
 agent-notes plugins list          # empty until Task 5 ships a manifest — prints nothing, exit 0
 uv run pytest tests/ -q
-XDG_CONFIG_HOME=tests/fixtures/state-local agent-notes build && git diff --stat agent_notes/dist/
+bash scripts/dev/verify_dist_equiv.sh   # REAL checksum gate vs branch point — NEVER `git diff` dist/ (gitignored, always empty)
 ```
 Expected: suite green; dist byte-identical.
 
@@ -566,8 +569,8 @@ Run:
 ```bash
 uv run pytest tests/unit/registries/test_plugin_equivalence.py -v
 uv run pytest tests/ -q
-XDG_CONFIG_HOME=tests/fixtures/state-local agent-notes build && git diff --stat agent_notes/dist/
-XDG_CONFIG_HOME=tests/fixtures/state-none  agent-notes build && git diff --stat agent_notes/dist/
+bash scripts/dev/verify_dist_equiv.sh   # REAL checksum gate vs branch point — NEVER `git diff` dist/ (gitignored, always empty)
+# (the checksum script above already pins XDG_CONFIG_HOME for both builds)
 ```
 Expected: all green; both dist builds byte-identical. **If dist drifts, stop** — the additive/bridge logic is wrong; do not suppress the diff.
 
@@ -772,13 +775,14 @@ Run:
 ```bash
 uv run pytest tests/ -q
 # default (cost-report off) → byte-identical to today
-XDG_CONFIG_HOME=tests/fixtures/state-local agent-notes build && git diff --stat agent_notes/dist/
+bash scripts/dev/verify_dist_equiv.sh   # REAL checksum gate vs branch point — NEVER `git diff` dist/ (gitignored, always empty)
 ```
-Expected: suite green; **dist byte-identical with cost-report disabled** (today's default). Then verify the *enabled* path is the expected diff:
+Expected: suite green; **dist byte-identical with cost-report disabled** (today's default — the checksum script compares HEAD-with-cost-report-disabled against the `7af1310` baseline and must report BYTE-IDENTICAL). Then verify the *enabled* path deliberately changes output. `git diff` cannot show it (dist is gitignored), so grep the built artifact for the include's content:
 ```bash
 agent-notes plugins enable cost-report
-agent-notes build && git diff --stat agent_notes/dist/   # cost_reporting include appears — expected
-git checkout agent_notes/dist/ ; agent-notes plugins disable cost-report   # restore
+agent-notes build
+grep -rl "cost" agent_notes/dist/claude/agents/ | head   # cost_reporting include now present in built agents — expected
+agent-notes plugins disable cost-report && agent-notes build   # restore default output
 ```
 
 - [ ] **Step 8: Verify disable uninstalls the Stop hook (the headline fix)**
