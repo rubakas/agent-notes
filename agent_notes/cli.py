@@ -299,6 +299,16 @@ def main():
     p_cost_report.add_argument("--since", help="Only include messages at or after this UTC datetime (ISO 8601)")
     p_cost_report.add_argument("--session", help="Session ID to report on (Claude Code only)")
 
+    # models
+    p_models = subparsers.add_parser("models", help="Manage the model catalog")
+    p_models_sub = p_models.add_subparsers(dest="subaction", metavar="")
+    p_refresh = p_models_sub.add_parser("refresh", help="Fetch latest models from providers and update cache")
+    p_refresh.add_argument("--provider", choices=["anthropic", "openai"],
+        help="Limit to one provider")
+    p_refresh.add_argument("--dry-run", action="store_true", dest="dry_run",
+        help="Print diff but do not write cache")
+    p_models_sub.add_parser("freeze", help="Promote cache to seed.json for committing")
+
     # config
     p_config = subparsers.add_parser("config", help="Reconfigure role/agent/model/memory/skill assignments after install")
     p_config.add_argument("action", nargs="?", default="wizard",
@@ -364,6 +374,19 @@ def main():
     elif args.command == "memory":
         from .commands.memory import memory
         memory(args.action, args.name, getattr(args, "extra", None), description=getattr(args, "description", ""))
+    elif args.command == "models":
+        subaction = getattr(args, "subaction", None)
+        if subaction == "refresh":
+            from .commands.models import refresh
+            refresh(
+                provider=getattr(args, "provider", None),
+                dry_run=getattr(args, "dry_run", False),
+            )
+        elif subaction == "freeze":
+            from .commands.models import freeze
+            freeze()
+        else:
+            parser.parse_args(["models", "--help"])
     elif args.command == "config":
         from .commands.config import config
         config(action=args.action, args=getattr(args, "extra", None) or [], cli_filter=args.cli)

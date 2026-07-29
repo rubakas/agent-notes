@@ -51,3 +51,17 @@ capabilities:
       long_context: false
     gpt-5-4-mini:
       long_context: false
+
+# Per-provider API filter applied during `models refresh`.
+# Models whose IDs match any exclude pattern are dropped before writing the cache.
+# Build reads seed.json (pre-filtered) and is never affected.
+filter:
+  openai:
+    exclude:
+      - "text-embedding-*"
+      - "tts-*"
+      - "whisper-*"
+      - "dall-e-*"
+      - "*-instruct"
+      - "*search*"
+      - "*realtime*"

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import os
+import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +17,29 @@ from ..config import DATA_DIR
 
 CATALOG_DIR = DATA_DIR / "catalog"
 USER_OVERRIDES_PATH = Path.home() / ".config" / "agent-notes" / "models.yaml"
+
+
+def _get_cache_path() -> Path:
+    xdg = os.environ.get("XDG_CACHE_HOME", "")
+    base = Path(xdg) if xdg else Path.home() / ".cache"
+    return base / "agent-notes" / "catalog.json"
+
+
+def _load_seed(seed_path: Path, use_cache: bool) -> dict:
+    """Load seed data, preferring the XDG cache when *use_cache* is True."""
+    if use_cache:
+        cache_path = _get_cache_path()
+        if cache_path.exists():
+            try:
+                return json.loads(cache_path.read_text())
+            except (json.JSONDecodeError, OSError) as e:
+                warnings.warn(
+                    f"Model cache at {cache_path} is corrupt ({e}); "
+                    "falling back to bundled seed.json",
+                    stacklevel=4,
+                )
+    with open(seed_path) as f:
+        return json.load(f)
 
 
 def _match(pattern: str, model_id: str) -> bool:
@@ -120,13 +145,20 @@ def load_catalog(
     catalog_dir: Optional[Path] = None,
     overrides_path: Optional[Path] = None,
 ) -> list[Model]:
-    """Load seed.json + rules.yaml + optional user overrides and return Model list."""
+    """Load seed.json + rules.yaml + optional user overrides and return Model list.
+
+    When *catalog_dir* is None (the default), the XDG cache at
+    ``~/.cache/agent-notes/catalog.json`` is preferred over the bundled seed.json.
+    A corrupt or unparseable cache falls back to seed.json with a warning.
+    When *catalog_dir* is explicitly supplied, the cache is bypassed and the
+    given directory's seed.json is used directly (useful for tests).
+    """
+    use_cache = catalog_dir is None
     if catalog_dir is None:
         catalog_dir = CATALOG_DIR
 
     seed_path = catalog_dir / "seed.json"
-    with open(seed_path) as f:
-        seed = json.load(f)
+    seed = _load_seed(seed_path, use_cache=use_cache)
 
     rules_path = catalog_dir / "rules.yaml"
     rules = _load_yaml(rules_path)
