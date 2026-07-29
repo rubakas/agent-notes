@@ -313,6 +313,12 @@ def main():
     p_plugins = subparsers.add_parser("plugins", help="Manage agent-notes plugins")
     p_plugins_sub = p_plugins.add_subparsers(dest="subaction", metavar="")
     p_plugins_sub.add_parser("list", help="List available plugins and their status")
+    p_plugins_enable = p_plugins_sub.add_parser("enable", help="Enable a plugin")
+    p_plugins_enable.add_argument("name", help="Plugin name")
+    p_plugins_disable = p_plugins_sub.add_parser("disable", help="Disable a plugin")
+    p_plugins_disable.add_argument("name", help="Plugin name")
+    p_plugins_info = p_plugins_sub.add_parser("info", help="Show details for a plugin")
+    p_plugins_info.add_argument("name", help="Plugin name")
 
     # config
     p_config = subparsers.add_parser("config", help="Reconfigure role/agent/model/memory/skill assignments after install")
@@ -397,6 +403,15 @@ def main():
         if subaction == "list":
             from .commands.plugins import list_plugins
             list_plugins()
+        elif subaction == "enable":
+            from .commands.plugins import enable_plugin
+            enable_plugin(args.name)
+        elif subaction == "disable":
+            from .commands.plugins import disable_plugin
+            disable_plugin(args.name)
+        elif subaction == "info":
+            from .commands.plugins import info_plugin
+            info_plugin(args.name)
         else:
             parser.parse_args(["plugins", "--help"])
     elif args.command == "config":
