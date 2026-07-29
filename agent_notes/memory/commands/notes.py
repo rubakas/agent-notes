@@ -18,7 +18,10 @@ def do_add(title: str, body: str, note_type: str = "context", agent: str = "", p
         return
     if backend == "obsidian":
         from ..obsidian_backend import obsidian_init, obsidian_write_note
+        from ...services.state_store import load_state as _load_state
         obsidian_init(path)
+        _state = _load_state()
+        strategy = _state.memory.strategy if _state is not None else "single-brain"
         note_path = obsidian_write_note(
             path,
             title=title,
@@ -28,6 +31,7 @@ def do_add(title: str, body: str, note_type: str = "context", agent: str = "", p
             project=project,
             description=description,
             tags=tags or [],
+            strategy=strategy,
         )
         print(f"{Color.GREEN}Note saved: {note_path}{Color.NC}")
     else:
