@@ -20,6 +20,7 @@ AGENTS_YAML = DATA_DIR / "agents" / "agents.yaml"
 AGENTS_DIR = DATA_DIR / "agents"
 RULES_DIR = DATA_DIR / "rules"
 SKILLS_DIR = DATA_DIR / "skills"
+PLUGINS_DIR = DATA_DIR / "plugins"
 MODELS_DIR = DATA_DIR / "models"
 ROLES_DIR = DATA_DIR / "roles"
 
