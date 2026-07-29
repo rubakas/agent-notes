@@ -1,0 +1,23 @@
+{
+  "fetched_at": "2026-07-29T00:00:00Z",
+  "providers": {
+    "anthropic": [
+      {"id": "claude-fable-5",    "display_name": "Claude Fable 5",    "created_at": null},
+      {"id": "claude-haiku-4-5",  "display_name": "Claude Haiku 4.5",  "created_at": null},
+      {"id": "claude-opus-4-1",   "display_name": "Claude Opus 4.1",   "created_at": null},
+      {"id": "claude-opus-4-5",   "display_name": "Claude Opus 4.5",   "created_at": null},
+      {"id": "claude-opus-4-6",   "display_name": "Claude Opus 4.6",   "created_at": null},
+      {"id": "claude-opus-4-7",   "display_name": "Claude Opus 4.7",   "created_at": null},
+      {"id": "claude-opus-4-8",   "display_name": "Claude Opus 4.8",   "created_at": null},
+      {"id": "claude-sonnet-4",   "display_name": "Claude Sonnet 4",   "created_at": null},
+      {"id": "claude-sonnet-4-5", "display_name": "Claude Sonnet 4.5", "created_at": null},
+      {"id": "claude-sonnet-4-6", "display_name": "Claude Sonnet 4.6", "created_at": null},
+      {"id": "claude-sonnet-5",   "display_name": "Claude Sonnet 5",   "created_at": null}
+    ],
+    "openai": [
+      {"id": "gpt-5.5",     "created": null},
+      {"id": "gpt-5.4",     "created": null},
+      {"id": "gpt-5.4-mini","created": null}
+    ]
+  }
+}
