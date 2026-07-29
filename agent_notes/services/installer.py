@@ -54,6 +54,8 @@ from .install_executor import (
     _filter_skills_by_backend,
 )
 
+from ..registries.plugin_registry import default_plugin_registry
+
 
 # ---------------------------------------------------------------------------
 # Top-level orchestrators (kept here so tests can patch installer.load_state
@@ -137,6 +139,41 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
 
 
 # ---------------------------------------------------------------------------
+# Plugin-driven hook and allow-entry install / remove
+# ---------------------------------------------------------------------------
+
+def _apply_plugin_settings(settings_path, backend, config) -> None:
+    """Install or remove hooks/allow-entries for all plugins based on enabled state.
+
+    Each hook/allow-entry is gated by ``backend.supports(requires)`` before
+    install or remove. Disabled plugins' contributions are actively removed.
+    Cost-report has no manifest yet (#37 adds it), so this loop is a no-op
+    today and the existing hardcoded Stop-hook line still owns that install.
+    """
+    from .settings_writer import (
+        install_hook, remove_hook, install_allow_entry, remove_allow_entry,
+    )
+    reg = default_plugin_registry()
+    enabled = {p.name for p in reg.enabled(config)}
+    for p in reg.all():
+        on = p.name in enabled
+        for h in p.hooks:
+            if h.requires and not backend.supports(h.requires):
+                continue
+            if on:
+                install_hook(settings_path, h.event, h.command, matcher=h.matcher or "")
+            else:
+                remove_hook(settings_path, h.event, h.command)
+        for a in p.allow:
+            if a.requires and not backend.supports(a.requires):
+                continue
+            if on:
+                install_allow_entry(settings_path, a.value)
+            else:
+                remove_allow_entry(settings_path, a.value)
+
+
+# ---------------------------------------------------------------------------
 # Session-hook install / uninstall (kept here: tests patch installer.load_state
 # to control the state lookup these functions perform)
 # ---------------------------------------------------------------------------
@@ -170,7 +207,6 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         memory_path = current_state.memory.path if current_state else ""
 
     skills = _filter_skills_by_backend(default_skill_registry().all(), memory_backend)
-    from ..registries.plugin_registry import default_plugin_registry
     from ..services.user_config import load_user_config
     _preg = default_plugin_registry()
     _disabled_owned = set()
@@ -209,6 +245,9 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
         install_memory_allow_entries(settings_path, memory_backend, memory_path, current_state)
 
+    # Plugin-driven hooks and allow-entries (no-op until Task 5 ships manifests)
+    _apply_plugin_settings(settings_path, backend, load_user_config())
+
 
 def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
     """Remove the SessionStart hook and context file.
@@ -242,6 +281,10 @@ def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memor
         # Read/Write/Edit entries for memory vault paths are intentionally kept —
         # the user may still want Claude to access their vault without agent-notes.
 
+    # Plugin-driven hooks and allow-entries — disable all so contributions are removed
+    _all_disabled = {"enabled_plugins": {p.name: False for p in default_plugin_registry().all()}}
+    _apply_plugin_settings(settings_path, backend, _all_disabled)
+
 
 __all__ = [
     # Data types
@@ -269,6 +312,7 @@ __all__ = [
     # Orchestrators (defined here — use load_state/load_registry)
     "install_all",
     "uninstall_all",
+    "_apply_plugin_settings",
     "_install_session_hook",
     "_uninstall_session_hook",
     # Dependencies re-exported so tests can patch installer.load_state etc.
