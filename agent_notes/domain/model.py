@@ -14,6 +14,7 @@ class Model:
     aliases: dict[str, str]          # {"anthropic": "claude-opus-4-7", ...}
     capabilities: dict[str, bool] = field(default_factory=dict)
     deprecated: bool = False
+    never_default: bool = False
 
     def has_alias_for(self, provider: str) -> bool:
         return provider in self.aliases

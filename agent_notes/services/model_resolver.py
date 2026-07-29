@@ -159,6 +159,8 @@ class ModelResolver:
             for model in models:
                 if model.model_class != role.typical_class:
                     continue
+                if model.never_default:
+                    continue
                 if family_filter is not None and model.family != family_filter:
                     continue
                 if skip_deprecated and model.deprecated:

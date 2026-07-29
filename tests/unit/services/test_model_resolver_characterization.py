@@ -433,6 +433,87 @@ class TestTypicalClassFallback:
             "Expected deprecated model to be returned as fallback when it is the only candidate"
         )
 
+    def test_never_default_model_is_never_selected_by_typical_class(self):
+        """A never_default model must be skipped even when it is the newest for its class."""
+        from dataclasses import replace
+
+        opus_normal = _make_model(
+            "claude-opus-4-7", model_class="opus",
+            aliases={"anthropic": "opus-normal-alias"},
+        )
+        opus_never_default = _make_model(
+            "claude-opus-4-9", model_class="opus",
+            aliases={"anthropic": "opus-never-default-alias"},
+        )
+        opus_never_default = replace(opus_never_default, never_default=True)
+        # opus-4-9 sorts higher — without never_default filter it would win
+        registry = ModelRegistry([opus_normal, opus_never_default])
+
+        opus_role = Role(
+            name="orchestrator", label="Orchestrator", description="",
+            typical_class="opus",
+        )
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([opus_role]),
+        ):
+            model_str, _ = _resolve(
+                agent_config={"role": "orchestrator"},
+                model_registry=registry,
+            )
+        assert model_str == "opus-normal-alias", (
+            "Expected normal model, not the never_default one"
+        )
+
+    def test_never_default_sole_candidate_returns_none_not_the_model(self):
+        """If the only candidate for the role's class has never_default=True,
+        _from_typical_class must return None (hard exclusion, no fallback)."""
+        from dataclasses import replace
+
+        opus_never_default = _make_model(
+            "claude-opus-4-9", model_class="opus",
+            aliases={"anthropic": "only-opus-alias"},
+        )
+        opus_never_default = replace(opus_never_default, never_default=True)
+        registry = ModelRegistry([opus_never_default])
+
+        opus_role = Role(
+            name="orchestrator", label="Orchestrator", description="",
+            typical_class="opus",
+        )
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([opus_role]),
+        ):
+            with pytest.raises(ValueError, match="no model could be resolved"):
+                _resolve(
+                    agent_config={"role": "orchestrator"},
+                    model_registry=registry,
+                )
+
+    def test_explicit_pin_to_never_default_model_still_resolves(self):
+        """An explicit state pin to a never_default model must resolve verbatim —
+        never_default gates automatic selection only, not explicit user choices."""
+        from dataclasses import replace
+
+        fable = _make_model(
+            "claude-fable-5", model_class="fable",
+            aliases={"anthropic": "claude-fable-5"},
+        )
+        fable = replace(fable, never_default=True)
+        registry = ModelRegistry([fable])
+
+        scope_state = _make_scope_state("claude", {"orchestrator": "claude-fable-5"})
+
+        model_str, _ = _resolve(
+            agent_config={"role": "orchestrator"},
+            scope_state=scope_state,
+            model_registry=registry,
+        )
+        assert model_str == "claude-fable-5", (
+            "Explicit pin to a never_default model must still resolve"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Branch 4: Unresolvable — raises ValueError

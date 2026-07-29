@@ -91,6 +91,7 @@ def load_model_registry(models_dir: Optional[Path] = None) -> ModelRegistry:
             aliases=data["aliases"],
             capabilities=data.get("capabilities", {}) or {},
             deprecated=bool(data.get("deprecated", False)),
+            never_default=bool(data.get("never_default", False)),
         ))
     
     return ModelRegistry(models)

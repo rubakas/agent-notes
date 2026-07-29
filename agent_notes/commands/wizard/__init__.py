@@ -147,10 +147,13 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
                 continue
 
             default_model = next(
-                (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.deprecated),
+                (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.deprecated and not m.never_default),
                 next(
-                    (m for m in reversed(compatible) if m.model_class == role.typical_class),
-                    compatible[0],
+                    (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.never_default),
+                    next(
+                        (m for m in reversed(compatible) if not m.never_default),
+                        compatible[0],
+                    ),
                 ),
             )
             default_idx = compatible.index(default_model)

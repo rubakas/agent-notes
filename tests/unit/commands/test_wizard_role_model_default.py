@@ -8,7 +8,7 @@ from agent_notes.domain.model import Model
 from agent_notes.registries.model_registry import ModelRegistry
 
 
-def _make_model(id_, model_class, deprecated=False):
+def _make_model(id_, model_class, deprecated=False, never_default=False):
     """Build a minimal Model for use in fixture registries."""
     return Model(
         id=id_,
@@ -17,6 +17,7 @@ def _make_model(id_, model_class, deprecated=False):
         model_class=model_class,
         aliases={"anthropic": id_},
         deprecated=deprecated,
+        never_default=never_default,
     )
 
 
@@ -110,3 +111,88 @@ class TestWizardRoleModelDefault:
         assert registry.get("test-sonnet").deprecated is False, (
             "omitting deprecated in YAML should default to False"
         )
+
+
+class TestWizardNeverDefault:
+    """Verify that _select_models_per_role never pre-selects a never_default model."""
+
+    def _run_model_selection(self, monkeypatch, fixture_registry):
+        monkeypatch.setattr("agent_notes.services.ui._can_interactive", lambda: False)
+
+        def fake_radio(title, options, default=0, **kwargs):
+            return options[default][1]
+
+        monkeypatch.setattr("agent_notes.commands.wizard._radio_select_fallback", fake_radio)
+        monkeypatch.setattr("agent_notes.commands.wizard._radio_select", fake_radio)
+        monkeypatch.setattr(
+            "agent_notes.registries.model_registry.load_model_registry",
+            lambda: fixture_registry,
+        )
+
+        from agent_notes.commands.wizard import _select_models_per_role
+        result, _ = _select_models_per_role({"claude"})
+        return result
+
+    def test_wizard_skips_never_default_when_matching_class_exists(self, monkeypatch):
+        """When a newer never_default model and an older normal model share the same
+        class, the wizard must default to the normal model."""
+        older_normal = _make_model("opus-test-1", "opus", never_default=False)
+        newer_never_default = _make_model("opus-test-2", "opus", never_default=True)
+        fixture = _make_registry(older_normal, newer_never_default)
+
+        result = self._run_model_selection(monkeypatch, fixture)
+
+        assert "claude" in result
+        assert "reasoner" in result["claude"]
+        chosen = result["claude"]["reasoner"]
+        assert chosen == "opus-test-1", (
+            f"Expected normal 'opus-test-1' but got '{chosen}' — "
+            f"wizard must never pre-select a never_default model"
+        )
+
+    def test_wizard_falls_through_to_other_compatible_when_class_is_only_never_default(self, monkeypatch):
+        """When the only model of the role's class is never_default, the wizard falls
+        through to another compatible model rather than picking the never_default one."""
+        sonnet_normal = _make_model("sonnet-test-1", "sonnet", never_default=False)
+        opus_never_default = _make_model("opus-test-1", "opus", never_default=True)
+        fixture = _make_registry(sonnet_normal, opus_never_default)
+
+        result = self._run_model_selection(monkeypatch, fixture)
+
+        assert "claude" in result
+        assert "reasoner" in result["claude"]
+        chosen = result["claude"]["reasoner"]
+        assert chosen != "opus-test-1", (
+            f"Got '{chosen}' — wizard must not pre-select never_default model even as last resort"
+        )
+
+    def test_never_default_field_loaded_from_yaml(self, tmp_path):
+        """never_default: true in YAML loads as bool True; omitting it defaults to False."""
+        from agent_notes.registries.model_registry import load_model_registry
+
+        (tmp_path / "test-fable.yaml").write_text(
+            "id: test-fable\nlabel: Test Fable\nfamily: test\nclass: fable\n"
+            "never_default: true\naliases:\n  anthropic: test-fable\n"
+        )
+        (tmp_path / "test-sonnet.yaml").write_text(
+            "id: test-sonnet\nlabel: Test Sonnet\nfamily: test\nclass: sonnet\n"
+            "aliases:\n  anthropic: test-sonnet\n"
+        )
+        registry = load_model_registry(tmp_path)
+
+        assert registry.get("test-fable").never_default is True
+        assert registry.get("test-sonnet").never_default is False
+
+    def test_claude_fable_5_is_never_default_in_real_registry(self):
+        """Smoke test: claude-fable-5 has never_default=True in the real catalog."""
+        from agent_notes.registries.model_registry import load_model_registry
+        registry = load_model_registry()
+        fable = registry.get("claude-fable-5")
+        assert fable.never_default is True, "claude-fable-5 must have never_default=True in the catalog"
+
+    def test_claude_fable_5_still_in_registry(self):
+        """claude-fable-5 must remain in the catalog and be listable."""
+        from agent_notes.registries.model_registry import load_model_registry
+        registry = load_model_registry()
+        ids = registry.ids()
+        assert "claude-fable-5" in ids, "claude-fable-5 must still be present in the registry"
