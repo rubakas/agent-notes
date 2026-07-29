@@ -309,6 +309,11 @@ def main():
         help="Print diff but do not write cache")
     p_models_sub.add_parser("freeze", help="Promote cache to seed.json for committing")
 
+    # plugins
+    p_plugins = subparsers.add_parser("plugins", help="Manage agent-notes plugins")
+    p_plugins_sub = p_plugins.add_subparsers(dest="subaction", metavar="")
+    p_plugins_sub.add_parser("list", help="List available plugins and their status")
+
     # config
     p_config = subparsers.add_parser("config", help="Reconfigure role/agent/model/memory/skill assignments after install")
     p_config.add_argument("action", nargs="?", default="wizard",
@@ -387,6 +392,13 @@ def main():
             freeze()
         else:
             parser.parse_args(["models", "--help"])
+    elif args.command == "plugins":
+        subaction = getattr(args, "subaction", None)
+        if subaction == "list":
+            from .commands.plugins import list_plugins
+            list_plugins()
+        else:
+            parser.parse_args(["plugins", "--help"])
     elif args.command == "config":
         from .commands.config import config
         config(action=args.action, args=getattr(args, "extra", None) or [], cli_filter=args.cli)
