@@ -629,13 +629,8 @@ def interactive_config_memory() -> None:
 
 def cost_report_toggle(value: str) -> None:
     """Enable or disable cost reporting via the plugin system."""
-    from ..services.user_config import load_user_config, save_user_config
-    cfg = load_user_config()
-    cfg.setdefault("enabled_plugins", {})["cost-report"] = (value == "on")
-    save_user_config(cfg)
-    state_label = "enabled" if value == "on" else "disabled"
-    print(f"Cost reporting {state_label}.")
-    print("Run 'agent-notes install' to apply hook changes.")
+    from .plugins import enable_plugin, disable_plugin
+    (enable_plugin if value == "on" else disable_plugin)("cost-report")
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────

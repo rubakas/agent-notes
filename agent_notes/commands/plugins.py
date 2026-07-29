@@ -18,7 +18,11 @@ def list_plugins() -> None:
     for p in sorted(plugins, key=lambda p: p.name):
         enabled = chosen.get(p.name, p.default)
         status = "on" if enabled else "off"
-        print(f"  {p.name:<20} [{status}]  {p.description}")
+        annotation = ""
+        if enabled != p.default:
+            default_label = "on" if p.default else "off"
+            annotation = f" (default: {default_label})"
+        print(f"  {p.name:<20} [{status}]{annotation}  {p.description}")
 
 
 def _set_enabled(name: str, value: bool) -> None:

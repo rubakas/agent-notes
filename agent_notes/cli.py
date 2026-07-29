@@ -311,7 +311,7 @@ def main():
 
     # plugins
     p_plugins = subparsers.add_parser("plugins", help="Manage agent-notes plugins")
-    p_plugins_sub = p_plugins.add_subparsers(dest="subaction", metavar="")
+    p_plugins_sub = p_plugins.add_subparsers(dest="subaction", metavar="{list,enable,disable,info}")
     p_plugins_sub.add_parser("list", help="List available plugins and their status")
     p_plugins_enable = p_plugins_sub.add_parser("enable", help="Enable a plugin")
     p_plugins_enable.add_argument("name", help="Plugin name")

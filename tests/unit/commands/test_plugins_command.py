@@ -99,6 +99,34 @@ class TestPluginsList:
         assert "cost-report" in out
         assert "on" in out
 
+    def test_list_annotates_when_effective_differs_from_default(self, capsys, monkeypatch):
+        """When effective state differs from manifest default, annotation is shown."""
+        p = _make_plugin("cost-report", "Cost reporting", default=False)
+        monkeypatch.setattr(plugins_cmd, "default_plugin_registry", lambda: _make_registry(p))
+        monkeypatch.setattr(plugins_cmd, "config_path", lambda: Path("/nonexistent.yaml"))
+        # User enabled cost-report, which has default=False
+        monkeypatch.setattr(plugins_cmd, "load_user_config",
+                            lambda path: {"enabled_plugins": {"cost-report": True}})
+
+        plugins_cmd.list_plugins()
+
+        out = capsys.readouterr().out
+        # Plugin is on but default is off → annotation expected
+        assert "(default: off)" in out
+
+    def test_list_no_annotation_when_effective_matches_default(self, capsys, monkeypatch):
+        """When effective state matches manifest default, no annotation is shown."""
+        p = _make_plugin("cost-report", "Cost reporting", default=False)
+        monkeypatch.setattr(plugins_cmd, "default_plugin_registry", lambda: _make_registry(p))
+        monkeypatch.setattr(plugins_cmd, "config_path", lambda: Path("/nonexistent.yaml"))
+        # No user override — effective state equals default (off)
+        monkeypatch.setattr(plugins_cmd, "load_user_config", lambda path: {})
+
+        plugins_cmd.list_plugins()
+
+        out = capsys.readouterr().out
+        assert "(default:" not in out
+
 
 # ---------------------------------------------------------------------------
 # plugins enable
@@ -203,3 +231,34 @@ class TestPluginsInfo:
 
         out = capsys.readouterr().out
         assert "on" in out
+
+
+# ---------------------------------------------------------------------------
+# plugins --help metavar
+# ---------------------------------------------------------------------------
+
+class TestPluginsHelpMetavar:
+    def test_plugins_help_has_no_blank_positional_entry(self, capsys):
+        """agent-notes plugins --help must not show a blank positional-argument line."""
+        import sys
+        from agent_notes.cli import main
+
+        with pytest.raises(SystemExit) as exc:
+            sys.argv = ["agent-notes", "plugins", "--help"]
+            main()
+
+        assert exc.value.code == 0
+        out = capsys.readouterr().out
+        # The help output must not contain a blank "positional arguments:" label
+        # which appears when metavar="" creates an empty heading line.
+        lines = out.splitlines()
+        positional_idx = next(
+            (i for i, l in enumerate(lines) if "positional arguments" in l), None
+        )
+        assert positional_idx is not None, "Expected 'positional arguments' section"
+        # The line immediately after "positional arguments:" must not be blank
+        # (a blank line here is the symptom of metavar="")
+        after_heading = lines[positional_idx + 1] if positional_idx + 1 < len(lines) else ""
+        assert after_heading.strip() != "", (
+            "Blank line after 'positional arguments:' — plugins subparser metavar is empty"
+        )

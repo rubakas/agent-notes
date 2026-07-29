@@ -1,12 +1,15 @@
 """Load and merge user config for agent role/model overrides and prompt patches."""
 from __future__ import annotations
+import os
 from pathlib import Path
 from typing import Optional
 import yaml
 
 
 def config_path() -> Path:
-    xdg = Path.home() / ".config" / "agent-notes" / "config.yaml"
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(config_home) if config_home else (Path.home() / ".config")
+    xdg = base / "agent-notes" / "config.yaml"
     legacy = Path.home() / ".agent-notes.yaml"
     if xdg.exists():
         return xdg

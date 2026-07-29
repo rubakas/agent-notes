@@ -250,13 +250,36 @@ class TestCostReportMainDisabledGuard:
 # ---------------------------------------------------------------------------
 
 class TestCostReportToggle:
+    def _patch_config_path(self, monkeypatch, cfg_file):
+        """Patch config_path in both plugins and user_config modules to cfg_file."""
+        import agent_notes.services.user_config as uc_mod
+        import agent_notes.commands.plugins as plugins_mod
+        monkeypatch.setattr(uc_mod, "config_path", lambda: cfg_file)
+        monkeypatch.setattr(plugins_mod, "config_path", lambda: cfg_file)
+
+    def test_toggle_delegates_to_enable_or_disable_plugin(self, tmp_path, monkeypatch, capsys):
+        """cost_report_toggle delegates to enable_plugin/disable_plugin, not direct config write."""
+        import agent_notes.commands.plugins as plugins_mod
+        import agent_notes.commands.config as cfg_mod
+
+        calls = []
+        monkeypatch.setattr(plugins_mod, "enable_plugin", lambda name: calls.append(("enable", name)))
+        monkeypatch.setattr(plugins_mod, "disable_plugin", lambda name: calls.append(("disable", name)))
+
+        cfg_mod.cost_report_toggle("on")
+        assert calls == [("enable", "cost-report")]
+
+        calls.clear()
+        cfg_mod.cost_report_toggle("off")
+        assert calls == [("disable", "cost-report")]
+
     def test_toggle_off_saves_false(self, tmp_path, monkeypatch):
         """cost_report_toggle('off') persists enabled_plugins.cost-report=False."""
         import agent_notes.services.user_config as uc_mod
         import agent_notes.commands.config as cfg_mod
 
         cfg_file = tmp_path / "config.yaml"
-        monkeypatch.setattr(uc_mod, "config_path", lambda: cfg_file)
+        self._patch_config_path(monkeypatch, cfg_file)
 
         cfg_mod.cost_report_toggle("off")
 
@@ -269,7 +292,7 @@ class TestCostReportToggle:
         import agent_notes.commands.config as cfg_mod
 
         cfg_file = tmp_path / "config.yaml"
-        monkeypatch.setattr(uc_mod, "config_path", lambda: cfg_file)
+        self._patch_config_path(monkeypatch, cfg_file)
 
         cfg_mod.cost_report_toggle("on")
 
@@ -282,7 +305,7 @@ class TestCostReportToggle:
         import agent_notes.commands.config as cfg_mod
 
         cfg_file = tmp_path / "config.yaml"
-        monkeypatch.setattr(uc_mod, "config_path", lambda: cfg_file)
+        self._patch_config_path(monkeypatch, cfg_file)
 
         cfg_mod.cost_report_toggle("off")
         cfg_mod.cost_report_toggle("on")
@@ -292,11 +315,10 @@ class TestCostReportToggle:
 
     def test_toggle_on_prints_enabled(self, tmp_path, monkeypatch, capsys):
         """cost_report_toggle('on') prints a message indicating it's enabled."""
-        import agent_notes.services.user_config as uc_mod
         import agent_notes.commands.config as cfg_mod
 
         cfg_file = tmp_path / "config.yaml"
-        monkeypatch.setattr(uc_mod, "config_path", lambda: cfg_file)
+        self._patch_config_path(monkeypatch, cfg_file)
 
         cfg_mod.cost_report_toggle("on")
         out = capsys.readouterr().out
@@ -304,11 +326,10 @@ class TestCostReportToggle:
 
     def test_toggle_off_prints_disabled(self, tmp_path, monkeypatch, capsys):
         """cost_report_toggle('off') prints a message indicating it's disabled."""
-        import agent_notes.services.user_config as uc_mod
         import agent_notes.commands.config as cfg_mod
 
         cfg_file = tmp_path / "config.yaml"
-        monkeypatch.setattr(uc_mod, "config_path", lambda: cfg_file)
+        self._patch_config_path(monkeypatch, cfg_file)
 
         cfg_mod.cost_report_toggle("off")
         out = capsys.readouterr().out
@@ -321,7 +342,7 @@ class TestCostReportToggle:
 
         cfg_file = tmp_path / "config.yaml"
         uc_mod.save_user_config({"agent_roles": {"coder": "sonnet"}}, path=cfg_file)
-        monkeypatch.setattr(uc_mod, "config_path", lambda: cfg_file)
+        self._patch_config_path(monkeypatch, cfg_file)
 
         cfg_mod.cost_report_toggle("off")
 
