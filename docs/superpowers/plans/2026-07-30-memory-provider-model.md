@@ -32,16 +32,20 @@
 
 ---
 
-### Task M2: obsidian backend strategy branching + `migrate` reconcile
+### Task M2: obsidian backend strategy-aware placement (NO on-the-fly conversion)
 
-**Files:** `agent_notes/memory/obsidian_backend.py`, `agent_notes/memory/commands/migrate.py`, `agent_notes/config.py` (`memory_dir_for_backend` if path differs by strategy). Tests: obsidian placement per strategy; migrate both directions.
+**User directive (locked):** switching provider/strategy MUST NOT touch, move, or convert previously-created notes. Old notes stay exactly where they are; only NEW notes/sessions/docs are written to the new destination in the new strategy's format. There is no automatic migration on switch.
 
-- `single-brain`: durable notes + sessions in the flat shared root (current behavior).
-- `per-project`: notes/sessions filed under a project subfolder (the pre-migration layout), keyed on the current project name/slug.
-- Read `strategy` from state where the backend decides placement. Default `single-brain` reproduces today's paths exactly (byte-identical for existing obsidian users who don't set per-project).
-- `migrate` becomes "reorganize the vault to match the selected strategy" in BOTH directions, with the existing per-project→flat logic serving the `→ single-brain` direction. Guard against data loss (never delete a non-empty source without moving its files).
+**Files:** `agent_notes/memory/obsidian_backend.py`. Tests: placement of a NEW note under each strategy; recall still finds pre-existing notes written under the other strategy.
 
-**Dist: byte-identical** (backend behavior, not built content). **Tests must cover both strategies + a round-trip migrate that loses no notes.**
+- Reads current `state.memory.strategy` when deciding where to WRITE a new note/session:
+  - `single-brain`: flat shared root (current behavior — unchanged).
+  - `per-project`: under a project subfolder, keyed by the current project name (`_current_project_name()` = cwd name, matching the existing convention; note the collision caveat for same-named dirs).
+- **No conversion, no `migrate` changes.** Leave `memory/commands/migrate.py` as the existing explicit one-way per-project→flat tool; it is NOT invoked by switching and is out of scope here.
+- **Never hide old notes.** Read/list/recall operations must still surface notes that were written under a different prior strategy (e.g. search the flat root AND project subfolders), so a switch never makes past notes disappear from recall — it just changes where new ones land.
+- Default `single-brain` reproduces today's write paths exactly.
+
+**Dist: byte-identical.** **Tests:** new-note placement per strategy; a note pre-existing in the flat root is still found after switching to `per-project` (nothing moved, nothing hidden).
 
 ---
 
