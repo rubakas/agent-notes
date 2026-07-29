@@ -23,5 +23,5 @@ features:
   allow_entries: false
 global_template: global-opencode.md
 exclude_flag: opencode_exclude
-accepted_providers: [github-copilot, anthropic, openrouter, openai, google, moonshot]
+accepted_providers: [anthropic, openai]
 preferred_family: claude

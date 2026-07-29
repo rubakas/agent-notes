@@ -133,8 +133,8 @@ class TestWizardSelectionsReachFrontmatter:
                        role_models={"opencode": {"worker": "claude-sonnet-4-6"}})
 
         coder = _frontmatter(dist / "opencode" / "agents" / "coder.md")
-        # opencode's first accepted provider for this model is github-copilot
-        assert "model: github-copilot/claude-sonnet-4.6" in coder
+        # opencode's first accepted provider for this model is anthropic
+        assert "model: claude-sonnet-4-6" in coder
 
 
 class TestPersistedStatePinsReachFrontmatter:

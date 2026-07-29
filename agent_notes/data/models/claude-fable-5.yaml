@@ -2,9 +2,9 @@ id: claude-fable-5
 label: Claude Fable 5
 family: claude
 class: fable
+never_default: true
 aliases:
-  anthropic:      claude-fable-5
-  github-copilot: github-copilot/claude-fable-5
+  anthropic: claude-fable-5
 capabilities:
   vision: true
   long_context: true

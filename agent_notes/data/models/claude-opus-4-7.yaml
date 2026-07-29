@@ -4,8 +4,7 @@ family: claude
 class: opus
 deprecated: true
 aliases:
-  anthropic:      claude-opus-4-7
-  github-copilot: github-copilot/claude-opus-4.7
+  anthropic: claude-opus-4-7
 capabilities:
   vision: true
   long_context: true

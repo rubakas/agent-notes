@@ -4,8 +4,7 @@ family: claude
 class: sonnet
 deprecated: true
 aliases:
-  anthropic:      claude-sonnet-4-20250514
-  github-copilot: github-copilot/claude-sonnet-4
+  anthropic: claude-sonnet-4-20250514
 capabilities:
   vision: true
   long_context: true

@@ -3,8 +3,7 @@ label: Claude Opus 4.8
 family: claude
 class: opus
 aliases:
-  anthropic:      claude-opus-4-8
-  github-copilot: github-copilot/claude-opus-4.8
+  anthropic: claude-opus-4-8
 capabilities:
   vision: true
   long_context: true

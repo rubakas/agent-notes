@@ -15,4 +15,6 @@ features:
   settings_template: false
   supports_symlink: true
 global_template: global-copilot.md
+# github-copilot has no alias coverage under the current anthropic+openai scope;
+# this backend renders only a global instructions file and needs no model resolution.
 accepted_providers: [github-copilot]

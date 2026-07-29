@@ -3,8 +3,7 @@ label: Claude Sonnet 4.6
 family: claude
 class: sonnet
 aliases:
-  anthropic:      claude-sonnet-4-6
-  github-copilot: github-copilot/claude-sonnet-4.6
+  anthropic: claude-sonnet-4-6
 capabilities:
   vision: true
   long_context: true
