@@ -29,6 +29,20 @@ class PluginRegistry:
         chosen = config.get("enabled_plugins") or {}
         return [p for p in self._plugins if chosen.get(p.name, p.default)]
 
+    def owned_includes(self) -> set:
+        """Return the set of include names declared by any plugin (enabled or not)."""
+        out = set()
+        for p in self._plugins:
+            out.update(p.includes)
+        return out
+
+    def active_includes(self, config: dict) -> set:
+        """Return the set of include names declared by currently enabled plugins."""
+        out = set()
+        for p in self.enabled(config):
+            out.update(p.includes)
+        return out
+
 
 def _parse_bool_default(value, source: Path) -> bool:
     if isinstance(value, bool):

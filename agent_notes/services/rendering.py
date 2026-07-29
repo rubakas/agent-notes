@@ -7,6 +7,26 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 
+def _plugin_include_skip(user_config: dict) -> set:
+    """Return the set of include names to skip, composed from the plugin registry
+    and a legacy bridge for subsystems not yet converted to plugins.
+
+    Logic:
+      - Any include owned by a plugin but not currently enabled is skipped.
+      - The legacy cost-report bridge is unioned in so cost_reporting stays
+        suppressed by default until Task 5 (#37) converts cost-report to a plugin.
+    """
+    from ..registries.plugin_registry import default_plugin_registry
+    from ..cost.render import include_skip as _legacy_cost_skip
+    reg = default_plugin_registry()
+    # additive: skip any owned include that no enabled plugin activates
+    skip = reg.owned_includes() - reg.active_includes(user_config)
+    # legacy bridge — cost-report is not a plugin yet (#37); honour the old flag
+    # so cost_reporting stays skipped by default.  Removed in #37.
+    skip |= _legacy_cost_skip(user_config)
+    return skip
+
+
 def expand_includes(text: str, shared_dir: Path, skip: Optional[set] = None) -> str:
     """Expand include directives in text by substituting shared content.
 
@@ -326,8 +346,7 @@ def generate_agent_files(agents_config: Dict[str, Any],
 
         # Expand shared-content include directives (<!-- include: NAME -->)
         # No-op if shared/ directory is absent.
-        from ..cost.render import include_skip as _cost_include_skip
-        _agent_include_skip = _cost_include_skip(user_config)
+        _agent_include_skip = _plugin_include_skip(user_config)
         prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared", skip=_agent_include_skip)
 
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
@@ -446,8 +465,7 @@ def render_globals() -> list[Path]:
     from ..config import AGENTS_DIR
     from ..services.user_config import load_user_config as _load_user_config
     _ucfg = _load_user_config()
-    from ..cost.render import include_skip as _cost_include_skip
-    _include_skip = _cost_include_skip(_ucfg)
+    _include_skip = _plugin_include_skip(_ucfg)
     claude_global_content = GLOBAL_CLAUDE_MD.read_text()
     claude_global_content = expand_includes(claude_global_content, AGENTS_DIR / "shared", skip=_include_skip)
     claude_global_content = claude_global_content.replace(

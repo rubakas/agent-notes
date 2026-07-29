@@ -170,6 +170,14 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         memory_path = current_state.memory.path if current_state else ""
 
     skills = _filter_skills_by_backend(default_skill_registry().all(), memory_backend)
+    from ..registries.plugin_registry import default_plugin_registry
+    from ..services.user_config import load_user_config
+    _preg = default_plugin_registry()
+    _disabled_owned = set()
+    for _p in _preg.all():
+        if _p not in _preg.enabled(load_user_config()):
+            _disabled_owned.update(_p.skills)
+    skills = [s for s in skills if s.name not in _disabled_owned]
 
     version = config.get_version()
     if not _fs.silent_file_ops:
