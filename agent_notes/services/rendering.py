@@ -344,6 +344,7 @@ def generate_agent_files(agents_config: Dict[str, Any],
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
         prompt_content = prompt_content.replace("{{MEMORY_PATH}}", _memory_path(_st))
         prompt_content = prompt_content.replace("{{MEMORY_READING_GUIDE}}", _memory_reading_guide(_st))
+        prompt_content = prompt_content.replace("{{MEMORY_INSTRUCTIONS}}", _memory_instructions(_st))
 
         # Generate for each backend that supports agents
         for backend in registry.all():

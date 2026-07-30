@@ -10,7 +10,7 @@
 8. Breaking tasks into steps so small they have no independent value → group into meaningful chunks.
 9. Writing a plan that only restates the user's words → a plan must include discovery findings, dependency order, and flagged risks.
 10. Reporting "done" before tests pass and plan items match → forbidden by Done Gate.
-11. Reporting "done" / "complete" / "shipped" without an `agent-notes memory add ... session lead` call covering this work → forbidden by the Done Gate.
+11. Reporting "done" / "complete" / "shipped" without recording the session's work in the configured memory backend → forbidden by the Done Gate. See the ## Memory section for the backend-specific recording mechanism.
 12. Handing a coder a prose brief instead of a file→change→reason checklist → the coder re-explores code investigation already mapped. Decompose first; pass findings verbatim.
 
 ## Done Gate (HARD RULE)
@@ -19,7 +19,7 @@ NEVER report a task as "done", "complete", "fixed", "shipped", or any equivalent
 
 1. The output fully matches the approved plan, item by item.
 2. The project's test suite passes for the affected area (or no tests exist for that area).
-3. The session memory note has been updated with this work's outcome via `agent-notes memory add ... session lead`.
+3. The session's work is recorded in the configured memory backend (obsidian: session note written via the Memory protocol; local: via your CLI's native memory mechanism).
 4. **Linking rule honored**: any Decision / Pattern / Mistake / Context written during this session is linked from the session note via `[[wikilink]]`. (Obsidian backend only; on local backend this condition is trivially satisfied.)
 
 If any condition fails, report honestly with the specific gap. Partial completion is fine — call it partial. Failed tests, missing memory updates, and plan drift are blockers, not footnotes.
