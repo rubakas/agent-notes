@@ -10,10 +10,6 @@ def do_export() -> None:
     """Copy memories to agent-notes/memory-backup/."""
     backend, path = _common._load_memory_config()
 
-    if backend == "none":
-        print("Memory is disabled.")
-        return
-
     if path is None:
         path = MEMORY_DIR
 
@@ -43,10 +39,6 @@ def do_export() -> None:
 def do_import() -> None:
     """Restore from agent-notes/memory-backup/."""
     backend, path = _common._load_memory_config()
-
-    if backend == "none":
-        print("Memory is disabled.")
-        return
 
     if path is None:
         path = MEMORY_DIR

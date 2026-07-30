@@ -12,10 +12,6 @@ def do_reset(name: Optional[str] = None) -> None:
     """Clear agent memory (all or specific agent)."""
     backend, path = _common._load_memory_config()
 
-    if backend == "none":
-        print("Memory is disabled.")
-        return
-
     if path is None:
         path = MEMORY_DIR
 

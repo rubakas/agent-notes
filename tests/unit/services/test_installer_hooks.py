@@ -56,13 +56,6 @@ class TestInstallRegistersMemoryBridge:
 
         assert not has_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
 
-    def test_none_backend_skips_memory_bridge(self, mock_backend, tmp_path):
-        settings_path = tmp_path / "settings.json"
-
-        _install_session_hook(mock_backend, "global", memory_backend="none")
-
-        assert not has_hook(settings_path, "SessionStart", Hooks.MEMORY_BRIDGE)
-
 
 class TestInstallRegistersCostReport:
     def test_registers_stop_hook_when_cost_report_enabled(self, mock_backend, tmp_path):

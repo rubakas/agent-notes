@@ -18,9 +18,6 @@ def _resolve_memory_path(st) -> Optional[str]:
     backend = st.memory.backend
     custom_path = st.memory.path
 
-    if backend == "none":
-        return None
-
     resolved = memory_dir_for_backend(backend, custom_path)
     if resolved is None:
         return None

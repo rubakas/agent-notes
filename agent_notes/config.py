@@ -43,8 +43,6 @@ BACKUP_DIR = Path.home() / ".agent-notes" / "memory-backup"
 
 def memory_dir_for_backend(backend: str, custom_path: str = "") -> Optional[Path]:
     """Return the root memory directory for the given backend and optional custom path."""
-    if backend == "none":
-        return None
     if backend == "local":
         return Path(custom_path).expanduser() if custom_path else MEMORY_DIR
     # obsidian is project-scoped

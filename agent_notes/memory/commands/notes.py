@@ -10,9 +10,6 @@ from ...config import MEMORY_DIR, Color
 def do_add(title: str, body: str, note_type: str = "context", agent: str = "", project: str = "", tags: Optional[list] = None, description: str = "") -> None:
     """Add a note to memory (obsidian backend)."""
     backend, path = _common._load_memory_config()
-    if backend == "none":
-        print("Memory is disabled. Run `agent-notes memory vault` to check configuration.")
-        return
     if path is None:
         print("Memory path not configured.")
         return
@@ -44,10 +41,6 @@ def do_add(title: str, body: str, note_type: str = "context", agent: str = "", p
 def do_list() -> None:
     """List all agent memories with sizes."""
     backend, path = _common._load_memory_config()
-
-    if backend == "none":
-        print("Memory is disabled. Run `agent-notes config` and select memory storage to enable it.")
-        return
 
     if backend == "obsidian":
         if path is None or not path.exists():
@@ -90,10 +83,6 @@ def do_size() -> None:
     """Show total memory usage."""
     backend, path = _common._load_memory_config()
 
-    if backend == "none":
-        print("Memory is disabled.")
-        return
-
     if path is None or not path.exists():
         print("No agent memories found.")
         return
@@ -107,10 +96,6 @@ def do_size() -> None:
 def do_show(name: str) -> None:
     """Show memory contents for one agent (local) or category (obsidian)."""
     backend, path = _common._load_memory_config()
-
-    if backend == "none":
-        print("Memory is disabled.")
-        return
 
     if backend == "obsidian":
         if path is None:

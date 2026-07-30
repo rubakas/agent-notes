@@ -61,7 +61,7 @@ def check_skill_frontmatter(scope: str, issues: list, fix_actions: list, profile
     Checks every skill for:
     - non-empty name and description
     - group, if present, is in {"process", "domain"}
-    - requires_memory tokens, if present, are each in {"obsidian", "local", "none"}
+    - requires_memory tokens, if present, are each in {"obsidian", "local"}
 
     Violations are printed as advisories and do NOT affect issues/fix_actions or exit code.
     """
