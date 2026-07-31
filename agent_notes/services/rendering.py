@@ -327,11 +327,11 @@ def generate_agent_files(agents_config: Dict[str, Any],
 
     _st = _load_state_fn()
 
-    from .stability import is_visible, enabled_wip
+    from .stability import is_visible, enabled_wip, normalize_stability
     _wip = enabled_wip()
     agents_config = {
         n: c for n, c in agents_config.items()
-        if is_visible(c.get("stability", "stable"), n, _wip)
+        if is_visible(normalize_stability(c.get("stability")), n, _wip)
     }
 
     for agent_name, agent_config in agents_config.items():
