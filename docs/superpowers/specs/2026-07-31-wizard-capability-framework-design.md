@@ -1,6 +1,6 @@
 # Wizard Capability Framework — Design Spec
 
-**Status:** Draft for review. Supersedes epic #32's #40 ("collapse two wizard steps"). Not an implementation plan — defines the model and the seam; the plan follows approval.
+**Status:** Approved for implementation (owner, 2026-08-01) — this is how epic #32's **#40** is built (superseding its stale "collapse two wizard steps / 9→8" framing). The four open questions are resolved below; build proceeds in the six byte-identical phases in "Suggested phasing". The implementation plan follows in `docs/superpowers/plans/`.
 
 **Author context:** written after establishing (with the owner) that agent-notes' pluggable things fall into four kinds, and that the CLI backends *are* the multi-select "AI-provider plugins."
 
@@ -101,9 +101,19 @@ Each phase is byte-identical for equivalent selections and independently reviewa
 - Not adding user-supplied/third-party capabilities (built-in only, as with plugins today).
 - Not a plugin marketplace or versioning.
 
-## Open questions for review
+## Resolved decisions (owner, 2026-08-01)
 
-1. **Skills** (today's step 6): a cross-cutting general selection, or its own capability kind? Leaning general (it's a selection that applies across backends), but it could be a fifth kind.
-2. **Provider slots beyond memory:** design the `provider` kind generically (a named slot with options) even though memory is the only slot today, or special-case memory now and generalize later? Leaning generic-but-thin.
-3. **Terminology in the UI:** do we surface "backend" / "provider" / "plugin" to users, or a single word ("what do you want to install?")? Naming affects the wizard copy and docs.
-4. **Ordering model:** a numeric `order` per capability, or explicit phases (general → selection → config → confirm)? Leaning explicit phases with `order` only for tie-breaks within a phase.
+The four open questions are settled; #40 is approved to be built as this full framework, phased, each phase byte-identical for equivalent selections.
+
+1. **Skills stay a general step**, not a capability kind. Skills apply across backends and are already a working general selection (today's step 6); a fifth kind is premature. Revisit only if skills gain per-skill configuration.
+2. **The `provider` kind is generic but thinly wired.** Implement it as a named slot with options plus a default option, but register only the `memory` slot today. No speculative second slot — the generality lives in the type, not in extra registrations.
+3. **Capability-kind jargon stays internal.** Users never see "backend / provider / toggle" as labels. Wizard copy uses friendly, capability-specific wording (e.g. "Which AI tools?", "Memory", "Extras"); the taxonomy lives in code and docs only.
+4. **Ordering is by explicit phase**, not a global numeric sort: general → selection → config → confirm. A per-capability `order` is only a tie-break *within* a phase.
+
+## Interaction with the component stability flag (shipped 2026-07-31)
+
+The stability flag (`stability: stable|wip` + `AGENT_NOTES_ENABLE_WIP`) already filters each registry's user-facing enumeration via `available()`. **The wizard composer MUST enumerate selectable capabilities through `available()`, never `all()`**, so a `wip` backend/toggle/provider option stays out of the wizard exactly as it stays out of the build. Hard integration constraint for the selection steps.
+
+## Docs (#41) fold into the final phase
+
+Epic #32's **#41** (plugin docs: the model, writing a plugin, the two meanings of "plugin", plus the provider/core distinction) is written as this framework's documentation phase — describing the finished wizard and the *delivered* plugin/provider/core model (cost-report = toggle, memory = provider, cred-guard = core), not the pre-rescope framing that called memory and cred-guard "plugins".
