@@ -83,9 +83,9 @@ def _interactive_install() -> None:
     # Step 7: Memory backend
     memory_backend, memory_path, memory_strategy = _wiz._select_memory(step=7, total=TOTAL_STEPS, version=version)
 
-    # Step 8: Cost report
-    from .cost_report import _select_cost_report
-    cost_report_enabled = _select_cost_report(step=8, total=TOTAL_STEPS, version=version)
+    # Step 8: Toggle plugins (cost-report, plus any future toggle) — registry-driven
+    from .capabilities import collect_toggle_selections
+    enabled_plugins = collect_toggle_selections(step=8, total=TOTAL_STEPS, version=version)
 
     # Build BEFORE the confirmation step: the pre-flight file count is computed
     # from the rendered dist/ directory, so it must reflect exactly what this
@@ -134,5 +134,5 @@ def _interactive_install() -> None:
         profile_label=profile_label,
         folder_overrides=folder_overrides,
         global_home_override=global_home_override,
-        cost_report_enabled=cost_report_enabled,
+        enabled_plugins=enabled_plugins,
     )

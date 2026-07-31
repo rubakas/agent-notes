@@ -88,15 +88,14 @@ class TestWizardHappyPath:
 
         # ── Step 8: cost_report → False ──────────────────────────────────────
         # _select_cost_report uses radio; first option should be enabled=True,
-        # but we'll patch the whole function to return False.
+        # but we'll patch the whole function to return False. The toggle runner
+        # (capabilities.py) imports _select_cost_report at module load time, so
+        # the patch must target the capabilities module's binding.
         monkeypatch.setattr(
-            "agent_notes.commands.wizard.cost_report._select_cost_report",
+            "agent_notes.commands.wizard.capabilities._select_cost_report",
             lambda **kw: False,
             raising=False,
         )
-        # Also patch at the import-time location used by orchestrator.py
-        with patch("agent_notes.commands.wizard.cost_report._select_cost_report", return_value=False):
-            pass  # pre-import
 
         # ── Step 9: Confirm → True ────────────────────────────────────────────
         monkeypatch.setattr(
@@ -113,7 +112,7 @@ class TestWizardHappyPath:
                 "agent_notes.commands.wizard.orchestrator._execute_install",
                 execute_mock,
             ), patch(
-                "agent_notes.commands.wizard.cost_report._select_cost_report",
+                "agent_notes.commands.wizard.capabilities._select_cost_report",
                 return_value=False,
             ):
                 from agent_notes.commands.wizard.orchestrator import _interactive_install
@@ -141,8 +140,8 @@ class TestWizardHappyPath:
             f"expected memory_backend='local', got {kwargs['memory_backend']!r}"
 
         # Cost report
-        assert kwargs["cost_report_enabled"] is False, \
-            f"expected cost_report_enabled=False, got {kwargs['cost_report_enabled']!r}"
+        assert kwargs["enabled_plugins"]["cost-report"] is False, \
+            f"expected enabled_plugins['cost-report']=False, got {kwargs['enabled_plugins']!r}"
 
         # Profile: no label, no overrides
         assert kwargs.get("profile_label", "") == "", \
