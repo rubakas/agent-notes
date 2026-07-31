@@ -7,7 +7,7 @@ from functools import lru_cache
 
 from ..config import AGENTS_YAML
 from ..domain.agent import AgentSpec
-from ..services.stability import normalize_stability
+from ..services.stability import is_visible, enabled_wip, normalize_stability
 from ._base import load_yaml_file
 
 # Top-level keys in agents.yaml that are NOT per-backend config entries.
@@ -24,7 +24,12 @@ class AgentRegistry:
     def all(self) -> list[AgentSpec]:
         """Return all agents."""
         return self._agents.copy()
-    
+
+    def available(self, override=None):
+        """Return agents visible under the wip stability gate."""
+        ov = enabled_wip() if override is None else override
+        return [a for a in self.all() if is_visible(a.stability, a.name, ov)]
+
     def get(self, name: str) -> AgentSpec:
         """Get agent by name. Raises KeyError if unknown."""
         if name not in self._by_name:

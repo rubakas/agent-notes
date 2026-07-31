@@ -8,7 +8,7 @@ import re
 
 from ..config import SKILLS_DIR
 from ..domain.skill import Skill
-from ..services.stability import normalize_stability
+from ..services.stability import is_visible, enabled_wip, normalize_stability
 
 
 class SkillRegistry:
@@ -21,7 +21,12 @@ class SkillRegistry:
     def all(self) -> list[Skill]:
         """Return all skills."""
         return self._skills.copy()
-    
+
+    def available(self, override=None):
+        """Return skills visible under the wip stability gate."""
+        ov = enabled_wip() if override is None else override
+        return [s for s in self.all() if is_visible(s.stability, s.name, ov)]
+
     def get(self, name: str) -> Skill:
         """Get skill by name. Raises KeyError if unknown."""
         if name not in self._by_name:

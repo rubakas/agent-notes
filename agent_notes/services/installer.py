@@ -206,7 +206,7 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         memory_backend = current_state.memory.backend if current_state else "local"
         memory_path = current_state.memory.path if current_state else ""
 
-    skills = _filter_skills_by_backend(default_skill_registry().all(), memory_backend)
+    skills = _filter_skills_by_backend(default_skill_registry().available(), memory_backend)
     from ..services.user_config import load_user_config
     _preg = default_plugin_registry()
     _disabled_owned = set()

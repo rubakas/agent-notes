@@ -327,6 +327,13 @@ def generate_agent_files(agents_config: Dict[str, Any],
 
     _st = _load_state_fn()
 
+    from .stability import is_visible, enabled_wip
+    _wip = enabled_wip()
+    agents_config = {
+        n: c for n, c in agents_config.items()
+        if is_visible(c.get("stability", "stable"), n, _wip)
+    }
+
     for agent_name, agent_config in agents_config.items():
         # Read the source prompt
         prompt_file = AGENTS_DIR / f'{agent_name}.md'
