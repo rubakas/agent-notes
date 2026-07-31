@@ -15,11 +15,11 @@ class AgentSpec:
     color: Optional[str] = None
     effort: Optional[str] = None  # low, medium, high
     backends: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    stability: str = "stable"
     # backends is keyed by CLI backend name (e.g. "claude", "opencode", "copilot", ...).
     # Each value is the per-backend override dict as declared in agents.yaml.
     # Example: {"claude": {"exclude": True}, "opencode": {"mode": "subagent"}}
-    
+    stability: str = "stable"
+
     def backend_config(self, backend_name: str) -> Dict[str, Any]:
         """Return per-backend config for backend_name, or {} if none declared."""
         return self.backends.get(backend_name, {}) or {}
