@@ -8,6 +8,7 @@ from functools import lru_cache
 
 from ..config import DATA_DIR
 from ..domain.cli_backend import CLIBackend
+from ..services.stability import normalize_stability
 from ._base import load_yaml_dir, require_fields
 
 
@@ -72,6 +73,7 @@ def load_registry(cli_dir: Optional[Path] = None) -> CLIRegistry:
             accepted_providers=tuple(data.get("accepted_providers", [])),
             use_model_class=data.get("use_model_class", False),
             preferred_family=data.get("preferred_family"),
+            stability=normalize_stability(data.get("stability"), yaml_file),
         )
         backends.append(backend)
     

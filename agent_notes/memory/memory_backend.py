@@ -9,6 +9,8 @@ from pathlib import Path
 class MemoryBackend(ABC):
     """Common interface that all memory backends must implement."""
 
+    stability: str = "stable"
+
     @abstractmethod
     def init(self, path: Path) -> None:
         """Initialise the storage layout at *path* (idempotent)."""

@@ -31,3 +31,4 @@ class Plugin:
     includes: tuple[str, ...] = ()
     hooks: tuple[PluginHook, ...] = ()
     allow: tuple[PluginAllow, ...] = ()
+    stability: str = "stable"

@@ -6,6 +6,7 @@ from functools import lru_cache
 
 from ..config import PLUGINS_DIR
 from ..domain.plugin import Plugin, PluginHook, PluginAllow
+from ..services.stability import normalize_stability
 from ._base import load_yaml_file, require_fields
 
 
@@ -77,6 +78,7 @@ def _plugin_from(path: Path, data: dict) -> Plugin:
         includes=tuple(data.get("includes") or ()),
         hooks=hooks,
         allow=allow,
+        stability=normalize_stability(data.get("stability"), path),
     )
 
 

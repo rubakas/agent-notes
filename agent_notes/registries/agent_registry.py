@@ -7,10 +7,11 @@ from functools import lru_cache
 
 from ..config import AGENTS_YAML
 from ..domain.agent import AgentSpec
+from ..services.stability import normalize_stability
 from ._base import load_yaml_file
 
 # Top-level keys in agents.yaml that are NOT per-backend config entries.
-NON_BACKEND_KEYS = {"description", "role", "mode", "color", "effort", "claude_exclude"}
+NON_BACKEND_KEYS = {"description", "role", "mode", "color", "effort", "claude_exclude", "stability"}
 
 
 class AgentRegistry:
@@ -92,6 +93,7 @@ def load_agent_registry(yaml_path: Optional[Path] = None) -> AgentRegistry:
             color=config.get("color"),
             effort=config.get("effort"),
             backends=backends,
+            stability=normalize_stability(config.get("stability"), yaml_path),
         )
         agents.append(agent)
     
