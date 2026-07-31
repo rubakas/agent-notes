@@ -6,7 +6,7 @@ from functools import lru_cache
 
 from ..config import PLUGINS_DIR
 from ..domain.plugin import Plugin, PluginHook, PluginAllow
-from ..services.stability import normalize_stability
+from ..services.stability import normalize_stability, is_visible, enabled_wip
 from ._base import load_yaml_file, require_fields
 
 
@@ -18,6 +18,10 @@ class PluginRegistry:
     def all(self) -> list[Plugin]:
         return list(self._plugins)
 
+    def available(self, override=None) -> list[Plugin]:
+        ov = enabled_wip() if override is None else override
+        return [p for p in self.all() if is_visible(p.stability, p.name, ov)]
+
     def get(self, name: str) -> Plugin:
         if name not in self._by_name:
             raise KeyError(f"Plugin '{name}' not found in registry")
@@ -27,8 +31,12 @@ class PluginRegistry:
         return sorted(self._by_name)
 
     def enabled(self, config: dict) -> list[Plugin]:
+        ov = enabled_wip()
         chosen = config.get("enabled_plugins") or {}
-        return [p for p in self._plugins if chosen.get(p.name, p.default)]
+        return [
+            p for p in self._plugins
+            if chosen.get(p.name, p.default) and is_visible(p.stability, p.name, ov)
+        ]
 
     def owned_includes(self) -> set:
         """Return the set of include names declared by any plugin (enabled or not)."""

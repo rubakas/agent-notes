@@ -64,7 +64,7 @@ def _select_cli(step: int = 0, total: int = 0, version: str = '') -> Set[str]:
     from ...registries.cli_registry import load_registry
     registry = load_registry()
     options = []
-    for backend in sorted(registry.all(), key=lambda b: b.name):
+    for backend in sorted(registry.available(), key=lambda b: b.name):
         options.append((backend.label, backend.name))
 
     safe_defaults = {"claude"}

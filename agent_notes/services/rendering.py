@@ -347,7 +347,7 @@ def generate_agent_files(agents_config: Dict[str, Any],
         prompt_content = prompt_content.replace("{{MEMORY_INSTRUCTIONS}}", _memory_instructions(_st))
 
         # Generate for each backend that supports agents
-        for backend in registry.all():
+        for backend in registry.available():
             if not backend.supports("agents"):
                 continue
                 

@@ -11,7 +11,7 @@ def list_plugins() -> None:
     registry = default_plugin_registry()
     cfg_path = config_path()
     config = load_user_config(cfg_path)
-    plugins = registry.all()
+    plugins = registry.available()
     if not plugins:
         return
     chosen = config.get("enabled_plugins") or {}
