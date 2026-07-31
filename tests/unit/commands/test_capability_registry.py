@@ -33,3 +33,21 @@ def test_unknown_get_raises():
         reg.get("nope")
     with pytest.raises(ValueError):
         reg.capability("nope")
+
+
+def test_by_kind_sorted_by_order():
+    reg = CapabilityRegistry()
+    second = Capability(name="second", kind=KIND_TOGGLE, order=2)
+    first = Capability(name="first", kind=KIND_TOGGLE, order=1)
+    reg.register(second, view=_noop_view)
+    reg.register(first, view=_noop_view)
+    assert reg.by_kind(KIND_TOGGLE) == [first, second]
+
+
+def test_by_kind_stable_for_equal_order():
+    reg = CapabilityRegistry()
+    a = Capability(name="a-cap", kind=KIND_TOGGLE, order=1)
+    b = Capability(name="b-cap", kind=KIND_TOGGLE, order=1)
+    reg.register(a, view=_noop_view)
+    reg.register(b, view=_noop_view)
+    assert reg.by_kind(KIND_TOGGLE) == [a, b]

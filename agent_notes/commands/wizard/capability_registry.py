@@ -32,16 +32,19 @@ class CapabilityRegistry:
         try:
             return self._entries[name][1]
         except KeyError:
-            raise ValueError(f"No behaviour registered for capability {name!r}")
+            raise ValueError(f"No behaviour registered for capability {name!r}") from None
 
     def capability(self, name: str) -> Capability:
         try:
             return self._entries[name][0]
         except KeyError:
-            raise ValueError(f"No capability {name!r} registered")
+            raise ValueError(f"No capability {name!r} registered") from None
 
     def by_kind(self, kind: str) -> list[Capability]:
-        return [cap for cap, _ in self._entries.values() if cap.kind == kind]
+        return sorted(
+            (cap for cap, _ in self._entries.values() if cap.kind == kind),
+            key=lambda c: c.order,
+        )
 
     def names(self) -> list[str]:
         return list(self._entries)
