@@ -80,6 +80,35 @@ def check_skill_frontmatter(scope: str, issues: list, fix_actions: list, profile
                     print(f"  [skill-frontmatter] {skill.name}: 'requires_memory' token '{token}' is not in {sorted(_VALID_MEMORY_BACKENDS)}")
 
 
+def _check_wip_components() -> None:
+    """Print any work-in-progress components and whether they are force-enabled."""
+    from ..registries.cli_registry import load_registry
+    from ..registries.plugin_registry import default_plugin_registry
+    from ..registries.skill_registry import default_skill_registry
+    from ..registries.agent_registry import default_agent_registry
+    from ..services.stability import enabled_wip, STABILITY_WIP
+
+    override = enabled_wip()
+    wip = []
+    for kind, items in (
+        ("backend", load_registry().all()),
+        ("plugin", default_plugin_registry().all()),
+        ("skill", default_skill_registry().all()),
+        ("agent", default_agent_registry().all()),
+    ):
+        for item in items:
+            if getattr(item, "stability", "stable") == STABILITY_WIP:
+                state = "ENABLED" if item.name in override else "hidden"
+                wip.append(f"  - {kind} {item.name}: {state}")
+
+    if not wip:
+        return
+    print("\nWork-in-progress components:")
+    print("\n".join(wip))
+    if override:
+        print(f"  (AGENT_NOTES_ENABLE_WIP={','.join(sorted(override))})")
+
+
 def _check_session_hook(scope: str, issues: list) -> None:
     """Check that the Claude Code SessionStart hook is registered in settings.json."""
     from ..services.settings_writer import has_hook
@@ -207,7 +236,10 @@ def diagnose(scope: str, fix: bool = False) -> bool:
     state = load_current_state()
     if state is not None:
         _check_role_models(state)
-    
+
+    # Print any work-in-progress components (advisory, non-fatal)
+    _check_wip_components()
+
     # Print issues and optionally fix
     if print_issues(issues):
         return True  # No issues
