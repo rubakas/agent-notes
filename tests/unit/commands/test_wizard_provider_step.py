@@ -43,30 +43,8 @@ def test_collect_provider_selections_passes_step_args_to_view():
     assert seen == {"step": 7, "total": 9, "version": "2.34"}
 
 
-def test_orchestrator_sources_memory_from_provider_collector(monkeypatch):
+def test_collect_provider_selections_is_importable_at_orchestrator_module_scope():
     from agent_notes.commands.wizard import orchestrator as orch
 
-    captured = {}
-
-    def fake_collect_provider_selections(step, total, version, registry=None):
-        captured["step"] = step
-        return {
-            "memory": {
-                "backend": "obsidian",
-                "path": "/vault",
-                "strategy": "per-project",
-            }
-        }
-
-    monkeypatch.setattr(
-        orch, "collect_provider_selections", fake_collect_provider_selections
-    )
-
-    sel = orch.collect_provider_selections(step=7, total=orch.TOTAL_STEPS, version="x")
-    memory = sel["memory"]
-    assert captured["step"] == 7
-    assert (memory["backend"], memory["path"], memory["strategy"]) == (
-        "obsidian",
-        "/vault",
-        "per-project",
-    )
+    assert hasattr(orch, "collect_provider_selections")
+    assert orch.TOTAL_STEPS == 9

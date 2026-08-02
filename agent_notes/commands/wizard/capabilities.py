@@ -13,6 +13,7 @@ from .cost_report import _select_cost_report
 
 COST_REPORT = Capability(name="cost-report", kind=KIND_TOGGLE, default=False)
 
+# provider slot: always present (floor = local); default=True means "required", not "pre-selected"
 MEMORY = Capability(name="memory", kind=KIND_PROVIDER, default=True, order=0)
 
 
@@ -20,7 +21,7 @@ def _cost_report_view(step, total, version) -> bool:
     return _select_cost_report(step=step, total=total, version=version)
 
 
-def _memory_view(step, total, version=""):
+def _memory_view(step, total, version="") -> dict:
     # lazy import: avoids a circular import between wizard.__init__ and capabilities
     from agent_notes.commands import wizard as _wiz
 
@@ -51,10 +52,10 @@ def collect_toggle_selections(step, total, version, registry=None) -> dict:
     return result
 
 
-def collect_provider_selections(step, total, version, registry=None):
+def collect_provider_selections(step, total, version, registry=None) -> dict:
     """Run every registered provider capability's view; return {name: selection}."""
     reg = registry if registry is not None else default_capability_registry()
-    result = {}
+    result: dict = {}
     for cap in reg.by_kind(KIND_PROVIDER):
         result[cap.name] = reg.get(cap.name).view(step, total, version)
     return result
