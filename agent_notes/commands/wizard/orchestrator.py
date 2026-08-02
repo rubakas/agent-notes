@@ -6,6 +6,9 @@ from ..build import build
 from .._install_helpers import count_agents, count_skills
 from ._common import _count_rules
 from .execute import _execute_install
+from .capabilities import collect_toggle_selections, collect_provider_selections
+
+TOTAL_STEPS = 9
 
 
 def interactive_install() -> None:
@@ -50,8 +53,6 @@ def _interactive_install() -> None:
     n_skills = count_skills()
     n_rules = _count_rules()
 
-    TOTAL_STEPS = 9
-
     _clear_screen()
     print(f"\n  {Color.BOLD}AgentNotes{Color.NC} {Color.CYAN}v{version}{Color.NC}")
     print(f"  {Color.DIM}AI agent configuration manager for Claude Code and OpenCode.{Color.NC}\n")
@@ -81,10 +82,15 @@ def _interactive_install() -> None:
     selected_skills = _wiz._select_skills(step=6, total=TOTAL_STEPS, version=version)
 
     # Step 7: Memory backend
-    memory_backend, memory_path, memory_strategy = _wiz._select_memory(step=7, total=TOTAL_STEPS, version=version)
+    provider_selections = collect_provider_selections(
+        step=7, total=TOTAL_STEPS, version=version
+    )
+    memory = provider_selections["memory"]
+    memory_backend = memory["backend"]
+    memory_path = memory["path"]
+    memory_strategy = memory["strategy"]
 
     # Step 8: Toggle plugins (cost-report, plus any future toggle) — registry-driven
-    from .capabilities import collect_toggle_selections
     enabled_plugins = collect_toggle_selections(step=8, total=TOTAL_STEPS, version=version)
 
     # Build BEFORE the confirmation step: the pre-flight file count is computed
