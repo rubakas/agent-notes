@@ -17,16 +17,20 @@ from ...domain.capability import Capability
 class CapabilityBehaviour:
     view: Callable
     process: Optional[Callable] = None
+    config_view: Optional[Callable] = None
 
 
 class CapabilityRegistry:
     def __init__(self) -> None:
         self._entries: dict[str, tuple[Capability, CapabilityBehaviour]] = {}
 
-    def register(self, capability: Capability, *, view, process=None) -> None:
+    def register(self, capability: Capability, *, view, process=None, config_view=None) -> None:
         if capability.name in self._entries:
             raise ValueError(f"Capability {capability.name!r} already registered")
-        self._entries[capability.name] = (capability, CapabilityBehaviour(view, process))
+        self._entries[capability.name] = (
+            capability,
+            CapabilityBehaviour(view, process, config_view),
+        )
 
     def get(self, name: str) -> CapabilityBehaviour:
         try:
