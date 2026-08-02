@@ -6,7 +6,12 @@ from ..build import build
 from .._install_helpers import count_agents, count_skills
 from ._common import _count_rules
 from .execute import _execute_install
-from .capabilities import collect_toggle_selections, collect_provider_selections, collect_backend_selections
+from .capabilities import (
+    collect_toggle_selections,
+    collect_provider_selections,
+    collect_backend_selections,
+    collect_backend_config,
+)
 
 TOTAL_STEPS = 9
 
@@ -66,7 +71,9 @@ def _interactive_install() -> None:
         return
 
     # Step 2: Model (and, where the provider supports it, effort) selection per role
-    role_models, role_efforts = _wiz._select_models_per_role(clis, step=2, total=TOTAL_STEPS, version=version)
+    role_models, role_efforts = collect_backend_config(
+        clis, step=2, total=TOTAL_STEPS, version=version
+    )
 
     # Step 3: Install scope
     scope = _wiz._select_scope(clis=clis, step=3, total=TOTAL_STEPS, version=version)

@@ -43,3 +43,10 @@ def test_collect_backend_config_passes_clis_and_step_args():
     )
     collect_backend_config({"claude", "codex"}, step=2, total=9, version="2.34", registry=reg)
     assert seen == {"clis": {"claude", "codex"}, "step": 2, "total": 9, "version": "2.34"}
+
+
+def test_collect_backend_config_importable_at_orchestrator_module_scope():
+    from agent_notes.commands.wizard import orchestrator as orch
+
+    assert hasattr(orch, "collect_backend_config")
+    assert orch.TOTAL_STEPS == 9
