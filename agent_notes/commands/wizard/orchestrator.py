@@ -6,7 +6,7 @@ from ..build import build
 from .._install_helpers import count_agents, count_skills
 from ._common import _count_rules
 from .execute import _execute_install
-from .capabilities import collect_toggle_selections, collect_provider_selections
+from .capabilities import collect_toggle_selections, collect_provider_selections, collect_backend_selections
 
 TOTAL_STEPS = 9
 
@@ -59,7 +59,7 @@ def _interactive_install() -> None:
     print(f"  Includes {total_agents} agents, {n_skills} skills, and {n_rules} rules.\n")
 
     # Step 1: CLI selection
-    clis = _wiz._select_cli(step=1, total=TOTAL_STEPS, version=version)
+    clis = collect_backend_selections(step=1, total=TOTAL_STEPS, version=version)
 
     if not clis:
         print("No CLI selected. Installation cancelled.")

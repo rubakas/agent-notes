@@ -35,3 +35,10 @@ def test_collect_backend_selections_passes_step_args_to_view():
     )
     collect_backend_selections(step=1, total=9, version="2.34", registry=reg)
     assert seen == {"step": 1, "total": 9, "version": "2.34"}
+
+
+def test_collect_backend_selections_importable_at_orchestrator_module_scope():
+    from agent_notes.commands.wizard import orchestrator as orch
+
+    assert hasattr(orch, "collect_backend_selections")
+    assert orch.TOTAL_STEPS == 9
