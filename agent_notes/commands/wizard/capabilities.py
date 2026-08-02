@@ -62,6 +62,27 @@ def default_capability_registry() -> CapabilityRegistry:
     return _build_registry()
 
 
+def _compute_total_steps(registry=None) -> int:
+    """Derive the wizard step count from the capability registry.
+
+    Fixed general steps: scope, mode, profile, skills, confirm (5).
+    Capability steps: one backend-selection step (if any backend), one
+    backend-config step (if any backend declares a config_view), one step
+    per provider slot, and one combined toggle step (if any toggle).
+    """
+    reg = registry if registry is not None else default_capability_registry()
+    total = 5  # scope, mode, profile, skills, confirm
+    backends = reg.by_kind(KIND_BACKEND)
+    if backends:
+        total += 1
+        if any(reg.get(c.name).config_view for c in backends):
+            total += 1
+    total += len(reg.by_kind(KIND_PROVIDER))
+    if reg.by_kind(KIND_TOGGLE):
+        total += 1
+    return total
+
+
 def collect_toggle_selections(step, total, version, registry=None) -> dict:
     """Run every registered toggle capability's view; return {name: enabled}."""
     reg = registry if registry is not None else default_capability_registry()

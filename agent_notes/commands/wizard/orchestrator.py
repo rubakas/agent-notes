@@ -7,13 +7,14 @@ from .._install_helpers import count_agents, count_skills
 from ._common import _count_rules
 from .execute import _execute_install
 from .capabilities import (
+    _compute_total_steps,
     collect_toggle_selections,
     collect_provider_selections,
     collect_backend_selections,
     collect_backend_config,
 )
 
-TOTAL_STEPS = 9
+TOTAL_STEPS = _compute_total_steps()
 
 
 def interactive_install() -> None:
