@@ -5,6 +5,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -65,15 +66,16 @@ def _fetch_openrouter(rules: dict, *, url: str = _OPENROUTER_URL) -> dict[str, l
     provider-native seed entries keyed by provider.
 
     Anthropic ids: strip 'anthropic/', convert dots->dashes, entry carries a
-    cleaned display_name and created_at=None. OpenAI ids: strip 'openai/',
-    keep dots, entry is id-only. Non-curated prefixes are ignored.
+    cleaned display_name and created_at=None (recency enrichment is deferred;
+    null matches the existing seed schema). OpenAI ids: strip 'openai/', keep
+    dots, entry is id-only. Non-curated prefixes are ignored.
     """
     import urllib.request
 
     version = _get_version()
     req = urllib.request.Request(url, headers={"User-Agent": f"agent-notes/{version}"})
     with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read())
+        data = json.loads(resp.read(16 * 1024 * 1024))
 
     out: dict[str, list[dict]] = {p: [] for p in _CURATED_PROVIDERS}
     for m in data.get("data", []):
@@ -82,12 +84,15 @@ def _fetch_openrouter(rules: dict, *, url: str = _OPENROUTER_URL) -> dict[str, l
         if prov not in _CURATED_PROVIDERS or not rest:
             continue
         native = rest.replace(".", "-") if prov == "anthropic" else rest
+        if not re.fullmatch(r"[A-Za-z0-9.\-]+", native):
+            continue  # untrusted OpenRouter input: drop ids with newlines/slashes/control chars
         if not _curated(native, rules, prov):
             continue
         if prov == "anthropic":
             name = m.get("name") or native
             if name.startswith("Anthropic:"):
                 name = name[len("Anthropic:"):].strip()
+            name = "".join(ch for ch in name if ch.isprintable())
             out["anthropic"].append({"id": native, "display_name": name, "created_at": None})
         else:
             out["openai"].append({"id": native})
