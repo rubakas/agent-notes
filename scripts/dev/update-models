@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Refresh the model catalog from OpenRouter (keyless) and freeze it into
+# agent_notes/data/catalog/seed.json. Runs the CLI from the WORKING-TREE
+# source (uv run / .venv), never the pipx binary, so `freeze` writes THIS repo.
+#
+# Usage:
+#   scripts/dev/update-models                  # refresh + freeze
+#   scripts/dev/update-models --dry-run        # preview only, writes nothing
+#   scripts/dev/update-models --provider openai
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_DIR"
+
+if command -v uv &> /dev/null; then
+  uv sync --quiet
+  PY_MOD() { uv run python -m "$@"; }
+elif [[ -x ".venv/bin/python" ]]; then
+  PY_MOD() { .venv/bin/python -m "$@"; }
+else
+  echo "Error: need uv (brew install uv) or a .venv to run the refresh." >&2
+  exit 1
+fi
+
+echo "==> Refreshing model catalog from OpenRouter (no credentials needed)"
+PY_MOD agent_notes models refresh "$@"
+
+for arg in "$@"; do
+  if [[ "$arg" == "--dry-run" ]]; then
+    echo "==> Dry run — seed.json left unchanged."
+    exit 0
+  fi
+done
+
+echo "==> Freezing cache into agent_notes/data/catalog/seed.json"
+PY_MOD agent_notes models freeze
+echo
+echo "==> Done. Next steps:"
+echo "    git diff agent_notes/data/catalog/seed.json   # review the change"
+echo "    uv run pytest tests/ -q"
+echo "    git add agent_notes/data/catalog/seed.json && git commit"
