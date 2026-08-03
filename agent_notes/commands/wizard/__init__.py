@@ -99,7 +99,7 @@ def _select_accept_all_models(step: int = 0, total: int = 0, version: str = '') 
     """Ask whether to accept recommended models/effort for every role. Default Yes."""
     options = [
         ("Yes  — use the recommended model and effort for every role", "yes"),
-        ("No   — choose the model (and effort) per role", "no"),
+        ("No   — choose the model and effort per role", "no"),
     ]
     if _can_interactive():
         choice = _radio_select(
@@ -429,7 +429,7 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
                 break
             raw = _path_input(f"  Vault path [{default_vault}]: ", default_vault)
             vault = raw.strip() or default_vault
-        path = str(Path(vault) / subfolder)
+        path = str(Path(vault).expanduser() / subfolder)
         print(f"  {Color.DIM}→ {path}{Color.NC}")
 
     if backend == "obsidian":

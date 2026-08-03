@@ -53,4 +53,7 @@ def test_accept_all_yes_matches_per_role_defaults(monkeypatch):
     no_models, no_efforts = wiz._select_models_per_role({"claude"}, step=2, total=9, version="x")
 
     assert yes_models == no_models
+    assert yes_efforts.get("claude"), (
+        "no effort entries populated for 'claude' — effort drift guard is a no-op"
+    )
     assert yes_efforts == no_efforts
