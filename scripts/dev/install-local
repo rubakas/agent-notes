@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Build the agent-notes wheel from the working tree and (re)install the CLI
+# from that local artifact via pipx.
+#
+# This installs the built *release artifact* (a wheel), which is what ships to
+# users — not an editable install. For live-from-source development instead use
+# `pipx install -e .` (see README "Local build (developers)").
+#
+# Steps: clean prior build artifacts -> build wheel + sdist -> pipx reinstall.
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_DIR"
+
+# Prefer uv for the managed build environment; fall back to a local .venv.
+if command -v uv &> /dev/null; then
+  uv sync --quiet
+  PY_MOD() { uv run python -m "$@"; }
+elif [[ -x ".venv/bin/python" ]]; then
+  PY_MOD() { .venv/bin/python -m "$@"; }
+else
+  echo "Error: need uv (brew install uv) or a .venv to build the wheel." >&2
+  exit 1
+fi
+
+if ! command -v pipx &> /dev/null; then
+  echo "Error: pipx is not installed. Install with: brew install pipx" >&2
+  exit 1
+fi
+
+echo "==> Cleaning previous build artifacts (dist/, build/, *.egg-info)"
+rm -rf dist/ build/ ./*.egg-info
+
+echo "==> Building wheel + sdist"
+PY_MOD build --outdir dist/
+
+wheel="$(ls -1 dist/*.whl)"
+echo "==> Built: $wheel"
+
+echo "==> Reinstalling agent-notes via pipx from the local wheel"
+pipx uninstall agent-notes >/dev/null 2>&1 || true
+pipx install "$wheel"
+
+echo "==> Installed:"
+agent-notes --version
