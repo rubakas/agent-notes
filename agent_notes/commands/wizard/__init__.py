@@ -346,6 +346,16 @@ def _select_skills(step: int = 0, total: int = 0, version: str = '') -> List[str
     return selected_skills
 
 
+def _validate_vault_path(path):
+    """Return (is_ok, reason). ok if the dir exists and contains an .obsidian/ folder."""
+    p = Path(path).expanduser()
+    if not p.exists():
+        return False, "that folder doesn't exist yet"
+    if not (p / ".obsidian").is_dir():
+        return False, "that folder isn't an Obsidian vault (no .obsidian/ inside)"
+    return True, ""
+
+
 def _detect_obsidian_vaults() -> List[Path]:
     """Scan common locations for Obsidian vaults (dirs containing .obsidian/)."""
     candidates = []
@@ -405,6 +415,20 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
         print(f"  {Color.DIM}Press Tab to autocomplete paths{Color.NC}")
         raw = _path_input(f"  Vault path [{default_vault}]: ", default_vault)
         vault = raw.strip() or default_vault
+        while _can_interactive():
+            ok, reason = _validate_vault_path(vault)
+            if ok:
+                break
+            print(f"  {Color.YELLOW}⚠{Color.NC}  {reason}: {vault}")
+            again = _radio_select(
+                "What now?",
+                [("Re-enter the path", "re"), ("Use it anyway", "use")],
+                default=0, step=step, total=total, version=version,
+            )
+            if again == "use":
+                break
+            raw = _path_input(f"  Vault path [{default_vault}]: ", default_vault)
+            vault = raw.strip() or default_vault
         path = str(Path(vault) / subfolder)
         print(f"  {Color.DIM}→ {path}{Color.NC}")
 
