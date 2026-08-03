@@ -1,0 +1,65 @@
+name: Update model catalog
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-models:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Sync deps
+        run: uv sync
+
+      - name: Refresh + freeze catalog (keyless via OpenRouter)
+        run: |
+          uv run python -m agent_notes models refresh
+          uv run python -m agent_notes models freeze
+
+      - name: Detect model add/remove vs committed seed
+        id: diff
+        # PR only when the SET of model ids changed (added or removed).
+        # Immune to the fetched_at timestamp, entry reordering, and cosmetic
+        # field churn (display_name) — those must NOT open a PR.
+        run: |
+          seed=agent_notes/data/catalog/seed.json
+          ids() { python3 -c 'import json,sys;d=json.load(sys.stdin);print(chr(10).join(sorted(i["id"] for p in d["providers"].values() for i in p)))'; }
+          old="$(git show HEAD:"$seed" | ids)"
+          new="$(ids < "$seed")"
+          if [ "$old" = "$new" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            git checkout -- "$seed"            # no model change -> discard timestamp/format churn
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Model set changed:"; diff <(printf '%s' "$old") <(printf '%s' "$new") || true
+          fi
+
+      - name: Run test suite (guard before opening PR)
+        if: steps.diff.outputs.changed == 'true'
+        run: uv run pytest tests/ -q
+
+      - name: Open / update PR (gh CLI — no third-party action)
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B automation/model-catalog-update
+          git add agent_notes/data/catalog/seed.json
+          git commit -m "chore(catalog): refresh model catalog from OpenRouter"
+          git push -f origin automation/model-catalog-update
+          gh pr create --base develop --head automation/model-catalog-update \
+            --title "chore(catalog): model catalog update" \
+            --body "Automated refresh from OpenRouter (keyless). Review the seed.json diff before merging; add pricing/rules for any new model." \
+            || gh pr edit automation/model-catalog-update --base develop
