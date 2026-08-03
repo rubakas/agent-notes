@@ -75,6 +75,80 @@ agent_notes/memory/
 └── __init__.py
 ```
 
+### Plugin Layer (`agent_notes/registries/plugin_registry.py`, `agent_notes/data/plugins/`)
+
+Enables toggleable subsystems (plugins) that can be enabled or disabled post-install without code changes. Plugins declare their contributions declaratively via YAML manifests.
+
+**What a plugin can contribute:**
+- **skills** — list of skill names to include
+- **agents** — list of agent names to include
+- **rules** — list of rule names to include
+- **includes** — list of include names for wizard steps
+- **hooks** — SessionStart / Stop / PreToolUse / PreCompact hooks installed into Claude settings.json
+- **allow** — Bash permission allow-list entries (e.g., `"Bash(agent-notes cost-report)"`)
+
+**How plugins work:**
+1. Each plugin has a `plugin.yaml` manifest in `agent_notes/data/plugins/<name>/`
+2. `PluginRegistry` loads all manifests from the `data/plugins/` directory (built-in plugins only — no user drop-ins)
+3. User enables/disables plugins via `agent-notes plugins enable <name>` and `agent-notes plugins disable <name>`
+4. Settings are stored in the user's config under `enabled_plugins: {<name>: true/false}`
+5. At install time, `_apply_plugin_settings()` routes enabled plugins' hooks and allow-entries into Claude's settings.json
+6. Disabled plugins' contributions are actively removed from settings.json
+
+**Current plugins:**
+- **cost-report** — Emits a token cost report at session end (Stop hook). Default: off.
+
+**Memory and credential guard are NOT plugins:**
+- **Memory** (`install_memory_hooks`, `install_memory_allow_entries`) — configured via `agent-notes config memory`, controlled by `enabled_plugins` list during filtering. Not a declarative plugin (backward-compatibility escape hatch).
+- **Credential guard** (`Hooks.GUARD_CREDENTIALS`) — hardcoded PreToolUse hook installed via `install_hook` escape hatch in `_install_session_hook()`. Not a declarative plugin (core, always-on when supported).
+
+**Directory structure:**
+```
+agent_notes/registries/
+├── plugin_registry.py              # PluginRegistry, loads plugin.yaml manifests
+
+agent_notes/data/plugins/
+└── cost-report/
+    └── plugin.yaml                 # cost-report plugin manifest
+```
+
+**Manifest fields (all required unless noted):**
+```yaml
+name: cost-report                           # Plugin identifier
+description: Emit a per-session token cost report at the Stop hook  # Display name
+default: off                                # Default on/off (string: "on" or "off")
+stability: stable                           # Optional: "stable" (visible); "wip" (hidden unless AGENT_NOTES_ENABLE_WIP set)
+
+# Contribution surfaces (all optional):
+skills: [skill1, skill2]                    # List of skill names
+agents: [agent1, agent2]                    # List of agent names
+rules: [rule1, rule2]                       # List of rule names
+includes: [include1, include2]              # List of include names
+
+# Hooks: SessionStart, Stop, PreToolUse, PreCompact
+hooks:
+  - event: Stop                             # Hook event
+    command: "agent-notes cost-report"      # Shell command to run
+    matcher: ""                             # Optional: tool matcher (e.g., "Read|Bash" for PreToolUse)
+    requires: stop_hook                     # Optional: backend capability gate
+
+# Allow entries: Bash/Read/Write/Edit permissions
+allow:
+  - value: "Bash(agent-notes cost-report)"  # Permission pattern
+    requires: allow_entries                 # Optional: backend capability gate
+```
+
+**Backend capability gates** (`requires` field):
+- `stop_hook` — Backend supports Stop hook (Claude: yes, OpenCode: yes, GitHub Copilot: no)
+- `allow_entries` — Backend supports permission allow-list (Claude: yes, OpenCode: no)
+- `pretooluse_hooks` — Backend supports PreToolUse hooks (Claude: yes, OpenCode: yes, GitHub Copilot: no)
+
+If a plugin's hook or allow-entry has a `requires` gate, it is only installed if the backend supports that capability. This allows plugins to gracefully degrade on backends that don't support all features.
+
+**Byte-identity discipline:** A plugin at its default state must not change `dist/`. If cost-report defaults to `off`, enabling it should install hooks but not alter byte-identical build outputs. This is enforced by tests.
+
+**Limitation: built-in only.** Plugins are shipped with agent-notes (`agent_notes/data/plugins/`); users cannot drop custom plugins in a user directory. This is deliberate scope (no dynamic loading, no security risk of user-provided hooks).
+
 ### Cost Subsystem (`agent_notes/cost/`)
 
 Tracks API costs and token usage per agent/model during sessions. Provides per-backend cost accounting and formatted reports for CLI output.
@@ -468,11 +542,13 @@ The engine's promise is enforced by putting all extensible data in `agent_notes/
 | Agent | Add to `data/agents/agents.yaml` + `data/agents/my-agent.md` | ✅ Yes |
 | Skill | New directory `data/skills/my-skill/` with `SKILL.md` | ✅ Yes |
 | Rule | New directory `data/rules/my-rule/` with `RULE.md` | ✅ Yes |
+| Plugin (toggleable subsystem) | `data/plugins/<name>/plugin.yaml` | ✅ Yes |
 
 For step-by-step guides, see:
 - `docs/ADD_CLI.md`
 - `docs/ADD_MODEL.md`
 - `docs/ADD_ROLE.md`
+- `docs/WRITING_A_PLUGIN.md`
 
 ---
 
