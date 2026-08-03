@@ -54,6 +54,8 @@ from .install_executor import (
     _filter_skills_by_backend,
 )
 
+from ..registries.plugin_registry import default_plugin_registry
+
 
 # ---------------------------------------------------------------------------
 # Top-level orchestrators (kept here so tests can patch installer.load_state
@@ -137,6 +139,41 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
 
 
 # ---------------------------------------------------------------------------
+# Plugin-driven hook and allow-entry install / remove
+# ---------------------------------------------------------------------------
+
+def _apply_plugin_settings(settings_path, backend, config) -> None:
+    """Install or remove hooks/allow-entries for all plugins based on enabled state.
+
+    Each hook/allow-entry is gated by ``backend.supports(requires)`` before
+    install or remove. Disabled plugins' contributions are actively removed.
+    Cost-report has no manifest yet (#37 adds it), so this loop is a no-op
+    today and the existing hardcoded Stop-hook line still owns that install.
+    """
+    from .settings_writer import (
+        install_hook, remove_hook, install_allow_entry, remove_allow_entry,
+    )
+    reg = default_plugin_registry()
+    enabled = {p.name for p in reg.enabled(config)}
+    for p in reg.all():
+        on = p.name in enabled
+        for h in p.hooks:
+            if h.requires and not backend.supports(h.requires):
+                continue
+            if on:
+                install_hook(settings_path, h.event, h.command, matcher=h.matcher or "")
+            else:
+                remove_hook(settings_path, h.event, h.command)
+        for a in p.allow:
+            if a.requires and not backend.supports(a.requires):
+                continue
+            if on:
+                install_allow_entry(settings_path, a.value)
+            else:
+                remove_allow_entry(settings_path, a.value)
+
+
+# ---------------------------------------------------------------------------
 # Session-hook install / uninstall (kept here: tests patch installer.load_state
 # to control the state lookup these functions perform)
 # ---------------------------------------------------------------------------
@@ -169,7 +206,14 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         memory_backend = current_state.memory.backend if current_state else "local"
         memory_path = current_state.memory.path if current_state else ""
 
-    skills = _filter_skills_by_backend(default_skill_registry().all(), memory_backend)
+    skills = _filter_skills_by_backend(default_skill_registry().available(), memory_backend)
+    from ..services.user_config import load_user_config
+    _preg = default_plugin_registry()
+    _disabled_owned = set()
+    for _p in _preg.all():
+        if _p not in _preg.enabled(load_user_config()):
+            _disabled_owned.update(_p.skills)
+    skills = [s for s in skills if s.name not in _disabled_owned]
 
     version = config.get_version()
     if not _fs.silent_file_ops:
@@ -177,11 +221,9 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
     write_context(context_file, agents, version, skills)
     install_hook(settings_path, "SessionStart", hook_command)
 
-    # Memory-bridge hooks and Stop/cost-report — backends that support stop_hook
+    # Memory-bridge hooks — backends that support stop_hook
     if backend.supports("stop_hook"):
         install_memory_hooks(settings_path, memory_backend)
-        # Stop hook: emit cost report at end of session
-        install_hook(settings_path, "Stop", Hooks.COST_REPORT)
 
     # PreToolUse credential guard — backends that support pretooluse_hooks
     if backend.supports("pretooluse_hooks"):
@@ -198,8 +240,10 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         # any previous install, not just the immediately preceding one)
         remove_matching_allow_entries(settings_path, "Bash(agent-notes")
         remove_allow_entry(settings_path, "Bash(cost-report)")
-        install_allow_entry(settings_path, "Bash(agent-notes cost-report)")
         install_memory_allow_entries(settings_path, memory_backend, memory_path, current_state)
+
+    # Plugin-driven hooks and allow-entries (no-op until Task 5 ships manifests)
+    _apply_plugin_settings(settings_path, backend, load_user_config())
 
 
 def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
@@ -222,7 +266,6 @@ def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memor
 
     if backend.supports("stop_hook"):
         uninstall_memory_hooks(settings_path)
-        remove_hook(settings_path, "Stop", Hooks.COST_REPORT)
 
     if backend.supports("pretooluse_hooks"):
         remove_hook(settings_path, "PreToolUse", Hooks.GUARD_CREDENTIALS)
@@ -233,6 +276,10 @@ def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memor
         remove_allow_entry(settings_path, "Bash(cost-report)")
         # Read/Write/Edit entries for memory vault paths are intentionally kept —
         # the user may still want Claude to access their vault without agent-notes.
+
+    # Plugin-driven hooks and allow-entries — disable all so contributions are removed
+    _all_disabled = {"enabled_plugins": {p.name: False for p in default_plugin_registry().all()}}
+    _apply_plugin_settings(settings_path, backend, _all_disabled)
 
 
 __all__ = [
@@ -261,6 +308,7 @@ __all__ = [
     # Orchestrators (defined here — use load_state/load_registry)
     "install_all",
     "uninstall_all",
+    "_apply_plugin_settings",
     "_install_session_hook",
     "_uninstall_session_hook",
     # Dependencies re-exported so tests can patch installer.load_state etc.

@@ -7,6 +7,18 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 
+def _plugin_include_skip(user_config: dict) -> set:
+    """Return the set of include names to skip, driven entirely by the plugin registry.
+
+    Any include owned by a plugin but not currently enabled is skipped.
+    cost-report owns cost_reporting and is off by default, so cost_reporting is
+    suppressed unless the user has enabled the cost-report plugin.
+    """
+    from ..registries.plugin_registry import default_plugin_registry
+    reg = default_plugin_registry()
+    return reg.owned_includes() - reg.active_includes(user_config)
+
+
 def expand_includes(text: str, shared_dir: Path, skip: Optional[set] = None) -> str:
     """Expand include directives in text by substituting shared content.
 
@@ -315,6 +327,13 @@ def generate_agent_files(agents_config: Dict[str, Any],
 
     _st = _load_state_fn()
 
+    from .stability import is_visible, enabled_wip, normalize_stability
+    _wip = enabled_wip()
+    agents_config = {
+        n: c for n, c in agents_config.items()
+        if is_visible(normalize_stability(c.get("stability")), n, _wip)
+    }
+
     for agent_name, agent_config in agents_config.items():
         # Read the source prompt
         prompt_file = AGENTS_DIR / f'{agent_name}.md'
@@ -326,16 +345,16 @@ def generate_agent_files(agents_config: Dict[str, Any],
 
         # Expand shared-content include directives (<!-- include: NAME -->)
         # No-op if shared/ directory is absent.
-        from ..cost.render import include_skip as _cost_include_skip
-        _agent_include_skip = _cost_include_skip(user_config)
+        _agent_include_skip = _plugin_include_skip(user_config)
         prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared", skip=_agent_include_skip)
 
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
         prompt_content = prompt_content.replace("{{MEMORY_PATH}}", _memory_path(_st))
         prompt_content = prompt_content.replace("{{MEMORY_READING_GUIDE}}", _memory_reading_guide(_st))
+        prompt_content = prompt_content.replace("{{MEMORY_INSTRUCTIONS}}", _memory_instructions(_st))
 
         # Generate for each backend that supports agents
-        for backend in registry.all():
+        for backend in registry.available():
             if not backend.supports("agents"):
                 continue
                 
@@ -446,8 +465,7 @@ def render_globals() -> list[Path]:
     from ..config import AGENTS_DIR
     from ..services.user_config import load_user_config as _load_user_config
     _ucfg = _load_user_config()
-    from ..cost.render import include_skip as _cost_include_skip
-    _include_skip = _cost_include_skip(_ucfg)
+    _include_skip = _plugin_include_skip(_ucfg)
     claude_global_content = GLOBAL_CLAUDE_MD.read_text()
     claude_global_content = expand_includes(claude_global_content, AGENTS_DIR / "shared", skip=_include_skip)
     claude_global_content = claude_global_content.replace(

@@ -6,14 +6,6 @@ import pytest
 from agent_notes.config import memory_dir_for_backend, MEMORY_DIR
 
 
-class TestMemoryDirForBackendNone:
-    def test_none_backend_returns_none(self):
-        assert memory_dir_for_backend("none") is None
-
-    def test_none_backend_ignores_custom_path(self):
-        assert memory_dir_for_backend("none", custom_path="/some/path") is None
-
-
 class TestMemoryDirForBackendLocal:
     def test_local_returns_memory_dir_constant(self):
         result = memory_dir_for_backend("local")

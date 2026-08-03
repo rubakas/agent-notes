@@ -64,7 +64,7 @@ def _select_cli(step: int = 0, total: int = 0, version: str = '') -> Set[str]:
     from ...registries.cli_registry import load_registry
     registry = load_registry()
     options = []
-    for backend in sorted(registry.all(), key=lambda b: b.name):
+    for backend in sorted(registry.available(), key=lambda b: b.name):
         options.append((backend.label, backend.name))
 
     safe_defaults = {"claude"}
@@ -79,6 +79,36 @@ def _select_cli(step: int = 0, total: int = 0, version: str = '') -> Set[str]:
     labels = [label for label, val in options if val in result]
     print(f"  {Color.GREEN}✓{Color.NC} CLI: {', '.join(labels) if labels else 'None'}")
     return result
+
+
+def _default_model_for_role(role, compatible):
+    """The pre-selected default model for a role given the backend's compatible models."""
+    return next(
+        (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.deprecated and not m.never_default),
+        next(
+            (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.never_default),
+            next(
+                (m for m in reversed(compatible) if not m.never_default),
+                compatible[0],
+            ),
+        ),
+    )
+
+
+def _select_accept_all_models(step: int = 0, total: int = 0, version: str = '') -> bool:
+    """Ask whether to accept recommended models/effort for every role. Default Yes."""
+    options = [
+        ("Yes  — use the recommended model and effort for every role", "yes"),
+        ("No   — choose the model and effort per role", "no"),
+    ]
+    if _can_interactive():
+        choice = _radio_select(
+            "Use recommended models for all agent roles?\n"
+            "  (you can change any of them later with: agent-notes config role-model)",
+            options, default=0, step=step, total=total, version=version,
+        )
+        return choice == "yes"
+    return True  # non-interactive: accept recommended silently (today's behavior)
 
 
 def _effort_provider_for_model(backend, model) -> Optional[str]:
@@ -120,6 +150,8 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
 
     roles_sorted = sorted(roles, key=_role_sort_key)
 
+    accept_all = _select_accept_all_models(step=step, total=total, version=version)
+
     result = {}
     effort_result = {}
     for backend_name in sorted(clis):
@@ -146,16 +178,7 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
             if backend_name == "claude" and role.name == "orchestrator":
                 continue
 
-            default_model = next(
-                (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.deprecated and not m.never_default),
-                next(
-                    (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.never_default),
-                    next(
-                        (m for m in reversed(compatible) if not m.never_default),
-                        compatible[0],
-                    ),
-                ),
-            )
+            default_model = _default_model_for_role(role, compatible)
             default_idx = compatible.index(default_model)
 
             options = []
@@ -166,21 +189,27 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
 
             role_color = (_ROLE_ANSI.get(role.color, '') if sys.stdout.isatty() else '') if role.color else ''
             role_label_colored = f"{role_color}{role.label}{Color.NC}" if role_color else role.label
-            title = (
-                f"{Color.DIM}CLI{Color.NC}          {Color.YELLOW}{backend.label}{Color.NC}\n"
-                f"  {Color.DIM}Role{Color.NC}         {role_label_colored}\n"
-                f"  {Color.DIM}Description{Color.NC}  {role.description}"
-            )
-            if _can_interactive():
-                picked = _radio_select(title, options, default=default_idx,
-                                       step=step, total=total, version=version)
-            else:
-                picked = _radio_select_fallback(title, options, default=default_idx,
-                                                step=step, total=total, version=version)
-            cli_role_models[role.name] = picked
 
-            picked_label = next(label for label, mid in options if mid == picked)
-            print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored}: {picked_label}")
+            if accept_all:
+                picked = default_model.id
+                picked_label = next(label for label, mid in options if mid == picked)
+                print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored}: {picked_label}")
+            else:
+                title = (
+                    f"{Color.DIM}CLI{Color.NC}          {Color.YELLOW}{backend.label}{Color.NC}\n"
+                    f"  {Color.DIM}Role{Color.NC}         {role_label_colored}\n"
+                    f"  {Color.DIM}Description{Color.NC}  {role.description}"
+                )
+                if _can_interactive():
+                    picked = _radio_select(title, options, default=default_idx,
+                                           step=step, total=total, version=version)
+                else:
+                    picked = _radio_select_fallback(title, options, default=default_idx,
+                                                    step=step, total=total, version=version)
+                picked_label = next(label for label, mid in options if mid == picked)
+                print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored}: {picked_label}")
+
+            cli_role_models[role.name] = picked
 
             picked_model = next(m for m in compatible if m.id == picked)
             provider_name = _effort_provider_for_model(backend, picked_model)
@@ -195,19 +224,25 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
                 effort_options = [(e, e) for e in provider.efforts]
                 default_effort = _effort_default_choice(role, provider)
                 default_effort_idx = provider.efforts.index(default_effort)
-                effort_title = (
-                    f"{Color.DIM}CLI{Color.NC}          {Color.YELLOW}{backend.label}{Color.NC}\n"
-                    f"  {Color.DIM}Role{Color.NC}         {role_label_colored}\n"
-                    f"  {Color.DIM}Effort{Color.NC}       for {picked_label} (via {provider_name})"
-                )
-                if _can_interactive():
-                    picked_effort = _radio_select(effort_title, effort_options, default=default_effort_idx,
-                                                   step=step, total=total, version=version)
+
+                if accept_all:
+                    picked_effort = default_effort
+                    print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored} effort: {picked_effort}")
                 else:
-                    picked_effort = _radio_select_fallback(effort_title, effort_options, default=default_effort_idx,
-                                                            step=step, total=total, version=version)
+                    effort_title = (
+                        f"{Color.DIM}CLI{Color.NC}          {Color.YELLOW}{backend.label}{Color.NC}\n"
+                        f"  {Color.DIM}Role{Color.NC}         {role_label_colored}\n"
+                        f"  {Color.DIM}Effort{Color.NC}       for {picked_label} (via {provider_name})"
+                    )
+                    if _can_interactive():
+                        picked_effort = _radio_select(effort_title, effort_options, default=default_effort_idx,
+                                                       step=step, total=total, version=version)
+                    else:
+                        picked_effort = _radio_select_fallback(effort_title, effort_options, default=default_effort_idx,
+                                                                step=step, total=total, version=version)
+                    print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored} effort: {picked_effort}")
+
                 cli_role_efforts[role.name] = picked_effort
-                print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored} effort: {picked_effort}")
 
         result[backend_name] = cli_role_models
         effort_result[backend_name] = cli_role_efforts
@@ -311,6 +346,16 @@ def _select_skills(step: int = 0, total: int = 0, version: str = '') -> List[str
     return selected_skills
 
 
+def _validate_vault_path(path):
+    """Return (is_ok, reason). ok if the dir exists and contains an .obsidian/ folder."""
+    p = Path(path).expanduser()
+    if not p.exists():
+        return False, "that folder doesn't exist yet"
+    if not (p / ".obsidian").is_dir():
+        return False, "that folder isn't an Obsidian vault (no .obsidian/ inside)"
+    return True, ""
+
+
 def _detect_obsidian_vaults() -> List[Path]:
     """Scan common locations for Obsidian vaults (dirs containing .obsidian/)."""
     candidates = []
@@ -331,24 +376,34 @@ def _detect_obsidian_vaults() -> List[Path]:
 
 
 def _select_memory(step: int, total: int, version: str = '') -> tuple:
-    """Step N: choose memory backend. Returns (backend, path)."""
-    storage_options = [
-        ("default - Claude Code built-in md files", "local"),
-        ("Obsidian - session", "obsidian"),
-        ("None  (disable memory)", "none"),
+    """Step N: choose memory provider and (for obsidian) strategy. Returns (backend, path, strategy)."""
+    provider_options = [
+        ("default — the CLI's native memory / Claude Code built-in md files", "local"),
+        ("Obsidian — external Obsidian vault", "obsidian"),
     ]
 
     if _can_interactive():
-        storage = _radio_select("How should agents store memory?", storage_options, default=0,
+        backend = _radio_select("How should agents store memory?", provider_options, default=0,
                                 step=step, total=total, version=version)
     else:
-        storage = _radio_select_fallback("How should agents store memory?", storage_options, default=0,
+        backend = _radio_select_fallback("How should agents store memory?", provider_options, default=0,
                                          step=step, total=total, version=version)
 
-    backend = storage
     path = ""
+    strategy = "single-brain"
 
     if backend == "obsidian":
+        strategy_options = [
+            ("single-brain — one shared vault across all projects", "single-brain"),
+            ("per-project — memory organized per project", "per-project"),
+        ]
+        if _can_interactive():
+            strategy = _radio_select("Obsidian strategy?", strategy_options, default=0,
+                                     step=step, total=total, version=version)
+        else:
+            strategy = _radio_select_fallback("Obsidian strategy?", strategy_options, default=0,
+                                              step=step, total=total, version=version)
+
         subfolder = Obsidian.SUBFOLDER
         candidates = _detect_obsidian_vaults()
         default_vault = str(candidates[0]) if candidates else str(Path.home() / DEFAULT_VAULT_DIR / DEFAULT_VAULT_NAME)
@@ -360,12 +415,29 @@ def _select_memory(step: int, total: int, version: str = '') -> tuple:
         print(f"  {Color.DIM}Press Tab to autocomplete paths{Color.NC}")
         raw = _path_input(f"  Vault path [{default_vault}]: ", default_vault)
         vault = raw.strip() or default_vault
-        path = str(Path(vault) / subfolder)
+        while _can_interactive():
+            ok, reason = _validate_vault_path(vault)
+            if ok:
+                break
+            print(f"  {Color.YELLOW}⚠{Color.NC}  {reason}: {vault}")
+            again = _radio_select(
+                "What now?",
+                [("Re-enter the path", "re"), ("Use it anyway", "use")],
+                default=0, step=step, total=total, version=version,
+            )
+            if again == "use":
+                break
+            raw = _path_input(f"  Vault path [{default_vault}]: ", default_vault)
+            vault = raw.strip() or default_vault
+        path = str(Path(vault).expanduser() / subfolder)
         print(f"  {Color.DIM}→ {path}{Color.NC}")
 
-    label = {"local": "Local markdown", "obsidian": f"Obsidian (session)  ({path})", "none": "Disabled"}[backend]
+    if backend == "obsidian":
+        label = f"Obsidian  →  {path}  ({strategy})" if path else f"Obsidian ({strategy})"
+    else:
+        label = "Local markdown"
     print(f"  {Color.GREEN}✓{Color.NC} Memory: {label}")
-    return backend, path
+    return backend, path, strategy
 
 
 def _format_role_model_display(role, model_id: str, models_registry, picked_effort: Optional[str] = None) -> str:
@@ -414,9 +486,9 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
             parts.append(f"Other ({ungrouped})")
         print(f"  {Color.DIM}Skills{Color.NC}    {', '.join(parts) if parts else 'none'}")
 
-    if memory_backend and memory_backend != "none":
+    if memory_backend:
         if memory_backend == "obsidian":
-            mem_label = f"Obsidian (session)  →  {memory_path}" if memory_path else "Obsidian (session)"
+            mem_label = f"Obsidian  →  {memory_path}" if memory_path else "Obsidian"
         else:
             mem_label = "Local markdown"
         print(f"  {Color.DIM}Memory{Color.NC}    {mem_label}")
@@ -455,7 +527,7 @@ def _render_install_summary(clis: Set[str], scope: str, copy_mode: bool, selecte
     print("")
 
 
-def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], role_efforts: Optional[Dict[str, Dict[str, str]]] = None, version: str = '', memory_backend: str = 'local', memory_path: str = '', step: int = 0, total: int = 0, folder_overrides: Optional[dict] = None, global_home_override: str = '') -> bool:
+def _confirm_install(clis: Set[str], scope: str, copy_mode: bool, selected_skills: List[str], role_models: Dict[str, Dict[str, str]], role_efforts: Optional[Dict[str, Dict[str, str]]] = None, version: str = '', memory_backend: str = 'local', memory_path: str = '', memory_strategy: str = 'single-brain', step: int = 0, total: int = 0, folder_overrides: Optional[dict] = None, global_home_override: str = '') -> bool:
     """Step: Confirmation — shows pre-flight summary including files to be backed up."""
     import logging
     from ...services.ui import _clear_screen, _render_step_header

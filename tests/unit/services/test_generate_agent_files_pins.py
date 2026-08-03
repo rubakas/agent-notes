@@ -71,7 +71,7 @@ def _write_state(tmp_path, monkeypatch, role_models, role_efforts=None):
                                 "installed": {}}},
         },
         "local": {},
-        "memory": {"backend": "none", "path": ""},
+        "memory": {"backend": "local", "path": ""},
     }))
     return load_state()
 

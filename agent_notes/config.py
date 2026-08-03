@@ -20,6 +20,7 @@ AGENTS_YAML = DATA_DIR / "agents" / "agents.yaml"
 AGENTS_DIR = DATA_DIR / "agents"
 RULES_DIR = DATA_DIR / "rules"
 SKILLS_DIR = DATA_DIR / "skills"
+PLUGINS_DIR = DATA_DIR / "plugins"
 MODELS_DIR = DATA_DIR / "models"
 ROLES_DIR = DATA_DIR / "roles"
 
@@ -42,8 +43,6 @@ BACKUP_DIR = Path.home() / ".agent-notes" / "memory-backup"
 
 def memory_dir_for_backend(backend: str, custom_path: str = "") -> Optional[Path]:
     """Return the root memory directory for the given backend and optional custom path."""
-    if backend == "none":
-        return None
     if backend == "local":
         return Path(custom_path).expanduser() if custom_path else MEMORY_DIR
     # obsidian is project-scoped

@@ -1,12 +1,15 @@
 """Load and merge user config for agent role/model overrides and prompt patches."""
 from __future__ import annotations
+import os
 from pathlib import Path
 from typing import Optional
 import yaml
 
 
 def config_path() -> Path:
-    xdg = Path.home() / ".config" / "agent-notes" / "config.yaml"
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(config_home) if config_home else (Path.home() / ".config")
+    xdg = base / "agent-notes" / "config.yaml"
     legacy = Path.home() / ".agent-notes.yaml"
     if xdg.exists():
         return xdg
@@ -22,9 +25,15 @@ def load_user_config(path: Optional[Path] = None) -> dict:
         return {}
     try:
         data = yaml.safe_load(p.read_text())
-        return data or {}
+        data = data or {}
     except yaml.YAMLError as e:
         raise ValueError(f"Invalid YAML in {p}: {e}") from e
+    # One-shot migration: cost_report_enabled → enabled_plugins.cost-report (#37)
+    if "cost_report_enabled" in data:
+        data.setdefault("enabled_plugins", {}).setdefault(
+            "cost-report", bool(data.pop("cost_report_enabled"))
+        )
+    return data
 
 
 def resolve_agent_role(agent_name: str, default_role: str, config: dict) -> str:

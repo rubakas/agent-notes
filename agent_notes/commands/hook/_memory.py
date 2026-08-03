@@ -18,7 +18,7 @@ def _load_memory_index() -> Optional[str]:
 
         backend, path = _load_memory_config()
 
-        if backend == "none" or backend is None:
+        if backend is None:
             return None
 
         if backend == "obsidian":

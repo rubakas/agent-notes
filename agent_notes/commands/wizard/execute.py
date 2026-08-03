@@ -146,10 +146,11 @@ def _execute_install(
     memory_backend: str,
     memory_path: str,
     role_efforts: Optional[Dict[str, Dict[str, str]]] = None,
+    memory_strategy: str = "single-brain",
     profile_label: str = "",
     folder_overrides: dict = None,
     global_home_override: str = "",
-    cost_report_enabled: bool = False,
+    enabled_plugins: dict = None,
 ) -> None:
     """Run all installation steps after parameters have been collected and the build is done."""
     label_msg = f", profile={profile_label}" if profile_label else ""
@@ -269,34 +270,36 @@ def _execute_install(
             folder_overrides=folder_overrides,
             global_home_override=global_home_override or None,
         )
-        st.memory = MemoryConfig(backend=memory_backend, path=memory_path)
+        st.memory = MemoryConfig(backend=memory_backend, path=memory_path, strategy=memory_strategy)
         record_install_state(st)
     except Exception as e:
         print(f"{Color.YELLOW}Warning: failed to write state.json: {e}{Color.NC}")
 
-    # Persist cost_report_enabled preference to user config
-    try:
-        from ...services.user_config import load_user_config as _load_user_config, save_user_config as _save_user_config
-        _ucfg = _load_user_config()
-        _ucfg["cost_report_enabled"] = cost_report_enabled
-        _save_user_config(_ucfg)
-    except Exception as e:
-        print(f"{Color.YELLOW}Warning: failed to save cost-report preference: {e}{Color.NC}")
+    # Persist enabled-plugins selections (cost-report and any future toggle)
+    if enabled_plugins:
+        try:
+            from ...services.user_config import load_user_config as _load_user_config, save_user_config as _save_user_config
+            _ucfg = _load_user_config()
+            _ucfg.setdefault("enabled_plugins", {}).update(
+                {name: bool(on) for name, on in enabled_plugins.items()}
+            )
+            _save_user_config(_ucfg)
+        except Exception as e:
+            print(f"{Color.YELLOW}Warning: failed to save plugin preferences: {e}{Color.NC}")
 
     # Initialize memory vault / directory on disk
-    if memory_backend != "none":
-        from ...config import memory_dir_for_backend
-        from ...memory.memory_router import memory_init
-        _mem_path = memory_dir_for_backend(memory_backend, memory_path)
-        try:
-            memory_init(memory_backend, _mem_path)
-            if memory_backend == "obsidian":
-                memory_label = f"Obsidian (session)  →  {_mem_path}"
-            else:
-                memory_label = f"Local markdown  →  {_mem_path}"
-        except Exception as e:
-            memory_label = f"(init failed: {e})"
-        print(_step_line("Memory", memory_label, _label_w))
+    from ...config import memory_dir_for_backend
+    from ...memory.memory_router import memory_init
+    _mem_path = memory_dir_for_backend(memory_backend, memory_path)
+    try:
+        memory_init(memory_backend, _mem_path)
+        if memory_backend == "obsidian":
+            memory_label = f"Obsidian  →  {_mem_path}"
+        else:
+            memory_label = f"Local markdown  →  {_mem_path}"
+    except Exception as e:
+        memory_label = f"(init failed: {e})"
+    print(_step_line("Memory", memory_label, _label_w))
 
     _render_configuration(role_models, role_efforts)
 

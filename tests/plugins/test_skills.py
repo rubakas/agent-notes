@@ -77,7 +77,7 @@ def test_skill_name_matches_dir(skill_dir):
     )
 
 
-VALID_MEMORY_BACKENDS = {"obsidian", "wiki", "local", "none"}
+VALID_MEMORY_BACKENDS = {"obsidian", "wiki", "local"}
 
 
 @pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=[d.name for d in SKILL_DIRS])

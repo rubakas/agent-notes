@@ -214,7 +214,7 @@ def test_apply_then_regenerate_called(state_file):
         st = load_state()
 
     before = json.dumps({"dummy": "before"})
-    st.memory.backend = "none"  # mutate so there IS a diff
+    st.memory.strategy = "per-project"  # mutate so there IS a diff
 
     with _patch_state_file(state_file), \
          patch.object(ui_mod, "_safe_input", return_value="Y"), \

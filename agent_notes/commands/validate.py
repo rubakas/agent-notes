@@ -12,6 +12,13 @@ from ..services.validation import (
 )
 
 
+def _agent_line_limit(local_name: str) -> int:
+    """Line-count ceiling for a built agent file. The lead orchestrator is
+    intentionally the largest agent (it composes many shared includes), so it
+    gets more headroom; every other agent stays lean."""
+    return 500 if local_name == "lead" else 300
+
+
 def validate() -> None:
     """Lint all agent-notes configs."""
     from ..config import (
@@ -50,8 +57,9 @@ def validate() -> None:
                 errors.append(ValidationError(label, f"name '{fm_name}' does not match filename '{local_name}'"))
 
             # Line count
-            if lines > 300:
-                errors.append(ValidationError(label, "exceeds 300 line limit"))
+            limit = _agent_line_limit(local_name)
+            if lines > limit:
+                errors.append(ValidationError(label, f"exceeds {limit} line limit"))
             elif lines > 80:
                 warnings.append(ValidationWarning(label, "over 80 lines (consider trimming)"))
             else:
@@ -79,8 +87,9 @@ def validate() -> None:
                 if not has_field(f, field):
                     errors.append(ValidationError(label, f"missing required field: {field}"))
 
-            if lines > 300:
-                errors.append(ValidationError(label, "exceeds 300 line limit"))
+            limit = _agent_line_limit(local_name)
+            if lines > limit:
+                errors.append(ValidationError(label, f"exceeds {limit} line limit"))
             elif lines > 80:
                 warnings.append(ValidationWarning(label, "over 80 lines (consider trimming)"))
             else:

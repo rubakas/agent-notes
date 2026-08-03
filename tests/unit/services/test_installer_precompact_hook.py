@@ -72,13 +72,6 @@ class TestPrecompactHookInstall:
 
         assert not has_hook(settings_path, "PreCompact", Hooks.PRECOMPACT_MEMORY_BRIDGE)
 
-    def test_none_backend_skips_precompact_hook(self, mock_backend, tmp_path):
-        settings_path = tmp_path / "settings.json"
-
-        _install_session_hook(mock_backend, "global", memory_backend="none")
-
-        assert not has_hook(settings_path, "PreCompact", Hooks.PRECOMPACT_MEMORY_BRIDGE)
-
     def test_non_capable_backend_skips_precompact_hook(self, mock_backend_no_stop_hook, tmp_path):
         settings_path = tmp_path / "settings.json"
 

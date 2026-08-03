@@ -18,7 +18,8 @@ class AgentSpec:
     # backends is keyed by CLI backend name (e.g. "claude", "opencode", "copilot", ...).
     # Each value is the per-backend override dict as declared in agents.yaml.
     # Example: {"claude": {"exclude": True}, "opencode": {"mode": "subagent"}}
-    
+    stability: str = "stable"
+
     def backend_config(self, backend_name: str) -> Dict[str, Any]:
         """Return per-backend config for backend_name, or {} if none declared."""
         return self.backends.get(backend_name, {}) or {}

@@ -8,6 +8,7 @@ import re
 
 from ..config import SKILLS_DIR
 from ..domain.skill import Skill
+from ..services.stability import is_visible, enabled_wip, normalize_stability
 
 
 class SkillRegistry:
@@ -20,7 +21,12 @@ class SkillRegistry:
     def all(self) -> list[Skill]:
         """Return all skills."""
         return self._skills.copy()
-    
+
+    def available(self, override=None):
+        """Return skills visible under the wip stability gate."""
+        ov = enabled_wip() if override is None else override
+        return [s for s in self.all() if is_visible(s.stability, s.name, ov)]
+
     def get(self, name: str) -> Skill:
         """Get skill by name. Raises KeyError if unknown."""
         if name not in self._by_name:
@@ -47,15 +53,16 @@ class SkillRegistry:
         return groups
 
 
-def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str, Optional[str], Optional[str]]:
-    """Parse SKILL.md frontmatter for description, group, and requires_memory.
+def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str, Optional[str], Optional[str], Optional[str]]:
+    """Parse SKILL.md frontmatter for description, group, requires_memory, and stability.
 
     Returns:
-        (description, group, requires_memory) where description is first line if no frontmatter,
-        group is None if not specified, and requires_memory is None if not specified.
+        (description, group, requires_memory, stability) where description is first line
+        if no frontmatter, group is None if not specified, requires_memory is None if not
+        specified, and stability is None if not specified.
     """
     if not skill_md_path.exists():
-        return skill_md_path.parent.name, None, None
+        return skill_md_path.parent.name, None, None, None
 
     content = skill_md_path.read_text()
     lines = content.split('\n')
@@ -75,6 +82,7 @@ def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str, Optional[str], O
             group = None
             description = None
             requires_memory = None
+            stability = None
 
             for line in frontmatter_lines:
                 if ':' in line:
@@ -88,6 +96,8 @@ def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str, Optional[str], O
                     elif key == 'requires_memory':
                         tokens = [t.strip() for t in value.split(",")]
                         requires_memory = ",".join(t for t in tokens if t)
+                    elif key == 'stability':
+                        stability = value
 
             # If no description in frontmatter, use first non-empty line after frontmatter
             if not description:
@@ -97,16 +107,16 @@ def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str, Optional[str], O
                         description = line
                         break
 
-            return description or skill_md_path.parent.name, group, requires_memory
+            return description or skill_md_path.parent.name, group, requires_memory, stability
 
     # No frontmatter - use first non-empty line as description
     for line in lines:
         line = line.strip()
         if line:
-            return line, None, None
+            return line, None, None, None
 
     # Fallback to directory name
-    return skill_md_path.parent.name, None, None
+    return skill_md_path.parent.name, None, None, None
 
 
 def load_skill_registry(skills_dir: Optional[Path] = None) -> SkillRegistry:
@@ -126,7 +136,7 @@ def load_skill_registry(skills_dir: Optional[Path] = None) -> SkillRegistry:
         if not skill_md.exists():
             continue
         
-        description, group, requires_memory = _parse_skill_frontmatter(skill_md)
+        description, group, requires_memory, stability = _parse_skill_frontmatter(skill_md)
 
         skill = Skill(
             name=skill_dir.name,
@@ -134,6 +144,7 @@ def load_skill_registry(skills_dir: Optional[Path] = None) -> SkillRegistry:
             description=description,
             group=group,
             requires_memory=requires_memory,
+            stability=normalize_stability(stability, skill_md),
         )
         skills.append(skill)
     

@@ -21,8 +21,8 @@ def _run_orchestrator(monkeypatch, events, confirm_result=True, build_error=None
     monkeypatch.setattr("agent_notes.commands.wizard._select_mode", lambda **kw: False)
     monkeypatch.setattr("agent_notes.commands.wizard._select_profile", lambda **kw: profile)
     monkeypatch.setattr("agent_notes.commands.wizard._select_skills", lambda **kw: [])
-    monkeypatch.setattr("agent_notes.commands.wizard._select_memory", lambda *a, **kw: ("local", ""))
-    monkeypatch.setattr("agent_notes.commands.wizard.cost_report._select_cost_report", lambda **kw: False)
+    monkeypatch.setattr("agent_notes.commands.wizard._select_memory", lambda *a, **kw: ("local", "", "single-brain"))
+    monkeypatch.setattr("agent_notes.commands.wizard.capabilities._select_cost_report", lambda **kw: False)
     monkeypatch.setattr("agent_notes.commands.wizard.orchestrator._clear_screen", lambda: None)
 
     def fake_build(**kw):

@@ -36,20 +36,10 @@ class TestMemoryInit:
             memory_init("local", tmp_path)
         mock_fn.assert_called_once_with(tmp_path)
 
-    def test_none_backend_raises(self, tmp_path):
-        from agent_notes.memory.memory_router import memory_init
-        with pytest.raises(ValueError, match="Unknown memory backend"):
-            memory_init("none", tmp_path)
-
     def test_unknown_backend_raises(self, tmp_path):
         from agent_notes.memory.memory_router import memory_init
         with pytest.raises(ValueError, match="Unknown memory backend"):
             memory_init("unknown_backend_xyz", tmp_path)
-
-    def test_none_backend_raises_valueerror(self, tmp_path):
-        from agent_notes.memory.memory_router import memory_init
-        with pytest.raises(ValueError):
-            memory_init("none", tmp_path)
 
     def test_totally_unknown_backend_raises_valueerror(self, tmp_path):
         from agent_notes.memory.memory_router import memory_init
@@ -77,20 +67,10 @@ class TestMemoryRegenerateIndex:
             memory_regenerate_index("local", tmp_path)
         mock_fn.assert_called_once_with(tmp_path)
 
-    def test_none_backend_raises(self, tmp_path):
-        from agent_notes.memory.memory_router import memory_regenerate_index
-        with pytest.raises(ValueError, match="Unknown memory backend"):
-            memory_regenerate_index("none", tmp_path)
-
     def test_unknown_backend_raises(self, tmp_path):
         from agent_notes.memory.memory_router import memory_regenerate_index
         with pytest.raises(ValueError, match="Unknown memory backend"):
             memory_regenerate_index("unknown_backend_xyz", tmp_path)
-
-    def test_none_backend_raises_valueerror(self, tmp_path):
-        from agent_notes.memory.memory_router import memory_regenerate_index
-        with pytest.raises(ValueError):
-            memory_regenerate_index("none", tmp_path)
 
     def test_totally_unknown_backend_raises_valueerror(self, tmp_path):
         from agent_notes.memory.memory_router import memory_regenerate_index

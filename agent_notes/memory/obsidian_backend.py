@@ -98,15 +98,73 @@ def _build_note(
     return "\n".join(lines)
 
 
+def _all_session_dirs(vault: Path) -> list[Path]:
+    """Return all Sessions/ directories from both flat and per-project layouts.
+
+    Always searches both layouts so that session notes are found regardless of
+    which strategy was active when they were written — no notes are hidden after
+    a strategy switch.
+    """
+    dirs: list[Path] = []
+    flat = vault / _SESSIONS_FOLDER
+    if flat.is_dir():
+        dirs.append(flat)
+    if vault.is_dir():
+        for subdir in vault.iterdir():
+            if not subdir.is_dir() or subdir.name in OBSIDIAN_CATEGORIES:
+                continue
+            proj_sessions = subdir / _SESSIONS_FOLDER
+            if proj_sessions.is_dir():
+                dirs.append(proj_sessions)
+    return dirs
+
+
+def _all_category_folders(vault: Path) -> list[tuple[str, Path]]:
+    """Return (category, folder) pairs from both flat and per-project layouts.
+
+    Always scans both so that read/list/index operations surface notes written
+    under either strategy without moving any files.
+
+    Flat layout:        vault/<category>/
+    Per-project layout: vault/<project_name>/<category>/
+    """
+    seen: set[Path] = set()
+    result: list[tuple[str, Path]] = []
+
+    # 1. Flat root (single-brain layout)
+    for cat in OBSIDIAN_CATEGORIES:
+        folder = vault / cat
+        if folder.is_dir() and folder not in seen:
+            seen.add(folder)
+            result.append((cat, folder))
+
+    # 2. Per-project subfolders — any first-level vault subdir that contains
+    #    at least one recognised category folder is treated as a project dir.
+    if vault.is_dir():
+        for subdir in vault.iterdir():
+            if not subdir.is_dir() or subdir.name in OBSIDIAN_CATEGORIES:
+                continue  # skip category dirs themselves and non-dirs
+            for cat in OBSIDIAN_CATEGORIES:
+                proj_cat = subdir / cat
+                if proj_cat.is_dir() and proj_cat not in seen:
+                    seen.add(proj_cat)
+                    result.append((cat, proj_cat))
+
+    return result
+
+
 def _find_session_note(vault: Path, session_id: str) -> Optional[Path]:
-    """Find the session note file for the given session_id (matches stem pattern YYYY-MM-DD_<id>)."""
-    sessions_dir = vault / _SESSIONS_FOLDER
-    if not sessions_dir.exists():
-        return None
-    for f in sessions_dir.glob("*.md"):
-        # New format: YYYY-MM-DD_<session-id>.md  → stem ends with _<session-id>
-        if f.stem.endswith(f"_{session_id}") or f.stem == session_id:
-            return f
+    """Find the session note file for the given session_id.
+
+    Searches both flat (vault/Sessions/) and per-project (vault/*/Sessions/)
+    directories so that session notes are found regardless of which strategy
+    was active when they were written.
+    """
+    for sessions_dir in _all_session_dirs(vault):
+        for f in sessions_dir.glob("*.md"):
+            # New format: YYYY-MM-DD_<session-id>.md  → stem ends with _<session-id>
+            if f.stem.endswith(f"_{session_id}") or f.stem == session_id:
+                return f
     return None
 
 
@@ -156,8 +214,26 @@ def obsidian_write_note(
     project: str = "",
     description: str = "",
     tags: list[str] | None = None,
+    strategy: str = "single-brain",  # "single-brain" | "per-project"
 ) -> Path:
-    """Write a structured note to the correct category folder."""
+    """Write a structured note to the correct category folder.
+
+    ``strategy`` controls where NEW notes land:
+      - ``"single-brain"`` (default): flat shared root — exactly today's paths,
+        unchanged.
+      - ``"per-project"``: notes land under ``vault/<cwd-name>/<category>/``.
+        Caveat: two projects with the same directory name will share the same
+        per-project subfolder inside the vault.
+
+    Existing callers that do not pass ``strategy`` continue to use the flat
+    root (``"single-brain"`` default) with no behavioural change.
+    """
+    # Determine the effective write root based on the active strategy.
+    if strategy == "per-project":
+        write_root = vault / _current_project_name()
+    else:
+        write_root = vault  # single-brain: unchanged behaviour
+
     category_map = {
         "pattern": "Patterns",
         "decision": "Decisions",
@@ -166,7 +242,7 @@ def obsidian_write_note(
         "feedback": "Feedback",
         "session": "Sessions",
     }
-    folder = vault / category_map.get(note_type, "Context")
+    folder = write_root / category_map.get(note_type, "Context")
     folder.mkdir(parents=True, exist_ok=True)
 
     body = _resolve_wikilinks(body, vault)
@@ -284,14 +360,15 @@ def _description_or_title(meta: dict) -> str:
 
 
 def obsidian_regenerate_index(vault: Path) -> None:
-    """Regenerate Index.md grouped by note type, with sessions capped."""
+    """Regenerate Index.md grouped by note type, with sessions capped.
+
+    Scans both flat (single-brain) and per-project category folders so that
+    the index reflects all notes regardless of which strategy wrote them.
+    """
     now_iso = _now_iso()
 
     all_notes: list[tuple[str, Path]] = []
-    for cat in Obsidian.CATEGORIES:
-        folder = vault / cat
-        if not folder.exists():
-            continue
+    for cat, folder in _all_category_folders(vault):
         for note in folder.glob("*.md"):
             all_notes.append((cat, note))
 
@@ -352,12 +429,13 @@ def obsidian_regenerate_index(vault: Path) -> None:
 
 
 def obsidian_list_notes(vault: Path) -> list[dict]:
-    """Return list of note metadata dicts from the vault."""
+    """Return list of note metadata dicts from the vault.
+
+    Always scans both flat (single-brain) and per-project category folders so
+    that switching strategy never hides previously written notes.
+    """
     notes = []
-    for cat in Obsidian.CATEGORIES:
-        folder = vault / cat
-        if not folder.exists():
-            continue
+    for cat, folder in _all_category_folders(vault):
         for f in sorted(folder.glob("*.md")):
             notes.append({"category": cat, "file": f.name, "path": str(f)})
     return notes

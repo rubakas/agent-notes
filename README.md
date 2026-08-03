@@ -87,6 +87,38 @@ To produce a release artifact (wheel for distribution), use `python -m build` + 
 
 The plugin runs a `session.start` hook that surfaces agent-notes context to the CLI session. It does **not** include the full `agent-notes` CLI (wizard, doctor, config, memory, etc.). For those, use install method 1 or 2.
 
+---
+
+**Note on two meanings of "plugin":** This distribution plugin (the `.claude-plugin/` marketplace artifact) is distinct from **agent-notes plugins** — an internal toggleable subsystem documented below. See [Plugins](#plugins) to tell them apart.
+
+### Plugins (toggleable subsystems)
+
+Agent-notes includes toggleable subsystems (plugins) that can be enabled or disabled post-install. Currently, only **cost-report** is available as a plugin.
+
+**List available plugins:**
+```bash
+agent-notes plugins list
+```
+
+Example output:
+```
+  cost-report          [off]  Emit a per-session token cost report at the Stop hook
+```
+
+**Enable or disable a plugin:**
+```bash
+agent-notes plugins enable cost-report   # Enable cost-report
+agent-notes plugins disable cost-report  # Disable cost-report
+agent-notes install                      # Apply changes
+```
+
+**Show plugin details:**
+```bash
+agent-notes plugins info cost-report
+```
+
+After enabling or disabling a plugin, run `agent-notes install` to apply the changes. For details, see `docs/WRITING_A_PLUGIN.md`.
+
 ### API keys
 
 Provider API keys live in `~/.agent-notes/credentials.toml` (mode 0600, never committed). Add or update via:

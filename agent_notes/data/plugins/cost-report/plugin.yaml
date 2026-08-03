@@ -1,0 +1,8 @@
+name: cost-report
+description: Emit a per-session token cost report at the Stop hook
+default: off
+includes: [cost_reporting]
+hooks:
+  - {event: Stop, command: "agent-notes cost-report", requires: stop_hook}
+allow:
+  - {value: "Bash(agent-notes cost-report)", requires: allow_entries}

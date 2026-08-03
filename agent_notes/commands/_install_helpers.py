@@ -188,7 +188,7 @@ def count_agents(backend) -> int:
         return 0
     from ..registries.agent_registry import load_agent_registry
     registry = load_agent_registry()
-    return sum(1 for a in registry.all() if not a.excluded_from(backend.name))
+    return sum(1 for a in registry.available() if not a.excluded_from(backend.name))
 
 
 def count_global() -> int:

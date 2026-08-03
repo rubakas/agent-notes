@@ -8,6 +8,7 @@ from functools import lru_cache
 
 from ..config import DATA_DIR
 from ..domain.cli_backend import CLIBackend
+from ..services.stability import normalize_stability, is_visible, enabled_wip
 from ._base import load_yaml_dir, require_fields
 
 
@@ -21,6 +22,11 @@ class CLIRegistry:
     def all(self) -> list[CLIBackend]:
         """Return all backends."""
         return self._backends.copy()
+    
+    def available(self, override=None) -> list[CLIBackend]:
+        """Backends visible to users: all() minus wip ones not force-enabled."""
+        ov = enabled_wip() if override is None else override
+        return [b for b in self.all() if is_visible(b.stability, b.name, ov)]
     
     def get(self, name: str) -> CLIBackend:
         """Get backend by name. Raises KeyError if unknown."""
@@ -72,6 +78,7 @@ def load_registry(cli_dir: Optional[Path] = None) -> CLIRegistry:
             accepted_providers=tuple(data.get("accepted_providers", [])),
             use_model_class=data.get("use_model_class", False),
             preferred_family=data.get("preferred_family"),
+            stability=normalize_stability(data.get("stability"), yaml_file),
         )
         backends.append(backend)
     

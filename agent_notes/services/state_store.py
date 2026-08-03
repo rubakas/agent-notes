@@ -186,7 +186,7 @@ def _state_to_dict(s: State) -> dict:
         "source_commit": s.source_commit,
         "global": _scope_to_dict(s.global_install) if s.global_install else None,
         "local": {path: _scope_to_dict(ss) for path, ss in s.local_installs.items()},
-        "memory": {"backend": s.memory.backend, "path": s.memory.path},
+        "memory": {"backend": s.memory.backend, "path": s.memory.path, "strategy": s.memory.strategy},
     }
     if s.global_installs:
         d["global_installs"] = {label: _scope_to_dict(ss) for label, ss in s.global_installs.items()}
@@ -234,9 +234,11 @@ def _state_from_dict(data: dict) -> State:
     global_installs = {label: _scope_from_dict(sd) for label, sd in global_installs_data.items()}
 
     memory_data = data.get("memory", {})
+    raw_backend = memory_data.get("backend", "local")
     memory = MemoryConfig(
-        backend=memory_data.get("backend", "local"),
+        backend="local" if raw_backend == "none" else raw_backend,
         path=memory_data.get("path", ""),
+        strategy=memory_data.get("strategy", "single-brain"),
     )
 
     return State(

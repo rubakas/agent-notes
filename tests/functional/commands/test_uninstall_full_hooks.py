@@ -176,8 +176,13 @@ class TestUninstallRemovesAllHooksAndPermissions:
                 registry=registry,
             )
 
-        # Also run the session hook manually with obsidian backend so memory-bridge hooks fire
-        with patch("agent_notes.services.installer.load_registry", return_value=registry):
+        # Also run the session hook manually with obsidian backend so memory-bridge hooks fire.
+        # Enable cost-report so the Stop hook is installed (it's off by default).
+        with patch("agent_notes.services.installer.load_registry", return_value=registry), \
+             patch(
+                 "agent_notes.services.user_config.load_user_config",
+                 return_value={"enabled_plugins": {"cost-report": True}},
+             ):
             from agent_notes.services.installer import _install_session_hook
             backend = registry.all()[0]
             _install_session_hook(

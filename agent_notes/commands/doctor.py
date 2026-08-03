@@ -52,7 +52,7 @@ from ..services.fs import (
 # docker-compose → group: docker).  There is no single source-of-truth
 # constant elsewhere in the codebase, so the full vocabulary is listed here.
 _VALID_GROUPS = {"process", "domain", "rails", "docker", "kamal"}
-_VALID_MEMORY_BACKENDS = {"obsidian", "local", "none"}
+_VALID_MEMORY_BACKENDS = {"obsidian", "local"}
 
 
 def check_skill_frontmatter(scope: str, issues: list, fix_actions: list, profile_label: str = "") -> None:
@@ -61,7 +61,7 @@ def check_skill_frontmatter(scope: str, issues: list, fix_actions: list, profile
     Checks every skill for:
     - non-empty name and description
     - group, if present, is in {"process", "domain"}
-    - requires_memory tokens, if present, are each in {"obsidian", "local", "none"}
+    - requires_memory tokens, if present, are each in {"obsidian", "local"}
 
     Violations are printed as advisories and do NOT affect issues/fix_actions or exit code.
     """
@@ -78,6 +78,35 @@ def check_skill_frontmatter(scope: str, issues: list, fix_actions: list, profile
                 token = token.strip()
                 if token and token not in _VALID_MEMORY_BACKENDS:
                     print(f"  [skill-frontmatter] {skill.name}: 'requires_memory' token '{token}' is not in {sorted(_VALID_MEMORY_BACKENDS)}")
+
+
+def _check_wip_components() -> None:
+    """Print any work-in-progress components and whether they are force-enabled."""
+    from ..registries.cli_registry import load_registry
+    from ..registries.plugin_registry import default_plugin_registry
+    from ..registries.skill_registry import default_skill_registry
+    from ..registries.agent_registry import default_agent_registry
+    from ..services.stability import enabled_wip, STABILITY_WIP
+
+    override = enabled_wip()
+    wip = []
+    for kind, items in (
+        ("backend", load_registry().all()),
+        ("plugin", default_plugin_registry().all()),
+        ("skill", default_skill_registry().all()),
+        ("agent", default_agent_registry().all()),
+    ):
+        for item in items:
+            if getattr(item, "stability", "stable") == STABILITY_WIP:
+                state = "ENABLED" if item.name in override else "hidden"
+                wip.append(f"  - {kind} {item.name}: {state}")
+
+    if not wip:
+        return
+    print("\nWork-in-progress components:")
+    print("\n".join(wip))
+    if override:
+        print(f"  (AGENT_NOTES_ENABLE_WIP={','.join(sorted(override))})")
 
 
 def _check_session_hook(scope: str, issues: list) -> None:
@@ -207,7 +236,10 @@ def diagnose(scope: str, fix: bool = False) -> bool:
     state = load_current_state()
     if state is not None:
         _check_role_models(state)
-    
+
+    # Print any work-in-progress components (advisory, non-fatal)
+    _check_wip_components()
+
     # Print issues and optionally fix
     if print_issues(issues):
         return True  # No issues
