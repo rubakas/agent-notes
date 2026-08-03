@@ -81,6 +81,36 @@ def _select_cli(step: int = 0, total: int = 0, version: str = '') -> Set[str]:
     return result
 
 
+def _default_model_for_role(role, compatible):
+    """The pre-selected default model for a role given the backend's compatible models."""
+    return next(
+        (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.deprecated and not m.never_default),
+        next(
+            (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.never_default),
+            next(
+                (m for m in reversed(compatible) if not m.never_default),
+                compatible[0],
+            ),
+        ),
+    )
+
+
+def _select_accept_all_models(step: int = 0, total: int = 0, version: str = '') -> bool:
+    """Ask whether to accept recommended models/effort for every role. Default Yes."""
+    options = [
+        ("Yes  — use the recommended model and effort for every role", "yes"),
+        ("No   — choose the model (and effort) per role", "no"),
+    ]
+    if _can_interactive():
+        choice = _radio_select(
+            "Use recommended models for all agent roles?\n"
+            "  (you can change any of them later with: agent-notes config role-model)",
+            options, default=0, step=step, total=total, version=version,
+        )
+        return choice == "yes"
+    return True  # non-interactive: accept recommended silently (today's behavior)
+
+
 def _effort_provider_for_model(backend, model) -> Optional[str]:
     """Pure helper: return the provider name resolved for model on backend, or None."""
     resolved = backend.first_alias_for(model.aliases)
@@ -120,6 +150,8 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
 
     roles_sorted = sorted(roles, key=_role_sort_key)
 
+    accept_all = _select_accept_all_models(step=step, total=total, version=version)
+
     result = {}
     effort_result = {}
     for backend_name in sorted(clis):
@@ -146,16 +178,7 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
             if backend_name == "claude" and role.name == "orchestrator":
                 continue
 
-            default_model = next(
-                (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.deprecated and not m.never_default),
-                next(
-                    (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.never_default),
-                    next(
-                        (m for m in reversed(compatible) if not m.never_default),
-                        compatible[0],
-                    ),
-                ),
-            )
+            default_model = _default_model_for_role(role, compatible)
             default_idx = compatible.index(default_model)
 
             options = []
@@ -166,21 +189,27 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
 
             role_color = (_ROLE_ANSI.get(role.color, '') if sys.stdout.isatty() else '') if role.color else ''
             role_label_colored = f"{role_color}{role.label}{Color.NC}" if role_color else role.label
-            title = (
-                f"{Color.DIM}CLI{Color.NC}          {Color.YELLOW}{backend.label}{Color.NC}\n"
-                f"  {Color.DIM}Role{Color.NC}         {role_label_colored}\n"
-                f"  {Color.DIM}Description{Color.NC}  {role.description}"
-            )
-            if _can_interactive():
-                picked = _radio_select(title, options, default=default_idx,
-                                       step=step, total=total, version=version)
-            else:
-                picked = _radio_select_fallback(title, options, default=default_idx,
-                                                step=step, total=total, version=version)
-            cli_role_models[role.name] = picked
 
-            picked_label = next(label for label, mid in options if mid == picked)
-            print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored}: {picked_label}")
+            if accept_all:
+                picked = default_model.id
+                picked_label = next(label for label, mid in options if mid == picked)
+                print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored}: {picked_label}")
+            else:
+                title = (
+                    f"{Color.DIM}CLI{Color.NC}          {Color.YELLOW}{backend.label}{Color.NC}\n"
+                    f"  {Color.DIM}Role{Color.NC}         {role_label_colored}\n"
+                    f"  {Color.DIM}Description{Color.NC}  {role.description}"
+                )
+                if _can_interactive():
+                    picked = _radio_select(title, options, default=default_idx,
+                                           step=step, total=total, version=version)
+                else:
+                    picked = _radio_select_fallback(title, options, default=default_idx,
+                                                    step=step, total=total, version=version)
+                picked_label = next(label for label, mid in options if mid == picked)
+                print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored}: {picked_label}")
+
+            cli_role_models[role.name] = picked
 
             picked_model = next(m for m in compatible if m.id == picked)
             provider_name = _effort_provider_for_model(backend, picked_model)
@@ -195,19 +224,25 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
                 effort_options = [(e, e) for e in provider.efforts]
                 default_effort = _effort_default_choice(role, provider)
                 default_effort_idx = provider.efforts.index(default_effort)
-                effort_title = (
-                    f"{Color.DIM}CLI{Color.NC}          {Color.YELLOW}{backend.label}{Color.NC}\n"
-                    f"  {Color.DIM}Role{Color.NC}         {role_label_colored}\n"
-                    f"  {Color.DIM}Effort{Color.NC}       for {picked_label} (via {provider_name})"
-                )
-                if _can_interactive():
-                    picked_effort = _radio_select(effort_title, effort_options, default=default_effort_idx,
-                                                   step=step, total=total, version=version)
+
+                if accept_all:
+                    picked_effort = default_effort
+                    print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored} effort: {picked_effort}")
                 else:
-                    picked_effort = _radio_select_fallback(effort_title, effort_options, default=default_effort_idx,
-                                                            step=step, total=total, version=version)
+                    effort_title = (
+                        f"{Color.DIM}CLI{Color.NC}          {Color.YELLOW}{backend.label}{Color.NC}\n"
+                        f"  {Color.DIM}Role{Color.NC}         {role_label_colored}\n"
+                        f"  {Color.DIM}Effort{Color.NC}       for {picked_label} (via {provider_name})"
+                    )
+                    if _can_interactive():
+                        picked_effort = _radio_select(effort_title, effort_options, default=default_effort_idx,
+                                                       step=step, total=total, version=version)
+                    else:
+                        picked_effort = _radio_select_fallback(effort_title, effort_options, default=default_effort_idx,
+                                                                step=step, total=total, version=version)
+                    print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored} effort: {picked_effort}")
+
                 cli_role_efforts[role.name] = picked_effort
-                print(f"  {Color.GREEN}✓{Color.NC} {role_label_colored} effort: {picked_effort}")
 
         result[backend_name] = cli_role_models
         effort_result[backend_name] = cli_role_efforts
