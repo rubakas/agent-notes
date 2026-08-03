@@ -31,273 +31,45 @@ class _FakeResponse:
         pass
 
 
-def _make_credentials(configured: dict[str, str | None]):
-    """Return (is_configured, get) mocks driven by *configured* dict.
-
-    Keys are provider names; values are API keys (None = not configured).
-    """
-    def _is_configured(provider: str) -> bool:
-        return provider in configured and configured[provider] is not None
-
-    def _get(provider: str):
-        return configured.get(provider)
-
-    return _is_configured, _get
-
-
 # ---------------------------------------------------------------------------
-# _fetch_anthropic
+# _fetch_openrouter
 # ---------------------------------------------------------------------------
 
-ANTHROPIC_PAGE_1 = {
-    "data": [
-        {
-            "id": "claude-sonnet-5",
-            "display_name": "Claude Sonnet 5",
-            "created_at": "2026-01-01T00:00:00Z",
-            "max_input_tokens": 200000,
-            "max_tokens": 8192,
-            "type": "model",
-        },
-        {
-            "id": "claude-opus-4-8",
-            "display_name": "Claude Opus 4.8",
-            "created_at": "2025-12-01T00:00:00Z",
-            "max_input_tokens": 0,   # unknown — must not be stored
-            "max_tokens": 4096,
-            "type": "model",
-        },
-    ],
-    "has_more": True,
-    "first_id": "claude-sonnet-5",
-    "last_id": "claude-opus-4-8",
-}
-
-ANTHROPIC_PAGE_2 = {
-    "data": [
-        {
-            "id": "claude-haiku-4-5",
-            "display_name": "Claude Haiku 4.5",
-            "created_at": "2025-06-01T00:00:00Z",
-            "max_input_tokens": 100000,
-            "max_tokens": 4096,
-            "type": "model",
-        },
-    ],
-    "has_more": False,
-    "first_id": "claude-haiku-4-5",
-    "last_id": "claude-haiku-4-5",
-}
+_OR_PAYLOAD = {"data": [
+    {"id": "anthropic/claude-opus-4.8", "name": "Anthropic: Claude Opus 4.8"},
+    {"id": "anthropic/claude-opus-5",   "name": "Claude Opus 5"},
+    {"id": "anthropic/claude-opus-5-fast", "name": "Claude Opus 5 (Fast)"},
+    {"id": "anthropic/claude-3-haiku",  "name": "Anthropic: Claude 3 Haiku"},
+    {"id": "openai/gpt-5.5",            "name": "OpenAI: GPT-5.5"},
+    {"id": "openai/gpt-5.4-mini",       "name": "OpenAI: GPT-5.4 Mini"},
+    {"id": "openai/gpt-5.6-luna",       "name": "OpenAI: GPT-5.6 Luna"},
+    {"id": "openai/gpt-5-nano",         "name": "OpenAI: GPT-5 Nano"},
+    {"id": "google/gemini-3-pro",       "name": "Google: Gemini 3 Pro"},
+]}
 
 
-class TestFetchAnthropic:
-    def test_pagination_assembles_full_list(self):
-        """Two pages of results are concatenated into a single list."""
-        responses = [_FakeResponse(ANTHROPIC_PAGE_1), _FakeResponse(ANTHROPIC_PAGE_2)]
-        call_count = [0]
+class TestFetchOpenRouter:
+    def test_fetch_openrouter_maps_and_curates(self):
+        from agent_notes.commands.models import _fetch_openrouter, _load_rules
+        with patch("urllib.request.urlopen", side_effect=lambda *a, **k: _FakeResponse(_OR_PAYLOAD)):
+            got = _fetch_openrouter(_load_rules())
+        anth_ids = {e["id"] for e in got["anthropic"]}
+        oai_ids  = {e["id"] for e in got["openai"]}
+        assert anth_ids == {"claude-opus-4-8", "claude-opus-5"}      # dots->dashes; -fast & claude-3 dropped
+        assert oai_ids  == {"gpt-5.5", "gpt-5.4-mini"}               # keep dots; -luna & -nano dropped
+        assert "google" not in got                                   # non-curated provider ignored
+        opus48 = next(e for e in got["anthropic"] if e["id"] == "claude-opus-4-8")
+        assert opus48["display_name"] == "Claude Opus 4.8"           # "Anthropic: " prefix stripped
+        assert opus48["created_at"] is None
+        assert set(got["openai"][0].keys()) == {"id"}                # openai entries are id-only
 
-        def fake_urlopen(req, timeout=None):
-            resp = responses[call_count[0]]
-            call_count[0] += 1
-            return resp
-
-        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-            from agent_notes.commands.models import _fetch_anthropic
-            entries = _fetch_anthropic("sk-fake-key")
-
-        assert len(entries) == 3
-        ids = [e["id"] for e in entries]
-        assert "claude-sonnet-5" in ids
-        assert "claude-opus-4-8" in ids
-        assert "claude-haiku-4-5" in ids
-
-    def test_pagination_uses_after_id_on_second_request(self):
-        """Second request URL contains after_id=<last_id from page 1>."""
-        responses = [_FakeResponse(ANTHROPIC_PAGE_1), _FakeResponse(ANTHROPIC_PAGE_2)]
-        call_count = [0]
-        urls_seen: list[str] = []
-
-        def fake_urlopen(req, timeout=None):
-            urls_seen.append(req.full_url)
-            resp = responses[call_count[0]]
-            call_count[0] += 1
-            return resp
-
-        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-            from agent_notes.commands.models import _fetch_anthropic
-            _fetch_anthropic("sk-fake-key")
-
-        assert len(urls_seen) == 2
-        assert "after_id=claude-opus-4-8" in urls_seen[1]
-
-    def test_max_input_tokens_zero_not_stored(self):
-        """max_input_tokens: 0 from the API is treated as unknown and omitted."""
-        responses = [_FakeResponse(ANTHROPIC_PAGE_1), _FakeResponse(ANTHROPIC_PAGE_2)]
-        call_count = [0]
-
-        def fake_urlopen(req, timeout=None):
-            resp = responses[call_count[0]]
-            call_count[0] += 1
-            return resp
-
-        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-            from agent_notes.commands.models import _fetch_anthropic
-            entries = _fetch_anthropic("sk-fake-key")
-
-        opus = next(e for e in entries if e["id"] == "claude-opus-4-8")
-        assert "max_input_tokens" not in opus
-
-    def test_max_input_tokens_nonzero_is_stored(self):
-        """max_input_tokens with a real value is preserved."""
-        responses = [_FakeResponse(ANTHROPIC_PAGE_1), _FakeResponse(ANTHROPIC_PAGE_2)]
-        call_count = [0]
-
-        def fake_urlopen(req, timeout=None):
-            resp = responses[call_count[0]]
-            call_count[0] += 1
-            return resp
-
-        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-            from agent_notes.commands.models import _fetch_anthropic
-            entries = _fetch_anthropic("sk-fake-key")
-
-        sonnet = next(e for e in entries if e["id"] == "claude-sonnet-5")
-        assert sonnet["max_input_tokens"] == 200000
-
-    def test_single_page_no_has_more(self):
-        """A single-page response (has_more=False) makes exactly one request."""
-        single_page = dict(ANTHROPIC_PAGE_2, has_more=False)
-        call_count = [0]
-
-        def fake_urlopen(req, timeout=None):
-            call_count[0] += 1
-            return _FakeResponse(single_page)
-
-        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-            from agent_notes.commands.models import _fetch_anthropic
-            entries = _fetch_anthropic("sk-fake-key")
-
-        assert call_count[0] == 1
-        assert len(entries) == 1
-
-
-# ---------------------------------------------------------------------------
-# _fetch_openai
-# ---------------------------------------------------------------------------
-
-OPENAI_RESPONSE = {
-    "object": "list",
-    "data": [
-        {"id": "gpt-5.5",           "object": "model", "created": 1700000001, "owned_by": "openai"},
-        {"id": "gpt-5.4",           "object": "model", "created": 1700000000, "owned_by": "openai"},
-        {"id": "gpt-5.4-mini",      "object": "model", "created": 1699999999, "owned_by": "openai"},
-        # noise — must be filtered out
-        {"id": "text-embedding-ada-002", "object": "model", "created": 1698000000, "owned_by": "openai"},
-        {"id": "tts-1",                  "object": "model", "created": 1698000001, "owned_by": "openai"},
-        {"id": "whisper-1",              "object": "model", "created": 1698000002, "owned_by": "openai"},
-        {"id": "dall-e-3",               "object": "model", "created": 1698000003, "owned_by": "openai"},
-        {"id": "gpt-4-instruct",         "object": "model", "created": 1698000004, "owned_by": "openai"},
-    ],
-}
-
-_RULES_WITH_OPENAI_FILTER = {
-    "filter": {
-        "openai": {
-            "exclude": [
-                "text-embedding-*",
-                "tts-*",
-                "whisper-*",
-                "dall-e-*",
-                "*-instruct",
-                "*search*",
-                "*realtime*",
-            ]
-        }
-    }
-}
-
-
-class TestFetchOpenAI:
-    def _do_fetch(self):
-        from agent_notes.commands.models import _fetch_openai
-
-        def fake_urlopen(req, timeout=None):
-            return _FakeResponse(OPENAI_RESPONSE)
-
-        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-            return _fetch_openai("sk-fake-key", _RULES_WITH_OPENAI_FILTER)
-
-    def test_chat_models_included(self):
-        entries = self._do_fetch()
-        ids = [e["id"] for e in entries]
-        assert "gpt-5.5" in ids
-        assert "gpt-5.4" in ids
-        assert "gpt-5.4-mini" in ids
-
-    def test_noise_models_excluded(self):
-        entries = self._do_fetch()
-        ids = [e["id"] for e in entries]
-        assert "text-embedding-ada-002" not in ids
-        assert "tts-1" not in ids
-        assert "whisper-1" not in ids
-        assert "dall-e-3" not in ids
-        assert "gpt-4-instruct" not in ids
-
-    def test_total_count_matches_chat_models_only(self):
-        entries = self._do_fetch()
-        assert len(entries) == 3
-
-    def test_created_timestamp_preserved(self):
-        entries = self._do_fetch()
-        gpt55 = next(e for e in entries if e["id"] == "gpt-5.5")
-        assert gpt55["created"] == 1700000001
-
-
-# ---------------------------------------------------------------------------
-# refresh — unconfigured provider is skipped gracefully
-# ---------------------------------------------------------------------------
-
-class TestRefreshUnconfiguredProvider:
-    def test_skips_unconfigured_with_named_message(self, capsys, tmp_path, monkeypatch):
-        """Both providers unconfigured: prints name-only skip message, fetches nothing."""
-        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
-
-        is_configured, get_key = _make_credentials({})  # nothing configured
-
-        with patch("agent_notes.commands.models._load_rules", return_value=_RULES_WITH_OPENAI_FILTER), \
-             patch("agent_notes.commands.models._load_current_catalog", return_value={"providers": {}}), \
-             patch("agent_notes.services.credentials.is_configured", side_effect=is_configured), \
-             patch("agent_notes.services.credentials.get", side_effect=get_key), \
-             patch("urllib.request.urlopen") as mock_urlopen:
-            from agent_notes.commands.models import refresh
-            refresh(dry_run=True)
-            mock_urlopen.assert_not_called()
-
-        out = capsys.readouterr().out
-        assert "anthropic" in out
-        assert "not configured" in out
-        assert "openai" in out
-
-    def test_api_key_never_in_output(self, capsys, tmp_path, monkeypatch):
-        """Even when an API key exists, it must not appear in printed output."""
-        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
-        secret = "SECRET-API-KEY-12345"
-
-        is_configured, get_key = _make_credentials({"anthropic": secret})
-
-        page = {"data": [], "has_more": False}
-
-        with patch("agent_notes.commands.models._load_rules", return_value=_RULES_WITH_OPENAI_FILTER), \
-             patch("agent_notes.commands.models._load_current_catalog", return_value={"providers": {}}), \
-             patch("agent_notes.services.credentials.is_configured", side_effect=is_configured), \
-             patch("agent_notes.services.credentials.get", side_effect=get_key), \
-             patch("urllib.request.urlopen", return_value=_FakeResponse(page)):
-            from agent_notes.commands.models import refresh
-            refresh(provider="anthropic", dry_run=True)
-
-        out, err = capsys.readouterr()
-        assert secret not in out
-        assert secret not in err
+    def test_refresh_fails_loud_on_empty(self, monkeypatch, tmp_path):
+        # OpenRouter returns nothing curated -> refresh must sys.exit(1) (CI guard)
+        from agent_notes.commands import models
+        monkeypatch.setattr(models, "_fetch_openrouter", lambda rules: {"anthropic": [], "openai": []})
+        with pytest.raises(SystemExit) as ei:
+            models.refresh()
+        assert ei.value.code == 1
 
 
 # ---------------------------------------------------------------------------
@@ -308,27 +80,15 @@ class TestRefreshDryRun:
     def test_dry_run_writes_no_files(self, tmp_path, monkeypatch):
         """--dry-run must not create any files under XDG_CACHE_HOME."""
         monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
-        secret = "sk-dry-run-test"
-        is_configured, get_key = _make_credentials(
-            {"anthropic": secret, "openai": secret}
-        )
 
-        responses = [
-            _FakeResponse({"data": [], "has_more": False}),
-            _FakeResponse({"object": "list", "data": []}),
-        ]
-        call_count = [0]
+        fake_fetched = {
+            "anthropic": [{"id": "claude-opus-4-8", "display_name": "Claude Opus 4.8", "created_at": None}],
+            "openai": [{"id": "gpt-5.5"}],
+        }
 
-        def fake_urlopen(req, timeout=None):
-            r = responses[call_count[0] % len(responses)]
-            call_count[0] += 1
-            return r
-
-        with patch("agent_notes.commands.models._load_rules", return_value=_RULES_WITH_OPENAI_FILTER), \
+        with patch("agent_notes.commands.models._load_rules", return_value={}), \
              patch("agent_notes.commands.models._load_current_catalog", return_value={"providers": {}}), \
-             patch("agent_notes.services.credentials.is_configured", side_effect=is_configured), \
-             patch("agent_notes.services.credentials.get", side_effect=get_key), \
-             patch("urllib.request.urlopen", side_effect=fake_urlopen):
+             patch("agent_notes.commands.models._fetch_openrouter", return_value=fake_fetched):
             from agent_notes.commands.models import refresh
             refresh(dry_run=True)
 

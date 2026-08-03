@@ -35,6 +35,15 @@ def _is_excluded(model_id: str, rules: dict, provider: str) -> bool:
     return any(fnmatch.fnmatch(model_id, pat) for pat in exclude_patterns)
 
 
+def _curated(model_id: str, rules: dict, provider: str) -> bool:
+    """True iff model_id matches an allow glob and no exclude glob for provider."""
+    pf = rules.get("filter", {}).get(provider, {})
+    allow = pf.get("allow", [])
+    if allow and not any(fnmatch.fnmatch(model_id, pat) for pat in allow):
+        return False
+    return not _is_excluded(model_id, rules, provider)
+
+
 def _get_version() -> str:
     from ..config import get_version
     try:
@@ -47,90 +56,42 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _fetch_anthropic(api_key: str) -> list[dict]:
-    """Fetch all models from Anthropic API with cursor pagination.
+_OPENROUTER_URL = "https://openrouter.ai/api/v1/models"
+_CURATED_PROVIDERS = ("anthropic", "openai")
 
-    Returns a list of seed-format entries:
-    ``{"id": ..., "display_name": ..., "created_at": ...}``
 
-    ``max_input_tokens: 0`` from the API means unknown; it is not stored.
+def _fetch_openrouter(rules: dict, *, url: str = _OPENROUTER_URL) -> dict[str, list[dict]]:
+    """Fetch the public OpenRouter model list (no auth) and return curated,
+    provider-native seed entries keyed by provider.
+
+    Anthropic ids: strip 'anthropic/', convert dots->dashes, entry carries a
+    cleaned display_name and created_at=None. OpenAI ids: strip 'openai/',
+    keep dots, entry is id-only. Non-curated prefixes are ignored.
     """
     import urllib.request
 
     version = _get_version()
-    base_url = "https://api.anthropic.com/v1/models"
-    entries: list[dict] = []
-    after_id: Optional[str] = None
-
-    while True:
-        url = f"{base_url}?limit=1000"
-        if after_id:
-            url += f"&after_id={after_id}"
-
-        req = urllib.request.Request(
-            url,
-            headers={
-                "anthropic-version": "2023-06-01",
-                "x-api-key": api_key,
-                "User-Agent": f"agent-notes/{version}",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
-
-        for m in data.get("data", []):
-            entry: dict = {
-                "id": m["id"],
-                "display_name": m.get("display_name") or m["id"],
-                "created_at": m.get("created_at"),
-            }
-            max_input = m.get("max_input_tokens")
-            if max_input and max_input != 0:
-                entry["max_input_tokens"] = max_input
-            entries.append(entry)
-
-        if not data.get("has_more"):
-            break
-        after_id = data.get("last_id")
-        if not after_id:
-            break
-
-    return entries
-
-
-def _fetch_openai(api_key: str, rules: dict) -> list[dict]:
-    """Fetch chat models from OpenAI API (unpaginated).
-
-    Non-chat models (embeddings, TTS, Whisper, DALL·E, etc.) are filtered
-    using the ``filter.openai.exclude`` patterns in ``rules.yaml``.
-
-    Returns a list of seed-format entries: ``{"id": ..., "created": ...}``
-    """
-    import urllib.request
-
-    version = _get_version()
-    req = urllib.request.Request(
-        "https://api.openai.com/v1/models",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "User-Agent": f"agent-notes/{version}",
-        },
-    )
+    req = urllib.request.Request(url, headers={"User-Agent": f"agent-notes/{version}"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         data = json.loads(resp.read())
 
-    entries: list[dict] = []
+    out: dict[str, list[dict]] = {p: [] for p in _CURATED_PROVIDERS}
     for m in data.get("data", []):
-        model_id = m["id"]
-        if _is_excluded(model_id, rules, "openai"):
+        mid = m.get("id", "")
+        prov, _, rest = mid.partition("/")
+        if prov not in _CURATED_PROVIDERS or not rest:
             continue
-        entry: dict = {"id": model_id}
-        created = m.get("created")
-        if created is not None:
-            entry["created"] = created
-        entries.append(entry)
-
-    return entries
+        native = rest.replace(".", "-") if prov == "anthropic" else rest
+        if not _curated(native, rules, prov):
+            continue
+        if prov == "anthropic":
+            name = m.get("name") or native
+            if name.startswith("Anthropic:"):
+                name = name[len("Anthropic:"):].strip()
+            out["anthropic"].append({"id": native, "display_name": name, "created_at": None})
+        else:
+            out["openai"].append({"id": native})
+    return out
 
 
 def _load_current_catalog() -> dict:
@@ -180,51 +141,36 @@ def _print_diff(old: dict, new_catalog: dict, providers: list[str]) -> None:
 
 
 def refresh(provider: Optional[str] = None, dry_run: bool = False) -> None:
-    """Fetch model catalog from provider APIs, show diff, and write cache.
+    """Fetch the model catalog from OpenRouter (keyless), show the diff, write cache.
 
-    - ``--provider anthropic|openai``  limit to one provider
+    - ``--provider anthropic|openai``  limit output to one provider
     - ``--dry-run``                    print diff but write nothing
-
-    Auth is read from the credentials store via ``is_configured`` / ``get``.
-    Unconfigured providers are skipped by name; the key value is never printed.
+    No credentials are used; OpenRouter's model list is public.
     """
-    from ..services import credentials
-
-    providers = ["anthropic", "openai"] if provider is None else [provider]
     rules = _load_rules()
     old_catalog = _load_current_catalog()
 
-    new_providers: dict = {}
-    for p in providers:
-        if not credentials.is_configured(p):
-            print(f"  {p}: not configured — skipping")
-            continue
-        api_key = credentials.get(p)
-        if not api_key:
-            print(f"  {p}: key is empty — skipping")
-            continue
-        print(f"Fetching {p}...")
-        try:
-            if p == "anthropic":
-                entries = _fetch_anthropic(api_key)
-            else:
-                entries = _fetch_openai(api_key, rules)
-        except Exception as exc:
-            print(f"  {p}: fetch failed — {type(exc).__name__}: {exc}")
-            continue
-        new_providers[p] = entries
-        print(f"  {p}: fetched {len(entries)} models")
+    print("Fetching from OpenRouter...")
+    try:
+        fetched = _fetch_openrouter(rules)
+    except Exception as exc:  # network/parse failure -> loud, non-zero (CI guard)
+        print(f"  fetch failed — {type(exc).__name__}: {exc}")
+        sys.exit(1)
 
+    if provider is not None:
+        fetched = {provider: fetched.get(provider, [])}
+
+    new_providers = {p: e for p, e in fetched.items() if e}
+    for p in fetched:
+        print(f"  {p}: {len(fetched[p])} models")
     if not new_providers:
         print("Nothing fetched.")
-        return
+        sys.exit(1)
 
-    # Merge: carry over providers we didn't refresh
-    new_catalog: dict = {
+    new_catalog = {
         "fetched_at": _now_iso(),
         "providers": {**old_catalog.get("providers", {}), **new_providers},
     }
-
     print("\nDiff:")
     _print_diff(old_catalog, new_catalog, list(new_providers.keys()))
 

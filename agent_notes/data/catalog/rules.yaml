@@ -52,16 +52,35 @@ capabilities:
     gpt-5-4-mini:
       long_context: false
 
-# Per-provider API filter applied during `models refresh`.
-# Models whose IDs match any exclude pattern are dropped before writing the cache.
-# Build reads seed.json (pre-filtered) and is never affected.
+# Per-provider curation applied during `models refresh` (keyless OpenRouter source).
+# A model is kept iff it matches an `allow` glob AND no `exclude` glob.
+# Build reads seed.json (already curated) and is never affected by this block.
 filter:
-  openai:
+  anthropic:
+    allow:
+      - "claude-opus-*"
+      - "claude-sonnet-*"
+      - "claude-haiku-*"
+      - "claude-fable-*"
     exclude:
-      - "text-embedding-*"
-      - "tts-*"
-      - "whisper-*"
-      - "dall-e-*"
+      - "*-fast"
+      - "claude-3-*"
+      - "claude-opus-4"
+  openai:
+    allow:
+      - "gpt-5*"
+    exclude:
+      - "*-image*"
+      - "*-audio*"
+      - "*-codex*"
+      - "*-pro"
+      - "*-nano"
+      - "*-luna*"
+      - "*-terra*"
+      - "*-sol*"
+      - "*-chat*"
+      - "*:free"
+      - "*oss*"
       - "*-instruct"
-      - "*search*"
-      - "*realtime*"
+      - "gpt-5-mini"
+      - "gpt-5"
