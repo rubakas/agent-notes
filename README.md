@@ -5,10 +5,12 @@ AI agent configuration manager for Claude Code and OpenCode — orchestrates a t
 ## Quick Start
 
 ```bash
-pip install agent-notes
+pipx install agent-notes
 agent-notes install    # interactive wizard guides you through setup
 agent-notes doctor
 ```
+
+> No `pipx`? Use `uv tool install agent-notes` instead, or see **Troubleshooting: externally-managed-environment** below.
 
 **What's Included**
 - 19 specialized AI subagents (Opus reasons, Sonnet executes, Haiku explores)
@@ -28,6 +30,13 @@ agent-notes doctor
 
 ```bash
 pipx install agent-notes
+agent-notes install
+```
+
+**uv tool (lightweight alternative to pipx):**
+
+```bash
+uv tool install agent-notes
 agent-notes install
 ```
 
@@ -64,6 +73,7 @@ agent-notes uninstall && pipx uninstall agent-notes && pipx install agent-notes 
 
 With venv:
 ```bash
+source .venv/bin/activate
 agent-notes uninstall && pip uninstall agent-notes && pip install agent-notes && agent-notes install
 ```
 
@@ -134,6 +144,46 @@ agent-notes config provider openrouter   # prints "configured" or "no key"
 ```
 
 </details>
+
+### Troubleshooting: externally-managed-environment
+
+On Arch, Debian, Ubuntu, and other distributions that mark the system Python as externally-managed (PEP 668), you may see an error like:
+
+```
+error: externally-managed-environment
+
+× This environment is externally managed
+```
+
+This error occurs because `pip` refuses to install into the system Python. **Solution:** use an isolated package manager instead:
+
+1. **Recommended — pipx:**
+   ```bash
+   pipx install agent-notes
+   agent-notes install
+   ```
+
+2. **Alternative — uv tool:**
+   ```bash
+   uv tool install agent-notes
+   agent-notes install
+   ```
+
+3. **Alternative — Create a venv first:**
+   ```bash
+   python -m venv .venv && source .venv/bin/activate
+   pip install agent-notes
+   agent-notes install
+   ```
+
+**Last resort only** (discouraged — system packages may conflict):
+```bash
+pip install --user agent-notes
+# or
+pip install --break-system-packages agent-notes
+```
+
+---
 
 <details>
 <summary>Uninstall</summary>

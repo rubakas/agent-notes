@@ -42,9 +42,11 @@ The plugin delivers agents, skills, and session context. For domain skills
 the interactive setup wizard:
 
 ```bash
-pip install agent-notes
+pipx install agent-notes
 agent-notes install
 ```
+
+> No `pipx`? Use `uv tool install agent-notes`, or see the main README's **Troubleshooting: externally-managed-environment**.
 
 ## What's in the full install
 
