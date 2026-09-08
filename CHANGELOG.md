@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Guard-credentials no longer denies benign commands containing bare `.key`/`.pem`-style fragments** (e.g. jq selectors such as `"\(.key)"`). Secret-extension matching now requires a non-empty stem (`id_rsa.key` is still denied; a bare `.key` fragment is not), and the same stem requirement is applied to the basename patterns for `.pem`, `.p12`, `.pfx`, `.jks`, `.keystore`, and `.truststore`. The `.env` handling is unchanged — `.env` and `.env.production` remain denied via their dedicated pattern.
+
 ### Added
 
 - **Synced Matt Pocock skills from upstream ([`391a270`](https://github.com/mattpocock/skills/commit/391a2701dd948f94f56a39f7533f8eea9a859c87), 2026-07-10).** New skills: `codebase-design`, `domain-modeling`, `grilling`, `research`, `triage`, `wayfinder`, `to-spec`, `to-tickets`, `diagnosing-bugs`, `writing-great-skills`, and `setup-agent-tracker` (the per-repo issue-tracker/triage/domain setup skill, de-branded from upstream's `setup-matt-pocock-skills`). Every imported skill was reviewed for prompt-injection, exfiltration, and destructive commands by an adversarial multi-agent pass before import. Run `agent-notes regenerate` to apply.

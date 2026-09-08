@@ -48,15 +48,15 @@ _CREDENTIAL_BASENAME_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^credentials\.", re.IGNORECASE),
     re.compile(r"^secrets\.", re.IGNORECASE),
     re.compile(r"^.*-secrets\.", re.IGNORECASE),
-    re.compile(r"^.*\.env$", re.IGNORECASE),            # bare *.env
+    re.compile(r"^.+\.env$", re.IGNORECASE),            # bare *.env
     re.compile(r"^\.env(\.|$)", re.IGNORECASE),         # .env, .env.production, etc.
-    re.compile(r"^.*\.key$", re.IGNORECASE),
-    re.compile(r"^.*\.pem$", re.IGNORECASE),
-    re.compile(r"^.*\.p12$", re.IGNORECASE),
-    re.compile(r"^.*\.pfx$", re.IGNORECASE),
-    re.compile(r"^.*\.jks$", re.IGNORECASE),
-    re.compile(r"^.*\.keystore$", re.IGNORECASE),
-    re.compile(r"^.*\.truststore$", re.IGNORECASE),
+    re.compile(r"^.+\.key$", re.IGNORECASE),
+    re.compile(r"^.+\.pem$", re.IGNORECASE),
+    re.compile(r"^.+\.p12$", re.IGNORECASE),
+    re.compile(r"^.+\.pfx$", re.IGNORECASE),
+    re.compile(r"^.+\.jks$", re.IGNORECASE),
+    re.compile(r"^.+\.keystore$", re.IGNORECASE),
+    re.compile(r"^.+\.truststore$", re.IGNORECASE),
 ]
 
 # Word-boundary separators for keyword matching within a path segment.
@@ -190,7 +190,13 @@ def _is_credential_path(path_str: str) -> bool:
 
     # 2. Hard-secret extensions are always denied (covers .enc and reinforces
     #    .key/.pem/etc. that are also in the basename patterns below).
-    if lower_basename.endswith(_HARD_SECRET_EXTS):
+    #    A stem is required: "id_rsa.key" is a key file, but a bare ".key" is not
+    #    a filename — it appears as a jq/JSON selector fragment when a command
+    #    string is decomposed, and denying it blocks benign commands.
+    if any(
+        lower_basename.endswith(ext) and len(lower_basename) > len(ext)
+        for ext in _HARD_SECRET_EXTS
+    ):
         return True
 
     is_source_file = lower_basename.endswith(_SOURCE_EXTS)
