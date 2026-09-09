@@ -293,6 +293,40 @@ class TestIsCredentialPath:
     def test_credential_dir_loader_py_denied(self):
         assert _is_credential_path("credential/loader.py")
 
+    # --- Bare-extension regressions: fragments must be ALLOWED ---
+    def test_bare_dot_key_allowed(self):
+        # ".key" is a jq/JSON selector fragment, not a key file — no stem means no secret
+        assert not _is_credential_path(".key")
+
+    def test_bare_dot_pem_allowed(self):
+        # ".pem" alone has no stem; must not block benign commands
+        assert not _is_credential_path(".pem")
+
+    def test_bare_dot_keystore_allowed(self):
+        # ".keystore" alone has no stem; must not block benign commands
+        assert not _is_credential_path(".keystore")
+
+    # --- True positives that MUST still deny (belt-and-suspenders) ---
+    def test_id_rsa_key_denied(self):
+        # "id_rsa.key" has a non-empty stem — real key file
+        assert _is_credential_path("id_rsa.key")
+
+    def test_server_pem_denied(self):
+        # "server.pem" has a non-empty stem — real certificate file
+        assert _is_credential_path("server.pem")
+
+    def test_dot_env_bare_denied(self):
+        # ".env" matches the dedicated ^\.env(\.|$) pattern — must remain denied
+        assert _is_credential_path(".env")
+
+    def test_dot_env_production_denied(self):
+        # ".env.production" matches the ^\.env(\.|$) pattern — must remain denied
+        assert _is_credential_path(".env.production")
+
+    def test_prod_env_denied(self):
+        # "prod.env" has a non-empty stem — real env file
+        assert _is_credential_path("prod.env")
+
 
 # ---------------------------------------------------------------------------
 # _bash_reads_credential — bash command analysis
@@ -570,6 +604,46 @@ class TestBashReadsCredential:
     def test_git_log_pretty_format_allowed(self):
         # format string with "%" is not path-shaped
         assert not _bash_reads_credential("git log --pretty=format:%h")
+
+    # --- Reported bug: jq selectors with bare .key fragment must be ALLOWED ---
+    def test_jq_selector_key_fragment_allowed(self):
+        # The exact command that triggered the bug: ".key" is a jq selector, not a key file
+        assert not _bash_reads_credential(
+            """jq -r '.permissions.allow | to_entries[] | "\\(.key)\\t\\(.value)"' .claude/settings.local.json | grep -n 'effects--tooltip'"""
+        )
+
+    def test_jq_dot_key_selector_simple_allowed(self):
+        # Simpler form: ".key" is a jq object-key selector, not a credential path
+        assert not _bash_reads_credential("jq -r '.key' data.json")
+
+    # --- Commands that MUST still be denied (belt-and-suspenders) ---
+    def test_cat_dot_env_denied(self):
+        # Plain cat of .env — must remain denied
+        assert _bash_reads_credential("cat .env")
+
+    def test_cat_dot_env_quoted_denied(self):
+        # Quoted .env — must remain denied
+        assert _bash_reads_credential('cat ".env"')
+
+    def test_cat_dot_env_production_denied(self):
+        # Env file with environment suffix — must remain denied
+        assert _bash_reads_credential("cat .env.production")
+
+    def test_cat_id_rsa_key_denied(self):
+        # Real key file with non-empty stem — must remain denied
+        assert _bash_reads_credential("cat id_rsa.key")
+
+    def test_cat_server_pem_denied(self):
+        # Real PEM certificate with non-empty stem — must remain denied
+        assert _bash_reads_credential("cat server.pem")
+
+    def test_sudo_cat_dot_env_denied(self):
+        # sudo prefix must not bypass the guard for .env
+        assert _bash_reads_credential("sudo cat .env")
+
+    def test_bash_c_cat_dot_env_denied(self):
+        # subshell -c form must not bypass the guard for .env
+        assert _bash_reads_credential("bash -c 'cat .env'")
 
 
 # ---------------------------------------------------------------------------
