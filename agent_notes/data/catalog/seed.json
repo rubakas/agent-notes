@@ -1,7 +1,12 @@
 {
-  "fetched_at": "2026-08-05T15:26:56Z",
+  "fetched_at": "2026-09-09T13:50:25Z",
   "providers": {
     "anthropic": [
+      {
+        "id": "claude-fable-5-1",
+        "display_name": "Claude Fable 5.1",
+        "created_at": null
+      },
       {
         "id": "claude-opus-5",
         "display_name": "Claude Opus 5",
