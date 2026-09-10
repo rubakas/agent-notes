@@ -61,14 +61,87 @@ _OPENROUTER_URL = "https://openrouter.ai/api/v1/models"
 _CURATED_PROVIDERS = ("anthropic", "openai")
 
 
+def _opt_float(value) -> Optional[float]:
+    """Coerce *value* to float; None when absent or unparsable (never 0.0)."""
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _opt_int(value) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _per_million(price) -> Optional[float]:
+    """OpenRouter prices are per-token USD strings; convert to per 1M tokens.
+
+    Rounded to 6 decimals so binary-float noise (0.2 -> 0.19999999999999998)
+    never reaches seed.json.
+    """
+    per_token = _opt_float(price)
+    return None if per_token is None else round(per_token * 1_000_000, 6)
+
+
+def _created_at(created) -> Optional[str]:
+    ts = _opt_int(created)
+    if ts is None:
+        return None
+    try:
+        return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d")
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def _enrichment(m: dict) -> dict:
+    """Capability/price/recency fields carried on every seed entry.
+
+    A missing benchmark stays null — a real 0.0 score exists upstream and
+    collapsing missing into 0.0 would corrupt the ranking.
+    """
+    bench = (m.get("benchmarks") or {}).get("artificial_analysis") or {}
+    pricing = m.get("pricing") or {}
+    return {
+        "coding_index": _opt_float(bench.get("coding_index")),
+        "intelligence_index": _opt_float(bench.get("intelligence_index")),
+        "price_in": _per_million(pricing.get("prompt")),
+        "price_out": _per_million(pricing.get("completion")),
+        "context_length": _opt_int(m.get("context_length")),
+        "created_at": _created_at(m.get("created")),
+    }
+
+
+def _rank(entries: list[dict]) -> list[dict]:
+    """Sort frontier→lowest by coding_index (nulls last, id order) and rank."""
+    ordered = sorted(
+        entries,
+        key=lambda e: (
+            e.get("coding_index") is None,
+            -(e.get("coding_index") or 0.0),
+            e["id"],
+        ),
+    )
+    for i, entry in enumerate(ordered, start=1):
+        entry["rank"] = i
+    return ordered
+
+
 def _fetch_openrouter(rules: dict, *, url: str = _OPENROUTER_URL) -> dict[str, list[dict]]:
     """Fetch the public OpenRouter model list (no auth) and return curated,
     provider-native seed entries keyed by provider.
 
-    Anthropic ids: strip 'anthropic/', convert dots->dashes, entry carries a
-    cleaned display_name and created_at=None (recency enrichment is deferred;
-    null matches the existing seed schema). OpenAI ids: strip 'openai/', keep
-    dots, entry is id-only. Non-curated prefixes are ignored.
+    Anthropic ids: strip 'anthropic/', convert dots->dashes. OpenAI ids: strip
+    'openai/', keep dots. Every entry carries a cleaned display_name (when the
+    source provides one) plus coding_index, intelligence_index, price_in, price_out,
+    context_length, created_at and a 1-based rank. Non-curated prefixes are
+    ignored.
     """
     import urllib.request
 
@@ -88,15 +161,21 @@ def _fetch_openrouter(rules: dict, *, url: str = _OPENROUTER_URL) -> dict[str, l
             continue  # untrusted OpenRouter input: drop ids with newlines/slashes/control chars
         if not _curated(native, rules, prov):
             continue
+        entry = {"id": native}
+        raw_name = m.get("name")
         if prov == "anthropic":
-            name = m.get("name") or native
+            name = raw_name or native
             if name.startswith("Anthropic:"):
                 name = name[len("Anthropic:"):].strip()
-            name = "".join(ch for ch in name if ch.isprintable())
-            out["anthropic"].append({"id": native, "display_name": name, "created_at": None})
-        else:
-            out["openai"].append({"id": native})
-    return out
+            entry["display_name"] = "".join(ch for ch in name if ch.isprintable())
+        elif raw_name:
+            name = raw_name
+            if name.startswith("OpenAI:"):
+                name = name[len("OpenAI:"):].strip()
+            entry["display_name"] = "".join(ch for ch in name if ch.isprintable())
+        entry.update(_enrichment(m))
+        out[prov].append(entry)
+    return {prov: _rank(entries) for prov, entries in out.items()}
 
 
 def _load_current_catalog() -> dict:

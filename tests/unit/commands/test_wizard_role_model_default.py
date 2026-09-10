@@ -1,6 +1,8 @@
-"""Tests that the wizard model default for a role picks the newest non-deprecated model.
+"""Tests that the wizard model default for a role picks the best-ranked
+non-deprecated model its budget allows.
 
 All tests use a fixture ModelRegistry so catalog changes cannot force test changes.
+Fixture registries are built in rank order: the first model listed is rank 1.
 """
 import pytest
 
@@ -8,7 +10,7 @@ from agent_notes.domain.model import Model
 from agent_notes.registries.model_registry import ModelRegistry
 
 
-def _make_model(id_, model_class, deprecated=False, never_default=False):
+def _make_model(id_, model_class, deprecated=False, coding_index=50.0, price_in=1.0):
     """Build a minimal Model for use in fixture registries."""
     return Model(
         id=id_,
@@ -17,7 +19,8 @@ def _make_model(id_, model_class, deprecated=False, never_default=False):
         model_class=model_class,
         aliases={"anthropic": id_},
         deprecated=deprecated,
-        never_default=never_default,
+        coding_index=coding_index,
+        price_in=price_in,
     )
 
 
@@ -52,16 +55,12 @@ class TestWizardRoleModelDefault:
         result, _ = _select_models_per_role({"claude"})
         return result
 
-    def test_wizard_picks_non_deprecated_even_when_newer_model_is_deprecated(self, monkeypatch):
-        """When the newest model of a class is deprecated but an older one is not,
-        the wizard must default to the non-deprecated option.
-
-        Natural sort ensures opus-test-2 > opus-test-1, so reversed iteration
-        visits opus-test-2 first — the test verifies the wizard skips it.
-        """
-        older_non_deprecated = _make_model("opus-test-1", "opus", deprecated=False)
-        newer_deprecated = _make_model("opus-test-2", "opus", deprecated=True)
-        fixture = _make_registry(older_non_deprecated, newer_deprecated)
+    def test_wizard_picks_non_deprecated_even_when_better_ranked_model_is_deprecated(self, monkeypatch):
+        """When the best-ranked model of a class is deprecated but a lower-ranked one
+        is not, the wizard must default to the non-deprecated option."""
+        better_deprecated = _make_model("opus-test-2", "opus", deprecated=True)
+        worse_non_deprecated = _make_model("opus-test-1", "opus", deprecated=False)
+        fixture = _make_registry(better_deprecated, worse_non_deprecated)
 
         result = self._run_model_selection(monkeypatch, fixture)
 
@@ -70,15 +69,15 @@ class TestWizardRoleModelDefault:
         chosen = result["claude"]["reasoner"]
         assert chosen == "opus-test-1", (
             f"Expected non-deprecated 'opus-test-1' but got '{chosen}' — "
-            f"wizard should prefer non-deprecated even when a newer deprecated model exists"
+            f"wizard should prefer non-deprecated even when a better-ranked deprecated model exists"
         )
 
-    def test_wizard_falls_back_to_newest_deprecated_when_all_are_deprecated(self, monkeypatch):
-        """When every model of the role's class is deprecated, the wizard must fall
-        back to the newest deprecated option rather than refusing to pick."""
-        older_deprecated = _make_model("opus-test-1", "opus", deprecated=True)
-        newer_deprecated = _make_model("opus-test-2", "opus", deprecated=True)
-        fixture = _make_registry(older_deprecated, newer_deprecated)
+    def test_wizard_falls_back_to_best_ranked_deprecated_when_all_are_deprecated(self, monkeypatch):
+        """When every candidate is deprecated, the wizard must fall back to the
+        best-ranked deprecated option rather than refusing to pick."""
+        better_deprecated = _make_model("opus-test-2", "opus", deprecated=True)
+        worse_deprecated = _make_model("opus-test-1", "opus", deprecated=True)
+        fixture = _make_registry(better_deprecated, worse_deprecated)
 
         result = self._run_model_selection(monkeypatch, fixture)
 
@@ -86,8 +85,9 @@ class TestWizardRoleModelDefault:
         assert "reasoner" in result["claude"]
         chosen = result["claude"]["reasoner"]
         assert chosen == "opus-test-2", (
-            f"Expected newest deprecated 'opus-test-2' but got '{chosen}' — "
-            f"wizard should fall back to newest deprecated when no non-deprecated option exists"
+            f"Expected best-ranked deprecated 'opus-test-2' but got '{chosen}' — "
+            f"wizard should fall back to the best-ranked deprecated model when no "
+            f"non-deprecated option exists"
         )
 
     def test_model_deprecated_field_is_loaded_as_boolean_from_yaml(self, tmp_path):
@@ -113,82 +113,8 @@ class TestWizardRoleModelDefault:
         )
 
 
-class TestWizardNeverDefault:
-    """Verify that _select_models_per_role never pre-selects a never_default model."""
-
-    def _run_model_selection(self, monkeypatch, fixture_registry):
-        monkeypatch.setattr("agent_notes.services.ui._can_interactive", lambda: False)
-
-        def fake_radio(title, options, default=0, **kwargs):
-            return options[default][1]
-
-        monkeypatch.setattr("agent_notes.commands.wizard._radio_select_fallback", fake_radio)
-        monkeypatch.setattr("agent_notes.commands.wizard._radio_select", fake_radio)
-        monkeypatch.setattr(
-            "agent_notes.registries.model_registry.load_model_registry",
-            lambda: fixture_registry,
-        )
-
-        from agent_notes.commands.wizard import _select_models_per_role
-        result, _ = _select_models_per_role({"claude"})
-        return result
-
-    def test_wizard_skips_never_default_when_matching_class_exists(self, monkeypatch):
-        """When a newer never_default model and an older normal model share the same
-        class, the wizard must default to the normal model."""
-        older_normal = _make_model("opus-test-1", "opus", never_default=False)
-        newer_never_default = _make_model("opus-test-2", "opus", never_default=True)
-        fixture = _make_registry(older_normal, newer_never_default)
-
-        result = self._run_model_selection(monkeypatch, fixture)
-
-        assert "claude" in result
-        assert "reasoner" in result["claude"]
-        chosen = result["claude"]["reasoner"]
-        assert chosen == "opus-test-1", (
-            f"Expected normal 'opus-test-1' but got '{chosen}' — "
-            f"wizard must never pre-select a never_default model"
-        )
-
-    def test_wizard_falls_through_to_other_compatible_when_class_is_only_never_default(self, monkeypatch):
-        """When the only model of the role's class is never_default, the wizard falls
-        through to another compatible model rather than picking the never_default one."""
-        sonnet_normal = _make_model("sonnet-test-1", "sonnet", never_default=False)
-        opus_never_default = _make_model("opus-test-1", "opus", never_default=True)
-        fixture = _make_registry(sonnet_normal, opus_never_default)
-
-        result = self._run_model_selection(monkeypatch, fixture)
-
-        assert "claude" in result
-        assert "reasoner" in result["claude"]
-        chosen = result["claude"]["reasoner"]
-        assert chosen != "opus-test-1", (
-            f"Got '{chosen}' — wizard must not pre-select never_default model even as last resort"
-        )
-
-    def test_never_default_field_loaded_from_yaml(self, tmp_path):
-        """never_default: true in YAML loads as bool True; omitting it defaults to False."""
-        from agent_notes.registries.model_registry import load_model_registry
-
-        (tmp_path / "test-fable.yaml").write_text(
-            "id: test-fable\nlabel: Test Fable\nfamily: test\nclass: fable\n"
-            "never_default: true\naliases:\n  anthropic: test-fable\n"
-        )
-        (tmp_path / "test-sonnet.yaml").write_text(
-            "id: test-sonnet\nlabel: Test Sonnet\nfamily: test\nclass: sonnet\n"
-            "aliases:\n  anthropic: test-sonnet\n"
-        )
-        registry = load_model_registry(tmp_path)
-
-        assert registry.get("test-fable").never_default is True
-        assert registry.get("test-sonnet").never_default is False
-
-    def test_claude_fable_5_is_never_default_in_real_registry(self):
-        """Smoke test: claude-fable-5 has never_default=True in the real catalog."""
-        from agent_notes.registries.model_registry import load_model_registry
-        registry = load_model_registry()
-        fable = registry.get("claude-fable-5")
-        assert fable.never_default is True, "claude-fable-5 must have never_default=True in the catalog"
+class TestCatalogRetention:
+    """Models excluded from auto-selection must remain listable and pinnable."""
 
     def test_claude_fable_5_still_in_registry(self):
         """claude-fable-5 must remain in the catalog and be listable."""

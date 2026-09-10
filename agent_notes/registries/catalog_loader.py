@@ -119,11 +119,9 @@ def _merge_rules(base: dict, overrides: dict) -> dict:
             base_ao.setdefault(provider, {}).update(models)
         merged["alias_overrides"] = base_ao
 
-    # deprecated / never_default: union
-    for key in ("deprecated", "never_default"):
-        if key in overrides:
-            combined = set(base.get(key, [])) | set(overrides[key])
-            merged[key] = sorted(combined)
+    # deprecated: union
+    if "deprecated" in overrides:
+        merged["deprecated"] = sorted(set(base.get("deprecated", [])) | set(overrides["deprecated"]))
 
     # capabilities: merge default and overrides dicts
     if "capabilities" in overrides:
@@ -174,7 +172,6 @@ def load_catalog(
     alias_transforms = rules.get("alias_transforms", {})
     alias_overrides = rules.get("alias_overrides", {})
     deprecated_ids: set[str] = set(rules.get("deprecated", []))
-    never_default_ids: set[str] = set(rules.get("never_default", []))
     capabilities = rules.get("capabilities", {})
 
     models: list[Model] = []
@@ -217,7 +214,13 @@ def load_catalog(
                 aliases=aliases,
                 capabilities=caps,
                 deprecated=model_id in deprecated_ids,
-                never_default=model_id in never_default_ids,
+                rank=int(entry.get("rank", 0)),
+                coding_index=entry.get("coding_index"),
+                intelligence_index=entry.get("intelligence_index"),
+                price_in=entry.get("price_in"),
+                price_out=entry.get("price_out"),
+                context_length=entry.get("context_length"),
+                created_at=entry.get("created_at"),
             ))
 
     return models

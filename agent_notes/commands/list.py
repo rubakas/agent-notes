@@ -20,21 +20,29 @@ def list_clis() -> None:
 
 
 def list_models() -> None:
-    """Print all available models with CLI compatibility."""
+    """Print the catalog grouped by provider, each provider in its own rank order.
+
+    `rank` is per-provider data, so mixing providers into one list would make the
+    numbers read as a single sequence they are not. Providers print in name order
+    (anthropic, then openai). Columns come from the shared `model_columns`
+    helper, so this table matches the wizard's and `config role-model`'s.
+    """
     from ..registries.model_registry import load_model_registry
-    from ..registries.cli_registry import load_registry
+    from .config import model_columns, MODEL_COLUMNS_HEADER
+
     models = load_model_registry().all()
-    registry = load_registry()
+    by_provider: Dict[str, list] = {}
+    for m in models:
+        provider = next(iter(m.aliases), "(no provider)")
+        by_provider.setdefault(provider, []).append(m)
+
     print(f"Models ({len(models)}):")
-    for m in sorted(models, key=lambda m: m.id):
-        compat = [b.name for b in registry.all() if b.first_alias_for(m.aliases) is not None]
-        label = f" {m.label}" if hasattr(m, 'label') and m.label else ""
-        model_class = f" [{m.model_class}]" if hasattr(m, 'model_class') and m.model_class else ""
-        if compat:
-            compat_str = ", ".join(compat)
-            print(f"  {m.id:<22}{label:<22}{model_class:<10} compatible: {compat_str}")
-        else:
-            print(f"  {m.id:<22}{label:<22}{model_class:<10} compatible: (none)")
+    for provider in sorted(by_provider):
+        provider_models = sorted(by_provider[provider], key=lambda m: m.rank)
+        print(f"\n  {provider} ({len(provider_models)}):")
+        print(f"    {'rank':>4}  {MODEL_COLUMNS_HEADER}")
+        for m in provider_models:
+            print(f"    {m.rank:>4}  {model_columns(m)}")
 
 
 def list_roles() -> None:
@@ -43,8 +51,8 @@ def list_roles() -> None:
     roles = load_role_registry().all()
     print(f"Roles ({len(roles)}):")
     for r in sorted(roles, key=lambda r: r.name):
-        typical = f" (typical: {r.typical_class})" if hasattr(r, 'typical_class') and r.typical_class else ""
-        print(f"  {r.name:<15} {r.description}{typical}")
+        budget = "unbounded" if r.budget is None else f"${r.budget:g}/M in"
+        print(f"  {r.name:<15} {r.description} (budget: {budget})")
 
 
 def list_agents() -> None:

@@ -56,8 +56,7 @@ def _make_scope_state(backend_name, role_efforts):
 
 
 def _patch_role_registry(monkeypatch, typical_effort="medium", role_name="worker"):
-    role = Role(name=role_name, label="Worker", description="", typical_class="sonnet",
-                typical_effort=typical_effort)
+    role = Role(name=role_name, label="Worker", description="", typical_effort=typical_effort)
 
     class FakeRegistry:
         def get(self, name):

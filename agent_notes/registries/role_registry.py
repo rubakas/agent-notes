@@ -10,6 +10,11 @@ from ..domain.role import Role, DEFAULT_ROLE_ORDER
 from ._base import load_yaml_file, require_fields
 
 
+def _opt_budget(value) -> Optional[float]:
+    """Parse a role budget: absent or explicit null means unbounded."""
+    return None if value is None else float(value)
+
+
 class RoleRegistry:
     def __init__(self, roles: list[Role]):
         self._by_name: dict[str, Role] = {r.name: r for r in roles}
@@ -44,7 +49,7 @@ def load_role_registry(roles_dir: Optional[Path] = None) -> RoleRegistry:
             raise
         
         require_fields(
-            data, ["name", "label", "description", "typical_class"], yaml_file,
+            data, ["name", "label", "description"], yaml_file,
             msg_template="Missing field '{field}' in {filename}",
         )
         
@@ -52,7 +57,7 @@ def load_role_registry(roles_dir: Optional[Path] = None) -> RoleRegistry:
             name=data["name"],
             label=data["label"],
             description=data["description"],
-            typical_class=data["typical_class"],
+            budget=_opt_budget(data.get("budget")),
             color=data.get("color", ""),
             typical_effort=data.get("typical_effort", ""),
             order=int(data.get("order", DEFAULT_ROLE_ORDER)),

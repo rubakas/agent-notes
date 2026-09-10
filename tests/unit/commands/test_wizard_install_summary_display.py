@@ -8,8 +8,7 @@ from agent_notes.registries.model_registry import ModelRegistry
 
 
 def _make_role(typical_effort=""):
-    return Role(name="worker", label="Worker", description="", typical_class="sonnet",
-                typical_effort=typical_effort)
+    return Role(name="worker", label="Worker", description="", typical_effort=typical_effort)
 
 
 def _make_registry_with(model_id="claude-sonnet-5", label="Claude Sonnet 5"):

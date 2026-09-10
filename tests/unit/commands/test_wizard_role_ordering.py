@@ -10,8 +10,7 @@ from agent_notes.domain.role import Role, DEFAULT_ROLE_ORDER
 
 
 def _make_role(name, order=DEFAULT_ROLE_ORDER):
-    return Role(name=name, label=name.capitalize(), description="",
-                typical_class="sonnet", order=order)
+    return Role(name=name, label=name.capitalize(), description="", order=order)
 
 
 class TestRoleSortKey:

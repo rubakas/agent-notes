@@ -14,7 +14,13 @@ class Model:
     aliases: dict[str, str]          # {"anthropic": "claude-opus-4-7", ...}
     capabilities: dict[str, bool] = field(default_factory=dict)
     deprecated: bool = False
-    never_default: bool = False
+    rank: int = 0                    # 1-based, frontier->lowest within its provider
+    coding_index: Optional[float] = None
+    intelligence_index: Optional[float] = None
+    price_in: Optional[float] = None   # USD per 1M input tokens
+    price_out: Optional[float] = None  # USD per 1M output tokens
+    context_length: Optional[int] = None
+    created_at: Optional[str] = None
 
     def has_alias_for(self, provider: str) -> bool:
         return provider in self.aliases

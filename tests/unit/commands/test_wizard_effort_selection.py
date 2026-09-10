@@ -46,16 +46,13 @@ ANTHROPIC = Provider(name="anthropic", efforts=("low", "medium", "high", "xhigh"
 
 class TestEffortDefaultChoice:
     def test_role_typical_effort_wins_when_valid_for_provider(self):
-        role = Role(name="worker", label="Worker", description="", typical_class="sonnet",
-                    typical_effort="medium")
+        role = Role(name="worker", label="Worker", description="", typical_effort="medium")
         assert _effort_default_choice(role, ANTHROPIC) == "medium"
 
     def test_falls_back_to_provider_default_when_role_effort_not_in_provider_vocab(self):
-        role = Role(name="worker", label="Worker", description="", typical_class="sonnet",
-                    typical_effort="none")  # "none" is an openai value, not anthropic's
+        role = Role(name="worker", label="Worker", description="", typical_effort="none")  # "none" is an openai value, not anthropic's
         assert _effort_default_choice(role, ANTHROPIC) == ANTHROPIC.default_effort
 
     def test_falls_back_to_provider_default_when_role_has_no_typical_effort(self):
-        role = Role(name="worker", label="Worker", description="", typical_class="sonnet",
-                    typical_effort="")
+        role = Role(name="worker", label="Worker", description="", typical_effort="")
         assert _effort_default_choice(role, ANTHROPIC) == ANTHROPIC.default_effort

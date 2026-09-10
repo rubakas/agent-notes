@@ -388,8 +388,8 @@ def generate_agent_files(agents_config: Dict[str, Any],
             
             # Resolve model. Resolution chain:
             #   1. State-driven: state.clis[backend].role_models[role] -> model_id
-            #   2. Role-class fallback: role.typical_class matched against
-            #      any model's class, with a compatible provider for this backend
+            #   2. Budget+rank fallback: the frontier-most rated model within
+            #      role.budget that this backend can serve
             #   3. Unresolvable: raises ValueError
             model_str, model_registry = _resolve_model_str(
                 agent_name, agent_config, backend, scope_state, model_registry, user_config

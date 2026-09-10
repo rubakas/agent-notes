@@ -2,6 +2,6 @@ name: worker
 label: Worker
 order: 3
 description: Implements code, writes tests, does focused analysis. Medium volume.
-typical_class: sonnet
+budget: 2.0   # max USD per 1M input tokens; null = unbounded
 typical_effort: medium
 color: green

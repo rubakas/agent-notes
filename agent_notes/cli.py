@@ -325,7 +325,9 @@ def main():
     p_config.add_argument("action", nargs="?", default="wizard",
         choices=["wizard", "show", "role-model", "role-agent", "role-effort", "provider", "providers", "memory", "cost-report"],
         help="Config action (default: wizard)")
-    p_config.add_argument("extra", nargs="*", help="Additional positional args (role, model, agent)")
+    p_config.add_argument("extra", nargs="*",
+        help="Additional positional args (role, model, agent). For role-model the model may be "
+             "a list index; omit it to print the numbered list")
     p_config.add_argument("--cli", help="Target CLI (claude / opencode / both)")
     
     args = parser.parse_args()

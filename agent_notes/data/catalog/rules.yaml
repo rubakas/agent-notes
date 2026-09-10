@@ -31,9 +31,6 @@ deprecated:
   - claude-sonnet-4
   - claude-sonnet-4-5
 
-never_default:
-  - claude-fable-5
-
 capabilities:
   default:
     vision: true
@@ -68,19 +65,16 @@ filter:
       - "claude-opus-4"
   openai:
     allow:
-      - "gpt-5*"
+      - "gpt-*"
     exclude:
+      - "gpt-3.5*"
+      - "gpt-4*"
       - "*-image*"
       - "*-audio*"
       - "*-codex*"
       - "*-pro"
-      - "*-nano"
-      - "*-luna*"
-      - "*-terra*"
-      - "*-sol*"
       - "*-chat*"
       - "*:free"
       - "*oss*"
       - "*-instruct"
-      - "gpt-5-mini"
-      - "gpt-5"
+      - "*-preview"

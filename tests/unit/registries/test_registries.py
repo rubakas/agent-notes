@@ -46,23 +46,42 @@ def test_newest_model_per_class_is_not_deprecated():
         )
 
 
-def test_every_role_class_has_at_least_one_non_deprecated_model():
-    """For each class a role needs (role.typical_class), at least one non-deprecated
-    model must exist in the catalog. Without this guard, the wizard falls back to
-    an arbitrary model for that role instead of its intended class."""
+def test_every_role_resolves_on_every_backend_with_compatible_models():
+    """Selection is budget-driven, so the invariant that can actually break is:
+    every role finds a rated, in-budget, servable model on every backend that has
+    any compatible model at all. A too-tight budget or an all-unrated catalog
+    slice would leave a role unresolvable at build time."""
+    from agent_notes.registries.cli_registry import load_registry
+    from agent_notes.services.model_resolver import select_model_for_role
+
     model_registry = load_model_registry()
     role_registry = load_role_registry()
+    models = model_registry.all()
 
-    non_deprecated_classes = {
-        m.model_class for m in model_registry.all() if not m.deprecated
-    }
-
-    for role in role_registry.all():
-        assert role.typical_class in non_deprecated_classes, (
-            f"Role '{role.name}' requires model_class '{role.typical_class}' but no "
-            f"non-deprecated model of that class exists in the catalog "
-            f"(available non-deprecated classes: {sorted(non_deprecated_classes)})"
-        )
+    for backend in load_registry().all():
+        servable = [
+            m for m in models
+            if m.resolve_for_providers(list(backend.accepted_providers)) is not None
+        ]
+        if not servable:
+            # copilot ships no model aliases by design — it renders instructions only.
+            continue
+        for role in role_registry.all():
+            matched, resolved = select_model_for_role(models, role, backend)
+            assert matched is not None and resolved is not None, (
+                f"Role '{role.name}' resolves to no model on backend "
+                f"'{backend.name}' (budget={role.budget})"
+            )
+            assert matched.coding_index is not None, (
+                f"Role '{role.name}' on '{backend.name}' resolved to unrated "
+                f"model '{matched.id}'"
+            )
+            if role.budget is not None:
+                assert matched.price_in is not None and matched.price_in <= role.budget, (
+                    f"Role '{role.name}' on '{backend.name}' resolved to "
+                    f"'{matched.id}' at ${matched.price_in}/M, over its "
+                    f"${role.budget}/M budget"
+                )
 
 
 def test_model_aliases_are_exact_version_strings_not_class_names():
@@ -129,6 +148,24 @@ def test_role_registry_loads_typical_effort():
     assert registry.get("scout").typical_effort == "low"
 
 
+def test_role_registry_loads_budget():
+    """Budgets are USD per 1M input tokens; orchestrator is explicitly unbounded."""
+    registry = load_role_registry()
+    assert registry.get("orchestrator").budget is None
+    assert registry.get("reasoner").budget == 5.0
+    assert registry.get("worker").budget == 2.0
+    assert registry.get("scout").budget == 1.0
+
+
+def test_role_budget_defaults_to_unbounded_when_missing(tmp_path):
+    """A role YAML without a budget is unbounded, not zero-budget."""
+    (tmp_path / "custom.yaml").write_text(
+        "name: custom\nlabel: Custom\ndescription: d\n"
+    )
+    registry = load_role_registry(tmp_path)
+    assert registry.get("custom").budget is None
+
+
 def test_role_registry_loads_order():
     """Canonical display order: orchestrator → reasoner → worker → scout."""
     registry = load_role_registry()
@@ -142,7 +179,7 @@ def test_role_order_defaults_to_last_when_missing(tmp_path):
     """Roles without an explicit order sort after all ordered roles."""
     from agent_notes.domain.role import DEFAULT_ROLE_ORDER
     (tmp_path / "custom.yaml").write_text(
-        "name: custom\nlabel: Custom\ndescription: d\ntypical_class: sonnet\n"
+        "name: custom\nlabel: Custom\ndescription: d\n"
     )
     registry = load_role_registry(tmp_path)
     assert registry.get("custom").order == DEFAULT_ROLE_ORDER
