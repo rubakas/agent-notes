@@ -4,13 +4,14 @@ global_home: ~/.codex
 local_dir: .codex
 layout:
   agents: agents/
-  skills: skills/
+  # NOTE: Codex CLI reads skills from .agents/skills and ~/.agents/skills, never
+  # from ~/.codex/skills — so skills are not a codex component (see features.skills).
   config: AGENTS.md
   hooks: hooks.json
   agent_extension: toml
 features:
   agents: true
-  skills: true
+  skills: false
   rules: false
   commands: false
   memory: false
@@ -25,5 +26,9 @@ features:
 global_template: global-codex.md
 exclude_flag: codex_exclude
 accepted_providers: [openai]
+# Codex CLI's `model_reasoning_effort` accepts these five only — notably NOT
+# `none`, which the OpenAI API itself does accept. Source:
+# learn.chatgpt.com/docs/config-file/config-reference (checked 2026-09-19).
+efforts: [minimal, low, medium, high, xhigh]
 use_model_class: false
 preferred_family: gpt

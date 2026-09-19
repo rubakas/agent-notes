@@ -78,6 +78,7 @@ def load_registry(cli_dir: Optional[Path] = None) -> CLIRegistry:
             accepted_providers=tuple(data.get("accepted_providers", [])),
             use_model_class=data.get("use_model_class", False),
             preferred_family=data.get("preferred_family"),
+            efforts=tuple(data.get("efforts", [])),
             stability=normalize_stability(data.get("stability"), yaml_file),
         )
         backends.append(backend)

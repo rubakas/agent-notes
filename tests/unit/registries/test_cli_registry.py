@@ -38,10 +38,12 @@ class TestCodexFeatures:
         backend = registry.get("codex")
         assert backend.supports("agents") is True
 
-    def test_supports_skills(self):
+    def test_does_not_support_skills(self):
+        # Codex CLI reads skills from ~/.agents/skills (the universal mirror),
+        # never from ~/.codex/skills — so skills are not a codex component.
         registry = load_registry()
         backend = registry.get("codex")
-        assert backend.supports("skills") is True
+        assert backend.supports("skills") is False
 
     def test_does_not_support_rules(self):
         registry = load_registry()

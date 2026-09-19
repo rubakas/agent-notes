@@ -350,3 +350,44 @@ class TestSummarizePlan:
 
         assert summary.to_install == []
         assert summary.overwrites == []
+
+
+class TestLocalDirOverrideValidation:
+    """local_dir_override comes from user-editable state.json — it must stay inside the project."""
+
+    def _claude(self):
+        from agent_notes.registries.cli_registry import load_registry
+
+        return load_registry().get("claude")
+
+    def test_relative_override_is_applied(self):
+        from agent_notes.services.installer import _apply_overrides
+
+        effective = _apply_overrides(self._claude(), {"claude": ".claude-work"})
+
+        assert effective.local_dir == ".claude-work"
+
+    def test_absolute_override_is_rejected(self):
+        from agent_notes.services.installer import _apply_overrides
+
+        backend = self._claude()
+        effective = _apply_overrides(backend, {"claude": "/etc"})
+
+        assert effective.local_dir == backend.local_dir
+
+    def test_traversing_override_is_rejected(self):
+        from agent_notes.services.installer import _apply_overrides
+
+        backend = self._claude()
+        effective = _apply_overrides(backend, {"claude": "../../.claude"})
+
+        assert effective.local_dir == backend.local_dir
+
+    def test_rejected_override_still_applies_global_home(self, tmp_path):
+        from agent_notes.services.installer import _apply_overrides
+
+        effective = _apply_overrides(
+            self._claude(), {"claude": "/etc"}, global_home_override=str(tmp_path)
+        )
+
+        assert effective.global_home == tmp_path
