@@ -20,7 +20,7 @@ class TestProviderRegistryLoads:
     def test_openai_efforts_and_default(self):
         registry = load_provider_registry()
         openai = registry.get("openai")
-        assert openai.efforts == ("none", "minimal", "low", "medium", "high", "xhigh")
+        assert openai.efforts == ("none", "minimal", "low", "medium", "high", "xhigh", "max")
         assert openai.default_effort == "medium"
 
     def test_default_effort_is_in_own_efforts_list(self):

@@ -8,6 +8,7 @@ from functools import lru_cache
 from ..config import DATA_DIR
 from ..domain.role import Role, DEFAULT_ROLE_ORDER
 from ._base import load_yaml_file, require_fields
+from .provider_registry import validate_effort
 
 
 def _opt_budget(value) -> Optional[float]:
@@ -59,7 +60,9 @@ def load_role_registry(roles_dir: Optional[Path] = None) -> RoleRegistry:
             description=data["description"],
             budget=_opt_budget(data.get("budget")),
             color=data.get("color", ""),
-            typical_effort=data.get("typical_effort", ""),
+            typical_effort=validate_effort(
+                data.get("typical_effort", ""), f"{yaml_file.name} (typical_effort)"
+            ),
             order=int(data.get("order", DEFAULT_ROLE_ORDER)),
         ))
     

@@ -24,14 +24,30 @@ def _build_price_table(pricing: dict) -> list:
     return rows
 
 
+# Fallback for an unmatched Anthropic id. Anthropic's lineup clusters around the
+# Sonnet rate, so it is a defensible guess for a Claude id and nothing else: an
+# OpenAI id billed at $3.00/$15.00 would be wrong by up to 60x and look plausible.
+_ANTHROPIC_FALLBACK = {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write_5m": 3.75, "cache_write_1h": 6.00}
+
+# Any other vendor's unmatched id is billed at zero rather than at a guessed
+# number, so the warning is the only thing that can explain a missing cost.
+_UNPRICED = {"in": 0.00, "out": 0.00, "cache_read": 0.00, "cache_write_5m": 0.00, "cache_write_1h": 0.00}
+
+
 def get_price(model_id: str) -> dict:
     pricing = _load()
     table = _build_price_table(pricing)
     for patterns, price in table:
         if any(fnmatch(model_id, p) for p in patterns):
             return price
-    sys.stderr.write(f"Warning: no pricing entry for model '{model_id}', falling back to Sonnet rates\n")
-    return {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write_5m": 3.75, "cache_write_1h": 6.00}
+    if "claude" in model_id:
+        sys.stderr.write(f"Warning: no pricing entry for model '{model_id}', falling back to Sonnet rates\n")
+        return _ANTHROPIC_FALLBACK
+    sys.stderr.write(
+        f"Warning: no pricing entry for model '{model_id}'; it is not an Anthropic id, "
+        f"so it is billed at $0.00 rather than at Claude rates — add an entry to pricing.yaml\n"
+    )
+    return _UNPRICED
 
 
 def calculate_cost(

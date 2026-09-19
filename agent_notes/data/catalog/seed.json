@@ -152,8 +152,8 @@
         "display_name": "GPT-5.6 Sol",
         "coding_index": 77.4,
         "intelligence_index": 47.1,
-        "price_in": 2.0,
-        "price_out": 10.0,
+        "price_in": 4.0,
+        "price_out": 20.0,
         "context_length": 1050000,
         "created_at": "2026-07-09",
         "rank": 1

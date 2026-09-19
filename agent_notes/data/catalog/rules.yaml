@@ -8,9 +8,23 @@ classes:
   - {match: "*opus*",     class: opus}
   - {match: "*sonnet*",   class: sonnet}
   - {match: "*haiku*",    class: haiku}
+  # GPT classes track capability, not name shape. Size suffixes are the small
+  # tier in every generation; the 5.5/5.6/6 generations are the frontier ones
+  # (coding_index >= 71) and so class opus.
   - {match: "gpt-*-mini", class: haiku}
-  - {match: "gpt-5-4",    class: sonnet}
-  - {match: "gpt-*",      class: opus}
+  - {match: "gpt-*-nano", class: haiku}
+  - {match: "gpt-6*",     class: opus}
+  # Luna is the cheap member of the 5.6 generation, not a frontier model: at
+  # coding_index 71.4 and $0.20/M it sits below every Claude model named opus
+  # and level with claude-sonnet-5 (71.5). Classing the generation by name
+  # shape put it in the most expensive tier; it is the middle tier.
+  - {match: "gpt-5-6-luna", class: sonnet}
+  - {match: "gpt-5-6*",   class: opus}
+  - {match: "gpt-5-5*",   class: opus}
+  # Unknown/future GPT ids take the middle tier: classing an unseen model opus
+  # would hand it the most expensive tier sight unseen (a $0.05 model used to
+  # land there), while haiku would understate a frontier model.
+  - {match: "gpt-*",      class: sonnet}
 
 # Alias template: {id} = normalized registry id, {seed_id} = original provider id.
 alias_transforms:
@@ -23,6 +37,20 @@ alias_overrides:
   anthropic:
     claude-sonnet-4: claude-sonnet-4-20250514
 
+# Per-model price pins, indexed by normalized registry id. Applied on top of the
+# seed, which is machine-refreshed from OpenRouter — an entry here survives a
+# refresh that reintroduces a wrong price. Prices gate role-budget selection, so
+# a wrong one silently changes which model a role resolves to. Cite a vendor
+# page and the date checked for every entry.
+price_overrides:
+  # OpenRouter reports $2.00 in / $10.00 out for Sol. OpenAI publishes
+  # $4.00 input / $20.00 output (developers.openai.com/api/docs/models/gpt-5.6-sol
+  # and developers.openai.com/api/docs/pricing, checked 2026-09-19). At the seed
+  # value Sol fit worker's $2.0/M budget; at the published one it does not.
+  gpt-5-6-sol:
+    price_in: 4.0
+    price_out: 20.0
+
 deprecated:
   - claude-opus-4-1
   - claude-opus-4-5
@@ -30,16 +58,37 @@ deprecated:
   - claude-opus-4-7
   - claude-sonnet-4
   - claude-sonnet-4-5
+  # Vendor SUPERSESSION guidance, not an announced shutdown: the model pages for
+  # both gpt-5 and gpt-5.2 read "We recommend using the latest [GPT-6 Astra]"
+  # (checked 2026-09-19). OpenAI's formal deprecations page lists dated shutdowns
+  # only for id variants this catalog does not carry (gpt-5.2-chat-latest,
+  # gpt-5.1-chat-latest, and the August-2025 gpt-5 / gpt-5-mini snapshots), so
+  # those are deliberately absent here. gpt-5.1 is ALSO deliberately absent: it
+  # carries no supersession notice at all, despite being older than gpt-5.2.
+  - gpt-5
+  - gpt-5-2
 
 capabilities:
   default:
     vision: true
     long_context: true
     tool_use: true
+    # Whether the model accepts a reasoning-effort setting at all. Gates whether
+    # the rendered agent file carries an effort field; an agent may still DECLARE
+    # an effort, which becomes meaningful if it later resolves to a model that
+    # supports one. Defaults true — only models known not to support it are
+    # overridden below.
+    effort_support: true
   # Preserve the inconsistent long_context assignments exactly as they exist today.
   overrides:
     claude-haiku-4-5:
       long_context: false
+      # Absent from the supported-models list on
+      # platform.claude.com/docs/en/build-with-claude/effort, and the
+      # models-overview comparison table reads "Default effort: Not supported"
+      # (checked 2026-09-19). Whether the API errors or silently ignores the
+      # field is undocumented, so it is treated as unsupported either way.
+      effort_support: false
     claude-opus-4-1:
       long_context: false
     claude-opus-4-5:

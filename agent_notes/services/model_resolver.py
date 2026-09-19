@@ -32,6 +32,7 @@ the wizard's pre-selection and a live build can never disagree.
 """
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
@@ -55,6 +56,9 @@ def select_model_for_role(models, role, backend):
     first over the whole catalog, backend.preferred_family behaves as a hard
     filter whenever *any* eligible model of that family exists — another family
     is only ever reachable when the preferred one has no eligible model at all.
+
+    Widening past the non-deprecated rungs is legal but never silent: landing on
+    a deprecated model emits a warning on stderr naming the model and the role.
     """
     providers = list(backend.accepted_providers)
 
@@ -87,8 +91,34 @@ def select_model_for_role(models, role, backend):
     for family_filter, skip_deprecated in ladder:
         matched, resolved = _first(family_filter, skip_deprecated)
         if matched is not None:
+            if matched.deprecated:
+                _warn_deprecated_selection(matched, role, backend)
             return matched, resolved
     return None, None
+
+
+def _warn_deprecated_selection(model, role, backend) -> None:
+    """Announce that the ladder widened past its non-deprecated rungs."""
+    budget = "unbounded" if role.budget is None else f"${role.budget}/M in"
+    sys.stderr.write(
+        f"Warning: role '{role.name}' on backend '{backend.name}' resolved to "
+        f"DEPRECATED model '{model.id}' — no non-deprecated model was both rated "
+        f"and within the role's budget ({budget}), so the deprecation guard was "
+        f"dropped to find a match\n"
+    )
+
+
+def configured_providers(backend) -> list[str]:
+    """Backend's accepted_providers that actually have a descriptor in data/providers/.
+
+    claude.yaml accepts bedrock and vertex, but no provider config exists for
+    either, so a user can never activate them. Resolution already ignores them;
+    this keeps user-facing output from advertising them.
+    """
+    from ..registries.provider_registry import default_provider_registry
+
+    known = set(default_provider_registry().names())
+    return [p for p in backend.accepted_providers if p in known]
 
 
 class ModelResolver:
@@ -233,7 +263,7 @@ class ModelResolver:
             f"user config, and budget+rank selection. "
             f"Check that data/roles/{agent_role}.yaml exists and that at least one "
             f"rated model within the role's budget ({role_budget}) "
-            f"has an alias for one of {list(backend.accepted_providers)}."
+            f"has an alias for one of {configured_providers(backend)}."
         )
 
     # ------------------------------------------------------------------

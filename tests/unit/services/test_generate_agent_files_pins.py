@@ -7,6 +7,9 @@ Covers the propagation path that was broken:
 both of which must render `model: <exact alias>` and `effort: <pin>` for the
 claude backend (use_model_class=True notwithstanding — pins always win with
 exact strings; only the UNPINNED fallback stays class-based).
+
+An effort pin is only EMITTED when the resolved model supports one; see
+tests/unit/services/test_effort_model_gating.py.
 """
 import json
 from pathlib import Path
@@ -87,7 +90,9 @@ class TestWizardSelectionsReachFrontmatter:
 
         explorer = _frontmatter(dist / "claude" / "agents" / "explorer.md")
         assert "model: claude-haiku-4-5" in explorer
-        assert "effort: medium" in explorer
+        # The effort pin is stored, but claude-haiku-4-5 supports no effort
+        # setting (effort_support: false), so nothing is emitted for it.
+        assert "effort:" not in explorer
 
         coder = _frontmatter(dist / "claude" / "agents" / "coder.md")
         assert "model: claude-sonnet-4-6" in coder
@@ -152,7 +157,8 @@ class TestPersistedStatePinsReachFrontmatter:
 
         explorer = _frontmatter(dist / "claude" / "agents" / "explorer.md")
         assert "model: claude-haiku-4-5" in explorer
-        assert "effort: medium" in explorer
+        # See above: a haiku pin carries no effort into frontmatter.
+        assert "effort:" not in explorer
 
         coder = _frontmatter(dist / "claude" / "agents" / "coder.md")
         assert "model: claude-sonnet-4-6" in coder

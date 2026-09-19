@@ -6,6 +6,7 @@ from typing import List, Dict, Set, Optional
 
 from ...config import Color
 from ...constants import DEFAULT_VAULT_DIR, DEFAULT_VAULT_NAME, Obsidian
+from ...services.model_resolver import configured_providers
 from ...services.ui import (
     _can_interactive, _safe_input, _path_input, _checkbox_select, _radio_select,
     _checkbox_select_fallback, _radio_select_fallback,
@@ -162,7 +163,7 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
             print(
                 f"  {Color.YELLOW}Warning:{Color.NC} no compatible models found for "
                 f"{backend.label} (accepted providers: "
-                f"{list(backend.accepted_providers) or 'none'}). Skipping model selection; "
+                f"{configured_providers(backend) or 'none'}). Skipping model selection; "
                 f"this CLI will rely on legacy tier resolution."
             )
             continue

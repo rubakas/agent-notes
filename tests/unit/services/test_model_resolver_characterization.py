@@ -599,7 +599,9 @@ class TestRealRegistryResolution:
     CODEX_DEFAULTS = {
         "orchestrator": ("gpt-5-6-sol", "gpt-5.6-sol"),
         "reasoner": ("gpt-5-6-sol", "gpt-5.6-sol"),
-        "worker": ("gpt-5-6-sol", "gpt-5.6-sol"),
+        # Sol is $4.00/M input, over worker's $2.0 budget — Terra is the
+        # frontier-most model that fits.
+        "worker": ("gpt-5-6-terra", "gpt-5.6-terra"),
         "scout": ("gpt-5-6-luna", "gpt-5.6-luna"),
     }
 
@@ -655,3 +657,94 @@ class TestRealRegistryResolution:
                 f"{backend_name}/{role_name}: wizard picked {wizard_pick.id!r} but "
                 f"the resolver picked {resolver_pick.id!r}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Observability: the ladder never widens past deprecation silently
+# ---------------------------------------------------------------------------
+
+class TestDeprecatedSelectionWarning:
+    """Rungs 3 and 4 of the ladder drop the deprecation guard on purpose. The
+    caller cannot tell a healthy pick from a deprecated one, so the widening
+    must announce itself on stderr."""
+
+    @staticmethod
+    def _registry_where_only_deprecated_fits():
+        """A cheap deprecated model plus an expensive current one, so only the
+        deprecated model is within a tight budget."""
+        from dataclasses import replace
+
+        deprecated = replace(
+            _make_model(
+                "claude-sonnet-4-5", model_class="sonnet",
+                aliases={"anthropic": "sonnet-4-5-alias"},
+                coding_index=52.1, price_in=3.0,
+            ),
+            deprecated=True,
+        )
+        current = _make_model(
+            "claude-opus-5", model_class="opus",
+            aliases={"anthropic": "opus-5-alias"},
+            coding_index=78.0, price_in=5.0,
+        )
+        return ModelRegistry([current, deprecated])
+
+    def test_warns_and_still_returns_the_deprecated_model(self, capsys):
+        registry = self._registry_where_only_deprecated_fits()
+        role = Role(name="worker", label="Worker", description="", budget=4.0)
+
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([role]),
+        ):
+            model_str, _ = _resolve(
+                agent_name="coder",
+                agent_config={"role": "worker"},
+                model_registry=registry,
+            )
+
+        assert model_str == "sonnet-4-5-alias"
+        err = capsys.readouterr().err
+        assert "DEPRECATED model 'claude-sonnet-4-5'" in err
+        assert "role 'worker'" in err
+        assert "backend 'claude'" in err
+        assert "$4.0/M in" in err
+
+    def test_silent_when_a_current_model_fits(self, capsys):
+        registry = self._registry_where_only_deprecated_fits()
+        role = Role(name="worker", label="Worker", description="", budget=None)
+
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([role]),
+        ):
+            model_str, _ = _resolve(
+                agent_name="coder",
+                agent_config={"role": "worker"},
+                model_registry=registry,
+            )
+
+        assert model_str == "opus-5-alias"
+        assert "DEPRECATED" not in capsys.readouterr().err
+
+
+class TestUnresolvableProviderList:
+    """The diagnostic must not advertise providers a user can never activate."""
+
+    def test_error_lists_only_configured_providers(self):
+        from agent_notes.services.rendering import _resolve_model_str
+
+        backend = _make_backend(accepted_providers=("anthropic", "bedrock", "vertex"))
+        with pytest.raises(ValueError) as exc:
+            _resolve_model_str(
+                agent_name="lead",
+                agent_config={"role": "orchestrator"},
+                backend=backend,
+                scope_state=None,
+                model_registry=ModelRegistry([]),
+                user_config={},
+            )
+        message = str(exc.value)
+        assert "anthropic" in message
+        assert "bedrock" not in message
+        assert "vertex" not in message

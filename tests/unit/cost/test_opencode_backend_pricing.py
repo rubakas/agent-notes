@@ -239,7 +239,7 @@ class TestGithubCopilotAliasPricing:
         ("github-copilot/claude-opus-4.6", 5.0),
         ("github-copilot/claude-opus-4.5", 5.0),
         ("github-copilot/claude-opus-4.1", 15.0),
-        ("github-copilot/claude-sonnet-5", 3.0),
+        ("github-copilot/claude-sonnet-5", 2.0),
         ("github-copilot/claude-sonnet-4.6", 3.0),
         ("github-copilot/claude-sonnet-4.5", 3.0),
         ("github-copilot/claude-sonnet-4", 3.0),
@@ -299,7 +299,7 @@ class TestRawDashedIdsNoNormalization:
         ("claude-opus-4-8", 5.0),
         ("claude-opus-4-5-20251101", 5.0),
         ("claude-haiku-4-5-20251001", 1.0),
-        ("claude-sonnet-5", 3.0),
+        ("claude-sonnet-5", 2.0),
         ("claude-sonnet-4-5-20250929", 3.0),
         ("claude-fable-5", 10.0),
     ])
@@ -308,3 +308,80 @@ class TestRawDashedIdsNoNormalization:
         assert price["in"] == expected_in, (
             f"{model_id} priced at {price['in']}/M in — expected {expected_in}"
         )
+
+
+class TestUnknownIdsAreNotBilledAtAnotherVendorsRates:
+    """An unmatched id used to fall back to Sonnet's $3.00/$15.00 regardless of
+    vendor, so every unpriced OpenAI id (gpt-4o, gpt-5-codex, gpt-5-pro, the
+    whole o-series) was silently billed at Anthropic rates. The fallback is now
+    provider-aware: Claude ids keep the Sonnet guess, anything else is billed at
+    $0.00 so the warning is the only explanation for a missing cost.
+    """
+
+    @pytest.mark.parametrize("model_id", [
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4.1",
+        "github-copilot/gpt-4.1",
+        "gpt-5-codex",
+        "gpt-5.1-codex",
+        "gpt-5-pro",
+        "o1",
+        "o3-mini",
+        "o4-mini",
+        "github-copilot/o3-mini",
+    ])
+    def test_unknown_openai_id_is_not_billed_at_claude_rates(self, model_id, capsys):
+        price = _pricing.get_price(model_id)
+        err = capsys.readouterr().err
+        assert "no pricing entry" in err, (
+            f"Expected a 'no pricing entry' warning for {model_id}, got: {err!r}"
+        )
+        assert (price["in"], price["out"]) != (3.00, 15.00), (
+            f"{model_id} was billed at Claude Sonnet's $3.00/$15.00 — an Anthropic "
+            "rate is never a correct guess for an OpenAI id"
+        )
+        assert price["in"] == 0.00 and price["out"] == 0.00, (
+            f"{model_id} was billed at ${price['in']}/${price['out']} — an unpriced "
+            "non-Claude id must cost 0.00, not a guessed rate"
+        )
+
+    def test_unknown_claude_id_still_falls_back_to_sonnet(self, capsys):
+        """The Anthropic fallback is unchanged: Anthropic's lineup clusters around
+        the Sonnet rate, so it stays a defensible guess for a Claude id."""
+        price = _pricing.get_price("claude-opus-9")
+        assert "no pricing entry" in capsys.readouterr().err
+        assert price["in"] == 3.00 and price["out"] == 15.00
+
+
+class TestOpenAIDatedSnapshotPricing:
+    """Session logs carry dated snapshot ids (gpt-5.1-2025-11-13), same as the
+    Anthropic side. Without a `-202*` glob per model they reached the fallback."""
+
+    @pytest.mark.parametrize("model_id,expected_in", [
+        ("gpt-5-2025-08-07", 1.25),
+        ("gpt-5.1-2025-11-13", 1.25),
+        ("gpt-5-1-2025-11-13", 1.25),
+        ("gpt-5-mini-2025-08-07", 0.25),
+        ("gpt-5-nano-2025-08-07", 0.05),
+        ("gpt-5.4-2026-03-01", 2.50),
+        ("gpt-5.4-mini-2026-03-01", 0.75),
+        ("gpt-5-4-mini-2026-03-01", 0.75),
+        ("gpt-5.6-sol-2026-09-01", 4.00),
+        ("gpt-5-6-sol-2026-09-01", 4.00),
+        ("github-copilot/gpt-5.6-sol-2026-09-01", 4.00),
+    ])
+    def test_dated_openai_id_prices_like_its_base_model(self, model_id, expected_in, capsys):
+        price = _pricing.get_price(model_id)
+        assert "no pricing entry" not in capsys.readouterr().err, (
+            f"{model_id} has no pricing.yaml entry and reached the fallback"
+        )
+        assert price["in"] == expected_in, (
+            f"{model_id} priced at {price['in']}/M in — expected {expected_in}"
+        )
+
+    def test_dated_glob_does_not_swallow_a_sibling_model(self):
+        """`*gpt-5-202*` must not reach gpt-5-mini / gpt-5-6-sol: the ids share a
+        prefix, which is why the base globs carry no trailing wildcard."""
+        assert _pricing.get_price("gpt-5-mini")["in"] == 0.25
+        assert _pricing.get_price("gpt-5-6-sol")["in"] == 4.00

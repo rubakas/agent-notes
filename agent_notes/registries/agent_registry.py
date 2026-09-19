@@ -9,6 +9,7 @@ from ..config import AGENTS_YAML
 from ..domain.agent import AgentSpec
 from ..services.stability import is_visible, enabled_wip, normalize_stability
 from ._base import load_yaml_file
+from .provider_registry import validate_effort
 
 # Top-level keys in agents.yaml that are NOT per-backend config entries.
 NON_BACKEND_KEYS = {"description", "role", "mode", "color", "effort", "claude_exclude", "stability"}
@@ -96,7 +97,7 @@ def load_agent_registry(yaml_path: Optional[Path] = None) -> AgentRegistry:
             role=config["role"],
             mode=config["mode"],
             color=config.get("color"),
-            effort=config.get("effort"),
+            effort=validate_effort(config.get("effort"), f"agent '{name}' in {yaml_path.name}") or None,
             backends=backends,
             stability=normalize_stability(config.get("stability"), yaml_path),
         )

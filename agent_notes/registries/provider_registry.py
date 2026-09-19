@@ -60,3 +60,30 @@ def load_provider_registry(providers_dir: Optional[Path] = None) -> ProviderRegi
 @lru_cache(maxsize=1)
 def default_provider_registry() -> ProviderRegistry:
     return load_provider_registry()
+
+
+def known_efforts() -> set[str]:
+    """Every effort value any provider understands.
+
+    Roles and agents are provider-agnostic, so the legal vocabulary for their
+    declared effort is the union over all providers, not any single one.
+    """
+    return {e for p in default_provider_registry().all() for e in p.efforts}
+
+
+def validate_effort(value: Optional[str], where: str) -> str:
+    """Return *value* unchanged, raising ValueError if it names no known effort.
+
+    An empty/absent value is legal — it means "unset". An unrecognized value is
+    a typo that would otherwise render silently as the provider default, so it
+    must fail at load time instead.
+    """
+    if not value:
+        return value or ""
+    allowed = known_efforts()
+    if value not in allowed:
+        raise ValueError(
+            f"Unknown effort '{value}' in {where}; "
+            f"expected one of {sorted(allowed)} or empty"
+        )
+    return value
