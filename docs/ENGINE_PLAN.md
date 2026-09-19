@@ -1,5 +1,7 @@
 # AgentNotes Engine — Phase 2 Plan (Models + Roles + CLIs)
 
+> **Historical record.** This plan describes the engine as of 2026-04-23 (v1.1.0), including the `data/models/*.yaml` per-model layout and the `role.typical_class -> model.class` resolution chain. Both have since been replaced — models now live in `agent_notes/data/catalog/seed.json` + `rules.yaml`, and selection is by `role.budget` + capability rank. For the current architecture, see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md). Left unmodified below as a record of the engine's history.
+
 **Status:** Phase 13 complete, v1.1.0-ready · **Target version:** 1.1.0 · **Date:** 2026-04-23
 
 Vision: **agent-notes is a true engine.** Adding a new AI CLI, a new AI model, or a new role is a matter of dropping YAML / template files. Zero Python code changes for the common case.

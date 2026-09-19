@@ -1,5 +1,7 @@
 # Release Plan — 1.3.0: Role-Model Config & Plugin Agent Routing
 
+> **Historical record.** This plan describes the engine as of the 1.3.0 release cycle (current version at the time was 1.2.0), including the `data/models/*.yaml` per-model layout and the `role.typical_class -> model.class` resolution chain. Both have since been replaced — models now live in `agent_notes/data/catalog/seed.json` + `rules.yaml`, and selection is by `role.budget` + capability rank. For the current architecture, see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md). Left unmodified below as a record of the engine's history.
+
 **Branch:** `release/1.3.0`
 **Goal:** Give users control over which model each agent uses. Pre-build the plugin
 with model assignments baked in. Add project-level overrides and agent prompt patches.
