@@ -1,0 +1,148 @@
+# Provenance manifest for skills vendored from mattpocock/skills.
+#
+# Upstream:      https://github.com/mattpocock/skills
+# License:       MIT
+# Copyright:     Copyright (c) 2026 Matt Pocock
+# Sync commit:   391a2701dd948f94f56a39f7533f8eea9a859c87 (2026-07-10)
+#
+# Upstream HEAD at audit time was c55ee46073ed923f86ce59a5eb3b6d895095d1b7
+# (2026-09-18); 46 commits since the sync commit touch vendored directories.
+# Re-syncing to that HEAD is a deliberate out-of-scope decision, not an
+# oversight — see specs/001-skills-and-catalog-audit/spec.md findings C4
+# and C5 for the drift inventory and the prompt-injection re-review surface
+# a future re-sync would need to cover.
+#
+# This file is PROVENANCE METADATA ONLY. It does not reproduce the upstream
+# MIT copyright/permission notice and does not discharge MIT's "accompany
+# all copies or substantial portions" attribution requirement. Whether/how
+# to satisfy that requirement (a NOTICE/THIRD-PARTY file, per-file headers,
+# or another route) is an open maintainer decision — see spec.md finding C1
+# and its "Decisions required from the maintainer" entry #1. Do not treat
+# the existence of this manifest as resolving C1.
+#
+# VERIFIED, NOT ASSERTED. On 2026-09-19 every field below was checked
+# against a full clone of the upstream repo at sync commit 391a2701:
+# each `upstream_path` was resolved with `git ls-tree -r --name-only 391a2701`
+# and confirmed to contain a SKILL.md, and every file in each vendored
+# skill directory was diffed against `git show 391a2701:<upstream_path>/<file>`
+# — not SKILL.md alone. `local_modifications` records exactly what those
+# diffs show; files not listed as modified are byte-identical to the sync
+# commit. Header facts (HEAD sha/date, commit count, license, copyright)
+# come from git commands against the same clone.
+#
+# An earlier revision of this manifest inferred 14 of the 16 `upstream_path`
+# values from a uniform `skills/engineering/<name>` layout; three of them
+# (`grill-me`, `grilling`, `handoff`, all under `skills/productivity/`) were
+# wrong and are corrected here.
+
+upstream:
+  repo: https://github.com/mattpocock/skills
+  license: MIT
+  copyright: "Copyright (c) 2026 Matt Pocock"
+  sync_commit: 391a2701dd948f94f56a39f7533f8eea9a859c87
+  sync_date: "2026-07-10"
+  head_at_audit:
+    commit: c55ee46073ed923f86ce59a5eb3b6d895095d1b7
+    date: "2026-09-18"
+    commits_since_sync_touching_vendored_dirs: 46
+
+verification:
+  date: "2026-09-19"
+  method: >-
+    Every upstream_path resolved and every file in each vendored skill
+    directory diffed against a full clone of the upstream repo at sync
+    commit 391a2701dd948f94f56a39f7533f8eea9a859c87. Header facts read
+    from git in the same clone. Claims below are verified, not inferred.
+  scope: all 16 skills, all files (not SKILL.md only)
+
+skills:
+  - name: grill-me
+    upstream_path: skills/productivity/grill-me
+    local_modifications:
+      - "group: frontmatter field added"
+
+  - name: grilling
+    upstream_path: skills/productivity/grilling
+    local_modifications:
+      - "group: frontmatter field added"
+
+  - name: grill-with-docs
+    upstream_path: skills/engineering/grill-with-docs
+    local_modifications:
+      - "group: frontmatter field added"
+
+  - name: diagnosing-bugs
+    upstream_path: skills/engineering/diagnosing-bugs
+    local_modifications:
+      - "group: frontmatter field added"
+
+  - name: improve-codebase-architecture
+    upstream_path: skills/engineering/improve-codebase-architecture
+    local_modifications:
+      - "group: frontmatter field added"
+      - "description extended with: \"For a single one-shot refactor use refactoring-protocol; for an iterative multi-dimensional cleanup loop use rsi.\" (applied 2026-09-19)"
+
+  - name: codebase-design
+    upstream_path: skills/engineering/codebase-design
+    local_modifications:
+      - "group: frontmatter field added"
+
+  - name: domain-modeling
+    upstream_path: skills/engineering/domain-modeling
+    local_modifications:
+      - "group: frontmatter field added"
+
+  - name: prototype
+    upstream_path: skills/engineering/prototype
+    local_modifications:
+      - "group: frontmatter field added"
+
+  - name: handoff
+    upstream_path: skills/productivity/handoff
+    local_modifications:
+      - "group: frontmatter field added"
+
+  - name: research
+    upstream_path: skills/engineering/research
+    local_modifications:
+      - "group: frontmatter field added"
+
+  - name: to-spec
+    upstream_path: skills/engineering/to-spec
+    local_modifications:
+      - "group: frontmatter field added"
+      - "/setup-matt-pocock-skills renamed to /setup-agent-tracker (1 occurrence)"
+
+  - name: to-tickets
+    upstream_path: skills/engineering/to-tickets
+    local_modifications:
+      - "group: frontmatter field added"
+      - "/setup-matt-pocock-skills renamed to /setup-agent-tracker (2 occurrences)"
+
+  - name: triage
+    upstream_path: skills/engineering/triage
+    local_modifications:
+      - "group: frontmatter field added"
+      - "/setup-matt-pocock-skills renamed to /setup-agent-tracker (1 occurrence)"
+
+  - name: wayfinder
+    upstream_path: skills/engineering/wayfinder
+    local_modifications:
+      - "group: frontmatter field added"
+      - "/setup-matt-pocock-skills renamed to /setup-agent-tracker (1 occurrence)"
+
+  - name: code-review
+    upstream_path: skills/engineering/code-review
+    local_modifications:
+      - "group: frontmatter field added"
+      - "/setup-matt-pocock-skills renamed to /setup-agent-tracker (1 occurrence)"
+      - "\"Use the general-purpose subagent for both.\" changed to \"Use the reviewer subagent for the Standards axis and the analyst subagent for the Spec axis.\""
+
+  - name: setup-agent-tracker
+    upstream_path: skills/engineering/setup-matt-pocock-skills
+    local_modifications:
+      - "group: frontmatter field added"
+      - "SKILL.md: de-branded — frontmatter name setup-matt-pocock-skills -> setup-agent-tracker, H1 \"Setup Matt Pocock's Skills\" -> \"Setup Agent Tracker\""
+      - "SKILL.md: skill list in the issue-tracker explainer narrowed from \"to-tickets, triage, to-spec, and qa\" to \"to-tickets, triage, and to-spec\" (qa is not vendored)"
+      - "triage-labels.md: table header column \"Label in mattpocock/skills\" -> \"Canonical role label\""
+      - "domain.md and the three issue-tracker-*.md files are byte-identical to the sync commit"

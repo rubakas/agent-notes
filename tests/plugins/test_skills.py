@@ -3,6 +3,7 @@ import pytest
 from pathlib import Path
 
 from agent_notes.config import SKILLS_DIR
+from agent_notes.memory.memory_backend import _REGISTRY, _REMOVED_BACKENDS
 
 
 def _skill_dirs():
@@ -77,7 +78,9 @@ def test_skill_name_matches_dir(skill_dir):
     )
 
 
-VALID_MEMORY_BACKENDS = {"obsidian", "wiki", "local"}
+# Derived from the live backend registry, minus _REMOVED_BACKENDS, so that removing
+# a backend automatically tightens this gate instead of leaving a dead name valid.
+VALID_MEMORY_BACKENDS = set(_REGISTRY) - _REMOVED_BACKENDS
 
 
 @pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=[d.name for d in SKILL_DIRS])
@@ -107,3 +110,56 @@ def test_skill_requires_memory_canonical_format(skill_dir):
                 f"{skill_dir.name}/SKILL.md: requires_memory token '{token}' has leading/trailing whitespace; "
                 f"use canonical form 'token1,token2' (no spaces after comma)"
             )
+
+
+# Skills written for this project rather than vendored from upstream. Every
+# directory in data/skills/ is either listed here or carries an entry in
+# THIRD_PARTY_SKILLS.yaml; the manifest is provenance metadata that nothing
+# else in the repo reads, so without this gate a skill can be added or an entry
+# can go stale with no failure anywhere.
+IN_HOUSE_SKILLS = frozenset({
+    "chrome-test",
+    "docker",
+    "git",
+    "ingest",
+    "migrate-memory",
+    "obsidian-memory",
+    "rails",
+    "refactoring-protocol",
+    "rsi",
+})
+
+THIRD_PARTY_MANIFEST = Path(__file__).resolve().parents[2] / "THIRD_PARTY_SKILLS.yaml"
+
+
+def _manifest_skill_names() -> set:
+    import yaml
+    manifest = yaml.safe_load(THIRD_PARTY_MANIFEST.read_text()) or {}
+    return {entry["name"] for entry in manifest.get("skills", [])}
+
+
+def test_third_party_manifest_exists():
+    assert THIRD_PARTY_MANIFEST.is_file(), (
+        f"{THIRD_PARTY_MANIFEST.name} is missing — vendored skills have no provenance record"
+    )
+
+
+def test_every_skill_has_a_provenance_decision():
+    """Manifest entries plus in-house names must equal the directories on disk.
+
+    Adding a skill fails this test until it is recorded as vendored (with its
+    upstream path and local modifications) or declared in-house.
+    """
+    on_disk = {d.name for d in SKILL_DIRS}
+    vendored = _manifest_skill_names()
+
+    overlap = vendored & IN_HOUSE_SKILLS
+    assert not overlap, (
+        f"{sorted(overlap)} are claimed both as vendored and as in-house"
+    )
+
+    accounted = vendored | IN_HOUSE_SKILLS
+    assert accounted == on_disk, (
+        f"skills with no provenance decision: {sorted(on_disk - accounted)}; "
+        f"declared but not on disk: {sorted(accounted - on_disk)}"
+    )

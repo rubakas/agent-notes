@@ -1,7 +1,7 @@
 ---
 name: docker
 group: domain
-description: "Docker development: Dockerfiles, Compose, multi-stage builds, and service patterns. Context7-style: loads only the relevant reference on demand."
+description: "Docker reference: Dockerfiles, Compose, multi-stage builds, health checks, and service patterns. Use when writing or debugging a Dockerfile or docker-compose file, containerizing an app, or shaping container images and services. Loads only the relevant reference on demand."
 triggers:
   - docker
   - Dockerfile

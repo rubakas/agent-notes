@@ -1,7 +1,7 @@
 ---
 name: rails
 group: domain
-description: "Rails development: models, controllers, views, testing, frontend, and infrastructure. Context7-style: loads only the relevant reference on demand."
+description: "Rails reference: models, controllers, views, testing, frontend, and infrastructure. Use when working on a Rails codebase — ActiveRecord models, migrations, associations, scopes, validations, callbacks, concerns, controllers, routes, ERB views, partials, ViewComponents, Hotwire (Turbo/Stimulus), Action Cable, Active Job, Active Storage, Action Mailer, or Kamal deploys. Loads only the relevant reference on demand."
 triggers:
   - rails
   - ActiveRecord

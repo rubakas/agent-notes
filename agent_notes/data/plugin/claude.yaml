@@ -15,6 +15,7 @@ vendored_skills:
   - prototype
   - refactoring-protocol
   - research
+  - rsi
   - setup-agent-tracker
   - to-spec
   - to-tickets

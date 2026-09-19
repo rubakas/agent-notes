@@ -34,7 +34,8 @@ Every record uses the same template. No `date:` field — only `created_at:`.
 ```yaml
 ---
 created_at: 2026-04-28T19:30:35Z   # ISO 8601, UTC, "Z" suffix — REQUIRED
-type: pattern                       # pattern|decision|mistake|context|session — REQUIRED
+type: pattern                       # pattern|decision|mistake|context|session|feedback — REQUIRED
+description: "..."                  # one-line summary optimized for index routing — optional; omitted from frontmatter entirely if not passed
 session: 2026-04-28_<session-id>   # wikilink target (no brackets); absent on session notes themselves
 agent: lead                         # optional
 ---
@@ -59,17 +60,24 @@ All timestamps everywhere are **UTC**. Local time is never written. The CLI uses
 Always use the CLI — never write vault files directly:
 
 ```bash
-agent-notes memory add "<title>" "<body>" [type] [agent]
+agent-notes memory add "<title>" "<body>" [type] [agent] [project] [--description "<one-liner>"]
 ```
+
+The title is positional, not a named argument — `body`, `type`, `agent`, and `project` are positional too, in that order. `--description` is the only named argument.
 
 **Types:**
 - `pattern` — reusable solution or technique discovered in the codebase
 - `decision` — architectural choice with rationale
 - `mistake` — recurring error to avoid
 - `context` — project background, constraints, stakeholder notes
+- `feedback` — guidance the user gave about how to approach work (corrections and confirmations)
 - `session` — current session's running log (one file per session, appended on each call)
 
 **Agent:** your agent name (`lead`, `coder`, `reviewer`, etc.)
+
+**Project:** optional override for the project folder; defaults to the current directory name.
+
+**`--description`:** one-line summary written to the `description:` field and used when rendering `Index.md`. Always pass it — if omitted the index falls back to the title.
 
 Examples:
 ```bash
@@ -113,6 +121,7 @@ vault/agent-notes/projects/
 │   ├── Decisions/    — architectural choices     YYYY-MM-DD_<slug>.md
 │   ├── Mistakes/     — errors to avoid           YYYY-MM-DD_<slug>.md
 │   ├── Context/      — project background        YYYY-MM-DD_<slug>.md
+│   ├── Feedback/     — user guidance on approach YYYY-MM-DD_<slug>.md
 │   ├── Sessions/     — one file per session      YYYY-MM-DD_<session-id>.md
 │   └── Index.md      — chronological list, newest first
 └── <another-project>/
@@ -132,7 +141,7 @@ agent-notes memory index
 
 If you change a rule above (filename pattern, frontmatter field, time format), update **both**:
 1. This file (`agent_notes/data/skills/obsidian-memory/SKILL.md`)
-2. `agent_notes/services/memory_backend.py` — the CLI that implements them
+2. `agent_notes/memory/memory_backend.py` — the CLI that implements them
 
 The two must stay in sync. The skill is the canonical statement; the CLI is the enforcer.
 
@@ -162,30 +171,15 @@ The session note becomes the navigable hub for everything written during the ses
 
 ## Plan-mirror rule (Obsidian storage only)
 
-After every Claude Code `ExitPlanMode` invocation:
+This is a model-discretion convention, not a harness hook — nothing enforces it. Apply it yourself whenever you exit plan mode:
 
-1. Check the configured memory storage. The SKILL substitutes `{{MEMORY_PATH}}` at build time; if it resolves to a path under a vault, the storage is Obsidian.
+1. Check the configured memory storage. `{{MEMORY_PATH}}` is NOT substituted inside skills — only agent prompts get that substitution, so the token reaches you literally here. Resolve the storage yourself with `agent-notes memory vault`; if it reports an Obsidian vault path, the storage is Obsidian.
 2. If Obsidian: write the plan content as a Decision note via `agent-notes memory add "<plan-title>" "<plan-body>" decision lead`. The local plan file at `~/.claude/plans/<file>.md` stays for harness compatibility.
 3. If local storage or memory disabled: skip the mirror entirely. The plan stays at its harness path; nothing else needs to happen.
 
 When mirrored, the new Decision participates in the Linking rule above — the active session note (if any) gets a wikilink to it.
 
 **Why mirror, not move**: Claude Code's plan-mode requires the local file to exist (the harness reads it on resume and ExitPlanMode writes to it). The Decision note in Obsidian is the navigable canonical record; the local file is the harness's working copy.
-
-## When to use Obsidian storage vs Wiki storage
-
-| Choose Obsidian when... | Choose Wiki when... |
-|---|---|
-| You want category-based organization (Patterns, Decisions, Mistakes) | You want knowledge that compounds (sources → concepts → synthesis) |
-| You need auto-linking between session notes and discoveries | You need the ingest → query → lint workflow |
-| You browse notes visually in Obsidian with backlinks | You're building a team knowledge base |
-| Your memory is about process (what worked, what failed) | Your memory is about domain knowledge (how things work) |
-
-**Process vs domain memory:**
-
-Obsidian storage focuses on **process memory** — tracking decisions, patterns, and mistakes across sessions. It answers "What did we learn?" and "Why did we choose this?"
-
-Wiki storage focuses on **domain memory** — compiling source material into a structured, cross-referenced knowledge base that compounds over time. It answers "How does this work?" and "What are the facts?"
 
 ## Read protocol (for team agents)
 
