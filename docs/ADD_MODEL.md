@@ -15,13 +15,13 @@ A **Model** (`agent_notes/domain/model.py`) has these fields. Some are supplied 
 | `family` | string | **DERIVED** — first `rules.yaml` `families` glob matching `id` | Brand grouping, e.g. `claude`, `gpt` |
 | `model_class` (`class`) | string | **DERIVED** — first `rules.yaml` `classes` glob matching `id` | Tier tag. For the *unpinned* budget+rank fallback on backends with `use_model_class: true` (currently only `claude`), this string — not the resolved alias — is written into the agent's `model:` frontmatter field |
 | `aliases` | dict[str, str] | **DERIVED** — a single entry keyed by the seed provider block the model came from: `alias_transforms[provider].format(id=id, seed_id=seed_id)`, overridable per-model via `alias_overrides[provider][id]` | Provider-specific model id string |
-| `capabilities` | dict[str, bool] | **DERIVED** — `rules.yaml capabilities.default` merged with `capabilities.overrides[id]` | Feature flags (vision, long_context, tool_use) |
+| `capabilities` | dict[str, bool] | **DERIVED** — `rules.yaml capabilities.default` merged with `capabilities.overrides[id]` | Feature flags (vision, long_context, tool_use, effort_support) |
 | `deprecated` | bool | **DERIVED** — `id in rules.yaml deprecated` | Soft preference in the selection ladder (see `model_resolver.py`); does not filter a model out entirely |
 | `rank` | int | Seed `rank` | Author-supplied ordering *within* a provider's block; NOT the global selection order — see below |
 | `coding_index` | float or `null` | Seed `coding_index` | Benchmark score. Gates automatic selection: a model with `coding_index: null` is never auto-selected |
 | `intelligence_index` | float or `null` | Seed `intelligence_index` | Benchmark score, informational |
-| `price_in` | float or `null` | Seed `price_in` | USD per 1M input tokens; compared directly against `role.budget` |
-| `price_out` | float or `null` | Seed `price_out` | USD per 1M output tokens |
+| `price_in` | float or `null` | Seed `price_in`, overridable per-model via `rules.yaml price_overrides[id].price_in` | USD per 1M input tokens; compared directly against `role.budget` |
+| `price_out` | float or `null` | Seed `price_out`, overridable per-model via `rules.yaml price_overrides[id].price_out` | USD per 1M output tokens |
 | `context_length` | int or `null` | Seed `context_length` | Informational |
 | `created_at` | string or `null` | Seed `created_at` | Informational |
 
@@ -66,6 +66,14 @@ There is no `agent_notes/data/models/` directory and no per-model YAML file. The
 - **`display_name`** (anthropic only) — becomes `Model.label` verbatim. openai has no `display_name`; its label is derived from `id` by `_derive_openai_label` (`"gpt-5.4-mini"` → `"GPT-5.4 Mini"`).
 - **`coding_index` / `intelligence_index`** — benchmark scores. `coding_index: null` (or omitted) makes the model permanently ineligible for automatic selection (`_eligible()` in `model_resolver.py` requires a non-null score) — it can still be reached by an explicit pin.
 - **`price_in` / `price_out`** — USD per 1M tokens. `price_in` is what `role.budget` is compared against.
+- **`price_overrides`** — a top-level block in `agent_notes/data/catalog/rules.yaml`, indexed by normalized registry id, that pins `price_in`/`price_out` on top of whatever the seed reports (`catalog_loader.py::_apply_price_overrides`). Two reasons to reach for it instead of editing `seed.json` directly: `seed.json` is machine-refreshed from OpenRouter by `models refresh` and would silently reintroduce a wrong price on the next refresh, and `~/.cache/agent-notes/catalog.json` shadows the bundled `seed.json` at runtime (`catalog_loader.py:167-169`) — editing `seed.json` alone can appear to do nothing on a machine that already has a cache, since `rules.yaml` (and `price_overrides` with it) is read fresh every time and always wins. The live entry:
+  ```yaml
+  price_overrides:
+    gpt-5-6-sol:
+      price_in: 4.0
+      price_out: 20.0
+  ```
+  pins GPT-5.6 Sol to OpenAI's published $4.00/$20.00 rate after the OpenRouter-sourced seed reported $2.00/$10.00.
 - **`rank`** — 1-based position within *this provider's* array. It does not by itself decide selection order across the whole catalog: `ModelRegistry` sorts every model globally by `coding_index` descending (`_frontier_key`), unrated models last. Keep `rank` consistent with `coding_index` ordering within a provider to avoid a confusing catalog.
 - **`created_at` / `context_length`** — informational, not consulted by selection logic.
 
@@ -349,6 +357,19 @@ default_effort: high
 **Hard rule: no cross-provider mapping or translation, anywhere.** Each provider's effort vocabulary is independent — `anthropic`'s `xhigh` is not translated to `openai`'s `xhigh` or anything else; they're just two providers that both happen to define a value with that name. If a resolved effort value isn't in the target provider's `efforts` list, the fallback is that provider's own `default_effort` — never another provider's value, never a translated/mapped equivalent.
 
 Providers with no YAML file here (`github-copilot`, `openrouter`, `google`, `moonshot` as of this writing) deliberately have no effort support: `agent_notes/registries/provider_registry.py`'s `.get()` raises `KeyError` for them, and the rendering seam (`rendering.py::_resolve_effort`) treats that as "emit nothing" rather than guessing a default. Adding effort support for a new provider means adding its YAML file with its own accurate `efforts`/`default_effort` — not reusing another provider's list.
+
+**Per-model gate: `effort_support`.** Independent of provider vocabulary, a model can be marked as accepting no effort setting at all via the `effort_support` capability under `rules.yaml`'s `capabilities:` block:
+
+```yaml
+capabilities:
+  default:
+    effort_support: true
+  overrides:
+    claude-haiku-4-5:
+      effort_support: false
+```
+
+Default is `true` (`capabilities.default.effort_support`). Setting it `false` under `capabilities.overrides[id]` makes `rendering.py`'s `_resolve_effort` omit the `effort` field entirely for that model (`rendering.py:265-266`) — this gate is checked before any provider-vocabulary validation runs. The live case is `claude-haiku-4-5`: it is absent from the supported-models list at `platform.claude.com/docs/en/build-with-claude/effort` and marked "Not supported" in the models-overview comparison table. An agent may still declare an `effort` value in `agents.yaml`; it only becomes meaningful if the agent later resolves to a model whose `effort_support` is `true`.
 
 ---
 
