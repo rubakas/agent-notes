@@ -80,7 +80,7 @@ Not a defect per se, but an undocumented precedence rule with a real failure mod
 - `docs/ADD_MODEL.md` does not document the new `price_overrides` or `effort_support` keys.
   [RESOLVED 2026-09-20 — see Status. Both are now documented in `docs/ADD_MODEL.md`.]
 - `agent_notes/data/agents/shared/cost_reporting.md:7` hardcodes `vs Claude Opus 4.8` (see D2).
-  [RESOLVED 2026-09-20 — see Status. The column is now described structurally (`vs <baseline>`), sourced from the pricing baseline label instead of pinned to a literal model name.]
+  [RESOLVED 2026-09-20 — see Status. The column label is now sourced from the pricing baseline instead of being pinned to a literal model name; the literal survives only as an illustrative parenthetical ("currently renders as `vs Claude Opus 4.8`").]
 - `docs/CLI_CAPABILITIES.md:1038` pins `anthropic/claude-sonnet-4-20250514` in an example — a model in the catalog's `deprecated:` list.
   [WITHDRAWN 2026-09-20 — see Status. The cited line number is wrong: line 1038 is about `autoMemoryDirectory`. `claude-sonnet-4-20250514` does appear at 8 sites, but every one illustrates another tool's config FORMAT, not a model recommendation. Downgraded to a low-priority doc-freshness nit, not a defect.]
 - `docs/CLI_CAPABILITIES.md:788` documents the Claude Code `attribution` default as `🤖 Generated with Claude Code`, the exact string `rules/no-ai-attribution.md:11` instructs stripping. Nothing reconciles the two.
