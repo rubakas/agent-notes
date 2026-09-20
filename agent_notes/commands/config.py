@@ -184,6 +184,14 @@ def _check_effort_valid(scope_state, cli_name: str, role_name: str, effort: str)
         print(f"Valid efforts for {provider_name}: {', '.join(provider.efforts)}")
         return False
 
+    # A CLI can accept a strict subset of the provider vocabulary (Codex rejects
+    # 'none'); an undeclared list constrains nothing. Mirrors rendering's
+    # _constrain_effort_to_backend, which would silently drop the value.
+    if backend.efforts and effort not in backend.efforts:
+        print(f"Invalid effort '{effort}' for CLI '{cli_name}'.")
+        print(f"Valid efforts for {cli_name}: {', '.join(backend.efforts)}")
+        return False
+
     return True
 
 
