@@ -79,6 +79,9 @@ class TestCheckEffortValidCLINarrowing:
         _check_effort_valid(_scope_state(), "codex", ROLE, "none")
         out = capsys.readouterr().out
         assert "codex" in out
+        # Pin WHICH branch fired: 'none' is provider-valid, so the provider
+        # branch must not be the one reporting it.
+        assert "for provider" not in out
         for effort in ("minimal", "low", "medium", "high", "xhigh"):
             assert effort in out
 
@@ -93,3 +96,59 @@ class TestCheckEffortValidCLINarrowing:
         _patch_backend(monkeypatch, efforts=())
         assert _check_effort_valid(_scope_state(), "codex", ROLE, "bogus") is False
         assert "openai" in capsys.readouterr().out
+
+
+def _patch_model(monkeypatch, capabilities):
+    model = Model(id=MODEL_ID, label=MODEL_ID, family="gpt", model_class="gpt",
+                  aliases={"openai": MODEL_ID}, capabilities=capabilities)
+
+    class FakeModelRegistry:
+        def get(self, model_id):
+            if model_id != MODEL_ID:
+                raise KeyError(model_id)
+            return model
+
+    monkeypatch.setattr(
+        "agent_notes.registries.model_registry.load_model_registry",
+        lambda: FakeModelRegistry(),
+    )
+
+
+class TestCheckEffortValidModelGate:
+    """A model can accept no effort setting at all (effort_support: false);
+    rendering drops such a pin silently, so config must refuse it up front."""
+
+    def test_rejects_effort_for_model_without_effort_support(self, monkeypatch):
+        _patch_model(monkeypatch, {"effort_support": False})
+        assert _check_effort_valid(_scope_state(), "codex", ROLE, "high") is False
+
+    def test_error_message_names_the_model(self, monkeypatch, capsys):
+        _patch_model(monkeypatch, {"effort_support": False})
+        _check_effort_valid(_scope_state(), "codex", ROLE, "high")
+        assert MODEL_ID in capsys.readouterr().out
+
+    def test_model_declaring_effort_support_is_unaffected(self, monkeypatch):
+        _patch_model(monkeypatch, {"effort_support": True})
+        assert _check_effort_valid(_scope_state(), "codex", ROLE, "high") is True
+
+
+class TestRealClaudeBackendDeclaresNoEfforts:
+    """claude.yaml declares no `efforts:` key, which must mean 'unconstrained' —
+    not 'nothing allowed'. Pins the semantic against a later `efforts:` addition."""
+
+    def test_anthropic_only_effort_accepted_on_claude(self, monkeypatch):
+        model = Model(id="claude-test", label="claude-test", family="claude",
+                      model_class="opus", aliases={"anthropic": "claude-test"})
+
+        class FakeModelRegistry:
+            def get(self, model_id):
+                if model_id != "claude-test":
+                    raise KeyError(model_id)
+                return model
+
+        monkeypatch.setattr(
+            "agent_notes.registries.model_registry.load_model_registry",
+            lambda: FakeModelRegistry(),
+        )
+        state = ScopeState(clis={"claude": BackendState(role_models={ROLE: "claude-test"})})
+        assert _check_effort_valid(state, "claude", ROLE, "max") is True

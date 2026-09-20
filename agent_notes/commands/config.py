@@ -135,12 +135,14 @@ def _validate_role(role_name: str):
 
 
 def _check_effort_valid(scope_state, cli_name: str, role_name: str, effort: str) -> bool:
-    """Check effort against the role's currently-assigned model's provider on
-    cli_name. Prints the provider name and its valid effort list on failure.
+    """Check effort for the role's currently-assigned model on cli_name, narrowing
+    through three gates in order: the model's own `effort_support` capability, the
+    provider's effort vocabulary, then the CLI backend's subset of it (when the
+    backend declares one). Prints the offending model, provider or CLI on failure.
     Returns True/False — does not exit (callers decide fatal vs. non-fatal).
 
     NO cross-provider mapping/translation — the value is checked against exactly
-    the provider that serves the role's current model, nothing more.
+    the provider that serves the role's current model.
     """
     from ..registries.model_registry import load_model_registry
     from ..registries.cli_registry import load_registry
@@ -157,6 +159,13 @@ def _check_effort_valid(scope_state, cli_name: str, role_name: str, effort: str)
         model = model_registry.get(model_id)
     except KeyError:
         print(f"Unknown model '{model_id}' assigned to role '{role_name}'.")
+        return False
+
+    # Per-MODEL gate: some models accept no effort setting at all, independently of
+    # their provider's vocabulary. Mirrors rendering.py's effort_support check, which
+    # would otherwise drop the pin silently at render time.
+    if not model.capabilities.get("effort_support", True):
+        print(f"Model '{model_id}' does not accept an effort setting.")
         return False
 
     cli_registry = load_registry()
