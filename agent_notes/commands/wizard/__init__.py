@@ -216,10 +216,22 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
                 except KeyError:
                     provider = None
 
-            if provider is not None:
-                effort_options = [(e, e) for e in provider.efforts]
+            # A model can accept no effort at all, and a CLI can accept a strict
+            # subset of the provider vocabulary; an undeclared backend list
+            # constrains nothing. Mirrors rendering's effort_support check and
+            # _constrain_effort_to_backend, which would silently drop or
+            # substitute the value at render time.
+            efforts = []
+            if provider is not None and picked_model.capabilities.get("effort_support", True):
+                efforts = [e for e in provider.efforts
+                           if not backend.efforts or e in backend.efforts]
+
+            if efforts:
+                effort_options = [(e, e) for e in efforts]
                 default_effort = _effort_default_choice(role, provider)
-                default_effort_idx = provider.efforts.index(default_effort)
+                if default_effort not in efforts:
+                    default_effort = efforts[0]
+                default_effort_idx = efforts.index(default_effort)
 
                 if accept_all:
                     picked_effort = default_effort
