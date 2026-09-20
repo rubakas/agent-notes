@@ -3,6 +3,8 @@
 ## Status
 Draft — awaiting decision. Investigation complete 2026-09-19. The mechanically-verifiable defects from this investigation were ALREADY FIXED and are covered in `tasks.md` as done; what remains are judgment calls that change how the whole agent system behaves.
 
+**D5 items — verified 2026-09-20:** items 1-3 are now resolved. `agent_notes/commands/config.py:190-193` validates a `role-effort` pin against the CLI backend's own `efforts` vocabulary (not just the provider's), closing the UX gap item 1 described. `docs/ADD_MODEL.md` now documents `price_overrides` and `effort_support`. `agent_notes/data/agents/shared/cost_reporting.md:7` no longer hardcodes a literal model name for the `vs` column — the label is now described as data-driven. Items 4 and 5 are WITHDRAWN by the lead — see the annotations under D5 below. D1-D4 remain open, awaiting the maintainer.
+
 ## Context
 Research against current Anthropic and OpenAI primary docs (2026-09-19) to check whether this repo's agent definitions, effort assignments and prompt text match how current frontier models actually behave. Sources: `platform.claude.com/docs` (docs.claude.com 302-redirects there), `developers.openai.com/api/docs` (platform.openai.com 301-redirects there), `learn.chatgpt.com/docs`, and the bundled `claude-api` reference skill.
 
@@ -74,10 +76,15 @@ Not a defect per se, but an undocumented precedence rule with a real failure mod
 ### D5 — smaller items, no decision needed, listed for scheduling
 
 - `agent_notes/commands/config.py:182` validates a `role-effort` pin against the PROVIDER vocabulary only, so `--cli codex worker none` still reports success at the command line even though the render now safely refuses it. UX gap: the CLI says the pin is valid, then doesn't honour it.
+  [RESOLVED 2026-09-20 — see Status. `config.py:190-193` now also validates against the CLI backend's own `efforts` list.]
 - `docs/ADD_MODEL.md` does not document the new `price_overrides` or `effort_support` keys.
+  [RESOLVED 2026-09-20 — see Status. Both are now documented in `docs/ADD_MODEL.md`.]
 - `agent_notes/data/agents/shared/cost_reporting.md:7` hardcodes `vs Claude Opus 4.8` (see D2).
+  [RESOLVED 2026-09-20 — see Status. The column is now described structurally (`vs <baseline>`), sourced from the pricing baseline label instead of pinned to a literal model name.]
 - `docs/CLI_CAPABILITIES.md:1038` pins `anthropic/claude-sonnet-4-20250514` in an example — a model in the catalog's `deprecated:` list.
+  [WITHDRAWN 2026-09-20 — see Status. The cited line number is wrong: line 1038 is about `autoMemoryDirectory`. `claude-sonnet-4-20250514` does appear at 8 sites, but every one illustrates another tool's config FORMAT, not a model recommendation. Downgraded to a low-priority doc-freshness nit, not a defect.]
 - `docs/CLI_CAPABILITIES.md:788` documents the Claude Code `attribution` default as `🤖 Generated with Claude Code`, the exact string `rules/no-ai-attribution.md:11` instructs stripping. Nothing reconciles the two.
+  [WITHDRAWN 2026-09-20 — see Status. Documenting a harness DEFAULT is how a user learns to override it; it does not conflict with the no-ai-attribution rule, which governs what agent-notes itself emits, not what it documents about another tool's factory setting.]
 
 ## Out of scope
 

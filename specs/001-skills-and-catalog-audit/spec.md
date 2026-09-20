@@ -17,8 +17,15 @@ Partially remediated (as of 2026-09-19). Investigation completed 2026-09-19; mos
 - F1 — landing on a deprecated model via the widened ladder now emits a stderr warning (`model_resolver.py::_warn_deprecated_selection`).
 - F2 — an unsupported effort value now emits a stderr warning naming the requested and fallback values (`rendering.py:264-269`).
 - F3 — `typical_effort` is now validated at role-load time (`role_registry.py` calls `validate_effort`).
+- F4 — NOW FIXED. `agent_notes/data/catalog/rules.yaml:14-16` now carries `gpt-*-mini`, `gpt-*-nano`, and `gpt-6*` class rules with an explanatory comment; the "no nano tier" gap this finding described is closed.
+- F5 — user-visible symptom FIXED; underlying data declaration remains inert (downgraded from a live bug to a data-hygiene note). `agent_notes/commands/set_role.py` now prints `configured_providers(backend)`, which filters to providers that actually exist, so users no longer see bedrock/vertex advertised. `agent_notes/data/cli/claude.yaml:30` still declares `accepted_providers: [anthropic, bedrock, vertex]`, but nothing surfaces it to a user anymore.
+- D10 — WITHDRAWN 2026-09-20. The finding's premise ("`triggers`, `argument-hint`, `disable-model-invocation` are parsed by nothing") is false: grepping `agent_notes/**/*.py` returns 10, 4, and 18 references respectively.
+- D11 — ADDRESSED. `agent_notes/data/skills/chrome-test/SKILL.md:16` now carries an explicit `## Precondition — claude --chrome is unverified` section.
+- D12 — WITHDRAWN 2026-09-20. The finding claims `obsidian-memory/SKILL.md` asserts an `ExitPlanMode` hook exists; the current text at `obsidian-memory/SKILL.md:182` describes Claude Code's own plan-mode file behavior and makes no claim that agent-notes implements a hook.
 
-**Not re-verified in this pass (status unknown, not required by this spec's acceptance criteria):** A5, A7, C4, C5, C6, D10, D11, D12, D13, F4, F5.
+**Not re-verified in this pass (status unknown, not required by this spec's acceptance criteria):** A5, A7, C4, C5, C6, D13.
+
+**Path correction:** the CLI-role-effort validation logic discussed under spec 002's D5 (item 1) lives at `agent_notes/commands/config.py:182` and `:190-193`. An earlier draft of that material cited `agent_notes/services/config.py`, which does not exist.
 
 **Deliberately held pending maintainer decision — do not mark as done:**
 - C1 (MIT attribution) — `THIRD_PARTY_SKILLS.yaml` now exists as a provenance manifest but its own text explicitly defers the NOTICE/THIRD-PARTY question to the maintainer.
@@ -57,6 +64,8 @@ B1. BROKEN — `claude-sonnet-5` is priced twice, differently, in the same repo.
 B2. BROKEN — `agent_notes/data/pricing.yaml:57-59` prices all 13 OpenAI catalog models with one glob set (`gpt-*`, `o1*`, `o3*`, `o4*`) at a flat 2.50/10.00, under an entry still labelled "GPT-4 / o-series". Twelve of thirteen are mispriced, from 50x over (`gpt-5-nano`, true 0.05/0.40) to 5x under (`gpt-6-astra`, true 10.0/50.0). The models the resolver actually selects on the codex backend are affected: `gpt-5.6-sol` (+25% input) for three roles, `gpt-5.6-luna` (12.5x over) for scout.
 
 B3. OPEN / PLAUSIBLE — not yet confirmed, must be checked against the live pricing page before acting. `agent_notes/data/pricing.yaml:17-20` uses one `*fable*` glob for both Fable 5 and Fable 5.1, setting `cache_read: 1.00` from the standard 0.1x-of-input rule. The provider reference states Claude Fable 5.1 has a special cache-read rate of $0.25/MTok. If correct, one glob cannot price both models and cache reads are billed at 4x for `claude-fable-5-1` — which is the automatic `orchestrator` pick and the most cache-heavy role in the system.
+
+[RESOLVED 2026-09-20 — see Status. `pricing.yaml:22-23` now splits Fable 5.1 into its own anchored-glob entry with `cache_read: 0.25`, separate from Fable 5's `cache_read: 1.00` at `pricing.yaml:26-27`.]
 
 B4. ROOT CAUSE, and the reason B1-B3 will recur. The catalog carries two independent price sources with nothing reconciling them: `seed.json.price_in` gates role-budget model selection, `pricing.yaml` gates cost reporting. `seed.json` is machine-refreshed (`fetched_at: 2026-09-09`); `pricing.yaml` is hand-maintained. Every catalog refresh re-opens this gap. Any fix that only corrects the numbers leaves the mechanism intact.
 
@@ -98,9 +107,15 @@ D9. BROKEN IN PLUGIN BUILD — `rsi` is excluded from `agent_notes/data/plugin/c
 
 D10. INERT FRONTMATTER — `triggers:`, `argument-hint:`, and `disable-model-invocation:` are parsed by nothing in agent-notes (`grep -rn 'triggers' --include='*.py' agent_notes/` → zero hits). They pass through verbatim into the built artifact. Only `name`, `description`, `group`, `requires_memory`, `stability` are live. This matters because `rails/SKILL.md:4` and `docker/SKILL.md:4` have descriptions with NO when-to-use clause and lean on 23- and 7-entry `triggers:` lists for routing — and `agent_notes/services/session_context.py:11-18` injects only name + description into the session catalog. Their sole routing signal never states when to fire. (Note `disable-model-invocation` IS a real Claude Code field and reaches the harness intact; it is only agent-notes that ignores it.)
 
+[WITHDRAWN 2026-09-20 — see Status. The finding's premise is false: `triggers`, `argument-hint`, and `disable-model-invocation` are referenced 10, 4, and 18 times respectively across `agent_notes/**/*.py`.]
+
 D11. RISKY — `chrome-test/SKILL.md` is built end-to-end on launching `claude --chrome` (`:3,14,63,91,214,259`). Nothing in the repo pins or verifies that flag. The skill concedes at `:261` that this is "a community pattern, not an officially documented Anthropic workflow", while `agent_notes/data/agents/shared/verification.md:41` treats the gate as mandatory.
 
+[ADDRESSED 2026-09-20 — see Status. `chrome-test/SKILL.md:16` now carries an explicit `## Precondition — claude --chrome is unverified` section.]
+
 D12. RISKY — `obsidian-memory/SKILL.md:165` states a rule firing "After every Claude Code `ExitPlanMode` invocation". No hook implements this; `agent_notes/cli.py:294` restricts hook subactions to memory-bridge, precompact-memory-bridge, session-discover, guard-credentials. Compliance is model discretion only.
+
+[WITHDRAWN 2026-09-20 — see Status. The current text at `obsidian-memory/SKILL.md:182` describes Claude Code's own plan-mode file behavior and makes no claim that agent-notes implements a hook.]
 
 D13. COSMETIC — routing collision. `rsi` and `refactoring-protocol` each point outward to both siblings; `improve-codebase-architecture` (vendored) references neither. Two of three arms disambiguate; the third offers no off-ramp.
 
@@ -130,7 +145,11 @@ F3. Nothing validates effort values at load time. `domain/role.py:20` types `typ
 
 F4. `agent_notes/data/catalog/rules.yaml:11-13` — GPT class globs do not scale. `gpt-*-mini` has no `nano` counterpart, so `gpt-5.4-nano` and `gpt-5-nano` class as opus; `gpt-5-4` is an exact-id pin. 10 of 13 GPT ids class as `opus`, spanning coding_index 77.4 down to 37.8 and input price $10.00 down to $0.05 — a 200x price range inside one class. Inert today (`model_class` renders only when `backend.use_model_class`, true only for claude, and GPT models carry only an openai alias), live the moment any `use_model_class` backend accepts openai.
 
+[RESOLVED 2026-09-20 — see Status. `rules.yaml:14-16` now carries `gpt-*-mini`/`gpt-*-nano`/`gpt-6*` class rules closing the gap.]
+
 F5. COSMETIC — `agent_notes/data/cli/claude.yaml:30` declares `accepted_providers: [anthropic, bedrock, vertex]`. Only `providers/anthropic.yaml` and `openai.yaml` exist. Traced: this degrades gracefully and is unreachable rather than broken — `catalog_loader.py:205` gives every model exactly one provider alias keyed by its seed block, so `domain/model.py:31-33` returns `anthropic` on the first iteration always. A user cannot activate bedrock/vertex even deliberately. `agent_notes/commands/set_role.py:115` nonetheless prints "Compatible providers: anthropic, bedrock, vertex" to the user, advertising two unusable providers.
+
+[Downgraded 2026-09-20 — see Status. The user-visible symptom is fixed (`set_role.py` now prints filtered `configured_providers`); the underlying `accepted_providers` over-declaration in `claude.yaml:30` remains as a data-hygiene nit, not a live bug.]
 
 ## Decisions required from the maintainer
 
@@ -139,7 +158,7 @@ F5. COSMETIC — `agent_notes/data/cli/claude.yaml:30` declares `accepted_provid
 3. `~/.codex/skills/` (A2) — stop writing it, or keep it as forward-compatible speculation. Note that removing it changes uninstall behavior for existing installs.
 4. Upstream re-sync (C4, C5) — out of scope for this spec by prior decision (manifest only, no re-sync). Confirm that still holds given the three structural rewrites.
 5. Non-standard frontmatter keys (A6) — migrate `group`/`requires_memory`/`stability` under the standard's `metadata` field, or accept that skills cannot be packaged/uploaded as-is.
-6. Fable 5.1 cache-read rate (B3) — OPEN, needs confirmation against the live pricing page before any change.
+6. ~~Fable 5.1 cache-read rate (B3)~~ — RESOLVED 2026-09-20, no longer a live decision. `pricing.yaml:22-23` now prices Fable 5.1 separately from Fable 5, with its own `cache_read: 0.25`; see Status and the B3 finding below.
 
 ## Acceptance criteria
 
