@@ -11,11 +11,6 @@ from agent_notes.config import DIST_DIR
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-# Files that test deleted wiki package functionality — removed with the wiki backend.
-collect_ignore = [
-    "unit/services/test_credential_filter.py",
-]
-
 # Session-scoped temp dir used for cache isolation.  Set in pytest_configure
 # (before pytest_sessionstart) so the shelled-out `agent-notes build` subprocess
 # inherits XDG_CACHE_HOME and never reads the developer's personal cache.
