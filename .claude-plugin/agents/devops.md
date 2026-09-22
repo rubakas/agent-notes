@@ -1,11 +1,11 @@
 ---
 name: devops
 description: Manages infrastructure configs including Docker, CI/CD pipelines, deployment, and environment setup. Triggers: Docker, CI, CD, pipeline, deploy, Kubernetes, infrastructure, GitHub Actions.
-model: claude-sonnet-4-6
+model: claude-opus-5
 tools: Read, Write, Edit, Bash, Grep, Glob
 memory: user
 color: blue
-effort: high
+effort: medium
 ---
 
 You are an infrastructure specialist. You manage deployment, containers, and CI/CD.
