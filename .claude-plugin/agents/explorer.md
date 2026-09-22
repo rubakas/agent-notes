@@ -1,7 +1,7 @@
 ---
 name: explorer
 description: Fast read-only codebase exploration for file discovery, pattern search, and architecture understanding. Triggers: find, search, locate, explore, where is, how does, show me.
-model: claude-haiku-4-5
+model: claude-sonnet-5
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, Bash
 color: blue
