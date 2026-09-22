@@ -56,8 +56,7 @@ def _make_scope_state(backend_name, role_efforts):
 
 
 def _patch_role_registry(monkeypatch, typical_effort="medium", role_name="worker"):
-    role = Role(name=role_name, label="Worker", description="", typical_class="sonnet",
-                typical_effort=typical_effort)
+    role = Role(name=role_name, label="Worker", description="", typical_effort=typical_effort)
 
     class FakeRegistry:
         def get(self, name):
@@ -381,3 +380,58 @@ class TestResolveEffortWithExactPinnedModelStr:
         result = _resolve_effort("coder", {"role": "worker"}, backend, scope_state,
                                  {}, "claude-sonnet-4-6", model_registry)
         assert result == "xhigh"
+
+
+# Real openai vocabulary — note it has no "max", and its default sits mid-list.
+OPENAI_FULL = Provider(
+    name="openai",
+    efforts=("none", "minimal", "low", "medium", "high", "xhigh"),
+    default_effort="medium",
+)
+
+
+class TestDroppedEffortWarning:
+    """Effort is validated per resolved model, not per backend, so an agent
+    declaring an anthropic-only value on codex silently becomes the openai
+    default. The substitution stays (NO cross-provider mapping) but must be
+    announced."""
+
+    def _resolve_max_on_codex(self, monkeypatch):
+        _patch_role_registry(monkeypatch, typical_effort="medium")
+        _patch_provider_registry(monkeypatch, [ANTHROPIC, OPENAI_FULL])
+
+        backend = _make_backend(name="codex", accepted_providers=("openai",))
+        model = _make_model(model_id="gpt-5-6-sol", family="gpt",
+                            aliases={"openai": "gpt-5.6-sol"})
+        model_registry = ModelRegistry([model])
+
+        agent_config = {"effort": "max", "role": "worker"}
+        return _resolve_effort("coder", agent_config, backend, None, {},
+                               "gpt-5.6-sol", model_registry)
+
+    def test_warns_and_still_substitutes_the_provider_default(self, monkeypatch, capsys):
+        result = self._resolve_max_on_codex(monkeypatch)
+
+        assert result == "medium"
+        err = capsys.readouterr().err
+        assert "agent 'coder'" in err
+        assert "role 'worker'" in err
+        assert "requested effort 'max'" in err
+        assert "provider 'openai'" in err
+        assert "using 'medium' instead" in err
+
+    def test_silent_when_the_declared_effort_is_supported(self, monkeypatch, capsys):
+        _patch_role_registry(monkeypatch, typical_effort="medium")
+        _patch_provider_registry(monkeypatch, [ANTHROPIC, OPENAI_FULL])
+
+        backend = _make_backend(name="codex", accepted_providers=("openai",))
+        model = _make_model(model_id="gpt-5-6-sol", family="gpt",
+                            aliases={"openai": "gpt-5.6-sol"})
+        model_registry = ModelRegistry([model])
+
+        agent_config = {"effort": "high", "role": "worker"}
+        result = _resolve_effort("coder", agent_config, backend, None, {},
+                                 "gpt-5.6-sol", model_registry)
+
+        assert result == "high"
+        assert capsys.readouterr().err == ""

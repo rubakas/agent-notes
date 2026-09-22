@@ -1,83 +1,294 @@
 {
-  "fetched_at": "2026-08-05T15:26:56Z",
+  "fetched_at": "2026-09-09T21:37:09Z",
   "providers": {
     "anthropic": [
       {
-        "id": "claude-opus-5",
-        "display_name": "Claude Opus 5",
-        "created_at": null
+        "id": "claude-fable-5-1",
+        "display_name": "Claude Fable 5.1",
+        "coding_index": 81.6,
+        "intelligence_index": 53.4,
+        "price_in": 10.0,
+        "price_out": 50.0,
+        "context_length": 1000000,
+        "created_at": "2026-09-01",
+        "rank": 1
       },
       {
-        "id": "claude-sonnet-5",
-        "display_name": "Claude Sonnet 5",
-        "created_at": null
+        "id": "claude-opus-5",
+        "display_name": "Claude Opus 5",
+        "coding_index": 78.0,
+        "intelligence_index": 50.7,
+        "price_in": 5.0,
+        "price_out": 25.0,
+        "context_length": 1000000,
+        "created_at": "2026-07-24",
+        "rank": 2
       },
       {
         "id": "claude-fable-5",
         "display_name": "Claude Fable 5",
-        "created_at": null
+        "coding_index": 76.5,
+        "intelligence_index": 49.7,
+        "price_in": 10.0,
+        "price_out": 50.0,
+        "context_length": 1000000,
+        "created_at": "2026-06-09",
+        "rank": 3
       },
       {
         "id": "claude-opus-4-8",
         "display_name": "Claude Opus 4.8",
-        "created_at": null
+        "coding_index": 74.3,
+        "intelligence_index": 42.0,
+        "price_in": 5.0,
+        "price_out": 25.0,
+        "context_length": 1000000,
+        "created_at": "2026-05-27",
+        "rank": 4
       },
       {
         "id": "claude-opus-4-7",
         "display_name": "Claude Opus 4.7",
-        "created_at": null
+        "coding_index": 73.6,
+        "intelligence_index": null,
+        "price_in": 5.0,
+        "price_out": 25.0,
+        "context_length": 1000000,
+        "created_at": "2026-04-16",
+        "rank": 5
+      },
+      {
+        "id": "claude-sonnet-5",
+        "display_name": "Claude Sonnet 5",
+        "coding_index": 71.5,
+        "intelligence_index": 38.4,
+        "price_in": 2.0,
+        "price_out": 10.0,
+        "context_length": 1000000,
+        "created_at": "2026-06-30",
+        "rank": 6
       },
       {
         "id": "claude-sonnet-4-6",
         "display_name": "Claude Sonnet 4.6",
-        "created_at": null
-      },
-      {
-        "id": "claude-opus-4-6",
-        "display_name": "Claude Opus 4.6",
-        "created_at": null
-      },
-      {
-        "id": "claude-opus-4-5",
-        "display_name": "Claude Opus 4.5",
-        "created_at": null
-      },
-      {
-        "id": "claude-haiku-4-5",
-        "display_name": "Claude Haiku 4.5",
-        "created_at": null
+        "coding_index": 63.0,
+        "intelligence_index": 30.5,
+        "price_in": 3.0,
+        "price_out": 15.0,
+        "context_length": 1000000,
+        "created_at": "2026-02-17",
+        "rank": 7
       },
       {
         "id": "claude-sonnet-4-5",
         "display_name": "Claude Sonnet 4.5",
-        "created_at": null
+        "coding_index": 52.1,
+        "intelligence_index": 21.2,
+        "price_in": 3.0,
+        "price_out": 15.0,
+        "context_length": 1000000,
+        "created_at": "2025-09-29",
+        "rank": 8
       },
       {
-        "id": "claude-opus-4-1",
-        "display_name": "Claude Opus 4.1",
-        "created_at": null
+        "id": "claude-haiku-4-5",
+        "display_name": "Claude Haiku 4.5",
+        "coding_index": 43.9,
+        "intelligence_index": 17.6,
+        "price_in": 1.0,
+        "price_out": 5.0,
+        "context_length": 200000,
+        "created_at": "2025-10-15",
+        "rank": 9
       },
       {
         "id": "claude-sonnet-4",
         "display_name": "Claude Sonnet 4",
-        "created_at": null
+        "coding_index": 37.6,
+        "intelligence_index": null,
+        "price_in": 3.0,
+        "price_out": 15.0,
+        "context_length": 1000000,
+        "created_at": "2025-05-22",
+        "rank": 10
+      },
+      {
+        "id": "claude-opus-4-1",
+        "display_name": "Claude Opus 4.1",
+        "coding_index": null,
+        "intelligence_index": null,
+        "price_in": 15.0,
+        "price_out": 75.0,
+        "context_length": 200000,
+        "created_at": "2025-08-05",
+        "rank": 11
+      },
+      {
+        "id": "claude-opus-4-5",
+        "display_name": "Claude Opus 4.5",
+        "coding_index": null,
+        "intelligence_index": null,
+        "price_in": 5.0,
+        "price_out": 25.0,
+        "context_length": 200000,
+        "created_at": "2025-11-24",
+        "rank": 12
+      },
+      {
+        "id": "claude-opus-4-6",
+        "display_name": "Claude Opus 4.6",
+        "coding_index": null,
+        "intelligence_index": null,
+        "price_in": 5.0,
+        "price_out": 25.0,
+        "context_length": 1000000,
+        "created_at": "2026-02-04",
+        "rank": 13
       }
     ],
     "openai": [
       {
-        "id": "gpt-5.5"
+        "id": "gpt-5.6-sol",
+        "display_name": "GPT-5.6 Sol",
+        "coding_index": 77.4,
+        "intelligence_index": 47.1,
+        "price_in": 4.0,
+        "price_out": 20.0,
+        "context_length": 1050000,
+        "created_at": "2026-07-09",
+        "rank": 1
       },
       {
-        "id": "gpt-5.4-mini"
+        "id": "gpt-6-astra",
+        "display_name": "GPT-6 Astra",
+        "coding_index": 76.9,
+        "intelligence_index": 52.8,
+        "price_in": 10.0,
+        "price_out": 50.0,
+        "context_length": 1050000,
+        "created_at": "2026-09-04",
+        "rank": 2
       },
       {
-        "id": "gpt-5.4"
+        "id": "gpt-5.6-terra",
+        "display_name": "GPT-5.6 Terra",
+        "coding_index": 76.7,
+        "intelligence_index": 42.3,
+        "price_in": 2.0,
+        "price_out": 12.0,
+        "context_length": 1050000,
+        "created_at": "2026-07-09",
+        "rank": 3
       },
       {
-        "id": "gpt-5.2"
+        "id": "gpt-5.5",
+        "display_name": "GPT-5.5",
+        "coding_index": 74.9,
+        "intelligence_index": 38.6,
+        "price_in": 5.0,
+        "price_out": 30.0,
+        "context_length": 1050000,
+        "created_at": "2026-04-24",
+        "rank": 4
       },
       {
-        "id": "gpt-5.1"
+        "id": "gpt-5.6-luna",
+        "display_name": "GPT-5.6 Luna",
+        "coding_index": 71.4,
+        "intelligence_index": 37.5,
+        "price_in": 0.2,
+        "price_out": 1.2,
+        "context_length": 1050000,
+        "created_at": "2026-07-09",
+        "rank": 5
+      },
+      {
+        "id": "gpt-5.4",
+        "display_name": "GPT-5.4",
+        "coding_index": 71.1,
+        "intelligence_index": null,
+        "price_in": 2.5,
+        "price_out": 15.0,
+        "context_length": 1050000,
+        "created_at": "2026-03-05",
+        "rank": 6
+      },
+      {
+        "id": "gpt-5.4-mini",
+        "display_name": "GPT-5.4 Mini",
+        "coding_index": 56.1,
+        "intelligence_index": 24.6,
+        "price_in": 0.75,
+        "price_out": 4.5,
+        "context_length": 400000,
+        "created_at": "2026-03-17",
+        "rank": 7
+      },
+      {
+        "id": "gpt-5.4-nano",
+        "display_name": "GPT-5.4 Nano",
+        "coding_index": 56.1,
+        "intelligence_index": 21.2,
+        "price_in": 0.2,
+        "price_out": 1.25,
+        "context_length": 400000,
+        "created_at": "2026-03-17",
+        "rank": 8
+      },
+      {
+        "id": "gpt-5.1",
+        "display_name": "GPT-5.1",
+        "coding_index": 49.4,
+        "intelligence_index": null,
+        "price_in": 1.25,
+        "price_out": 10.0,
+        "context_length": 400000,
+        "created_at": "2025-11-13",
+        "rank": 9
+      },
+      {
+        "id": "gpt-5",
+        "display_name": "GPT-5",
+        "coding_index": 37.8,
+        "intelligence_index": null,
+        "price_in": 1.25,
+        "price_out": 10.0,
+        "context_length": 400000,
+        "created_at": "2025-08-07",
+        "rank": 10
+      },
+      {
+        "id": "gpt-5-mini",
+        "display_name": "GPT-5 Mini",
+        "coding_index": 15.6,
+        "intelligence_index": 17.4,
+        "price_in": 0.25,
+        "price_out": 2.0,
+        "context_length": 400000,
+        "created_at": "2025-08-07",
+        "rank": 11
+      },
+      {
+        "id": "gpt-5-nano",
+        "display_name": "GPT-5 Nano",
+        "coding_index": null,
+        "intelligence_index": null,
+        "price_in": 0.05,
+        "price_out": 0.4,
+        "context_length": 400000,
+        "created_at": "2025-08-07",
+        "rank": 12
+      },
+      {
+        "id": "gpt-5.2",
+        "display_name": "GPT-5.2",
+        "coding_index": null,
+        "intelligence_index": null,
+        "price_in": 1.75,
+        "price_out": 14.0,
+        "context_length": 400000,
+        "created_at": "2025-12-10",
+        "rank": 13
       }
     ]
   }

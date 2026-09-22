@@ -12,11 +12,12 @@ Resolution precedence (in order):
                             verbatim even on use_model_class backends.
   2. User-config override — user_config["role_models"][backend_name][role]
                             → returned verbatim (no registry lookup)
-  3. Role typical_class   — load role registry, match role.typical_class
-                            against model registry (newest id first).
-                            When backend.preferred_family is set, prefer
-                            models of that family; fall back to any-family
-                            if no preferred match found.
+  3. Role budget + rank  — walk the catalog frontier first (globally, across
+                            providers) and take the first model that is rated,
+                            priced within role.budget, and servable by the
+                            backend. When backend.preferred_family is set it
+                            wins outright unless no model of that family is
+                            eligible at all.
                             Returns alias (or model_class if use_model_class).
   4. Error — raises ValueError with a diagnostic message.
 
@@ -25,19 +26,99 @@ Role resolution:
   user_config["agent_roles"][agent_name] (override) falling back to
   agent_config["role"] (declared). This mirrors resolve_agent_role().
 
-Note: Role.typical_class drives both the wizard default pre-selection and
-Branch 3 of this resolver. The wizard selects the newest non-deprecated
-model of the matching class; this resolver picks newest (any deprecation
-status) when serving a live build.
+Note: select_model_for_role() below is the single implementation of "which
+model does this role get" — Branch 3 and the install wizard both call it, so
+the wizard's pre-selection and a live build can never disagree.
 """
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
     from ..domain.cli_backend import CLIBackend
     from ..domain.state import ScopeState
     from ..registries.model_registry import ModelRegistry
+
+
+def select_model_for_role(models, role, backend):
+    """The one implementation of "which model does this role get?".
+
+    Walks *models* in the registry's global frontier-first order and returns the first
+    ``(model, (provider, alias))`` that the backend can serve, is rated by the
+    benchmark, and costs no more than ``role.budget`` per 1M input tokens.
+    An unrated model (``coding_index is None``) is never auto-selected; a
+    ``None`` budget is unbounded. Returns ``(None, None)`` when nothing fits.
+
+    Family and deprecation are applied as a widening ladder:
+    ``(preferred_family, non-deprecated)`` → ``(any family, non-deprecated)`` →
+    ``(preferred_family, any)`` → ``(any family, any)``. Because rung 1 is tried
+    first over the whole catalog, backend.preferred_family behaves as a hard
+    filter whenever *any* eligible model of that family exists — another family
+    is only ever reachable when the preferred one has no eligible model at all.
+
+    Widening past the non-deprecated rungs is legal but never silent: landing on
+    a deprecated model emits a warning on stderr naming the model and the role.
+    """
+    providers = list(backend.accepted_providers)
+
+    def _eligible(model) -> bool:
+        if model.coding_index is None:
+            return False
+        if role.budget is None:
+            return True
+        return model.price_in is not None and model.price_in <= role.budget
+
+    def _first(family_filter=None, skip_deprecated=False):
+        for model in models:
+            if not _eligible(model):
+                continue
+            if family_filter is not None and model.family != family_filter:
+                continue
+            if skip_deprecated and model.deprecated:
+                continue
+            resolved = model.resolve_for_providers(providers)
+            if resolved is not None:
+                return model, resolved
+        return None, None
+
+    preferred = backend.preferred_family
+    if preferred is not None:
+        ladder = [(preferred, True), (None, True), (preferred, False), (None, False)]
+    else:
+        ladder = [(None, True), (None, False)]
+
+    for family_filter, skip_deprecated in ladder:
+        matched, resolved = _first(family_filter, skip_deprecated)
+        if matched is not None:
+            if matched.deprecated:
+                _warn_deprecated_selection(matched, role, backend)
+            return matched, resolved
+    return None, None
+
+
+def _warn_deprecated_selection(model, role, backend) -> None:
+    """Announce that the ladder widened past its non-deprecated rungs."""
+    budget = "unbounded" if role.budget is None else f"${role.budget}/M in"
+    sys.stderr.write(
+        f"Warning: role '{role.name}' on backend '{backend.name}' resolved to "
+        f"DEPRECATED model '{model.id}' — no non-deprecated model was both rated "
+        f"and within the role's budget ({budget}), so the deprecation guard was "
+        f"dropped to find a match\n"
+    )
+
+
+def configured_providers(backend) -> list[str]:
+    """Backend's accepted_providers that actually have a descriptor in data/providers/.
+
+    claude.yaml accepts bedrock and vertex, but no provider config exists for
+    either, so a user can never activate them. Resolution already ignores them;
+    this keeps user-facing output from advertising them.
+    """
+    from ..registries.provider_registry import default_provider_registry
+
+    known = set(default_provider_registry().names())
+    return [p for p in backend.accepted_providers if p in known]
 
 
 class ModelResolver:
@@ -84,9 +165,9 @@ class ModelResolver:
         if model_str is not None:
             return model_str
 
-        # Branch 3: role typical_class fallback
+        # Branch 3: role budget + catalog rank
         if agent_role is not None:
-            model_str = self._from_typical_class(agent_role, backend)
+            model_str = self._from_budget_rank(agent_role, backend)
             if model_str is not None:
                 return model_str
 
@@ -125,7 +206,7 @@ class ModelResolver:
         _provider, alias_str = resolved
         # DECISION: state pins always render the exact alias string, even on
         # use_model_class backends (claude). Class-based rendering remains only
-        # for the UNPINNED typical_class fallback (Branch 3) — a pin is an
+        # for the UNPINNED budget+rank fallback (Branch 3) — a pin is an
         # explicit version choice and flattening it to "sonnet" would let the
         # harness silently substitute its own default version.
         return alias_str
@@ -141,8 +222,8 @@ class ModelResolver:
             .get(agent_role)
         )
 
-    def _from_typical_class(self, agent_role: str, backend: "CLIBackend") -> Optional[str]:
-        """Branch 3: role.typical_class → newest matching model."""
+    def _from_budget_rank(self, agent_role: str, backend: "CLIBackend") -> Optional[str]:
+        """Branch 3: best-ranked rated model within the role's budget."""
         from ..registries.role_registry import load_role_registry
 
         try:
@@ -152,37 +233,7 @@ class ModelResolver:
             return None
 
         registry = self._ensure_registry()
-        all_models_reversed = list(reversed(registry.all()))
-        preferred_family = backend.preferred_family
-
-        def _find_class_match(models, family_filter=None, skip_deprecated=False):
-            for model in models:
-                if model.model_class != role.typical_class:
-                    continue
-                if model.never_default:
-                    continue
-                if family_filter is not None and model.family != family_filter:
-                    continue
-                if skip_deprecated and model.deprecated:
-                    continue
-                resolved = model.resolve_for_providers(list(backend.accepted_providers))
-                if resolved is not None:
-                    return model, resolved
-            return None, None
-
-        if preferred_family is not None:
-            matched_model, resolved = _find_class_match(all_models_reversed, preferred_family, skip_deprecated=True)
-            if matched_model is None:
-                matched_model, resolved = _find_class_match(all_models_reversed, skip_deprecated=True)
-            if matched_model is None:
-                matched_model, resolved = _find_class_match(all_models_reversed, preferred_family)
-            if matched_model is None:
-                matched_model, resolved = _find_class_match(all_models_reversed)
-        else:
-            matched_model, resolved = _find_class_match(all_models_reversed, skip_deprecated=True)
-            if matched_model is None:
-                matched_model, resolved = _find_class_match(all_models_reversed)
-
+        matched_model, resolved = select_model_for_role(registry.all(), role, backend)
         if matched_model is None or resolved is None:
             return None
 
@@ -197,22 +248,22 @@ class ModelResolver:
     ) -> str:
         """Branch 4: no model could be resolved. Raises ValueError."""
         agent_role = self._effective_role(agent_name, agent_config)
-        role_class = "?"
+        role_budget = "?"
         if agent_role is not None:
             try:
                 from ..registries.role_registry import load_role_registry
                 role_registry = load_role_registry()
                 role = role_registry.get(agent_role)
-                role_class = role.typical_class
+                role_budget = "unbounded" if role.budget is None else f"${role.budget}/M in"
             except (KeyError, FileNotFoundError, ValueError):
                 pass
         raise ValueError(
             f"Agent '{agent_name}' has role='{agent_role}' but no model could be "
             f"resolved for backend '{backend.name}'. Tried: state.role_models, "
-            f"role.typical_class->model.class matching, and legacy 'tier' fallback. "
+            f"user config, and budget+rank selection. "
             f"Check that data/roles/{agent_role}.yaml exists and that at least one "
-            f"model in data/models/*.yaml has class={role_class} "
-            f"with an alias for one of {list(backend.accepted_providers)}."
+            f"rated model within the role's budget ({role_budget}) "
+            f"has an alias for one of {configured_providers(backend)}."
         )
 
     # ------------------------------------------------------------------

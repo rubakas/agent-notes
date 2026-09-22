@@ -201,9 +201,11 @@ def print_summary(scope: str):
         installed, expected = _count_agents(backend, scope)
         _print_status("agents", installed, expected)
 
-        # Skills
-        installed, expected = _count_skills(backend, scope)
-        _print_status("skills", installed, expected)
+        # Skills — backends without a skills location (codex) are served by the
+        # universal ~/.agents/skills mirror, so a per-CLI row would misreport.
+        if backend.supports("skills"):
+            installed, expected = _count_skills(backend, scope)
+            _print_status("skills", installed, expected)
 
         # Config
         from ...config import ok, warn

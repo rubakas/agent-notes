@@ -1,7 +1,7 @@
 ---
 name: analyst
 description: Translates vague requests into concrete requirements, user stories, acceptance criteria, and edge cases. Identifies missing information. Read-only. Triggers: requirements, user story, acceptance criteria, clarify, scope, analyze request.
-model: claude-haiku-4-5
+model: claude-sonnet-5
 tools: Read, Grep, Glob, WebFetch
 disallowedTools: Write, Edit, Bash
 color: cyan

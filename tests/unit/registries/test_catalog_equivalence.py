@@ -27,9 +27,8 @@ EXPECTED = [
         "family": "claude",
         "model_class": "fable",
         "aliases": {"anthropic": "claude-fable-5"},
-        "capabilities": {"vision": True, "long_context": True, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
         "deprecated": False,
-        "never_default": True,
     },
     {
         "id": "claude-haiku-4-5",
@@ -37,9 +36,8 @@ EXPECTED = [
         "family": "claude",
         "model_class": "haiku",
         "aliases": {"anthropic": "claude-haiku-4-5"},
-        "capabilities": {"vision": True, "long_context": False, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": False, "tool_use": True, "effort_support": False},
         "deprecated": False,
-        "never_default": False,
     },
     {
         "id": "claude-opus-4-1",
@@ -47,9 +45,8 @@ EXPECTED = [
         "family": "claude",
         "model_class": "opus",
         "aliases": {"anthropic": "claude-opus-4-1"},
-        "capabilities": {"vision": True, "long_context": False, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": False, "tool_use": True, "effort_support": True},
         "deprecated": True,
-        "never_default": False,
     },
     {
         "id": "claude-opus-4-5",
@@ -57,9 +54,8 @@ EXPECTED = [
         "family": "claude",
         "model_class": "opus",
         "aliases": {"anthropic": "claude-opus-4-5"},
-        "capabilities": {"vision": True, "long_context": False, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": False, "tool_use": True, "effort_support": True},
         "deprecated": True,
-        "never_default": False,
     },
     {
         "id": "claude-opus-4-6",
@@ -67,9 +63,8 @@ EXPECTED = [
         "family": "claude",
         "model_class": "opus",
         "aliases": {"anthropic": "claude-opus-4-6"},
-        "capabilities": {"vision": True, "long_context": True, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
         "deprecated": True,
-        "never_default": False,
     },
     {
         "id": "claude-opus-4-7",
@@ -77,9 +72,8 @@ EXPECTED = [
         "family": "claude",
         "model_class": "opus",
         "aliases": {"anthropic": "claude-opus-4-7"},
-        "capabilities": {"vision": True, "long_context": True, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
         "deprecated": True,
-        "never_default": False,
     },
     {
         "id": "claude-opus-4-8",
@@ -87,9 +81,8 @@ EXPECTED = [
         "family": "claude",
         "model_class": "opus",
         "aliases": {"anthropic": "claude-opus-4-8"},
-        "capabilities": {"vision": True, "long_context": True, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
         "deprecated": False,
-        "never_default": False,
     },
     {
         "id": "claude-sonnet-4",
@@ -97,9 +90,8 @@ EXPECTED = [
         "family": "claude",
         "model_class": "sonnet",
         "aliases": {"anthropic": "claude-sonnet-4-20250514"},
-        "capabilities": {"vision": True, "long_context": True, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
         "deprecated": True,
-        "never_default": False,
     },
     {
         "id": "claude-sonnet-4-5",
@@ -107,9 +99,8 @@ EXPECTED = [
         "family": "claude",
         "model_class": "sonnet",
         "aliases": {"anthropic": "claude-sonnet-4-5"},
-        "capabilities": {"vision": True, "long_context": False, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": False, "tool_use": True, "effort_support": True},
         "deprecated": True,
-        "never_default": False,
     },
     {
         "id": "claude-sonnet-4-6",
@@ -117,9 +108,8 @@ EXPECTED = [
         "family": "claude",
         "model_class": "sonnet",
         "aliases": {"anthropic": "claude-sonnet-4-6"},
-        "capabilities": {"vision": True, "long_context": True, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
         "deprecated": False,
-        "never_default": False,
     },
     {
         "id": "claude-sonnet-5",
@@ -127,9 +117,8 @@ EXPECTED = [
         "family": "claude",
         "model_class": "sonnet",
         "aliases": {"anthropic": "claude-sonnet-5"},
-        "capabilities": {"vision": True, "long_context": True, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
         "deprecated": False,
-        "never_default": False,
     },
     {
         "id": "gpt-5-4",
@@ -137,9 +126,8 @@ EXPECTED = [
         "family": "gpt",
         "model_class": "sonnet",
         "aliases": {"openai": "gpt-5.4"},
-        "capabilities": {"vision": True, "long_context": True, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
         "deprecated": False,
-        "never_default": False,
     },
     {
         "id": "gpt-5-4-mini",
@@ -147,9 +135,8 @@ EXPECTED = [
         "family": "gpt",
         "model_class": "haiku",
         "aliases": {"openai": "gpt-5.4-mini"},
-        "capabilities": {"vision": True, "long_context": False, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": False, "tool_use": True, "effort_support": True},
         "deprecated": False,
-        "never_default": False,
     },
     {
         "id": "gpt-5-5",
@@ -157,14 +144,13 @@ EXPECTED = [
         "family": "gpt",
         "model_class": "opus",
         "aliases": {"openai": "gpt-5.5"},
-        "capabilities": {"vision": True, "long_context": True, "tool_use": True},
+        "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
         "deprecated": False,
-        "never_default": False,
     },
 ]
 
 EXPECTED_BY_ID = {e["id"]: e for e in EXPECTED}
-FIELDS = ("id", "label", "family", "model_class", "aliases", "capabilities", "deprecated", "never_default")
+FIELDS = ("id", "label", "family", "model_class", "aliases", "capabilities", "deprecated")
 
 
 @pytest.mark.parametrize("expected", EXPECTED, ids=[e["id"] for e in EXPECTED])
@@ -313,3 +299,76 @@ def test_model_ids_well_formed():
                 f"'{model.id}' does not match ^[a-z0-9.\\-]+$"
             )
     assert not violations, "Malformed model ids:\n  " + "\n  ".join(violations)
+
+
+def test_registry_all_preserves_catalog_rank_order():
+    """`all()` must hand back the catalog's rank order (frontier first) — the
+    resolver walks it top-down, so a re-sort here silently inverts selection."""
+    registry = load_model_registry()
+    seed = json.loads((CATALOG_DIR / "seed.json").read_text())
+
+    by_id = {m.id: m for m in registry.all()}
+    for provider, entries in seed.get("providers", {}).items():
+        ranked = [
+            (e["id"].replace(".", "-") if provider == "openai" else e["id"])
+            for e in entries
+        ]
+        assert [m.rank for m in (by_id[mid] for mid in ranked)] == list(range(1, len(ranked) + 1))
+
+        positions = [list(by_id).index(mid) for mid in ranked]
+        assert positions == sorted(positions), (
+            f"registry.all() reorders {provider} away from rank order"
+        )
+
+
+def test_enrichment_fields_reach_the_model_objects():
+    """rank / coding_index / price fields must survive the seed → Model hop."""
+    registry = load_model_registry()
+    seed = json.loads((CATALOG_DIR / "seed.json").read_text())
+
+    for provider, entries in seed.get("providers", {}).items():
+        for entry in entries:
+            model_id = entry["id"].replace(".", "-") if provider == "openai" else entry["id"]
+            model = registry.get(model_id)
+            for field in ("rank", "coding_index", "intelligence_index", "price_in",
+                          "price_out", "context_length", "created_at"):
+                assert getattr(model, field) == entry.get(field), (
+                    f"{model_id}.{field}: seed {entry.get(field)!r} != model {getattr(model, field)!r}"
+                )
+
+
+def test_seed_prices_have_no_float_noise():
+    """Prices are rounded at fetch time; a long binary tail means the rounding
+    in `models._per_million` was bypassed."""
+    seed = json.loads((CATALOG_DIR / "seed.json").read_text())
+    offenders = [
+        f"{e['id']}.{key}={e[key]!r}"
+        for entries in seed.get("providers", {}).values()
+        for e in entries
+        for key in ("price_in", "price_out")
+        if e.get(key) is not None and round(e[key], 6) != e[key]
+    ]
+    assert not offenders, "Unrounded prices in seed.json: " + ", ".join(offenders)
+
+
+def test_intelligence_index_round_trips_zero_and_null_distinctly(tmp_path):
+    """0.0 is a real upstream score; absent must not collapse into it (or vice
+    versa) anywhere on the seed → Model path."""
+    seed = {
+        "fetched_at": "2026-01-01T00:00:00Z",
+        "providers": {
+            "anthropic": [
+                {"id": "claude-opus-4-7", "display_name": "Claude Opus 4.7",
+                 "coding_index": 73.6, "intelligence_index": 0.0, "rank": 1},
+                {"id": "claude-opus-4-8", "display_name": "Claude Opus 4.8",
+                 "coding_index": 74.3, "rank": 2},
+            ]
+        },
+    }
+    (tmp_path / "seed.json").write_text(json.dumps(seed))
+    (tmp_path / "rules.yaml").write_text((CATALOG_DIR / "rules.yaml").read_text())
+
+    by_id = {m.id: m for m in load_catalog(catalog_dir=tmp_path)}
+
+    assert by_id["claude-opus-4-7"].intelligence_index == 0.0
+    assert by_id["claude-opus-4-8"].intelligence_index is None

@@ -2,6 +2,6 @@ name: reasoner
 label: Reasoner
 order: 2
 description: Deep debugging and architecture analysis. Low volume, max reasoning needed.
-typical_class: opus
+budget: 5.0   # max USD per 1M input tokens; null = unbounded
 typical_effort: high
 color: red

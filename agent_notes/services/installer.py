@@ -33,6 +33,7 @@ from .install_plan import (
     _apply_overrides,
     _agent_glob,
     dist_source_for,
+    legacy_skills_dir_for,
     target_dir_for,
     config_filename_for,
     _plan_file,
@@ -115,6 +116,8 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
                 count = uninstall_component_for_backend(effective, component, scope, copy_mode)
                 if count:
                     dst = target_dir_for(effective, component, scope)
+                    if dst is None and component == "skills":
+                        dst = legacy_skills_dir_for(effective, scope)
                     if dst is not None:
                         key = str(dst)
                         summary[key] = summary.get(key, 0) + count
@@ -291,6 +294,7 @@ __all__ = [
     "_apply_overrides",
     "_agent_glob",
     "dist_source_for",
+    "legacy_skills_dir_for",
     "target_dir_for",
     "config_filename_for",
     "_plan_file",

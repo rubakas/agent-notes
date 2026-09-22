@@ -22,6 +22,10 @@ class CLIBackend:
     accepted_providers: tuple[str, ...] = ()   # new
     use_model_class: bool = False
     preferred_family: Optional[str] = None     # "claude", "gpt", etc. — preferred model family for step-2 fallback
+    # Effort values this CLI accepts, which can be a strict subset of what the
+    # provider's API accepts (Codex rejects 'none'; the OpenAI API allows it).
+    # Empty means the CLI adds no constraint of its own.
+    efforts: tuple[str, ...] = ()
     stability: str = "stable"                   # "stable" | "wip"
 
     def supports(self, feature: str) -> bool:

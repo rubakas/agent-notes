@@ -4,7 +4,7 @@ lock in the current behavior of _resolve_model_str.
 These tests exercise each branch of the resolution chain:
   1. State-driven pin  (scope_state.clis[backend].role_models[role])
   2. User config override  (user_config["role_models"][backend][role])
-  3. Role typical_class fallback (newest model whose class matches role.typical_class)
+  3. Role budget + rank fallback (best-ranked rated model within role.budget)
   4. Unresolvable — raises ValueError
 
 The tests use lightweight fakes (dataclasses + dicts) rather than disk I/O.
@@ -54,13 +54,18 @@ def _make_model(
     family: str = "claude",
     model_class: str = "opus",
     aliases: Optional[dict] = None,
+    coding_index: Optional[float] = 50.0,
+    price_in: Optional[float] = 1.0,
 ) -> Model:
+    """Fixture Model. Registries are built in rank order — first listed is rank 1."""
     return Model(
         id=model_id,
         label=model_id,
         family=family,
         model_class=model_class,
         aliases=aliases or {"anthropic": model_id},
+        coding_index=coding_index,
+        price_in=price_in,
     )
 
 
@@ -165,14 +170,14 @@ class TestStateDrivenPin:
                 model_registry=registry,
             )
 
-    def test_state_pin_missing_role_falls_to_typical_class(self):
-        """Role not in state.role_models falls through to typical_class branch."""
+    def test_state_pin_missing_role_falls_to_budget_rank(self):
+        """Role not in state.role_models falls through to the budget+rank branch."""
         opus = _make_model("claude-opus-4-8", model_class="opus",
                            aliases={"anthropic": "opus-alias"})
         registry = ModelRegistry([opus])
         scope_state = _make_scope_state("claude", {"other-role": "claude-opus-4-8"})
 
-        # orchestrator -> typical_class=opus -> matches claude-opus-4-8 -> alias "opus-alias"
+        # orchestrator -> unbounded budget -> best-ranked rated model -> alias "opus-alias"
         model_str, _ = _resolve(
             agent_config={"role": "orchestrator"},
             scope_state=scope_state,
@@ -197,7 +202,7 @@ class TestUserConfigOverride:
         assert model_str == "user-pinned-model"
 
     def test_user_config_override_beats_role_fallback(self):
-        """User config beats the typical_class fallback even when roles are resolvable."""
+        """User config beats the budget+rank fallback even when roles are resolvable."""
         opus = _make_model("claude-opus-4-8", model_class="opus",
                            aliases={"anthropic": "opus-alias"})
 
@@ -205,8 +210,7 @@ class TestUserConfigOverride:
 
         opus_role = Role(
             name="orchestrator", label="Orchestrator", description="",
-            typical_class="opus",
-        )
+            )
 
         with patch(
             "agent_notes.registries.role_registry.load_role_registry",
@@ -243,24 +247,23 @@ class TestUserConfigOverride:
 
 
 # ---------------------------------------------------------------------------
-# Branch 3: Role typical_class fallback
+# Branch 3: Role budget + catalog rank
 # ---------------------------------------------------------------------------
 
-class TestTypicalClassFallback:
-    """Role typical_class matched against model registry, newest-first."""
+class TestBudgetRankFallback:
+    """Best-ranked rated model the role's budget allows."""
 
-    def test_typical_class_fallback_picks_newest_model(self):
-        """When multiple models match typical_class, the highest id (newest) wins."""
-        opus_old = _make_model("claude-opus-4-6", model_class="opus",
-                               aliases={"anthropic": "old-alias"})
-        opus_new = _make_model("claude-opus-4-8", model_class="opus",
-                               aliases={"anthropic": "new-alias"})
-        registry = ModelRegistry([opus_old, opus_new])
+    def test_fallback_picks_best_ranked_model_not_the_worst(self):
+        """The catalog is walked frontier-first: rank 1 wins, not the tail."""
+        opus_best = _make_model("claude-opus-4-8", model_class="opus",
+                                aliases={"anthropic": "best-alias"}, coding_index=80.0)
+        opus_worse = _make_model("claude-opus-4-6", model_class="opus",
+                                 aliases={"anthropic": "worse-alias"}, coding_index=40.0)
+        registry = ModelRegistry([opus_best, opus_worse])
 
         opus_role = Role(
             name="orchestrator", label="Orchestrator", description="",
-            typical_class="opus",
-        )
+            )
         with patch(
             "agent_notes.registries.role_registry.load_role_registry",
             return_value=RoleRegistry([opus_role]),
@@ -269,25 +272,153 @@ class TestTypicalClassFallback:
                 agent_config={"role": "orchestrator"},
                 model_registry=registry,
             )
-        assert model_str == "new-alias"
+        assert model_str == "best-alias"
 
-    def test_typical_class_fallback_filters_by_accepted_providers(self):
-        """Only models that have an alias for an accepted_provider are considered."""
-        opus_anthropic = _make_model(
-            "claude-opus-4-8", model_class="opus",
-            aliases={"anthropic": "anthropic-opus"},
+    def test_budget_skips_models_priced_above_it(self):
+        """A cheaper, lower-ranked model wins when the frontier is over budget."""
+        expensive = _make_model("claude-opus-5", model_class="opus",
+                                aliases={"anthropic": "expensive-alias"},
+                                coding_index=80.0, price_in=10.0)
+        affordable = _make_model("claude-sonnet-5", model_class="sonnet",
+                                 aliases={"anthropic": "affordable-alias"},
+                                 coding_index=70.0, price_in=2.0)
+        registry = ModelRegistry([expensive, affordable])
+
+        worker_role = Role(
+            name="worker", label="Worker", description="", budget=2.0,
         )
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([worker_role]),
+        ):
+            model_str, _ = _resolve(
+                agent_config={"role": "worker"},
+                model_registry=registry,
+            )
+        assert model_str == "affordable-alias"
+
+    def test_null_budget_is_unbounded(self):
+        """budget=None takes the frontier model no matter how expensive."""
+        expensive = _make_model("claude-fable-5-1", model_class="fable",
+                                aliases={"anthropic": "expensive-alias"},
+                                coding_index=90.0, price_in=1000.0)
+        cheap = _make_model("claude-haiku-4-5", model_class="haiku",
+                            aliases={"anthropic": "cheap-alias"},
+                            coding_index=40.0, price_in=0.5)
+        registry = ModelRegistry([expensive, cheap])
+
+        role = Role(
+            name="orchestrator", label="Orchestrator", description="", budget=None,
+        )
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([role]),
+        ):
+            model_str, _ = _resolve(
+                agent_config={"role": "orchestrator"},
+                model_registry=registry,
+            )
+        assert model_str == "expensive-alias"
+
+    def test_unpriced_model_is_skipped_when_the_role_has_a_budget(self):
+        """A null price cannot be proven within budget, so it is not auto-selected."""
+        unpriced = _make_model("claude-opus-5", model_class="opus",
+                               aliases={"anthropic": "unpriced-alias"},
+                               coding_index=80.0, price_in=None)
+        priced = _make_model("claude-sonnet-5", model_class="sonnet",
+                             aliases={"anthropic": "priced-alias"},
+                             coding_index=70.0, price_in=1.0)
+        registry = ModelRegistry([unpriced, priced])
+
+        worker_role = Role(
+            name="worker", label="Worker", description="", budget=2.0,
+        )
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([worker_role]),
+        ):
+            model_str, _ = _resolve(
+                agent_config={"role": "worker"},
+                model_registry=registry,
+            )
+        assert model_str == "priced-alias"
+
+    def test_unrated_model_is_never_auto_selected(self):
+        """coding_index=None means the benchmark has no opinion — skip it."""
+        unrated = _make_model("claude-opus-4-6", model_class="opus",
+                              aliases={"anthropic": "unrated-alias"}, coding_index=None)
+        rated = _make_model("claude-opus-4-5", model_class="opus",
+                            aliases={"anthropic": "rated-alias"}, coding_index=10.0)
+        registry = ModelRegistry([unrated, rated])
+
+        opus_role = Role(
+            name="orchestrator", label="Orchestrator", description="",
+            )
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([opus_role]),
+        ):
+            model_str, _ = _resolve(
+                agent_config={"role": "orchestrator"},
+                model_registry=registry,
+            )
+        assert model_str == "rated-alias"
+
+    def test_unrated_sole_candidate_raises_rather_than_being_selected(self):
+        """Exclusion of unrated models is hard — there is no last-resort fallback."""
+        unrated = _make_model("claude-opus-4-6", model_class="opus",
+                              aliases={"anthropic": "unrated-alias"}, coding_index=None)
+        registry = ModelRegistry([unrated])
+
+        opus_role = Role(
+            name="orchestrator", label="Orchestrator", description="",
+            )
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([opus_role]),
+        ):
+            with pytest.raises(ValueError, match="no model could be resolved"):
+                _resolve(
+                    agent_config={"role": "orchestrator"},
+                    model_registry=registry,
+                )
+
+    def test_explicit_pin_to_an_unrated_model_still_resolves(self):
+        """Rating and budget gate automatic selection only, not explicit user choices."""
+        unrated = _make_model(
+            "claude-fable-5", model_class="fable",
+            aliases={"anthropic": "claude-fable-5"},
+            coding_index=None, price_in=None,
+        )
+        registry = ModelRegistry([unrated])
+
+        scope_state = _make_scope_state("claude", {"orchestrator": "claude-fable-5"})
+
+        model_str, _ = _resolve(
+            agent_config={"role": "orchestrator"},
+            scope_state=scope_state,
+            model_registry=registry,
+        )
+        assert model_str == "claude-fable-5", (
+            "Explicit pin to an unrated model must still resolve"
+        )
+
+    def test_fallback_filters_by_accepted_providers(self):
+        """Only models that have an alias for an accepted_provider are considered."""
         opus_openai = _make_model(
             "gpt-opus-99", model_class="opus",
             aliases={"openai": "gpt-opus"},
         )
-        registry = ModelRegistry([opus_anthropic, opus_openai])
+        opus_anthropic = _make_model(
+            "claude-opus-4-8", model_class="opus",
+            aliases={"anthropic": "anthropic-opus"},
+        )
+        registry = ModelRegistry([opus_openai, opus_anthropic])
         backend = _make_backend(accepted_providers=("anthropic",))
 
         opus_role = Role(
             name="orchestrator", label="Orchestrator", description="",
-            typical_class="opus",
-        )
+            )
         with patch(
             "agent_notes.registries.role_registry.load_role_registry",
             return_value=RoleRegistry([opus_role]),
@@ -299,23 +430,22 @@ class TestTypicalClassFallback:
             )
         assert model_str == "anthropic-opus"
 
-    def test_typical_class_fallback_respects_preferred_family(self):
+    def test_fallback_respects_preferred_family(self):
         """preferred_family filters model family before falling back to any-family."""
-        claude_sonnet = _make_model(
-            "claude-sonnet-4-6", family="claude", model_class="sonnet",
-            aliases={"anthropic": "claude-sonnet"},
-        )
         gpt_sonnet = _make_model(
             "gpt-sonnet-99", family="openai", model_class="sonnet",
             aliases={"anthropic": "gpt-sonnet"},
         )
-        # gpt-sonnet-99 > claude-sonnet-4-6 lexicographically — without family filter it would win
-        registry = ModelRegistry([claude_sonnet, gpt_sonnet])
+        claude_sonnet = _make_model(
+            "claude-sonnet-4-6", family="claude", model_class="sonnet",
+            aliases={"anthropic": "claude-sonnet"},
+        )
+        # gpt-sonnet-99 ranks first — without the family filter it would win
+        registry = ModelRegistry([gpt_sonnet, claude_sonnet])
         backend = _make_backend(accepted_providers=("anthropic",), preferred_family="claude")
 
         worker_role = Role(
-            name="worker", label="Worker", description="", typical_class="sonnet",
-        )
+            name="worker", label="Worker", description="", )
         with patch(
             "agent_notes.registries.role_registry.load_role_registry",
             return_value=RoleRegistry([worker_role]),
@@ -327,7 +457,7 @@ class TestTypicalClassFallback:
             )
         assert model_str == "claude-sonnet"
 
-    def test_typical_class_fallback_falls_back_any_family_when_preferred_not_found(self):
+    def test_fallback_falls_back_any_family_when_preferred_not_found(self):
         """If no model matches preferred_family, any-family is tried."""
         gpt_sonnet = _make_model(
             "gpt-sonnet-99", family="openai", model_class="sonnet",
@@ -337,8 +467,7 @@ class TestTypicalClassFallback:
         backend = _make_backend(accepted_providers=("anthropic",), preferred_family="claude")
 
         worker_role = Role(
-            name="worker", label="Worker", description="", typical_class="sonnet",
-        )
+            name="worker", label="Worker", description="", )
         with patch(
             "agent_notes.registries.role_registry.load_role_registry",
             return_value=RoleRegistry([worker_role]),
@@ -350,7 +479,7 @@ class TestTypicalClassFallback:
             )
         assert model_str == "gpt-sonnet"
 
-    def test_typical_class_fallback_uses_model_class_string_when_flag_set(self):
+    def test_fallback_uses_model_class_string_when_flag_set(self):
         """use_model_class=True returns model.model_class rather than alias."""
         haiku = _make_model("claude-haiku-4-5", model_class="haiku",
                             aliases={"anthropic": "haiku-alias"})
@@ -358,8 +487,7 @@ class TestTypicalClassFallback:
         backend = _make_backend(use_model_class=True)
 
         scout_role = Role(
-            name="scout", label="Scout", description="", typical_class="haiku",
-        )
+            name="scout", label="Scout", description="", )
         with patch(
             "agent_notes.registries.role_registry.load_role_registry",
             return_value=RoleRegistry([scout_role]),
@@ -371,28 +499,26 @@ class TestTypicalClassFallback:
             )
         assert model_str == "haiku"
 
-    def test_typical_class_prefers_non_deprecated_over_deprecated(self):
-        """When a deprecated and a non-deprecated model share the same class,
-        the non-deprecated model is returned even if it sorts lower."""
+    def test_prefers_non_deprecated_over_better_ranked_deprecated(self):
+        """Deprecation is a soft preference applied before rank widens."""
+        from dataclasses import replace
+
         opus_deprecated = _make_model(
             "claude-opus-4-9", model_class="opus",
             aliases={"anthropic": "opus-deprecated-alias"},
         )
-        # Manually construct with deprecated=True (frozen dataclass — use replace)
-        from dataclasses import replace
         opus_deprecated = replace(opus_deprecated, deprecated=True)
 
         opus_current = _make_model(
             "claude-opus-4-7", model_class="opus",
             aliases={"anthropic": "opus-current-alias"},
         )
-        # opus-4-9 sorts higher than opus-4-7 — without deprecated filter it would win
-        registry = ModelRegistry([opus_current, opus_deprecated])
+        # the deprecated model ranks first — without the filter it would win
+        registry = ModelRegistry([opus_deprecated, opus_current])
 
         opus_role = Role(
             name="orchestrator", label="Orchestrator", description="",
-            typical_class="opus",
-        )
+            )
         with patch(
             "agent_notes.registries.role_registry.load_role_registry",
             return_value=RoleRegistry([opus_role]),
@@ -405,9 +531,9 @@ class TestTypicalClassFallback:
             "Expected non-deprecated model, got deprecated one"
         )
 
-    def test_typical_class_falls_back_to_deprecated_when_only_candidate(self):
-        """When only deprecated models exist for the class, one is still returned
-        rather than falling through to tier and potentially failing."""
+    def test_falls_back_to_deprecated_when_only_candidate(self):
+        """When only deprecated models exist, one is still returned rather than
+        failing outright."""
         from dataclasses import replace
 
         opus_deprecated = _make_model(
@@ -419,8 +545,7 @@ class TestTypicalClassFallback:
 
         opus_role = Role(
             name="orchestrator", label="Orchestrator", description="",
-            typical_class="opus",
-        )
+            )
         with patch(
             "agent_notes.registries.role_registry.load_role_registry",
             return_value=RoleRegistry([opus_role]),
@@ -431,87 +556,6 @@ class TestTypicalClassFallback:
             )
         assert model_str == "only-opus-alias", (
             "Expected deprecated model to be returned as fallback when it is the only candidate"
-        )
-
-    def test_never_default_model_is_never_selected_by_typical_class(self):
-        """A never_default model must be skipped even when it is the newest for its class."""
-        from dataclasses import replace
-
-        opus_normal = _make_model(
-            "claude-opus-4-7", model_class="opus",
-            aliases={"anthropic": "opus-normal-alias"},
-        )
-        opus_never_default = _make_model(
-            "claude-opus-4-9", model_class="opus",
-            aliases={"anthropic": "opus-never-default-alias"},
-        )
-        opus_never_default = replace(opus_never_default, never_default=True)
-        # opus-4-9 sorts higher — without never_default filter it would win
-        registry = ModelRegistry([opus_normal, opus_never_default])
-
-        opus_role = Role(
-            name="orchestrator", label="Orchestrator", description="",
-            typical_class="opus",
-        )
-        with patch(
-            "agent_notes.registries.role_registry.load_role_registry",
-            return_value=RoleRegistry([opus_role]),
-        ):
-            model_str, _ = _resolve(
-                agent_config={"role": "orchestrator"},
-                model_registry=registry,
-            )
-        assert model_str == "opus-normal-alias", (
-            "Expected normal model, not the never_default one"
-        )
-
-    def test_never_default_sole_candidate_returns_none_not_the_model(self):
-        """If the only candidate for the role's class has never_default=True,
-        _from_typical_class must return None (hard exclusion, no fallback)."""
-        from dataclasses import replace
-
-        opus_never_default = _make_model(
-            "claude-opus-4-9", model_class="opus",
-            aliases={"anthropic": "only-opus-alias"},
-        )
-        opus_never_default = replace(opus_never_default, never_default=True)
-        registry = ModelRegistry([opus_never_default])
-
-        opus_role = Role(
-            name="orchestrator", label="Orchestrator", description="",
-            typical_class="opus",
-        )
-        with patch(
-            "agent_notes.registries.role_registry.load_role_registry",
-            return_value=RoleRegistry([opus_role]),
-        ):
-            with pytest.raises(ValueError, match="no model could be resolved"):
-                _resolve(
-                    agent_config={"role": "orchestrator"},
-                    model_registry=registry,
-                )
-
-    def test_explicit_pin_to_never_default_model_still_resolves(self):
-        """An explicit state pin to a never_default model must resolve verbatim —
-        never_default gates automatic selection only, not explicit user choices."""
-        from dataclasses import replace
-
-        fable = _make_model(
-            "claude-fable-5", model_class="fable",
-            aliases={"anthropic": "claude-fable-5"},
-        )
-        fable = replace(fable, never_default=True)
-        registry = ModelRegistry([fable])
-
-        scope_state = _make_scope_state("claude", {"orchestrator": "claude-fable-5"})
-
-        model_str, _ = _resolve(
-            agent_config={"role": "orchestrator"},
-            scope_state=scope_state,
-            model_registry=registry,
-        )
-        assert model_str == "claude-fable-5", (
-            "Explicit pin to a never_default model must still resolve"
         )
 
 
@@ -542,102 +586,165 @@ class TestUnresolvable:
 
 class TestRealRegistryResolution:
     """Smoke-tests against the real on-disk data to catch regressions.
-    These pin the actual resolved model ids for representative agents.
+    These pin the model each role resolves to with no state pin and no user config.
     """
 
-    def test_orchestrator_role_resolves_opus_for_claude_backend(self):
-        """orchestrator (typical_class=opus) should resolve to the newest opus model."""
+    CLAUDE_DEFAULTS = {
+        "orchestrator": ("claude-fable-5-1", "fable"),
+        "reasoner": ("claude-opus-5", "opus"),
+        "worker": ("claude-sonnet-5", "sonnet"),
+        "scout": ("claude-haiku-4-5", "haiku"),
+    }
+
+    CODEX_DEFAULTS = {
+        "orchestrator": ("gpt-5-6-sol", "gpt-5.6-sol"),
+        "reasoner": ("gpt-5-6-sol", "gpt-5.6-sol"),
+        # Sol is $4.00/M input, over worker's $2.0 budget — Terra is the
+        # frontier-most model that fits.
+        "worker": ("gpt-5-6-terra", "gpt-5.6-terra"),
+        "scout": ("gpt-5-6-luna", "gpt-5.6-luna"),
+    }
+
+    @staticmethod
+    def _registries():
         from agent_notes.registries.model_registry import load_model_registry
         from agent_notes.registries.role_registry import load_role_registry
         from agent_notes.registries.cli_registry import load_registry
+        return load_model_registry(), load_role_registry(), load_registry()
 
-        model_registry = load_model_registry()
-        role_registry = load_role_registry()
-        cli_registry = load_registry()
+    @pytest.mark.parametrize("backend_name,expected", [
+        ("claude", CLAUDE_DEFAULTS),
+        ("codex", CODEX_DEFAULTS),
+    ])
+    def test_role_defaults_are_pinned(self, backend_name, expected):
+        """The four role defaults each backend ships with must not drift silently."""
+        model_registry, _role_registry, cli_registry = self._registries()
+        backend = cli_registry.get(backend_name)
 
-        backend = cli_registry.get("claude")
-        role = role_registry.get("orchestrator")
+        for role_name, (_model_id, rendered) in expected.items():
+            model_str, _ = _resolve(
+                agent_config={"role": role_name},
+                backend=backend,
+                model_registry=model_registry,
+            )
+            assert model_str == rendered, (
+                f"{backend_name}/{role_name}: expected {rendered!r}, got {model_str!r}"
+            )
 
-        # Find what the fallback would pick (newest opus with anthropic alias)
-        all_models = list(reversed(model_registry.all()))
-        expected = None
-        for m in all_models:
-            if m.model_class == role.typical_class:
-                resolved = m.resolve_for_providers(list(backend.accepted_providers))
-                if resolved is not None:
-                    _, alias = resolved
-                    expected = m.model_class if backend.use_model_class else alias
-                    break
+    @pytest.mark.parametrize("backend_name,expected", [
+        ("claude", CLAUDE_DEFAULTS),
+        ("codex", CODEX_DEFAULTS),
+    ])
+    def test_wizard_and_resolver_agree(self, backend_name, expected):
+        """The wizard's pre-selection is the same model the resolver would build."""
+        from agent_notes.commands.config import compatible_models_for
+        from agent_notes.commands.wizard import _default_model_for_role
+        from agent_notes.services.model_resolver import select_model_for_role
 
-        assert expected is not None, "No opus model found for claude backend"
+        model_registry, role_registry, cli_registry = self._registries()
+        backend = cli_registry.get(backend_name)
+        compatible = compatible_models_for(backend)
 
-        model_str, _ = _resolve(
-            agent_config={"role": "orchestrator"},
-            backend=backend,
-            model_registry=model_registry,
+        for role_name, (model_id, _rendered) in expected.items():
+            role = role_registry.get(role_name)
+            resolver_pick, _ = select_model_for_role(model_registry.all(), role, backend)
+            wizard_pick = _default_model_for_role(role, compatible, backend)
+
+            assert resolver_pick.id == model_id, (
+                f"{backend_name}/{role_name}: resolver picked {resolver_pick.id!r}"
+            )
+            assert wizard_pick.id == resolver_pick.id, (
+                f"{backend_name}/{role_name}: wizard picked {wizard_pick.id!r} but "
+                f"the resolver picked {resolver_pick.id!r}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Observability: the ladder never widens past deprecation silently
+# ---------------------------------------------------------------------------
+
+class TestDeprecatedSelectionWarning:
+    """Rungs 3 and 4 of the ladder drop the deprecation guard on purpose. The
+    caller cannot tell a healthy pick from a deprecated one, so the widening
+    must announce itself on stderr."""
+
+    @staticmethod
+    def _registry_where_only_deprecated_fits():
+        """A cheap deprecated model plus an expensive current one, so only the
+        deprecated model is within a tight budget."""
+        from dataclasses import replace
+
+        deprecated = replace(
+            _make_model(
+                "claude-sonnet-4-5", model_class="sonnet",
+                aliases={"anthropic": "sonnet-4-5-alias"},
+                coding_index=52.1, price_in=3.0,
+            ),
+            deprecated=True,
         )
-        assert model_str == expected
-
-    def test_worker_role_resolves_sonnet_for_claude_backend(self):
-        """worker (typical_class=sonnet) should resolve to the newest sonnet model."""
-        from agent_notes.registries.model_registry import load_model_registry
-        from agent_notes.registries.role_registry import load_role_registry
-        from agent_notes.registries.cli_registry import load_registry
-
-        model_registry = load_model_registry()
-        role_registry = load_role_registry()
-        cli_registry = load_registry()
-
-        backend = cli_registry.get("claude")
-        role = role_registry.get("worker")
-
-        all_models = list(reversed(model_registry.all()))
-        expected = None
-        for m in all_models:
-            if m.model_class == role.typical_class:
-                resolved = m.resolve_for_providers(list(backend.accepted_providers))
-                if resolved is not None:
-                    _, alias = resolved
-                    expected = m.model_class if backend.use_model_class else alias
-                    break
-
-        assert expected is not None, "No sonnet model found for claude backend"
-
-        model_str, _ = _resolve(
-            agent_config={"role": "worker"},
-            backend=backend,
-            model_registry=model_registry,
+        current = _make_model(
+            "claude-opus-5", model_class="opus",
+            aliases={"anthropic": "opus-5-alias"},
+            coding_index=78.0, price_in=5.0,
         )
-        assert model_str == expected
+        return ModelRegistry([current, deprecated])
 
-    def test_scout_role_resolves_haiku_for_claude_backend(self):
-        """scout (typical_class=haiku) should resolve to the newest haiku model."""
-        from agent_notes.registries.model_registry import load_model_registry
-        from agent_notes.registries.role_registry import load_role_registry
-        from agent_notes.registries.cli_registry import load_registry
+    def test_warns_and_still_returns_the_deprecated_model(self, capsys):
+        registry = self._registry_where_only_deprecated_fits()
+        role = Role(name="worker", label="Worker", description="", budget=4.0)
 
-        model_registry = load_model_registry()
-        role_registry = load_role_registry()
-        cli_registry = load_registry()
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([role]),
+        ):
+            model_str, _ = _resolve(
+                agent_name="coder",
+                agent_config={"role": "worker"},
+                model_registry=registry,
+            )
 
-        backend = cli_registry.get("claude")
-        role = role_registry.get("scout")
+        assert model_str == "sonnet-4-5-alias"
+        err = capsys.readouterr().err
+        assert "DEPRECATED model 'claude-sonnet-4-5'" in err
+        assert "role 'worker'" in err
+        assert "backend 'claude'" in err
+        assert "$4.0/M in" in err
 
-        all_models = list(reversed(model_registry.all()))
-        expected = None
-        for m in all_models:
-            if m.model_class == role.typical_class:
-                resolved = m.resolve_for_providers(list(backend.accepted_providers))
-                if resolved is not None:
-                    _, alias = resolved
-                    expected = m.model_class if backend.use_model_class else alias
-                    break
+    def test_silent_when_a_current_model_fits(self, capsys):
+        registry = self._registry_where_only_deprecated_fits()
+        role = Role(name="worker", label="Worker", description="", budget=None)
 
-        assert expected is not None, "No haiku model found for claude backend"
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([role]),
+        ):
+            model_str, _ = _resolve(
+                agent_name="coder",
+                agent_config={"role": "worker"},
+                model_registry=registry,
+            )
 
-        model_str, _ = _resolve(
-            agent_config={"role": "scout"},
-            backend=backend,
-            model_registry=model_registry,
-        )
-        assert model_str == expected
+        assert model_str == "opus-5-alias"
+        assert "DEPRECATED" not in capsys.readouterr().err
+
+
+class TestUnresolvableProviderList:
+    """The diagnostic must not advertise providers a user can never activate."""
+
+    def test_error_lists_only_configured_providers(self):
+        from agent_notes.services.rendering import _resolve_model_str
+
+        backend = _make_backend(accepted_providers=("anthropic", "bedrock", "vertex"))
+        with pytest.raises(ValueError) as exc:
+            _resolve_model_str(
+                agent_name="lead",
+                agent_config={"role": "orchestrator"},
+                backend=backend,
+                scope_state=None,
+                model_registry=ModelRegistry([]),
+                user_config={},
+            )
+        message = str(exc.value)
+        assert "anthropic" in message
+        assert "bedrock" not in message
+        assert "vertex" not in message

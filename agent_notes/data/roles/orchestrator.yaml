@@ -2,6 +2,6 @@ name: orchestrator
 label: Orchestrator
 order: 1
 description: Plans and delegates complex multi-step tasks. Low volume, high reasoning needed.
-typical_class: opus
+budget: null   # max USD per 1M input tokens; null = unbounded
 typical_effort: high
 color: purple

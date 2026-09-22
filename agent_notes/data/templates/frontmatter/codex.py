@@ -31,10 +31,11 @@ def emit_file(ctx: dict, body: str) -> tuple[str, str]:
     if model_str:
         doc["model"] = model_str
 
-    # ctx['resolved_effort'] is already validated against the openai provider's
-    # effort vocabulary upstream (rendering.py's _resolve_effort) — emitted verbatim,
-    # no cross-provider mapping. "medium" is the openai provider's own default_effort,
-    # used here only when nothing resolved at all, to preserve prior behavior.
+    # ctx['resolved_effort'] is already validated upstream (rendering.py's
+    # _resolve_effort) against both the openai provider's effort vocabulary and
+    # codex.yaml's narrower `efforts` list — emitted verbatim, no cross-provider
+    # mapping. "medium" is the openai provider's own default_effort, used here
+    # only when nothing resolved at all, to preserve prior behavior.
     doc["model_reasoning_effort"] = ctx.get("resolved_effort") or "medium"
 
     doc["sandbox_mode"] = _sandbox_mode(agent_config)

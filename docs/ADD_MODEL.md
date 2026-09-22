@@ -1,137 +1,127 @@
 # Adding a New AI Model
 
-This guide shows how to add support for a new AI model (e.g., Kimi K2, GPT-5, Gemini 2.5) to agent-notes. Models are **purely declarative YAML files** — zero Python changes required.
+This guide shows how to add a new AI model to agent-notes' live catalog. Models are **not** individual YAML files per model — they are entries in a shared seed file (`agent_notes/data/catalog/seed.json`) plus glob-based rules (`agent_notes/data/catalog/rules.yaml`) that a loader composes into `Model` objects at runtime (`agent_notes.registries.catalog_loader.load_catalog`). Zero Python changes required, but the mechanics differ from "drop a YAML file" — see Section 2.
 
 ---
 
 ## Section 1: Model Dataclass Fields
 
-A **Model** is defined by these fields (all stored in YAML):
+A **Model** (`agent_notes/domain/model.py`) has these fields. Some are supplied directly by a `seed.json` provider entry; the rest are DERIVED at load time by `catalog_loader.load_catalog` from `rules.yaml` glob rules — they are never written per-model by an author.
 
-| Field | Type | Required | Purpose | Example |
-|-------|------|----------|---------|---------|
-| `id` | string | **Yes** | Unique identifier (lowercase, hyphens) | `"kimi-k2"` |
-| `label` | string | **Yes** | Display name shown in UI | `"Moonshot Kimi K2"` |
-| `family` | string | **Yes** | Brand/family (used for grouping) | `"kimi"`, `"openai"`, `"claude"` |
-| `class` | string | **Yes** | Model tier for role defaults | `"opus"`, `"sonnet"`, `"haiku"` |
-| `aliases` | dict[str, str] | **Yes** | Provider-specific model IDs | `{"openrouter": "moonshotai/kimi-k2"}` |
-| `capabilities` | dict[str, bool] | No | Feature flags (optional, for filtering) | `{"vision": true, "long_context": true}` |
+| Field | Type | Source | Purpose |
+|-------|------|--------|---------|
+| `id` | string | Seed `id`, normalized (anthropic: unchanged; openai: dots → dashes, e.g. `gpt-5.4` → `gpt-5-4`) | Unique identifier |
+| `label` | string | Seed `display_name` (anthropic) or derived from `id` (openai, e.g. `gpt-5.4-mini` → `GPT-5.4 Mini`) | Display name |
+| `family` | string | **DERIVED** — first `rules.yaml` `families` glob matching `id` | Brand grouping, e.g. `claude`, `gpt` |
+| `model_class` (`class`) | string | **DERIVED** — first `rules.yaml` `classes` glob matching `id` | Tier tag. For the *unpinned* budget+rank fallback on backends with `use_model_class: true` (currently only `claude`), this string — not the resolved alias — is written into the agent's `model:` frontmatter field |
+| `aliases` | dict[str, str] | **DERIVED** — a single entry keyed by the seed provider block the model came from: `alias_transforms[provider].format(id=id, seed_id=seed_id)`, overridable per-model via `alias_overrides[provider][id]` | Provider-specific model id string |
+| `capabilities` | dict[str, bool] | **DERIVED** — `rules.yaml capabilities.default` merged with `capabilities.overrides[id]` | Feature flags (vision, long_context, tool_use, effort_support) |
+| `deprecated` | bool | **DERIVED** — `id in rules.yaml deprecated` | Soft preference in the selection ladder (see `model_resolver.py`); does not filter a model out entirely |
+| `rank` | int | Seed `rank` | Author-supplied ordering *within* a provider's block; NOT the global selection order — see below |
+| `coding_index` | float or `null` | Seed `coding_index` | Benchmark score. Gates automatic selection: a model with `coding_index: null` is never auto-selected |
+| `intelligence_index` | float or `null` | Seed `intelligence_index` | Benchmark score, informational |
+| `price_in` | float or `null` | Seed `price_in`, overridable per-model via `rules.yaml price_overrides[id].price_in` | USD per 1M input tokens; compared directly against `role.budget` |
+| `price_out` | float or `null` | Seed `price_out`, overridable per-model via `rules.yaml price_overrides[id].price_out` | USD per 1M output tokens |
+| `context_length` | int or `null` | Seed `context_length` | Informational |
+| `created_at` | string or `null` | Seed `created_at` | Informational |
 
 **Key concepts:**
-- **`class`** hints which role typically uses this model (used by wizard to default-select a model for a role):
-  - `"opus"` → high-reasoning models (orchestrator, reasoner roles)
-  - `"sonnet"` → balanced models (worker role)
-  - `"haiku"` → fast models (scout role)
-  - `"flash"` → ultra-fast (new tier for fast models)
-  - `"pro"` → specialty (future)
-  - `"fable"` → premium tier (no role's `typical_class` maps to it; available only via explicit user pin)
-  
-- **`aliases`** is critical: maps **provider names** (e.g., `"openrouter"`, `"openai"`, `"anthropic"`) to that provider's **model ID**. A model must have at least one alias for a CLI to use it.
-  - Anthropic Direct: `anthropic: "claude-opus-4-7"`
-  - AWS Bedrock: `bedrock: "anthropic.claude-opus-4-7-20260101-v1:0"` or ARN
-  - Google Vertex: `vertex: "claude-opus-4-7@20260101"`
-  - GitHub Copilot: `github-copilot: "github-copilot/claude-opus-4.7"`
-  - OpenRouter: `openrouter: "anthropic/claude-opus-4.7"` or `"moonshotai/kimi-k2"`
-  - OpenAI: `openai: "gpt-5"` or `"gpt-4o"`
 
-- **Compatibility** is computed automatically: a model is compatible with a CLI iff the CLI's `accepted_providers` list has at least one key from the model's `aliases`. For example:
-  - CLI: `accepted_providers: [anthropic, openrouter]`
-  - Model with `aliases: {openrouter: "...", openai: "..."}` → **compatible** (openrouter matches)
-  - Model with `aliases: {openai: "...", google: "..."}` → **incompatible** (no overlap)
+- **A model's `aliases` dict always has exactly one entry**, keyed by the provider block it was loaded from in `seed.json` (`agent_notes/registries/catalog_loader.py:205`). There is no way to give one model multiple provider aliases (e.g. both `anthropic` and `bedrock`) today — see the Pitfalls section.
+
+- **`class` does not drive selection.** It is derived from `rules.yaml`'s `classes` globs and is rendered into frontmatter only on backends with `use_model_class: true` (currently `claude` alone). Automatic model selection is driven entirely by `role.budget` + `coding_index` — see Section 3 and `docs/ADD_ROLE.md`.
+
+- **Compatibility** is computed automatically: a model is compatible with a CLI iff the CLI's `accepted_providers` list contains the model's single alias-provider key. For example:
+  - CLI: `accepted_providers: [anthropic, bedrock, vertex]`
+  - Model loaded from the seed's `anthropic` block → alias key `anthropic` → **compatible**
+  - Model loaded from the seed's `openai` block → alias key `openai` → **incompatible** with a CLI that only accepts `anthropic`/`bedrock`/`vertex`
 
 ---
 
-## Section 2: Step-by-Step — Create `agent_notes/data/models/kimi-k2.yaml`
+## Section 2: Step-by-Step — Add an entry to `agent_notes/data/catalog/seed.json`
 
-### Step 2.1: Create the YAML descriptor
+There is no `agent_notes/data/models/` directory and no per-model YAML file. The live loader (`catalog_loader.load_catalog`, wired at `agent_notes/registries/model_registry.py:104-114`) reads exactly two files: `agent_notes/data/catalog/seed.json` (per-provider model data) and `agent_notes/data/catalog/rules.yaml` (glob rules that derive `family`/`class`/`aliases`/`capabilities`/`deprecated`). A file dropped at the old `data/models/<id>.yaml` path is never read by `load_model_registry()` in production — see "Legacy per-file loader" below for the one place that path still applies.
 
-Create `agent_notes/data/models/kimi-k2.yaml`:
+### Step 2.1: Add a provider entry to `seed.json`
 
-```yaml
-id: kimi-k2
-label: Moonshot Kimi K2
-family: kimi
-class: opus
-aliases:
-  openrouter: moonshotai/kimi-k2
-  moonshot:   moonshot/kimi-k2
-capabilities:
-  vision: true
-  long_context: true
-  tool_use: false
+`seed.json` today has two provider blocks: `anthropic` and `openai` (`agent_notes/data/catalog/seed.json`). Adding a model already on one of those providers means appending an entry to its array:
+
+```json
+{
+  "id": "claude-opus-5-1",
+  "display_name": "Claude Opus 5.1",
+  "coding_index": 79.2,
+  "intelligence_index": 51.0,
+  "price_in": 5.0,
+  "price_out": 25.0,
+  "context_length": 1000000,
+  "created_at": "2026-10-01",
+  "rank": 1
+}
 ```
 
 **Field explanations:**
 
-- **`id: kimi-k2`** — Unique ID. Must be lowercase with hyphens (no spaces). Used in:
-  - Wizard step 2 (model picker)
-  - state.json (`role_models: {orchestrator: "kimi-k2"}`)
-  - Commands: `agent-notes set role orchestrator kimi-k2`
-
-- **`label: Moonshot Kimi K2`** — Shown in UI and docs. Human-readable.
-
-- **`family: kimi`** — Brand identifier. Used for:
-  - Grouping models by vendor in `list models` output
-  - Future filtering ("show me all kimi models")
-
-- **`class: opus`** — Model capability tier. Sets default role assignments in wizard:
-  - Wizard shows this model as the `[*]` default for any role with `typical_class: opus`
-  - Example: Role "orchestrator" has `typical_class: opus`, so Kimi K2 (with `class: opus`) is checked by default for that role
-
-- **`typical_effort`** (role field, not a model field) — each `data/roles/*.yaml` may declare a `typical_effort` (`low`, `medium`, `high`) parallel to `typical_class`. It's the fallback reasoning-effort value written to agent frontmatter (`effort:` for Claude, `model_reasoning_effort` for Codex, `reasoningEffort` for OpenCode) when the agent doesn't declare its own `effort` in `agents.yaml`. An agent's explicit `effort` always wins over its role's `typical_effort`.
-
-- **`aliases`** — Provider-to-model-id mapping. At install time, agent-notes:
-  1. Reads CLI's `accepted_providers` (e.g., `[openrouter, moonshot]`)
-  2. Looks for the **first** matching key in this model's aliases
-  3. Resolves the alias value (e.g., `"moonshotai/kimi-k2"`)
-  4. Writes that into the agent's frontmatter `model:` field
-
-  Examples for common providers:
+- **`id`** — the seed id. For `anthropic` it becomes the model's registry `id` unchanged. For `openai` it is normalized (dots → dashes) before becoming the registry `id`, e.g. `"gpt-5.5"` → `gpt-5-5`.
+- **`display_name`** (anthropic only) — becomes `Model.label` verbatim. openai has no `display_name`; its label is derived from `id` by `_derive_openai_label` (`"gpt-5.4-mini"` → `"GPT-5.4 Mini"`).
+- **`coding_index` / `intelligence_index`** — benchmark scores. `coding_index: null` (or omitted) makes the model permanently ineligible for automatic selection (`_eligible()` in `model_resolver.py` requires a non-null score) — it can still be reached by an explicit pin.
+- **`price_in` / `price_out`** — USD per 1M tokens. `price_in` is what `role.budget` is compared against.
+- **`price_overrides`** — a top-level block in `agent_notes/data/catalog/rules.yaml`, indexed by normalized registry id, that pins `price_in`/`price_out` on top of whatever the seed reports (`catalog_loader.py::_apply_price_overrides`). Two reasons to reach for it instead of editing `seed.json` directly: `seed.json` is machine-refreshed from OpenRouter by `models refresh` and would silently reintroduce a wrong price on the next refresh, and `~/.cache/agent-notes/catalog.json` shadows the bundled `seed.json` at runtime (`catalog_loader.py:173-178`) — editing `seed.json` alone can appear to do nothing on a machine that already has a cache, since `rules.yaml` (and `price_overrides` with it) is read fresh every time and always wins. The live entry:
   ```yaml
-  aliases:
-    anthropic:      claude-opus-4-7                    # Direct Anthropic API
-    bedrock:        anthropic.claude-opus-4-7-v1:0     # AWS Bedrock model ID
-    vertex:         claude-opus-4-7@20250101           # Google Vertex location-prefixed
-    github-copilot: github-copilot/claude-opus-4.7    # GitHub Copilot provider
-    openai:         gpt-5                              # OpenAI direct model alias
-    openrouter:     openai/gpt-5                       # OpenRouter vendor prefix
+  price_overrides:
+    gpt-5-6-sol:
+      price_in: 4.0
+      price_out: 20.0
   ```
+  pins GPT-5.6 Sol to OpenAI's published $4.00/$20.00 rate after the OpenRouter-sourced seed reported $2.00/$10.00.
+- **`rank`** — 1-based position within *this provider's* array. It does not by itself decide selection order across the whole catalog: `ModelRegistry` sorts every model globally by `coding_index` descending (`_frontier_key`), unrated models last. Keep `rank` consistent with `coding_index` ordering within a provider to avoid a confusing catalog.
+- **`created_at` / `context_length`** — informational, not consulted by selection logic.
 
-- **`capabilities`** (optional) — Feature flags. Reserved for future filtering:
-  - `vision: true/false` — Can process images
-  - `long_context: true/false` — Has 100k+ token context
-  - `tool_use: true/false` — Can invoke tools/functions
-  - (More capabilities may be added as features require)
+A brand-new **family** (not `claude-*` or `gpt-*`) needs two more things before it resolves:
 
-### Step 2.2: Verify YAML is valid
+1. A new top-level key under `"providers"` in `seed.json`, e.g. `"kimi": [...]`.
+2. A matching glob in `agent_notes/data/catalog/rules.yaml`'s `families:` and `classes:` lists — otherwise `catalog_loader._apply_family`/`_apply_class` raise `ValueError: No family rule matched '<id>'`. An `alias_transforms:` entry for the new provider key is optional (defaults to the id unchanged, `"{id}"`, if omitted).
+
+### Step 2.2: Verify the files parse
 
 ```bash
-python3 -c "import yaml; yaml.safe_load(open('agent_notes/data/models/kimi-k2.yaml'))"
-# Should produce no output (success).
+python3 -c "import json; json.load(open('agent_notes/data/catalog/seed.json'))"
+python3 -c "import yaml; yaml.safe_load(open('agent_notes/data/catalog/rules.yaml'))"
+# Both should produce no output (success).
 ```
 
 ### Step 2.3: Test registry loading
 
 ```bash
 python3 << 'EOF'
-from agent_notes.model_registry import load_model_registry
+from agent_notes.registries.model_registry import load_model_registry
 
 registry = load_model_registry()
-model = registry.get("kimi-k2")
+model = registry.get("claude-opus-5-1")
 print(f"ID:       {model.id}")
 print(f"Label:    {model.label}")
+print(f"Family:   {model.family}")
 print(f"Class:    {model.model_class}")
 print(f"Aliases:  {model.aliases}")
+print(f"Coding index: {model.coding_index}")
+print(f"Price in: {model.price_in}")
 EOF
 ```
 
-Expected output:
+Expected output (family/class are DERIVED from `rules.yaml`'s globs, not authored above):
 ```
-ID:       kimi-k2
-Label:    Moonshot Kimi K2
+ID:       claude-opus-5-1
+Label:    Claude Opus 5.1
+Family:   claude
 Class:    opus
-Aliases:  {'openrouter': 'moonshotai/kimi-k2', 'moonshot': 'moonshot/kimi-k2'}
+Aliases:  {'anthropic': 'claude-opus-5-1'}
+Coding index: 79.2
+Price in: 5.0
 ```
+
+### Legacy per-file loader (tests only)
+
+`agent_notes/registries/model_registry.py::_load_from_yaml_dir` still loads a directory of per-model YAML files (`id`, `label`, `family`, `class`, `aliases` required, mirroring the old schema) — but only when `load_model_registry(models_dir=...)` is called with an explicit directory. Production code never passes `models_dir`, so this path is exercised only by tests that build fixture registries on disk (e.g. `tests/unit/registries/test_registries.py`). Do not rely on it for real models.
 
 ---
 
@@ -148,46 +138,46 @@ Understanding the resolution chain helps verify your model works end-to-end.
    → Loaded from data/cli/*.yaml
 
 3. Wizard step 2: Model selection per role per CLI
-   → For each (role, CLI) pair:
-     a. Load role from registry (e.g., "orchestrator" with typical_class="opus")
-     b. Get CLI's accepted_providers (e.g., ["openrouter", "anthropic"])
-     c. Filter models: keep those compatible with CLI
-        (model has alias for ≥1 provider in CLI's list)
-     d. Default-check models whose class matches role's typical_class
-     e. Show picker; user selects one
-     f. Write choice to state (e.g., {"orchestrator": "kimi-k2"})
+   → For each (role, CLI) pair, the wizard's default checkbox calls the SAME
+     function the build uses — select_model_for_role(models, role, backend)
+     (agent_notes/services/model_resolver.py) — so the two can never disagree:
+     a. Load role from registry (e.g., "orchestrator" with budget=null)
+     b. Filter to models compatible with the CLI's accepted_providers
+        (model's single alias-provider key is in that list)
+     c. Walk a widening ladder over the catalog frontier (coding_index
+        descending): if the backend declares preferred_family, that family
+        is tried first over the whole catalog and wins outright whenever it
+        has any eligible model — only then does the ladder fall back to any
+        family, and only then to deprecated models (with a stderr warning).
+        Default-check the first rated model priced at or under role.budget
+     d. Show picker; user can accept the default or pick another
+     e. Write choice to state (e.g., {"orchestrator": "claude-opus-5-1"})
 
 4. Build time: generate agents
    → For each agent in agents.yaml:
      a. Get agent's role (e.g., "orchestrator")
      b. Look up state[scope].clis[cli].role_models["orchestrator"]
-        → Get model_id (e.g., "kimi-k2")
+        → Get model_id (e.g., "claude-opus-5-1")
      c. Load model from registry
      d. Call model.resolve_for_providers(cli.accepted_providers)
         → Returns (provider, resolved_id)
-        → Example: ("openrouter", "moonshotai/kimi-k2")
+        → Example: ("anthropic", "claude-opus-5-1")
      e. Load frontmatter template
      f. Render frontmatter with model_id = resolved_id
      g. Write agent file with frontmatter + prompt
 ```
 
-### Example: Install Kimi K2 for OpenCode
+### Example: automatic selection for `orchestrator`
 
-```bash
-# Step 1: User selects OpenCode
-# Step 2: For "orchestrator" role:
-#   - Wizard shows: Claude Opus 4.7 [*], Kimi K2 [ ], GPT-5 [ ]
-#   - Kimi K2 is selectable because:
-#     * OpenCode.accepted_providers = ["github-copilot", "openrouter"]
-#     * Kimi K2.aliases = {"openrouter": "moonshotai/kimi-k2", ...}
-#     * "openrouter" is in both lists → compatible
-# Step 3: User selects Kimi K2 → state saves {"orchestrator": "kimi-k2"}
-# Step 4: Build generates agents:
-#   - For "lead" agent (role: orchestrator):
-#     * Resolve: kimi-k2 for OpenCode (accepted_providers = ["github-copilot", "openrouter"])
-#     * First matching provider in accepted_providers: "openrouter"
-#     * model_id = aliases["openrouter"] = "moonshotai/kimi-k2"
-#     * Frontmatter: model: moonshotai/kimi-k2
+`orchestrator`'s `budget` is `null` (unbounded), so the resolver walks the frontier and picks whichever rated model has the highest `coding_index` that the backend can serve — today that is `claude-fable-5-1` (`coding_index: 81.6`, rank 1 in the `anthropic` seed block), not the model with `class: opus`. `class` is not consulted at all in this decision.
+
+```
+# For a Claude backend (accepted_providers includes "anthropic"):
+#   - claude-fable-5-1 is rated and unbounded budget accepts any price
+#     → automatic pick for "orchestrator", no explicit pin needed
+# For a backend whose accepted_providers has no overlap with claude-fable-5-1's
+# single alias ("anthropic"), the resolver keeps walking the frontier to the
+# next rated, servable model.
 ```
 
 ### Known limitation: one shared `dist/` across scopes
@@ -204,20 +194,27 @@ Understanding the resolution chain helps verify your model works end-to-end.
 agent-notes list models
 ```
 
-Expected output includes your new model:
+`list_models()` groups by provider (each provider's `rank` is only meaningful within its own block) and renders every model through the shared `model_columns` helper — the same columns the wizard and `config role-model` use:
+
 ```
-Models (5):
-  claude-haiku-4-5       Claude Haiku 4.5        [haiku]   compatible: claude, opencode, copilot
-  claude-opus-4-7        Claude Opus 4.7         [opus]    compatible: claude, opencode, copilot
-  claude-sonnet-4        Claude Sonnet 4         [sonnet]  compatible: claude, opencode, copilot
-  kimi-k2                Moonshot Kimi K2        [opus]    compatible: opencode
-  ...
+Models (N):
+
+  anthropic (M):
+    rank  model                          int  coding    $/M in
+       1  claude-fable-5-1              53.4    81.6      10.00
+       2  claude-opus-5                 50.7    78.0       5.00
+       3  claude-fable-5                49.7    76.5      10.00
+       ...
+       X  claude-opus-5-1               51.0    79.2       5.00
+
+  openai (K):
+    rank  model                          int  coding    $/M in
+       1  gpt-5-6-sol                    47.1    77.4       2.00
+       2  gpt-6-astra                    52.8    76.9      10.00
+       ...
 ```
 
-Notice `compatible: opencode` — this was auto-computed from:
-- OpenCode.accepted_providers = ["github-copilot", "openrouter"]
-- Kimi K2.aliases keys = ["openrouter", "moonshot"]
-- Intersection = ["openrouter"] → compatible!
+A model with `coding_index: null` prints `—` in the `coding` column and is never auto-selected.
 
 ### 4.2 Run wizard with new model
 
@@ -225,54 +222,44 @@ Notice `compatible: opencode` — this was auto-computed from:
 agent-notes install
 ```
 
-**Step 1:** Select OpenCode
+**Step 1:** Select OpenCode (`accepted_providers: [anthropic, openai]`, `preferred_family: claude`)
 
-**Step 2:** For "orchestrator" role, you should see:
+**Step 2:** For "orchestrator" role (`budget: null`), the wizard's radio list is a flat list of compatible models rendered through `model_columns` (columns: model id, `int`, `coding`, `$/M in` — `class` is not shown). The pre-checked default is whichever rated model the backend can serve with the highest `coding_index` — today `claude-fable-5-1`:
 ```
-Orchestrator (plans, delegates — typical: opus):
-  1) [ ] Claude Opus 4.7        (via anthropic)
-  2) [ ] Kimi K2                (via openrouter)
-  3) [*] Claude Sonnet 4        (via github-copilot)  ← default
+CLI           OpenCode
+Role          Orchestrator
+Description   Plans and delegates complex multi-step tasks...
+   model                          int  coding    $/M in
+  1) [*] claude-fable-5-1        53.4    81.6      10.00
+  2) [ ] claude-opus-5-1         51.0    79.2       5.00
+  3) [ ] claude-opus-5           50.7    78.0       5.00
+  ...
 ```
 
-Wait, why is Sonnet defaulted, not Opus? Because of how the wizard picks defaults:
-- Role "orchestrator" has `typical_class: opus`
-- Available models with `class: opus`:
-  - Claude Opus 4.7 (anthropic) ← matches "orchestrator" typical_class
-  - Kimi K2 (openrouter) ← also matches
-- Wizard picks one. The exact behavior depends on the wizard's default selection logic.
+`class` is not part of this decision at all — `claude-fable-5-1`'s `class` is `fable`, not `opus`, and it is still the default, and is not displayed in the picker. `worker` (`budget: 2.0`) or `scout` (`budget: 1.0`) would instead default to the highest-`coding_index` rated model priced at or under their respective ceilings — for `worker` on a `claude`-family-preferring backend, that is `claude-sonnet-5` (`coding_index: 71.5`, `price_in: 2.0`), since every pricier Sonnet/Opus lineage is either deprecated or over budget.
 
-### 4.3 Set role command (Phase 10)
+Note: the wizard skips the `orchestrator` role entirely for the `claude` backend specifically — "Claude Code controls its own lead model via `/model`" (`agent_notes/commands/wizard/__init__.py:174-178`) — so this role/backend pairing only appears for backends other than `claude`.
 
-Once Phase 10 is complete, you can change model assignments post-install:
+### 4.3 Set role command
+
+You can change model assignments post-install:
 
 ```bash
-agent-notes set role orchestrator kimi-k2 --cli opencode
-# Output: Updated opencode: orchestrator → kimi-k2
-# Then regenerates affected agents
+agent-notes set role orchestrator claude-opus-5-1 --cli opencode
+# Updates state.json and regenerates affected agents
 ```
 
 ---
 
 ## Section 5: Make Model Available for Specific CLIs Only
 
-By default, a model is available to **all CLIs** that have a matching provider in their `accepted_providers`.
+A model is available to a CLI iff its single alias-provider key is in that CLI's `accepted_providers`.
 
-**Example:** Kimi K2 has aliases for `["openrouter", "moonshot"]`. If only OpenCode accepts "openrouter", Kimi is available only for OpenCode.
+**Example:** a model loaded from the seed's `openai` block has `aliases: {"openai": "..."}`. `codex` (`accepted_providers: [openai]`) and `opencode` (`accepted_providers: [anthropic, openai]`) can serve it; `claude` (`accepted_providers: [anthropic, bedrock, vertex]`) cannot.
 
 ### To restrict further
 
-There's no per-CLI filtering in the model YAML itself (no `supported_clis` field yet). Restriction happens at the CLI level:
-
-**Option 1: CLI configuration** (current method)
-- Kimi only available if you want it in OpenCode?
-- OpenCode has `accepted_providers: ["github-copilot", "openrouter"]`
-- If Claude has `accepted_providers: ["anthropic", "bedrock", "vertex"]` (no openrouter), Kimi won't be offered for Claude
-- **So control availability by controlling each CLI's `accepted_providers` list**
-
-**Option 2: Future — capability matching**
-- Future versions may support: Model declares `requires_providers: ["openrouter"]`, CLI declares `provides_providers: ["openrouter"]`
-- For now, this is in `CLI_CAPABILITIES.md` for documentation only, not enforced in code
+There's no per-CLI filtering in the seed data itself (no `supported_clis` field). Availability is controlled entirely by each CLI's `accepted_providers` list in `agent_notes/data/cli/*.yaml` — a model is offered to a CLI iff there's overlap, nothing more granular exists today.
 
 ---
 
@@ -284,10 +271,10 @@ There's no per-CLI filtering in the model YAML itself (no `supported_clis` field
 
 **Symptom:** `agent-notes install` shows the model nowhere in step 2.
 
-**Solution:** Add aliases that match at least one CLI's `accepted_providers`. Check existing CLIs:
+**Solution:** Add the model under a provider block whose key matches at least one CLI's `accepted_providers`. Check existing CLIs:
 ```bash
 python3 << 'EOF'
-from agent_notes.cli_backend import load_registry
+from agent_notes.registries.cli_registry import load_registry
 
 registry = load_registry()
 for cli in registry.all():
@@ -297,84 +284,63 @@ EOF
 
 Output:
 ```
-claude: ('anthropic', 'bedrock', 'vertex')
-copilot: ('github-copilot',)
-opencode: ('github-copilot', 'openrouter')
+claude:   ('anthropic', 'bedrock', 'vertex')
+codex:    ('openai',)
+copilot:  ('github-copilot',)
+opencode: ('anthropic', 'openai')
 ```
 
-So for a model to appear in the wizard for OpenCode, it needs an alias for `github-copilot` or `openrouter`.
+So a model only reaches `codex` if it came from the seed's `openai` block (or a user override adds an `openai` alias); `copilot` has no models today, since neither seed provider block is `github-copilot`.
 
-### Pitfall 2: Wrong alias format for provider
+### Pitfall 2: Wrong alias format for a provider
 
-**Problem:** You set `openai: gpt-5` but the actual provider expects `openai-v1: ...` or has different format.
+**Problem:** The derived alias (via `alias_transforms`) doesn't match what the provider actually expects — e.g. anthropic needs a dated id (`claude-sonnet-4-20250514`) but the transform emits the bare `id`.
 
-**Symptom:** Agent file is generated with `model: gpt-5`, but the CLI doesn't recognize it.
+**Symptom:** Agent file is generated with a `model:` value the provider's API rejects.
 
-**Solution:** Check the provider's docs or existing models in the registry:
-```bash
-python3 << 'EOF'
-from agent_notes.model_registry import load_model_registry
+**Solution:** Add a per-model override in `agent_notes/data/catalog/rules.yaml`'s `alias_overrides:` block (see the existing `claude-sonnet-4` entry), or in `~/.config/agent-notes/models.yaml` for a local-only override — both are keyed `provider -> normalized_id -> alias_string`.
 
-registry = load_model_registry()
-for model in registry.all():
-    if "openai" in model.aliases:
-        print(f"{model.id}: openai → {model.aliases['openai']}")
-EOF
-```
+### Pitfall 3: New model's id doesn't match any `family`/`class` glob
 
-If no models exist for that provider yet, check CLI's official docs for the model ID format.
+**Problem:** You add a `seed.json` entry whose `id` doesn't match any pattern in `rules.yaml`'s `families:` or `classes:` lists (e.g. a brand-new family with no existing glob).
 
-### Pitfall 3: YAML field typos
+**Symptom:** `catalog_loader._apply_family`/`_apply_class` raise `ValueError: No family rule matched '<id>'` (or the `classes` equivalent) — the whole catalog fails to load, not just the new model.
 
-**Problem:** You write `aliases:` but the loader expects `alias:` (singular).
+**Solution:** Add a matching glob to `rules.yaml`'s `families:`/`classes:` lists (or a narrower one ahead of the existing catch-alls, since first match wins), or add an `alias_overrides`/`id` that matches an existing pattern.
 
-**Symptom:** Loader crashes with `ValueError: Missing field 'aliases'`.
+### Pitfall 4: `class` does not affect automatic selection
 
-**Solution:** Required fields are:
-```
-id, label, family, class, aliases
-```
+**Problem:** You expect a new `class: flash` model to become the default pick for a role because you assume `class` is compared against something on the role.
 
-Optional fields:
-```
-capabilities
-```
+**Symptom:** The model is or isn't auto-selected based purely on `coding_index` + `role.budget` — `class` never enters the decision. `class` affects only what gets written into the agent's `model:` frontmatter field, and only for the *unpinned* budget+rank fallback on backends with `use_model_class: true` (currently `claude` alone): there, `model:` is rendered as the bare class string (e.g. `sonnet`) instead of the resolved alias. Every other backend, and every explicit pin (state or `set role`) regardless of backend, always renders the exact alias string. The wizard's model picker itself never displays `class` at all (see Section 4.2).
 
-### Pitfall 4: `class` doesn't match role's `typical_class`
+**Solution:** To change a role's default pick, adjust `role.budget` (see `docs/ADD_ROLE.md`) — not the model's `class`.
 
-**Problem:** You set `class: flash` (new ultra-fast tier) but roles only have `typical_class: [opus, sonnet, haiku]`.
+### Pitfall 5: Alias values are hardcoded but change
 
-**Symptom:** Model doesn't get default-selected in wizard. Not wrong, just doesn't auto-default.
+**Problem:** A provider's model-id format changes (Anthropic ships a new dated id, for example), but the `alias_transforms`/`alias_overrides` entry in `rules.yaml` still emits the old form.
 
-**Solution:** Use existing classes for now (`opus`, `sonnet`, `haiku`). Or:
-1. Add new role with `typical_class: flash` (see `docs/ADD_ROLE.md`)
-2. Or accept that the model won't auto-default and users manually select it
+**Symptom:** Installation works today but produces a rejected `model:` value once the provider retires the old id.
 
-### Pitfall 5: `aliases` values are hardcoded but change
-
-**Problem:** You hardcode `anthropic: "claude-opus-4-7"` but Anthropic changes the model ID format in a new release.
-
-**Symptom:** Installation works today but breaks when Anthropic updates.
-
-**Solution:** No automated solution yet. This is why `docs/CLI_CAPABILITIES.md` exists — to document provider-specific formats. If the format changes:
-1. Update the model YAML
-2. Re-run `agent-notes regenerate` to rebuild agents with new aliases
+**Solution:** No automated solution yet. If the format changes:
+1. Update the `alias_overrides` (or `alias_transforms`) entry in `rules.yaml`
+2. Re-run `agent-notes regenerate` to rebuild agents with the corrected alias
 
 ### Pitfall 6: Bare provider aliases that equal a class name
 
-**Problem:** You set `anthropic: sonnet` (or `opus`, `haiku`) instead of a version-pinned id like `anthropic: claude-sonnet-4-6`.
+**Problem:** An alias resolves to a bare class-like string (e.g. `sonnet`) instead of a version-pinned id (`claude-sonnet-4-6`). With the live loader, `alias_transforms`/`alias_overrides` are the only place this could be introduced.
 
 **Symptom (silent drift):** Anthropic resolves bare aliases like `sonnet` server-side to whatever they currently consider their newest Sonnet model. When Anthropic ships a new Sonnet release, your pinned agent silently starts running a different model — no error, no changelog entry in this repo, just different behavior.
 
-**Symptom (test fragility):** A bare alias that happens to equal its `class` value (e.g. `anthropic: sonnet` on a model with `class: sonnet`) makes it easy to write a resolver test that checks against `model.model_class` instead of the actual resolved alias — the two strings match by coincidence, and the test stays green even if the resolution logic is broken. This bit `test_model_resolver_characterization.py`: fixing a bare `sonnet` alias to `claude-sonnet-4-6` immediately surfaced a latent bug in the "expected value" computation of three tests, because the coincidence had been hiding it.
+**Symptom (test fragility):** A bare alias that happens to equal its `class` value makes it easy to write a resolver test that checks against `model.model_class` instead of the actual resolved alias — the two strings match by coincidence, and the test stays green even if the resolution logic is broken. This bit `test_model_resolver_characterization.py` in the past: fixing a bare `sonnet` alias to `claude-sonnet-4-6` immediately surfaced a latent bug in the "expected value" computation of three tests, because the coincidence had been hiding it.
 
-**Solution:** Alias values must always be version-pinned ids (`claude-sonnet-4-6`, `claude-opus-4-8`), never bare class names. As of 2026-07 every lineage (Haiku, Opus, Sonnet, Fable) uses exact ids, and `tests/unit/registries/test_registries.py::test_model_aliases_are_exact_version_strings_not_class_names` enforces `alias != class` for every model/provider pair — a bare alias will fail the suite. Do not add a bare alias to any model file, current or future.
+**Solution:** Alias values must always be version-pinned ids, never bare class names. `tests/unit/registries/test_registries.py::test_model_aliases_are_exact_version_strings_not_class_names` enforces `alias != class` for every model/provider pair — a bare alias will fail the suite. Do not introduce a bare alias via `alias_transforms` or `alias_overrides`.
 
 ---
 
-## Future: Model Catalog Refresh (#21, #22)
+## Catalog refresh
 
-The model registry is evolving. Upcoming work (#21 — model metadata enrichment, #22 — catalog refresh/freeze workflow) will add fields for versioning, release dates, context windows, and cost-per-token metadata. For now, the current YAML schema (id, label, family, class, aliases, capabilities, deprecated) is sufficient. When the new schema lands, this guide will be updated with the additional fields and refresh/freeze workflow. **Do not yet document or implement catalog refresh, model deprecation, or cost-tracking workflows** — these are not yet wired into the engine.
+`agent_notes/data/catalog/seed.json` carries a `fetched_at` timestamp and is refreshed by a separate `models refresh` workflow driven by `rules.yaml`'s `filter:` block (per-provider `allow`/`exclude` globs). Refreshing the catalog, deprecating models, and cost tracking are live today (`rank`, `coding_index`, `price_in`/`price_out`, `deprecated` are all read by the resolver and cost subsystem) — this is no longer future work. Do not add a per-model YAML file expecting it to participate in a refresh; only `seed.json` and `rules.yaml` are refreshed.
 
 ---
 
@@ -392,25 +358,37 @@ default_effort: high
 
 Providers with no YAML file here (`github-copilot`, `openrouter`, `google`, `moonshot` as of this writing) deliberately have no effort support: `agent_notes/registries/provider_registry.py`'s `.get()` raises `KeyError` for them, and the rendering seam (`rendering.py::_resolve_effort`) treats that as "emit nothing" rather than guessing a default. Adding effort support for a new provider means adding its YAML file with its own accurate `efforts`/`default_effort` — not reusing another provider's list.
 
+**Per-model gate: `effort_support`.** Independent of provider vocabulary, a model can be marked as accepting no effort setting at all via the `effort_support` capability under `rules.yaml`'s `capabilities:` block:
+
+```yaml
+capabilities:
+  default:
+    effort_support: true
+  overrides:
+    claude-haiku-4-5:
+      effort_support: false
+```
+
+Default is `true` (`capabilities.default.effort_support`). Setting it `false` under `capabilities.overrides[id]` makes `rendering.py`'s `_resolve_effort` omit the `effort` field entirely for that model (`rendering.py:265-266`) — this gate is checked before any provider-vocabulary validation runs. The live case is `claude-haiku-4-5`: it is absent from the supported-models list at `platform.claude.com/docs/en/build-with-claude/effort` and marked "Not supported" in the models-overview comparison table. An agent may still declare an `effort` value in `agents.yaml`; it only becomes meaningful if the agent later resolves to a model whose `effort_support` is `true`.
+
 ---
 
 ## Checklist
 
-- [ ] Created `agent_notes/data/models/kimi-k2.yaml`
-- [ ] All required fields present: `id`, `label`, `family`, `class`, `aliases`
-- [ ] `class` matches one of: `opus`, `sonnet`, `haiku`, `flash` (or a new class with roles to match)
-- [ ] `aliases` has at least one provider matching a CLI's `accepted_providers`
-  - Check with: `agent-notes list clis` or inspect `data/cli/*.yaml`
-- [ ] `id` is lowercase with hyphens, no spaces
-- [ ] Ran `agent-notes list models` and saw the new model
-- [ ] Ran `agent-notes install` and the model appears in step 2 (for compatible CLIs)
-- [ ] Wizard step 2 shows the model and allows selection (if compatible with selected CLI)
+- [ ] Added an entry to the right provider block in `agent_notes/data/catalog/seed.json` (`id`, `coding_index`, `price_in`, `price_out`, `rank`, ...)
+- [ ] `id` matches an existing `families:`/`classes:` glob in `rules.yaml`, or new globs were added for it
+- [ ] If the provider needs a non-default alias format, added an `alias_overrides` (or `alias_transforms`) entry in `rules.yaml`
+- [ ] The model's alias-provider key matches at least one CLI's `accepted_providers`
+  - Check with: `python3 -c "from agent_notes.registries.cli_registry import load_registry; [print(c.name, c.accepted_providers) for c in load_registry().all()]"`
+- [ ] `coding_index` set (or explicitly left `null` if genuinely unrated) — a `null` model is never auto-selected
+- [ ] Ran `agent-notes list models` and saw the new model under its provider
+- [ ] Ran `agent-notes install` and the model appears in step 2 for compatible CLIs
 
 ---
 
 ## Next Steps
 
-- **Add a new role** if you want this model to default for a new role type: see `docs/ADD_ROLE.md`.
-- **Update CLI_CAPABILITIES.md** with details about the model's provider if relevant (e.g., "Kimi K2 available via OpenRouter at...").
-- **Set role** (Phase 10+): `agent-notes set role orchestrator kimi-k2 --cli opencode` to test post-install changes.
+- **Add a new role** if you want a role with a different `budget` ceiling for this model to default under: see `docs/ADD_ROLE.md`.
+- **Update CLI_CAPABILITIES.md** with details about the model's provider if relevant.
+- **Set role**: `agent-notes set role <role> <model-id> --cli <cli>` to pin the model post-install.
 

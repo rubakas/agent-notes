@@ -45,6 +45,19 @@ def summarize_plan(manifest: List[InstallAction]) -> PlanSummary:
     )
 
 
+def _is_safe_local_dir(value: str) -> bool:
+    """A local_dir override must stay a relative, non-traversing project subpath.
+
+    Values come from state.json, which is user-editable, and are resolved
+    against the process cwd. An absolute or '..'-bearing value would point the
+    install (and the uninstall sweep) outside the project.
+    """
+    if not value:
+        return False
+    p = Path(value)
+    return not p.is_absolute() and ".." not in p.parts
+
+
 def _apply_overrides(
     backend: CLIBackend,
     folder_overrides: Optional[dict] = None,
@@ -58,7 +71,15 @@ def _apply_overrides(
     """
     effective = backend
     if folder_overrides and backend.name in folder_overrides:
-        effective = effective.with_local_dir(folder_overrides[backend.name])
+        local_dir = folder_overrides[backend.name]
+        if _is_safe_local_dir(local_dir):
+            effective = effective.with_local_dir(local_dir)
+        else:
+            print(
+                f"Refusing local directory override for {backend.name}: "
+                f"{local_dir!r} is absolute or escapes the project directory. "
+                f"Using default {backend.local_dir!r}."
+            )
     if global_home_override and backend.name == "claude":
         effective = effective.with_global_home(Path(global_home_override).expanduser())
     return effective
@@ -120,6 +141,21 @@ def target_dir_for(backend: CLIBackend, component: str, scope: str) -> Optional[
         return home
     # All others are subdirectories
     return home / layout_value.rstrip("/")
+
+
+def legacy_skills_dir_for(backend: CLIBackend, scope: str) -> Optional[Path]:
+    """Return an abandoned skills directory for *backend*, or None.
+
+    Legacy-cleanup only — never an install target. agent-notes used to install a
+    full skill tree into ~/.codex/skills/ (and .codex/skills/ locally), a location
+    Codex CLI does not read: it searches .agents/skills, ~/.agents/skills and
+    /etc/codex/skills. Codex is served by the ~/.agents/skills mirror instead, but
+    uninstall must still sweep the dead tree on machines that already have it.
+    """
+    if backend.name != "codex":
+        return None
+    home = backend.global_home if scope == "global" else Path(backend.local_dir)
+    return home / "skills"
 
 
 def config_filename_for(backend: CLIBackend) -> Optional[str]:

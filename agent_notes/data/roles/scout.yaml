@@ -2,6 +2,6 @@ name: scout
 label: Scout
 order: 4
 description: Fast file discovery, pattern search. High volume, low reasoning.
-typical_class: haiku
+budget: 1.0   # max USD per 1M input tokens; null = unbounded
 typical_effort: low
 color: cyan

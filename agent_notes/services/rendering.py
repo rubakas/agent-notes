@@ -3,6 +3,7 @@
 import yaml
 import importlib
 import re
+import sys
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -137,11 +138,11 @@ def _effective_role(agent_name: str, agent_config: Dict[str, Any], user_config: 
     return user_config.get("agent_roles", {}).get(agent_name, default_role)
 
 
-def _resolve_provider_for_model_str(model_str: Optional[str], backend, model_registry) -> Optional[str]:
+def _resolve_model_for_model_str(model_str: Optional[str], backend, model_registry):
     """Reverse-lookup: given the already-resolved model_str for this backend, find
-    which provider (from backend.accepted_providers) produced it, by scanning the
-    model registry. Returns None if model_str isn't traceable to a registry model
-    (e.g. legacy tier fallback, which isn't provider-registry-aware).
+    the registry model that produced it and the provider it resolved through.
+    Returns (model, provider), or None if model_str isn't traceable to a registry
+    model (e.g. legacy tier fallback, which isn't provider-registry-aware).
 
     Models are scanned in registry order and the scan returns on the first
     model that either matches model_str exactly by alias (state-pinned models
@@ -155,20 +156,46 @@ def _resolve_provider_for_model_str(model_str: Optional[str], backend, model_reg
     if not model_str or model_registry is None:
         return None
 
-    class_match_provider = None
+    class_match = None
     for model in model_registry.all():
         resolved = model.resolve_for_providers(list(backend.accepted_providers))
         if resolved is None:
             continue
         provider, alias = resolved
         if alias == model_str:
-            return provider
+            return model, provider
         if backend.use_model_class and model.model_class == model_str:
             if model.family == backend.preferred_family:
-                return provider
-            if class_match_provider is None:
-                class_match_provider = provider
-    return class_match_provider
+                return model, provider
+            if class_match is None:
+                class_match = (model, provider)
+    return class_match
+
+
+def _resolve_provider_for_model_str(model_str: Optional[str], backend, model_registry) -> Optional[str]:
+    """The provider half of :func:`_resolve_model_for_model_str`."""
+    matched = _resolve_model_for_model_str(model_str, backend, model_registry)
+    return matched[1] if matched is not None else None
+
+
+def _constrain_effort_to_backend(effort: str, agent_name: str, backend, provider) -> Optional[str]:
+    """Narrow a provider-valid effort to the CLI backend's own vocabulary.
+
+    The provider vocabulary describes what the API accepts; a CLI can accept a
+    strict subset of it (Codex's `model_reasoning_effort` rejects 'none', which
+    the OpenAI API allows). A backend with no declared vocabulary constrains
+    nothing. When the value is rejected, the provider default is used if the CLI
+    accepts it, otherwise nothing is emitted — never the rejected value."""
+    if not backend.efforts or effort in backend.efforts:
+        return effort
+
+    replacement = provider.default_effort if provider.default_effort in backend.efforts else None
+    sys.stderr.write(
+        f"Warning: agent '{agent_name}' resolved effort '{effort}', which CLI "
+        f"'{backend.name}' does not accept (accepts: {', '.join(backend.efforts)}); "
+        f"using {replacement if replacement else 'no effort'} instead\n"
+    )
+    return replacement
 
 
 def _resolve_effort(
@@ -189,11 +216,17 @@ def _resolve_effort(
       3. Role's 'typical_effort'
       4. None
 
+    Two gates can suppress emission entirely before any validation matters:
+    a model whose ``effort_support`` capability is false accepts no effort
+    setting at all (resolves to None), and a CLI backend declaring its own
+    ``efforts`` list narrows the provider vocabulary to what that CLI accepts.
+
     The raw value from that chain is then validated against the provider's
     effort list (resolved via the agent's model on this backend): if the
     provider has a registry entry and the raw value isn't in its vocabulary,
     the provider's own default_effort is used instead (NO cross-provider
-    mapping/translation). If the provider has no registry entry at all,
+    mapping/translation) and a warning is written to stderr so the substitution
+    is never silent. If the provider has no registry entry at all,
     falls back to the model's other alias-providers (preferring the canonical
     one whose alias value equals the model's own id); resolves to None only
     if no alias-provider is in the registry either (nothing is emitted).
@@ -221,8 +254,15 @@ def _resolve_effort(
     if not raw_effort:
         return None
 
-    provider_name = _resolve_provider_for_model_str(model_str, backend, model_registry)
-    if provider_name is None:
+    matched = _resolve_model_for_model_str(model_str, backend, model_registry)
+    if matched is None:
+        return None
+    matched_model, provider_name = matched
+
+    # Per-MODEL gate: some models accept no effort setting at all, independently
+    # of what their provider's API vocabulary allows. Declared efforts are left
+    # alone; only the emission is suppressed.
+    if not matched_model.capabilities.get("effort_support", True):
         return None
 
     from ..registries.provider_registry import default_provider_registry
@@ -257,8 +297,15 @@ def _resolve_effort(
             return None
 
     if raw_effort in provider.efforts:
-        return raw_effort
-    return provider.default_effort
+        return _constrain_effort_to_backend(raw_effort, agent_name, backend, provider)
+
+    sys.stderr.write(
+        f"Warning: agent '{agent_name}' (role '{agent_role}') on backend "
+        f"'{backend.name}' requested effort '{raw_effort}', which provider "
+        f"'{provider.name}' does not support (accepts: "
+        f"{', '.join(provider.efforts)}); using '{provider.default_effort}' instead\n"
+    )
+    return _constrain_effort_to_backend(provider.default_effort, agent_name, backend, provider)
 
 
 def _overlay_selection_pins(scope_state, role_models, role_efforts):
@@ -388,8 +435,8 @@ def generate_agent_files(agents_config: Dict[str, Any],
             
             # Resolve model. Resolution chain:
             #   1. State-driven: state.clis[backend].role_models[role] -> model_id
-            #   2. Role-class fallback: role.typical_class matched against
-            #      any model's class, with a compatible provider for this backend
+            #   2. Budget+rank fallback: the frontier-most rated model within
+            #      role.budget that this backend can serve
             #   3. Unresolvable: raises ValueError
             model_str, model_registry = _resolve_model_str(
                 agent_name, agent_config, backend, scope_state, model_registry, user_config
@@ -523,5 +570,10 @@ def load_agents_config() -> Dict[str, Any]:
     if not AGENTS_YAML.exists():
         raise FileNotFoundError(f"Configuration file not found: {AGENTS_YAML}")
 
+    from ..registries.provider_registry import validate_effort
+
     config = yaml.safe_load(AGENTS_YAML.read_text())
-    return config.get('agents', {})
+    agents = config.get('agents', {})
+    for name, agent_config in agents.items():
+        validate_effort(agent_config.get("effort"), f"agent '{name}' in {AGENTS_YAML.name}")
+    return agents

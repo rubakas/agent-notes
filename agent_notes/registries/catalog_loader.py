@@ -68,6 +68,18 @@ def _apply_capabilities(model_id: str, capabilities: dict) -> dict[str, bool]:
     return caps
 
 
+def _apply_price_overrides(model_id: str, entry: dict, price_overrides: dict) -> tuple:
+    """Return (price_in, price_out) for *model_id*, with rules.yaml pins winning.
+
+    The seed is machine-refreshed and its prices gate role-budget selection, so a
+    pin here must survive a refresh that reintroduces a wrong number.
+    """
+    override = price_overrides.get(model_id) or {}
+    price_in = override.get("price_in", entry.get("price_in"))
+    price_out = override.get("price_out", entry.get("price_out"))
+    return price_in, price_out
+
+
 def _derive_openai_label(seed_id: str) -> str:
     """Derive display label from a dotted OpenAI seed id.
 
@@ -119,11 +131,16 @@ def _merge_rules(base: dict, overrides: dict) -> dict:
             base_ao.setdefault(provider, {}).update(models)
         merged["alias_overrides"] = base_ao
 
-    # deprecated / never_default: union
-    for key in ("deprecated", "never_default"):
-        if key in overrides:
-            combined = set(base.get(key, [])) | set(overrides[key])
-            merged[key] = sorted(combined)
+    # deprecated: union
+    if "deprecated" in overrides:
+        merged["deprecated"] = sorted(set(base.get("deprecated", [])) | set(overrides["deprecated"]))
+
+    # price_overrides: deep merge per model, user wins
+    if "price_overrides" in overrides:
+        base_po: dict = {k: dict(v) for k, v in base.get("price_overrides", {}).items()}
+        for mid, prices in overrides["price_overrides"].items():
+            base_po.setdefault(mid, {}).update(prices)
+        merged["price_overrides"] = base_po
 
     # capabilities: merge default and overrides dicts
     if "capabilities" in overrides:
@@ -174,8 +191,8 @@ def load_catalog(
     alias_transforms = rules.get("alias_transforms", {})
     alias_overrides = rules.get("alias_overrides", {})
     deprecated_ids: set[str] = set(rules.get("deprecated", []))
-    never_default_ids: set[str] = set(rules.get("never_default", []))
     capabilities = rules.get("capabilities", {})
+    price_overrides = rules.get("price_overrides", {}) or {}
 
     models: list[Model] = []
 
@@ -208,6 +225,7 @@ def load_catalog(
             aliases: dict[str, str] = {provider: alias_value}
 
             caps = _apply_capabilities(model_id, capabilities)
+            price_in, price_out = _apply_price_overrides(model_id, entry, price_overrides)
 
             models.append(Model(
                 id=model_id,
@@ -217,7 +235,13 @@ def load_catalog(
                 aliases=aliases,
                 capabilities=caps,
                 deprecated=model_id in deprecated_ids,
-                never_default=model_id in never_default_ids,
+                rank=int(entry.get("rank", 0)),
+                coding_index=entry.get("coding_index"),
+                intelligence_index=entry.get("intelligence_index"),
+                price_in=price_in,
+                price_out=price_out,
+                context_length=entry.get("context_length"),
+                created_at=entry.get("created_at"),
             ))
 
     return models

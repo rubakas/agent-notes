@@ -288,10 +288,8 @@ agent-notes config wizard                                     # interactive menu
 Agents accumulate knowledge across sessions. Choose a backend during `agent-notes install`:
 
 **Backends:**
-- **`default - Claude Code built-in md files`** (default) — Plain markdown in `~/.claude/agent-memory/<agent>/`. No external tools. Simple, portable.
-- **`Obsidian - session`** — Per-project session notes in Obsidian vault. Auto-creates `<vault>/<project>/` with categories: `Patterns/`, `Decisions/`, `Mistakes/`, `Context/`, `Sessions/`. Includes YAML frontmatter and `[[wikilinks]]`.
-- **`Obsidian - brain`** — Karpathy's LLM Wiki pattern. Per-project knowledge brain in `<vault>/<project>/raw/` and `wiki/` (sources, concepts, entities, synthesis, sessions). Supports ingest/query/lint operations.
-- **`None`** — Disables memory.
+- **`local`** (default) — Plain markdown in `~/.claude/agent-memory/<agent>/`. No external tools. Simple, portable.
+- **`obsidian`** — Notes in an external Obsidian vault, with categories: `Patterns/`, `Decisions/`, `Mistakes/`, `Context/`, `Feedback/`, `Sessions/`. Includes YAML frontmatter and `[[wikilinks]]`. Choose a storage strategy at setup: `single-brain` (one shared vault across all projects, default) or `per-project` (notes organized under `<vault>/<project-name>/`).
 
 **To reconfigure after install:**
 ```bash
@@ -312,30 +310,22 @@ agent-notes memory export             # back up to memory-backup/
 agent-notes memory import             # restore from memory-backup/
 ```
 
-### Obsidian (session or brain mode)
+### Obsidian
 
-**Storage:** `<vault-root>/<project-name>/` (auto-created per CWD)
+**Storage:** `<vault-root>/projects/<project-name>/` (single-brain) or `<vault-root>/<project-name>/` (per-project)
 
-**Session mode commands:**
 ```bash
 agent-notes memory init               # create folder structure and Index.md
 agent-notes memory list               # list all notes (by category or agent)
 agent-notes memory vault              # show storage path and init status
 agent-notes memory index              # regenerate Index.md
-agent-notes memory add <title> <body> [type] [agent]  # type: pattern|decision|mistake|context|session
+agent-notes memory add <title> <body> [type] [agent] [project] [--description "..."]  # type: pattern|decision|mistake|context|feedback|session
 agent-notes memory reset [agent]      # clear memory (confirmation required)
 agent-notes memory export             # back up to memory-backup/
 agent-notes memory import             # restore from memory-backup/
 ```
 
-**Brain mode adds:**
-```bash
-agent-notes memory ingest <title> <body> <concepts> <entities> <tags>  # manual ingest
-agent-notes memory query <question>   # search wiki pages
-agent-notes memory lint               # health-check
-```
-
-**Setup:** Run `agent-notes install` and choose `Obsidian - session` or `Obsidian - brain`. The wizard auto-detects vaults under `~/Documents`, `~/Desktop`, and `~`. Then run `agent-notes memory init`.
+**Setup:** Run `agent-notes install` and choose `Obsidian — external Obsidian vault`, then pick a strategy (`single-brain` or `per-project`). The wizard auto-detects vaults under `~/Documents`, `~/Desktop`, and `~`. Then run `agent-notes memory init`.
 
 </details>
 
@@ -571,8 +561,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ADD_CLI.md](docs/ADD_CLI
 
 ## Inspired by
 
-- [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — The wiki memory backend implements his compile-once, query-forever knowledge pattern with structured page types and three core operations (ingest, query, lint)
-- [Matt Pocock's skills repo](https://github.com/mattpocock/skills) — Skill format (SKILL.md per directory), failure-mode table (misalignment, broken code, architectural degradation), and a set of engineering/productivity skills vendored from the upstream repo (grill-me, grilling, grill-with-docs, diagnosing-bugs, improve-codebase-architecture, codebase-design, domain-modeling, prototype, handoff, research, to-spec, to-tickets, triage, wayfinder). Last synced from upstream commit [`391a270`](https://github.com/mattpocock/skills/commit/391a2701dd948f94f56a39f7533f8eea9a859c87) (2026-07-10), reviewed for prompt-injection before import.
+- [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — an earlier "wiki" memory backend implemented his compile-once, query-forever knowledge pattern with structured page types and ingest/query/lint operations. It has since been removed in favor of the Obsidian backend (`local` and `obsidian` are the only supported backends today)
+- [Matt Pocock's skills repo](https://github.com/mattpocock/skills) — Skill format (SKILL.md per directory), failure-mode table (misalignment, broken code, architectural degradation), and 16 engineering/productivity skills vendored from the upstream repo, reviewed for prompt-injection before import. Provenance, sync commit, and per-skill local modifications are tracked in [`THIRD_PARTY_SKILLS.yaml`](THIRD_PARTY_SKILLS.yaml).
 
 ## License
 

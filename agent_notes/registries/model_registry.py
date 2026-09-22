@@ -19,7 +19,8 @@ def _natural_key(model_id: str) -> tuple:
     Each chunk is tagged (0, int) or (1, str) so numeric and text chunks never compare
     against each other and raise TypeError.
 
-    Issue #21 will layer a fetched `created_at` on top of this as the primary key.
+    Used only for human-facing id listings; automatic selection is driven by the
+    catalog's frontier-first order, not by id sorting.
     """
     return tuple(
         (0, int(part)) if part.isdigit() else (1, part)
@@ -28,12 +29,29 @@ def _natural_key(model_id: str) -> tuple:
     )
 
 
+def _frontier_key(model: Model) -> tuple:
+    """Global frontier-first order across every provider.
+
+    seed.json ranks each provider independently, so concatenating provider
+    blocks yields two separate descending runs. Sorting on the benchmark score
+    itself merges them: rated models by capability descending, unrated last
+    (keeping their relative catalog order, since the sort is stable).
+    """
+    return (model.coding_index is None, -(model.coding_index or 0.0))
+
+
 class ModelRegistry:
     def __init__(self, models: list[Model]):
-        self._by_id: dict[str, Model] = {m.id: m for m in models}
+        ordered = sorted(models, key=_frontier_key)
+        self._by_id: dict[str, Model] = {m.id: m for m in ordered}
 
     def all(self) -> list[Model]:
-        return sorted(self._by_id.values(), key=lambda m: _natural_key(m.id))
+        """Every model, frontier first — see :func:`_frontier_key`.
+
+        This is the single ordering every consumer inherits: automatic
+        selection, the numbered `config role-model` list, and `list models`.
+        """
+        return list(self._by_id.values())
 
     def get(self, model_id: str) -> Model:
         if model_id not in self._by_id:
@@ -41,23 +59,7 @@ class ModelRegistry:
         return self._by_id[model_id]
 
     def ids(self) -> list[str]:
-        return sorted(self._by_id.keys())
-
-    def by_class(self, class_name: str) -> list[Model]:
-        """All models with model_class == class_name, sorted by id."""
-        return sorted(
-            [m for m in self._by_id.values() if m.model_class == class_name],
-            key=lambda m: m.id,
-        )
-
-    def compatible_with_providers(self, providers: list[str]) -> list[Model]:
-        """Return models that have at least one alias matching providers list.
-        Useful for CLI filtering: pass cli.accepted_providers."""
-        result = []
-        for m in self._by_id.values():
-            if any(p in m.aliases for p in providers):
-                result.append(m)
-        return sorted(result, key=lambda m: m.id)
+        return sorted(self._by_id.keys(), key=_natural_key)
 
 
 def _load_from_yaml_dir(models_dir: Path) -> ModelRegistry:
@@ -87,7 +89,13 @@ def _load_from_yaml_dir(models_dir: Path) -> ModelRegistry:
             aliases=data["aliases"],
             capabilities=data.get("capabilities", {}) or {},
             deprecated=bool(data.get("deprecated", False)),
-            never_default=bool(data.get("never_default", False)),
+            rank=int(data.get("rank", 0)),
+            coding_index=data.get("coding_index"),
+            intelligence_index=data.get("intelligence_index"),
+            price_in=data.get("price_in"),
+            price_out=data.get("price_out"),
+            context_length=data.get("context_length"),
+            created_at=data.get("created_at"),
         ))
 
     return ModelRegistry(models)

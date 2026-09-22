@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, List
 
 from ..config import Color
+from ..services.model_resolver import configured_providers
 
 
 def set_role(role_name: str, model_id: str, cli: Optional[str] = None, scope: Optional[str] = None, local: bool = False) -> None:
@@ -112,7 +113,7 @@ def set_role(role_name: str, model_id: str, cli: Optional[str] = None, scope: Op
         backend = registry.get(cli)
         if backend.first_alias_for(model.aliases) is None:
             print(f"Model {model_id} is not compatible with {backend.label}")
-            print(f"Compatible providers: {', '.join(backend.accepted_providers)}")
+            print(f"Compatible providers: {', '.join(configured_providers(backend))}")
             print(f"Model providers: {', '.join(model.aliases.keys())}")
             sys.exit(1)
         

@@ -13,6 +13,12 @@ triggers:
 
 Coordinates browser testing between this dev session and a separate `claude --chrome` session via a profile-aware file bus. Two legs: **Generate** (write a handoff prompt + scenarios to the bus) and **Ingest** (consume the report the chrome session writes back).
 
+## Precondition — `claude --chrome` is unverified
+
+Everything below assumes an operator can start a `claude --chrome` session. That flag is a community pattern, not an officially documented Anthropic workflow, and nothing here pins or verifies it. Confirm with the operator before relying on it.
+
+If `claude --chrome` is unavailable, the operator leg does not exist and this gate cannot close. Still write `request-<uuid>.md` to the bus, then record the browser test as **DEFERRED — pending operator** and report the Done Gate as partial, per the lead's chrome-test gate rule. Never skip the gate silently, and never call it closed without a `report-<uuid>.md`.
+
 ---
 
 ## The File Bus

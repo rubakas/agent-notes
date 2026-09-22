@@ -6,6 +6,7 @@ from typing import List, Dict, Set, Optional
 
 from ...config import Color
 from ...constants import DEFAULT_VAULT_DIR, DEFAULT_VAULT_NAME, Obsidian
+from ...services.model_resolver import configured_providers
 from ...services.ui import (
     _can_interactive, _safe_input, _path_input, _checkbox_select, _radio_select,
     _checkbox_select_fallback, _radio_select_fallback,
@@ -81,18 +82,17 @@ def _select_cli(step: int = 0, total: int = 0, version: str = '') -> Set[str]:
     return result
 
 
-def _default_model_for_role(role, compatible):
-    """The pre-selected default model for a role given the backend's compatible models."""
-    return next(
-        (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.deprecated and not m.never_default),
-        next(
-            (m for m in reversed(compatible) if m.model_class == role.typical_class and not m.never_default),
-            next(
-                (m for m in reversed(compatible) if not m.never_default),
-                compatible[0],
-            ),
-        ),
-    )
+def _default_model_for_role(role, compatible, backend):
+    """The pre-selected default model for a role given the backend's compatible models.
+
+    Delegates to the resolver's selection so the wizard's pre-selection and a
+    live build always agree. Falls back to the first compatible model when
+    nothing is rated and within budget, since the wizard must offer some default.
+    """
+    from ...services.model_resolver import select_model_for_role
+
+    matched, _resolved = select_model_for_role(compatible, role, backend)
+    return matched if matched is not None else compatible[0]
 
 
 def _select_accept_all_models(step: int = 0, total: int = 0, version: str = '') -> bool:
@@ -139,12 +139,11 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
     effort registry entry are skipped for effort selection (not present in role_efforts).
     """
     from ...registries.cli_registry import load_registry
-    from ...registries.model_registry import load_model_registry
     from ...registries.role_registry import load_role_registry
     from ...registries.provider_registry import default_provider_registry
+    from ..config import compatible_models_for, model_columns, MODEL_COLUMNS_HEADER
 
     registry = load_registry()
-    models = load_model_registry().all()
     roles = load_role_registry().all()
     provider_registry = default_provider_registry()
 
@@ -159,12 +158,12 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
         if backend is None or not backend.supports("agents"):
             continue
 
-        compatible = [m for m in models if backend.first_alias_for(m.aliases) is not None]
+        compatible = compatible_models_for(backend)
         if not compatible:
             print(
                 f"  {Color.YELLOW}Warning:{Color.NC} no compatible models found for "
                 f"{backend.label} (accepted providers: "
-                f"{list(backend.accepted_providers) or 'none'}). Skipping model selection; "
+                f"{configured_providers(backend) or 'none'}). Skipping model selection; "
                 f"this CLI will rely on legacy tier resolution."
             )
             continue
@@ -178,14 +177,10 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
             if backend_name == "claude" and role.name == "orchestrator":
                 continue
 
-            default_model = _default_model_for_role(role, compatible)
+            default_model = _default_model_for_role(role, compatible, backend)
             default_idx = compatible.index(default_model)
 
-            options = []
-            for m in compatible:
-                prov_alias = backend.first_alias_for(m.aliases)
-                provider = prov_alias[0] if prov_alias else "?"
-                options.append((f"{m.label} (via {provider})", m.id))
+            options = [(model_columns(m), m.id) for m in compatible]
 
             role_color = (_ROLE_ANSI.get(role.color, '') if sys.stdout.isatty() else '') if role.color else ''
             role_label_colored = f"{role_color}{role.label}{Color.NC}" if role_color else role.label
@@ -198,7 +193,8 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
                 title = (
                     f"{Color.DIM}CLI{Color.NC}          {Color.YELLOW}{backend.label}{Color.NC}\n"
                     f"  {Color.DIM}Role{Color.NC}         {role_label_colored}\n"
-                    f"  {Color.DIM}Description{Color.NC}  {role.description}"
+                    f"  {Color.DIM}Description{Color.NC}  {role.description}\n"
+                    f"  {Color.DIM}   {MODEL_COLUMNS_HEADER}{Color.NC}"
                 )
                 if _can_interactive():
                     picked = _radio_select(title, options, default=default_idx,
@@ -220,10 +216,22 @@ def _select_models_per_role(clis: Set[str], step: int = 0, total: int = 0, versi
                 except KeyError:
                     provider = None
 
-            if provider is not None:
-                effort_options = [(e, e) for e in provider.efforts]
+            # A model can accept no effort at all, and a CLI can accept a strict
+            # subset of the provider vocabulary; an undeclared backend list
+            # constrains nothing. Mirrors rendering's effort_support check and
+            # _constrain_effort_to_backend, which would silently drop or
+            # substitute the value at render time.
+            efforts = []
+            if provider is not None and picked_model.capabilities.get("effort_support", True):
+                efforts = [e for e in provider.efforts
+                           if not backend.efforts or e in backend.efforts]
+
+            if efforts:
+                effort_options = [(e, e) for e in efforts]
                 default_effort = _effort_default_choice(role, provider)
-                default_effort_idx = provider.efforts.index(default_effort)
+                if default_effort not in efforts:
+                    default_effort = efforts[0]
+                default_effort_idx = efforts.index(default_effort)
 
                 if accept_all:
                     picked_effort = default_effort

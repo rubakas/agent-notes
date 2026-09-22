@@ -38,10 +38,12 @@ class TestCodexFeatures:
         backend = registry.get("codex")
         assert backend.supports("agents") is True
 
-    def test_supports_skills(self):
+    def test_does_not_support_skills(self):
+        # Codex CLI reads skills from ~/.agents/skills (the universal mirror),
+        # never from ~/.codex/skills — so skills are not a codex component.
         registry = load_registry()
         backend = registry.get("codex")
-        assert backend.supports("skills") is True
+        assert backend.supports("skills") is False
 
     def test_does_not_support_rules(self):
         registry = load_registry()
@@ -102,83 +104,37 @@ class TestCodexProviders:
 # ---------------------------------------------------------------------------
 
 class TestModelResolutionForCodex:
-    def test_worker_role_resolves_to_gpt_model_for_codex(self):
-        """Worker role (typical_class=sonnet) should resolve to a gpt-* model for codex."""
+    """Exercise production selection (select_model_for_role), not a re-implementation."""
+
+    def _select(self, role_name, cli_name):
         from agent_notes.registries.model_registry import load_model_registry
         from agent_notes.registries.role_registry import load_role_registry
+        from agent_notes.services.model_resolver import select_model_for_role
 
-        model_registry = load_model_registry()
-        role_registry = load_role_registry()
-        registry = load_registry()
-        codex = registry.get("codex")
+        backend = load_registry().get(cli_name)
+        role = load_role_registry().get(role_name)
+        return select_model_for_role(load_model_registry().all(), role, backend)
 
-        role = role_registry.get("worker")
-        resolved_model = None
-        for model in reversed(model_registry.all()):
-            if model.model_class != role.typical_class:
-                continue
-            result = model.resolve_for_providers(list(codex.accepted_providers))
-            if result is not None:
-                _provider, alias_str = result
-                resolved_model = alias_str
-                break
+    @pytest.mark.parametrize("role_name", ["orchestrator", "reasoner", "worker", "scout"])
+    def test_every_role_resolves_to_a_gpt_model_for_codex(self, role_name):
+        matched, resolved = self._select(role_name, "codex")
 
-        assert resolved_model is not None, (
-            "No model resolved for worker role + codex backend (openai provider)"
+        assert matched is not None, (
+            f"No model resolved for {role_name} role + codex backend (openai provider)"
         )
-        assert "gpt" in resolved_model.lower(), (
-            f"Resolved model '{resolved_model}' for codex/worker should contain 'gpt'"
+        provider, alias_str = resolved
+        assert provider == "openai"
+        assert "gpt" in alias_str.lower(), (
+            f"Resolved model '{alias_str}' for codex/{role_name} should contain 'gpt'"
         )
 
-    def test_scout_role_resolves_to_gpt_model_for_codex(self):
-        """Scout role (typical_class=haiku) should resolve to a gpt-* model for codex."""
-        from agent_notes.registries.model_registry import load_model_registry
-        from agent_notes.registries.role_registry import load_role_registry
+    @pytest.mark.parametrize("role_name", ["orchestrator", "reasoner", "worker", "scout"])
+    def test_claude_backend_never_resolves_gpt_models(self, role_name):
+        matched, resolved = self._select(role_name, "claude")
 
-        model_registry = load_model_registry()
-        role_registry = load_role_registry()
-        registry = load_registry()
-        codex = registry.get("codex")
-
-        role = role_registry.get("scout")
-        resolved_model = None
-        for model in reversed(model_registry.all()):
-            if model.model_class != role.typical_class:
-                continue
-            result = model.resolve_for_providers(list(codex.accepted_providers))
-            if result is not None:
-                _provider, alias_str = result
-                resolved_model = alias_str
-                break
-
-        assert resolved_model is not None, (
-            "No model resolved for scout role + codex backend (openai provider)"
+        assert matched is not None
+        provider, alias_str = resolved
+        assert provider == "anthropic"
+        assert "gpt" not in alias_str.lower(), (
+            f"Claude backend resolved to '{alias_str}' — gpt models must not be selected"
         )
-        assert "gpt" in resolved_model.lower(), (
-            f"Resolved model '{resolved_model}' for codex/scout should contain 'gpt'"
-        )
-
-    def test_claude_backend_does_not_resolve_gpt_models(self):
-        """Claude backend (anthropic provider) must not select gpt-* models."""
-        from agent_notes.registries.model_registry import load_model_registry
-        from agent_notes.registries.role_registry import load_role_registry
-
-        model_registry = load_model_registry()
-        role_registry = load_role_registry()
-        registry = load_registry()
-
-        try:
-            claude = registry.get("claude")
-        except KeyError:
-            pytest.skip("claude backend not in registry")
-
-        role = role_registry.get("worker")
-        for model in model_registry.all():
-            if model.model_class != role.typical_class:
-                continue
-            result = model.resolve_for_providers(list(claude.accepted_providers))
-            if result is not None:
-                _provider, alias_str = result
-                assert "gpt" not in alias_str.lower(), (
-                    f"Claude backend resolved to '{alias_str}' — gpt models must not be selected"
-                )

@@ -14,14 +14,22 @@ providers:
         match: "*haiku*"
         price: {in: 1.00, out: 5.00, cache_read: 0.10, cache_write_5m: 1.25, cache_write_1h: 2.00}
         updated_at: "2026-04"
+      # Fable 5.1 has a special cache-read rate ($0.25/MTok) that does NOT follow
+      # the usual 0.1x-of-input ratio, so it cannot share a glob with Fable 5.
+      # Anchored pins only, per the Opus block below — a future Fable must reach
+      # the `no pricing entry` warning rather than inherit 5.1's rates.
+      - name: Claude Fable 5.1
+        match: ["*fable-5-1", "*fable-5-1-*", "*fable-5.1"]
+        price: {in: 10.00, out: 50.00, cache_read: 0.25, cache_write_5m: 12.50, cache_write_1h: 20.00}
+        updated_at: "2026-09"
       - name: Claude Fable 5
-        match: "*fable*"
+        match: ["*fable-5", "*fable-5-202*", "*fable-5.0"]
         price: {in: 10.00, out: 50.00, cache_read: 1.00, cache_write_5m: 12.50, cache_write_1h: 20.00}
         updated_at: "2026-07"
       - name: Claude Sonnet 5
         match: "*sonnet-5*"
-        price: {in: 3.00, out: 15.00, cache_read: 0.30, cache_write_5m: 3.75, cache_write_1h: 6.00}
-        updated_at: "2026-07"
+        price: {in: 2.00, out: 10.00, cache_read: 0.20, cache_write_5m: 2.50, cache_write_1h: 4.00}
+        updated_at: "2026-09"
       - name: Claude Sonnet
         match: "*sonnet*"
         price: {in: 3.00, out: 15.00, cache_read: 0.30, cache_write_5m: 3.75, cache_write_1h: 6.00}
@@ -54,7 +62,69 @@ providers:
 
   - name: OpenAI
     models:
-      - name: GPT-4 / o-series
-        match: ["gpt-*", "o1*", "o3*", "o4*"]
-        price: {in: 2.50, out: 10.00, cache_read: 0.50, cache_write_5m: 0.00, cache_write_1h: 0.00}
-        updated_at: "2026-04"
+      # Catalog ids are dotted (gpt-5.6-sol); the registry normalizes them to a
+      # dash form (gpt-5-6-sol), and both reach get_price, so each model pins
+      # both. Every pin is an ends-with anchor on the bare id plus a `-202*`
+      # glob for dated snapshots (gpt-5.1-2025-11-13), mirroring the dated pins
+      # in the Anthropic block above. The bare-id globs carry NO trailing `*`:
+      # the ids share prefixes (gpt-5 / gpt-5-mini / gpt-5.6-sol), so a
+      # trailing wildcard would swallow the more specific entries. The leading
+      # `*` is what lets prefixed aliases (github-copilot/gpt-5.4-mini) match.
+      #
+      # There is deliberately no catch-all row. A catch-all placed last would
+      # not shadow anything under first-match-wins, but no published rate
+      # covers an arbitrary OpenAI id, so any number in it would be a guess.
+      # Unmatched OpenAI ids (gpt-4o, gpt-5-codex, gpt-5-pro, ...) therefore
+      # reach the warning path in get_price, which refuses to bill a non-Claude
+      # id at Claude rates. Add a row here when you have a published rate.
+      #
+      # OpenAI does not bill cache writes, so both write rates are 0.
+      - name: GPT-6 Astra
+        match: ["*gpt-6-astra", "*gpt-6-astra-202*"]
+        price: {in: 10.00, out: 50.00, cache_read: 1.00, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"
+      - name: GPT-5.6 Sol
+        match: ["*gpt-5.6-sol", "*gpt-5.6-sol-202*", "*gpt-5-6-sol", "*gpt-5-6-sol-202*"]
+        price: {in: 4.00, out: 20.00, cache_read: 0.40, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"
+      - name: GPT-5.6 Terra
+        match: ["*gpt-5.6-terra", "*gpt-5.6-terra-202*", "*gpt-5-6-terra", "*gpt-5-6-terra-202*"]
+        price: {in: 2.00, out: 12.00, cache_read: 0.20, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"
+      - name: GPT-5.6 Luna
+        match: ["*gpt-5.6-luna", "*gpt-5.6-luna-202*", "*gpt-5-6-luna", "*gpt-5-6-luna-202*"]
+        price: {in: 0.20, out: 1.20, cache_read: 0.02, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"
+      - name: GPT-5.5
+        match: ["*gpt-5.5", "*gpt-5.5-202*", "*gpt-5-5", "*gpt-5-5-202*"]
+        price: {in: 5.00, out: 30.00, cache_read: 0.50, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"
+      - name: GPT-5.4 Mini
+        match: ["*gpt-5.4-mini", "*gpt-5.4-mini-202*", "*gpt-5-4-mini", "*gpt-5-4-mini-202*"]
+        price: {in: 0.75, out: 4.50, cache_read: 0.075, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"
+      - name: GPT-5.4 Nano
+        match: ["*gpt-5.4-nano", "*gpt-5.4-nano-202*", "*gpt-5-4-nano", "*gpt-5-4-nano-202*"]
+        price: {in: 0.20, out: 1.25, cache_read: 0.02, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"
+      - name: GPT-5.4
+        match: ["*gpt-5.4", "*gpt-5.4-202*", "*gpt-5-4", "*gpt-5-4-202*"]
+        price: {in: 2.50, out: 15.00, cache_read: 0.25, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"
+      - name: GPT-5.2
+        match: ["*gpt-5.2", "*gpt-5.2-202*", "*gpt-5-2", "*gpt-5-2-202*"]
+        price: {in: 1.75, out: 14.00, cache_read: 0.175, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"
+      - name: GPT-5 Mini
+        match: ["*gpt-5-mini", "*gpt-5-mini-202*"]
+        price: {in: 0.25, out: 2.00, cache_read: 0.025, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"
+      - name: GPT-5 Nano
+        match: ["*gpt-5-nano", "*gpt-5-nano-202*"]
+        price: {in: 0.05, out: 0.40, cache_read: 0.005, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"
+      - name: GPT-5.1 / GPT-5
+        match: ["*gpt-5.1", "*gpt-5.1-202*", "*gpt-5-1", "*gpt-5-1-202*",
+                "*gpt-5", "*gpt-5-202*"]
+        price: {in: 1.25, out: 10.00, cache_read: 0.125, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-09"

@@ -66,8 +66,49 @@ class TestFetchOpenRouter:
         assert "google" not in got                                   # non-curated provider ignored
         opus48 = next(e for e in got["anthropic"] if e["id"] == "claude-opus-4-8")
         assert opus48["display_name"] == "Claude Opus 4.8"           # "Anthropic: " prefix stripped
-        assert opus48["created_at"] is None
-        assert all(set(e.keys()) == {"id"} for e in got["openai"])   # openai entries are id-only
+        assert opus48["created_at"] is None                          # payload carries no `created`
+        assert all(                                                  # every entry carries the rank fields
+            set(e.keys()) == {"id", "display_name", "coding_index", "intelligence_index",
+                              "price_in", "price_out", "context_length", "created_at", "rank"}
+            for e in got["openai"]
+        )
+        gpt55 = next(e for e in got["openai"] if e["id"] == "gpt-5.5")
+        assert gpt55["display_name"] == "GPT-5.5"                    # "OpenAI: " prefix stripped
+
+    def test_fetch_openrouter_enriches_and_ranks(self):
+        from agent_notes.commands.models import _fetch_openrouter
+        payload = {"data": [
+            {"id": "openai/gpt-5.4", "name": "OpenAI: GPT-5.4",
+             "benchmarks": {"artificial_analysis": {"intelligence_index": 0.0, "coding_index": 71.1}},
+             "pricing": {"prompt": "0.0000025", "completion": "0.00001"},
+             "context_length": 400000, "created": 1764547200},
+            {"id": "openai/gpt-5.5", "name": "OpenAI: GPT-5.5",
+             "benchmarks": {"artificial_analysis": {"coding_index": 74.9}}},
+            {"id": "openai/gpt-5.1", "name": "OpenAI: GPT-5.1"},
+        ]}
+        with patch("urllib.request.urlopen", side_effect=lambda *a, **k: _FakeResponse(payload)):
+            got = _fetch_openrouter(_RULES)
+
+        assert [e["id"] for e in got["openai"]] == ["gpt-5.5", "gpt-5.4", "gpt-5.1"]
+        assert [e["rank"] for e in got["openai"]] == [1, 2, 3]
+
+        gpt54 = got["openai"][1]
+        assert gpt54["coding_index"] == 71.1                         # 0.0 intelligence_index must not mask it
+        assert gpt54["intelligence_index"] == 0.0                    # a real 0.0 is kept as 0.0, not nulled
+        assert gpt54["price_in"] == pytest.approx(2.5)               # per-token -> per 1M tokens
+        assert gpt54["price_out"] == pytest.approx(10.0)
+        assert gpt54["context_length"] == 400000
+        assert gpt54["created_at"] == "2025-12-01"
+
+        gpt51 = got["openai"][2]
+        assert gpt51["coding_index"] is None                         # missing benchmark stays null, not 0.0
+        assert gpt51["intelligence_index"] is None                   # absent must stay distinguishable from 0.0
+
+        gpt55 = got["openai"][0]
+        assert gpt55["intelligence_index"] is None                   # benchmark block present but no intelligence key
+        assert gpt51["price_in"] is None
+        assert gpt51["context_length"] is None
+        assert gpt51["created_at"] is None
 
     def test_refresh_fails_loud_on_empty(self, monkeypatch, tmp_path):
         # OpenRouter returns nothing curated -> refresh must sys.exit(1) (CI guard)

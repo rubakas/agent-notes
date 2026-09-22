@@ -2,7 +2,7 @@
 
 ## Overview
 
-AgentNotes is a **hub** that registers and installs AI agent configurations across multiple CLIs (Claude Code, OpenCode, GitHub Copilot, etc.). At its core, the engine reads declarative YAML files from three registries — **CLIs, Models, and Roles** — and orchestrates the build-and-install pipeline. Beyond the core engine, two subsystems handle **agent memory** (session notes, knowledge bases) and **cost tracking** (token/pricing accounting). The engine's promise: **adding a new CLI, model, role, agent, skill, or rule requires zero Python changes** — only drop a YAML file in the right data directory.
+AgentNotes is a **hub** that registers and installs AI agent configurations across multiple CLIs (Claude Code, OpenCode, GitHub Copilot, etc.). At its core, the engine reads declarative YAML (and, for models, JSON) files from four registries — **CLIs, Models, Roles, and Providers** — and orchestrates the build-and-install pipeline. Beyond the core engine, two subsystems handle **agent memory** (session notes, knowledge bases) and **cost tracking** (token/pricing accounting). The engine's promise: **adding a new CLI, model, role, agent, skill, or rule requires zero Python changes** — only drop a YAML file in the right data directory.
 
 This document describes the 4-layer core architecture and two subsystems that enforce this promise.
 
@@ -200,20 +200,24 @@ agent_notes/domain/
 ### Layer 2: Registries (`agent_notes/registries/`)
 
 **What it contains:**
-- YAML loaders that hydrate domain types from `agent_notes/data/`
+- YAML (and, for models, JSON) loaders that hydrate domain types from `agent_notes/data/`
 - Registry classes that provide lookup by ID
 
 **Rules:**
 - May import `domain` + `config`
 - Forbidden: `services/`, `commands/`, top-level command modules (`install`, `doctor`, etc.)
-- Each registry has a loader function (e.g., `load_cli_registry()`, `default_model_registry()`)
+- Each registry has a loader function (e.g., `load_registry()`, `load_model_registry()`, `default_provider_registry()`)
 
 **Examples:**
 ```
 agent_notes/registries/
 ├── cli_registry.py          # CLIBackend loader from data/cli/*.yaml
-├── model_registry.py        # Model loader from data/models/*.yaml
+├── catalog_loader.py        # Composes data/catalog/seed.json + rules.yaml into Model objects
+├── model_registry.py        # Model registry — load_model_registry() delegates to catalog_loader by
+│                             #   default; accepts an explicit models_dir for a legacy per-file YAML
+│                             #   loader used only by tests
 ├── role_registry.py         # Role loader from data/roles/*.yaml
+├── provider_registry.py     # Provider loader from data/providers/*.yaml (reasoning-effort vocabularies)
 ├── agent_registry.py        # AgentSpec loader from data/agents/agents.yaml
 ├── skill_registry.py        # Skill loader from data/skills/*/SKILL.md
 ├── rule_registry.py         # Rule loader from data/rules/*/RULE.md
@@ -221,11 +225,13 @@ agent_notes/registries/
 └── __init__.py              # Public loader exports
 ```
 
+**Provider registry** (`provider_registry.py`) gates all reasoning-effort rendering: `agent_notes/services/rendering.py`'s effort-resolution seam looks up the resolved model's provider here. If the routing provider itself has no registry entry, it falls back to walking the model's other alias-providers for one that does (`rendering.py:238-256`) before giving up; only when no provider in that chain has an entry is the `effort:`-equivalent field omitted (see `docs/ADD_MODEL.md` Section 6).
+
 **Usage example:**
 ```python
-from agent_notes.registries import load_cli_registry
+from agent_notes.registries import load_registry
 
-registry = load_cli_registry()
+registry = load_registry()
 claude_backend = registry.get("claude")
 print(claude_backend.label)  # "Claude Code"
 ```
@@ -262,9 +268,9 @@ agent_notes/services/
 **Usage example:**
 ```python
 from agent_notes.services import installer
-from agent_notes.registries import load_cli_registry
+from agent_notes.registries import load_registry
 
-registry = load_cli_registry()
+registry = load_registry()
 installer.install_all(backends=registry.all(), scope="global")
 ```
 
@@ -306,9 +312,9 @@ agent_notes/commands/
 # agent_notes/commands/install.py
 def install(local: bool = False, copy: bool = False) -> None:
     from ..services import installer
-    from ..registries import load_cli_registry
+    from ..registries import load_registry
     
-    registry = load_cli_registry()
+    registry = load_registry()
     scope = "local" if local else "global"
     installer.install_all(backends=registry.all(), scope=scope)
 ```
@@ -429,8 +435,11 @@ Here's a 10-line walk-through of how a single command executes:
 **Adding a dataclass for a domain concept?**
 → Create `agent_notes/domain/my_type.py`
 
-**Adding a new CLI, model, role, agent, skill, or rule?**
-→ Drop a YAML file in `agent_notes/data/{cli,models,roles,agents,skills,rules}/` — zero Python changes
+**Adding a new CLI, role, agent, skill, or rule?**
+→ Drop a YAML file in `agent_notes/data/{cli,roles,agents,skills,rules}/` — zero Python changes
+
+**Adding a new model?**
+→ Add an entry to `agent_notes/data/catalog/seed.json` (and a matching glob in `data/catalog/rules.yaml` if it doesn't already fit an existing family/class pattern) — see `docs/ADD_MODEL.md`. There is no `data/models/` directory; a per-model YAML loader survives only for tests that pass an explicit `models_dir`.
 
 ---
 
@@ -537,7 +546,7 @@ The engine's promise is enforced by putting all extensible data in `agent_notes/
 | To add… | Create… | Zero Python changes? |
 |---------|---------|----------------------|
 | CLI (e.g., Cursor) | `data/cli/cursor.yaml` + optional `data/templates/frontmatter/cursor.py` | ✅ Yes |
-| Model (e.g., Kimi) | `data/models/kimi-k2.yaml` | ✅ Yes |
+| Model (e.g., a new Claude/GPT release) | An entry in `data/catalog/seed.json` (+ a matching glob in `data/catalog/rules.yaml` if it's a new family) | ✅ Yes |
 | Role (e.g., Specialist) | `data/roles/specialist.yaml` | ✅ Yes |
 | Agent | Add to `data/agents/agents.yaml` + `data/agents/my-agent.md` | ✅ Yes |
 | Skill | New directory `data/skills/my-skill/` with `SKILL.md` | ✅ Yes |

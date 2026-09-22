@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -44,8 +45,13 @@ def _get_scope_state(state, scope: Optional[str] = None, project_path: Optional[
     return scope, project_path, scope_state
 
 
-def _validate_model(model_id: str):
-    """Validate model exists in registry, exit on failure."""
+def _validate_model(model_id: str, fatal: bool = True):
+    """Validate model exists in registry.
+
+    Returns the model, or None when it is unknown and *fatal* is False. The
+    scriptable commands exit 1 on an unknown id; the wizard passes fatal=False
+    so a typo drops back to the menu instead of killing the session.
+    """
     from ..registries.model_registry import load_model_registry
     registry = load_model_registry()
     try:
@@ -53,7 +59,67 @@ def _validate_model(model_id: str):
     except KeyError:
         print(f"Unknown model: {model_id}")
         print(f"Available models: {', '.join(registry.ids())}")
+        if fatal:
+            sys.exit(1)
+        return None
+
+
+def compatible_models_for(backend) -> list:
+    """Models the given CLI backend can serve, in registry order (frontier first).
+
+    The registry is already globally ordered, so this only filters — sorting
+    here again would be a second, divergent ordering.
+
+    Shared by the install wizard and `config role-model` so the numbered list a
+    user sees is the same one indices are resolved against.
+    """
+    from ..registries.model_registry import load_model_registry
+    models = load_model_registry().all()
+    return [m for m in models if backend.first_alias_for(m.aliases) is not None]
+
+
+MODEL_COLUMNS_HEADER = f"{'model':<28} {'int':>5}  {'coding':>6}  {'$/M in':>8}"
+
+
+def model_columns(model) -> str:
+    """One row of the shared model table: id, intelligence index, coding index,
+    USD per 1M INPUT tokens.
+
+    Every model list in the product renders through this one function, so the
+    columns cannot drift between `list models`, `config role-model` and the
+    install wizard. A missing metric prints an em dash — 0.0 is a real score
+    upstream and must stay distinguishable from "not measured".
+
+    Output prices differ from input prices, so the price column is always
+    labelled `$/M in` rather than a bare `$`.
+    """
+    intelligence = "—" if model.intelligence_index is None else f"{model.intelligence_index:.1f}"
+    coding = "—" if model.coding_index is None else f"{model.coding_index:.1f}"
+    price = "—" if model.price_in is None else f"{model.price_in:.2f}"
+    return f"{model.id:<28} {intelligence:>5}  {coding:>6}  {price:>8}"
+
+
+def _backend_for(cli_name: str):
+    """Return the CLI backend descriptor, exit on unknown name."""
+    from ..registries.cli_registry import load_registry
+    try:
+        return load_registry().get(cli_name)
+    except KeyError:
+        print(f"Unknown CLI '{cli_name}'.")
         sys.exit(1)
+
+
+def _print_model_choices(cli_name: str) -> None:
+    """Print the numbered model list `config role-model` accepts indices against."""
+    backend = _backend_for(cli_name)
+    models = compatible_models_for(backend)
+    print(f"\nModels available for {cli_name}:")
+    if not models:
+        print("  (none compatible)")
+        return
+    print(f"  {'#':>2}  {MODEL_COLUMNS_HEADER}")
+    for index, model in enumerate(models, 1):
+        print(f"  {index:>2}  {model_columns(model)}")
 
 
 def _validate_role(role_name: str):
@@ -69,12 +135,14 @@ def _validate_role(role_name: str):
 
 
 def _check_effort_valid(scope_state, cli_name: str, role_name: str, effort: str) -> bool:
-    """Check effort against the role's currently-assigned model's provider on
-    cli_name. Prints the provider name and its valid effort list on failure.
+    """Check effort for the role's currently-assigned model on cli_name, narrowing
+    through three gates in order: the model's own `effort_support` capability, the
+    provider's effort vocabulary, then the CLI backend's subset of it (when the
+    backend declares one). Prints the offending model, provider or CLI on failure.
     Returns True/False — does not exit (callers decide fatal vs. non-fatal).
 
     NO cross-provider mapping/translation — the value is checked against exactly
-    the provider that serves the role's current model, nothing more.
+    the provider that serves the role's current model.
     """
     from ..registries.model_registry import load_model_registry
     from ..registries.cli_registry import load_registry
@@ -91,6 +159,13 @@ def _check_effort_valid(scope_state, cli_name: str, role_name: str, effort: str)
         model = model_registry.get(model_id)
     except KeyError:
         print(f"Unknown model '{model_id}' assigned to role '{role_name}'.")
+        return False
+
+    # Per-MODEL gate: some models accept no effort setting at all, independently of
+    # their provider's vocabulary. Mirrors rendering.py's effort_support check, which
+    # would otherwise drop the pin silently at render time.
+    if not model.capabilities.get("effort_support", True):
+        print(f"Model '{model_id}' does not accept an effort setting.")
         return False
 
     cli_registry = load_registry()
@@ -116,6 +191,14 @@ def _check_effort_valid(scope_state, cli_name: str, role_name: str, effort: str)
     if effort not in provider.efforts:
         print(f"Invalid effort '{effort}' for provider '{provider_name}'.")
         print(f"Valid efforts for {provider_name}: {', '.join(provider.efforts)}")
+        return False
+
+    # A CLI can accept a strict subset of the provider vocabulary (Codex rejects
+    # 'none'); an undeclared list constrains nothing. Mirrors rendering's
+    # _constrain_effort_to_backend, which would silently drop the value.
+    if backend.efforts and effort not in backend.efforts:
+        print(f"Invalid effort '{effort}' for CLI '{cli_name}'.")
+        print(f"Valid efforts for {cli_name}: {', '.join(backend.efforts)}")
         return False
 
     return True
@@ -187,26 +270,89 @@ def _apply_and_regenerate(state, before: str) -> None:
 
 # ── Scriptable (non-interactive) actions ────────────────────────────────────
 
-def role_model(role_name: str, model_id: str, cli_filter: Optional[str] = None) -> None:
-    """Set role→model for one or both CLIs. Validates, diffs, prompts, applies."""
+def _resolve_index(raw_index: str, target_clis: list) -> str:
+    """Resolve a 1-based list index to a model id. Exits on ambiguity or range."""
+    if len(target_clis) != 1:
+        print("An index is ambiguous: model numbering differs per CLI.")
+        print(f"Installed CLIs: {', '.join(target_clis)}")
+        print("Re-run with --cli <cli> to pick one.")
+        sys.exit(1)
+
+    cli_name = target_clis[0]
+    models = compatible_models_for(_backend_for(cli_name))
+    index = int(raw_index)
+    if not 1 <= index <= len(models):
+        print(f"Index {index} out of range for {cli_name}: valid range is 1-{len(models)}.")
+        sys.exit(1)
+
+    model_id = models[index - 1].id
+    print(f"{index} -> {model_id}")
+    return model_id
+
+
+def _target_clis(scope_state, cli_filter: Optional[str], scope: str,
+                 fatal: bool = True) -> Optional[list]:
+    """CLIs a role command applies to: one named CLI, or every installed CLI.
+
+    A falsy filter or the literal "both" means all of them. An unknown name is
+    never silently widened to "both" — that would write the change to CLIs the
+    user did not ask for. It exits 1 for the scriptable commands, or returns
+    None when *fatal* is False so the wizard can stay interactive.
+    """
+    if not cli_filter or cli_filter == "both":
+        return list(scope_state.clis.keys())
+    if cli_filter not in scope_state.clis:
+        print(f"CLI '{cli_filter}' not in {scope} installation.")
+        print(f"Installed CLIs: {', '.join(scope_state.clis.keys())}")
+        if fatal:
+            sys.exit(1)
+        return None
+    return [cli_filter]
+
+
+def _prompt_target_clis(scope_state, scope: str, fatal: bool = True) -> Optional[list]:
+    """Ask which installed CLI a wizard branch applies to, defaulting to all.
+
+    Thin prompt around _target_clis so the wizard and the scriptable commands
+    resolve a CLI choice through exactly one code path.
+    """
+    from ..services.ui import _safe_input
+
+    cli_names = list(scope_state.clis.keys())
+    if len(cli_names) <= 1:
+        return cli_names
+    prompt = f"\nWhich CLI? ({' / '.join(cli_names)} / both) [both]: "
+    cli_choice = _safe_input(prompt, "both").strip().lower()
+    return _target_clis(scope_state, cli_choice, scope, fatal=fatal)
+
+
+def role_model(role_name: str, model_id: Optional[str] = None,
+               cli_filter: Optional[str] = None) -> None:
+    """Set role→model for one or both CLIs. Validates, diffs, prompts, applies.
+
+    `model_id` may be a model id or a 1-based index into the CLI's model list.
+    Omit it to print that list without writing anything.
+    """
     state = _load_state()
     before = _state_snapshot(state)
 
     _validate_role(role_name)
-    _validate_model(model_id)
 
     scope, project_path, scope_state = _get_scope_state(state)
 
-    if cli_filter and cli_filter not in ("both",):
-        # Single CLI
-        target_clis = [cli_filter]
+    target_clis = _target_clis(scope_state, cli_filter, scope)
+
+    if model_id is None:
         for cli_name in target_clis:
-            if cli_name not in scope_state.clis:
-                print(f"CLI '{cli_name}' not in {scope} installation.")
-                print(f"Installed CLIs: {', '.join(scope_state.clis.keys())}")
-                sys.exit(1)
-    else:
-        target_clis = list(scope_state.clis.keys())
+            _print_model_choices(cli_name)
+        print("\nPick one with: agent-notes config role-model "
+              f"[--cli <cli>] {role_name} <index|model-id>")
+        return
+
+    if re.fullmatch(r"\d+", model_id):
+        model_id = _resolve_index(model_id, target_clis)
+
+    _validate_model(model_id)
 
     for cli_name in target_clis:
         scope_state.clis[cli_name].role_models[role_name] = model_id
@@ -225,16 +371,7 @@ def role_effort(role_name: str, effort: str, cli_filter: Optional[str] = None) -
 
     scope, project_path, scope_state = _get_scope_state(state)
 
-    if cli_filter and cli_filter not in ("both",):
-        # Single CLI
-        target_clis = [cli_filter]
-        for cli_name in target_clis:
-            if cli_name not in scope_state.clis:
-                print(f"CLI '{cli_name}' not in {scope} installation.")
-                print(f"Installed CLIs: {', '.join(scope_state.clis.keys())}")
-                sys.exit(1)
-    else:
-        target_clis = list(scope_state.clis.keys())
+    target_clis = _target_clis(scope_state, cli_filter, scope)
 
     for cli_name in target_clis:
         _validate_effort(scope_state, cli_name, role_name, effort)
@@ -352,14 +489,12 @@ def show(state=None) -> None:
 def _wizard_role_model(state, before: str) -> bool:
     """Branch 1: interactive role→model reassignment. Returns True if changes were applied."""
     from ..registries.cli_registry import load_registry
-    from ..registries.model_registry import load_model_registry
     from ..registries.role_registry import load_role_registry
     from ..services.ui import _safe_input
 
     scope, project_path, scope_state = _get_scope_state(state)
 
     cli_registry = load_registry()
-    model_registry = load_model_registry()
     role_registry = load_role_registry()
 
     # Show current
@@ -374,21 +509,10 @@ def _wizard_role_model(state, before: str) -> bool:
             model_id = backend_state.role_models[role_name]
             print(f"    {role_name:<20} {model_id}")
 
-    available_ids = model_registry.ids()
-    print(f"\nAvailable models: {', '.join(available_ids)}")
-
-    cli_names = list(scope_state.clis.keys())
-    if len(cli_names) > 1:
-        cli_choice = _safe_input("\nWhich CLI? (claude / opencode / both) [both]: ", "both").strip().lower()
-        if cli_choice in ("both", ""):
-            target_clis = cli_names
-        elif cli_choice in cli_names:
-            target_clis = [cli_choice]
-        else:
-            print(f"Unknown CLI '{cli_choice}'. No changes made.")
-            return False
-    else:
-        target_clis = cli_names
+    target_clis = _prompt_target_clis(scope_state, scope, fatal=False)
+    if target_clis is None:
+        print("No changes made.")
+        return False
 
     role_names = role_registry.names()
     role_choice = _safe_input(
@@ -398,14 +522,18 @@ def _wizard_role_model(state, before: str) -> bool:
         print(f"Unknown role '{role_choice}'. No changes made.")
         return False
 
-    model_choice = _safe_input(f"New model: ", "").strip()
+    for cli_name in target_clis:
+        _print_model_choices(cli_name)
+
+    model_choice = _safe_input("\nNew model (index or id): ", "").strip()
     if not model_choice:
         print("No model entered. No changes made.")
         return False
 
-    if model_choice not in available_ids:
-        print(f"Unknown model '{model_choice}'.")
-        print(f"Available: {', '.join(available_ids)}")
+    if re.fullmatch(r"\d+", model_choice):
+        model_choice = _resolve_index(model_choice, target_clis)
+    if _validate_model(model_choice, fatal=False) is None:
+        print("No changes made.")
         return False
 
     for cli_name in target_clis:
@@ -439,18 +567,10 @@ def _wizard_role_effort(state, before: str) -> bool:
             effort = backend_state.role_efforts[role_name]
             print(f"    {role_name:<20} {effort}")
 
-    cli_names = list(scope_state.clis.keys())
-    if len(cli_names) > 1:
-        cli_choice = _safe_input("\nWhich CLI? (claude / opencode / both) [both]: ", "both").strip().lower()
-        if cli_choice in ("both", ""):
-            target_clis = cli_names
-        elif cli_choice in cli_names:
-            target_clis = [cli_choice]
-        else:
-            print(f"Unknown CLI '{cli_choice}'. No changes made.")
-            return False
-    else:
-        target_clis = cli_names
+    target_clis = _prompt_target_clis(scope_state, scope, fatal=False)
+    if target_clis is None:
+        print("No changes made.")
+        return False
 
     role_names = role_registry.names()
     role_choice = _safe_input(
@@ -659,11 +779,11 @@ def config(action: str = "wizard", args: Optional[list] = None, cli_filter: Opti
     elif action == "show":
         show()
     elif action == "role-model":
-        # args: [role_name, model_id]
-        if len(args) < 2:
-            print("Usage: agent-notes config role-model [--cli <cli>] <role> <model>")
+        # args: [role_name] to list, [role_name, model_id_or_index] to set
+        if not args:
+            print("Usage: agent-notes config role-model [--cli <cli>] <role> [<index>|<model>]")
             sys.exit(1)
-        role_model(args[0], args[1], cli_filter=cli_filter)
+        role_model(args[0], args[1] if len(args) > 1 else None, cli_filter=cli_filter)
     elif action == "role-agent":
         if len(args) < 2:
             print("Usage: agent-notes config role-agent <role> <agent>")
