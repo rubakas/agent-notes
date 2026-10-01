@@ -7,25 +7,48 @@ behind the seed. These tests fail on any divergence.
 """
 import json
 import re
+from pathlib import Path
 
 import pytest
 
 from agent_notes.config import DATA_DIR
 from agent_notes.cost import _pricing
-from agent_notes.registries.catalog_loader import _normalize_openai_id
+from agent_notes.registries.catalog_loader import _normalize_openai_id, load_catalog
 
 # Vendor prefix used by github-copilot aliases in opencode session logs.
 ALIAS_PREFIX = "github-copilot"
 
+# Stands in for USER_OVERRIDES_PATH so load_catalog() never reads the developer's
+# personal models.yaml. Must not exist — load_catalog only merges it if it does.
+_NO_USER_OVERRIDES = Path(__file__).parent / "no-such-user-overrides.yaml"
+
 
 def _seed_models() -> list:
-    """Yield (provider, seed_id, price_in, price_out) for every catalog model."""
+    """Yield (provider, seed_id, price_in, price_out) for every catalog model.
+
+    The prices are the RESOLVED ones — seed.json after rules.yaml
+    ``price_overrides`` is applied — because that is the number the rest of the
+    system bills and budgets against. Comparing pricing.yaml to the raw seed
+    would make every refresh reopen a divergence that a pin already settled.
+
+    ``overrides_path`` is aimed at a path that cannot exist so the gate reads the
+    repo's rules.yaml alone: left to its default it would pick up the developer's
+    own ~/.config/agent-notes/models.yaml and pass or fail per machine.
+    """
     seed = json.loads((DATA_DIR / "catalog" / "seed.json").read_text())
-    return [
-        (provider, entry["id"], entry.get("price_in"), entry.get("price_out"))
-        for provider, entries in seed.get("providers", {}).items()
-        for entry in entries
-    ]
+    resolved = {
+        m.id: m
+        for m in load_catalog(DATA_DIR / "catalog", overrides_path=_NO_USER_OVERRIDES)
+    }
+    out = []
+    for provider, entries in seed.get("providers", {}).items():
+        for entry in entries:
+            model_id = (
+                _normalize_openai_id(entry["id"]) if provider == "openai" else entry["id"]
+            )
+            model = resolved[model_id]
+            out.append((provider, entry["id"], model.price_in, model.price_out))
+    return out
 
 
 def _dotted_version(model_id: str) -> str:
@@ -62,9 +85,9 @@ SEED_MODELS = _seed_models()
 )
 def test_pricing_yaml_matches_seed(provider, seed_id, price_in, price_out, capsys):
     if price_in is None or price_out is None:
-        # Deprecated/unrated entries carry no seed price, so there is nothing to
-        # reconcile against — pricing.yaml is the only source for them.
-        pytest.skip(f"{seed_id} has no seed price")
+        # Deprecated/unrated entries carry no catalog price, so there is nothing
+        # to reconcile against — pricing.yaml is the only source for them.
+        pytest.skip(f"{seed_id} has no catalog price")
 
     for model_id in _billed_ids(provider, seed_id):
         price = _pricing.get_price(model_id)
@@ -76,9 +99,9 @@ def test_pricing_yaml_matches_seed(provider, seed_id, price_in, price_out, capsy
         )
         assert price["in"] == price_in, (
             f"{model_id}: pricing.yaml bills ${price['in']}/MTok input, "
-            f"seed.json says ${price_in}"
+            f"the catalog resolves ${price_in}"
         )
         assert price["out"] == price_out, (
             f"{model_id}: pricing.yaml bills ${price['out']}/MTok output, "
-            f"seed.json says ${price_out}"
+            f"the catalog resolves ${price_out}"
         )
