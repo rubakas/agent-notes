@@ -34,6 +34,14 @@ DECLARED_DEVIATIONS = {
             "its $10.00/MTok input rate."
         ),
     },
+    ("Anthropic", "Claude Opus 5.5"): {
+        "rates": {"cache_read": 0.20},
+        "source": (
+            "https://platform.claude.com/docs/en/about-claude/pricing (checked "
+            "2026-10-01): Claude Opus 5.5 is published with a $0.20/MTok cache-read "
+            "rate, 0.05x of its $4.00/MTok input rather than the usual 0.1x."
+        ),
+    },
 }
 
 # OpenAI prices cached input but does not bill cache WRITES at all, so both write

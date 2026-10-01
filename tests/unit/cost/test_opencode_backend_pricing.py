@@ -159,9 +159,9 @@ class TestOpus5Pricing:
             "claude-sonnet-4-5-20250929 priced incorrectly (expected 3.0/M in)"
         )
 
-        # opus-5 future dated — matches *opus-5-*
+        # opus-5 future dated — matches *opus-5-202*
         assert get_price("claude-opus-5-20260401")["in"] == 5.0, (
-            "claude-opus-5-20260401 priced incorrectly (expected 5.0/M in via *opus-5-* pin)"
+            "claude-opus-5-20260401 priced incorrectly (expected 5.0/M in via *opus-5-202* pin)"
         )
 
     def test_unknown_opus_warns_to_stderr_instead_of_silent_misprice(self, capsys):
