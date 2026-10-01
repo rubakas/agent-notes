@@ -40,7 +40,7 @@ ACCEPTANCE CRITERIA
 - `.venv/bin/python -m pytest` is green. Note pytest is NOT on PATH in this repo; it must be invoked as `.venv/bin/python -m pytest` or via `uv run pytest`. The current baseline is 2196 passing tests; after deleting the orphaned file the count must not drop by more than the tests removed from that file (11 test functions, all parametrized).
 - The deleted test file and the collect_ignore entry are both gone; `grep -rn collect_ignore tests/` returns nothing.
 - `grep -rn 'import tomli as tomllib' agent_notes/` returns nothing.
-- No behavior change in shipped code. `agent-notes build` output must be byte-identical to before the change.
+- No behavior change in shipped code. `agent-notes build` output must be byte-identical to before the change. VERIFIED 2026-10-01 — see Verification.
 - No AI self-attribution anywhere in commits, code comments, or the PR description. No Co-Authored-By naming a model, no "Generated with" line, no robot emoji. This is a hard project rule.
 
 OUT OF SCOPE
@@ -63,7 +63,7 @@ A maintainer of this repo returns to two deliberate workarounds epic #17 left in
 1. **Given** a green baseline of 2196 passing tests, **When** the orphaned test module is deleted, **Then** `uv run pytest -q` passes and the collected-item total drops by exactly the items that file contributed and by no more.
 2. **Given** the `collect_ignore` suppression in `tests/conftest.py`, **When** the orphaned module is gone, **Then** `grep -rn collect_ignore tests/` returns no results.
 3. **Given** the dead TOML fallback in `agent_notes/services/credentials.py`, **When** it is collapsed, **Then** `grep -rn 'import tomli as tomllib' agent_notes/` returns no results.
-4. **Given** the change touches only tests and import statements, **When** `agent-notes build` is run before and after, **Then** its output is byte-identical.
+4. **Given** the change touches only tests and import statements, **When** `agent-notes build` is run before and after, **Then** its output is byte-identical — measured 2026-10-01, see Verification.
 5. **Given** the project's no-AI-attribution rule, **When** the commits and PR description are reviewed, **Then** no AI self-attribution appears anywhere (no Co-Authored-By naming a model, no "Generated with" line, no robot emoji).
 6. **Given** the five test files that replicate the dead tomllib/tomli shim across seven sites, **When** the branch is complete, **Then** `git grep -n 'tomli\b' -- . ':!uv.lock' | grep -v 'tomli[-_]w'` returns nothing and the suite still reports 2196 passed, 15 deselected.
 
@@ -94,7 +94,7 @@ A maintainer of this repo returns to two deliberate workarounds epic #17 left in
 - **FR-005**: System MUST make no changes to the credential guard's own logic, and do not read, log, or surface any credential value while editing `credentials.py`.
 - **FR-006**: System MUST do not reinstall the global CLI (`pipx uninstall/install`) as part of this change; note it only as a follow-up for the repo owner.
 - **FR-007**: System MUST address blocking security finding: The spec's justification for deleting tests/unit/services/test_credential_filter.py is factually inconsistent with the code: the file imports _is_credential_file from agent_notes.services.wiki_backend, a module that no longer exists (conftest.py's own comment says it was 'removed with the wiki backend'), not from an epic #17/issue #27 credential-guard workaround. This means the required 'strict subset' comparison is between two independently-implemented, unrelated credential-detection functions (a deleted wiki-export exclusion filter vs. the live CLI guard's _is_credential_path). The subset claim must be verified by an actual diff of parametrize cases/expected outputs against the current test_guard_credentials.py, not accepted on the issue's narrative, before the file is deleted. [severity: medium]
-- **FR-008**: System MUST address blocking security finding: credentials.py is explicitly marked CRITICAL in its own docstring (must never log/print/expose secret values), yet the spec does not require confirming the failure mode after collapsing the tomllib/tomli try/except to a bare 'import tomllib'. If the CLI is ever invoked under an unsupported Python (<3.11) or a broken venv despite pyproject's constraint, the resulting unguarded ImportError's behavior (hard crash = fail-closed/safe, vs. caught/swallowed upstream = fail-open/unsafe, silently disabling the credential guard or credential store) is not verified anywhere in the requirements or acceptance criteria. [severity: high]
+- **FR-008**: RESOLVED (was: blocking security finding, severity high) — the failure mode after collapsing the tomllib/tomli try/except in the CRITICAL `credentials.py` is fail-closed. Both call sites import the module unguarded — `agent_notes/commands/config.py:660` in `_wizard_providers` and `:695` in `_wizard_provider_status`, each a bare `from ..services import credentials` with no surrounding try/except — so an ImportError on an unsupported interpreter propagates and crashes rather than being swallowed into a silently disabled credential store.
 - **FR-009**: System MUST address blocking security finding: Verifying that the CI workflow matrix doesn't still run tests against Python <3.11 is listed only as an enrichment 'check' item, not as a hard, gating acceptance criterion. If any supported environment still runs <3.11, removing the fallback breaks the only working import path for the credential-storage module in that environment; this must be a verified precondition before merge, not an optional note. [severity: medium]
 
 ## Success Criteria *(mandatory)*
@@ -103,7 +103,7 @@ A maintainer of this repo returns to two deliberate workarounds epic #17 left in
 
 - **SC-001**: The test suite reports 2196 passed, 15 deselected after the tomli shim removal — unchanged from the baseline, because the change is import-only.
 - **SC-002**: No reference to the removed code remains: `grep -rn collect_ignore tests/` is empty, and `git grep -n 'tomli\b' -- . ':!uv.lock' | grep -v 'tomli[-_]w'` is empty.
-- **SC-003**: Shipped behavior is unchanged — `agent-notes build` output is byte-identical before and after.
+- **SC-003**: Shipped behavior is unchanged — MEASURED 2026-10-01: `agent-notes build` output is byte-identical before and after, 113 files per side with zero differences. See Verification.
 
 ## Assumptions
 
@@ -115,3 +115,12 @@ A maintainer of this repo returns to two deliberate workarounds epic #17 left in
 ## Verification
 
 The credential guard was re-checked against the issue #27 cases on both the installed 2.33.1 and the source 2.34.0, with no divergence between versions. Template files (`.env.example`, `.env.sample`, `.env.dist`, `config.template`) and `.py` sources are allowed; `.env`, `.env.production`, the user credential store, `server.pem`, and `cat .env` are denied. Known non-goal, already documented in #27: a credential filename mentioned in prose inside a Bash command is still denied.
+
+**Build output is byte-identical (measured 2026-10-01).** Two `git worktree add --detach` checkouts were made in a scratch directory, one at `develop` (`1833b00`) and one at the branch head (`6e2a0f9`). In each, the build was run from that worktree's own source with `HOME` and `XDG_CACHE_HOME` pointed at separate empty scratch directories, so neither read the operator's cache or config:
+
+```
+HOME=<scratch>/home-{base,head} XDG_CACHE_HOME=<scratch>/cache-{base,head} uv run agent-notes build
+diff -r <scratch>/wt-base/agent_notes/dist <scratch>/wt-head/agent_notes/dist
+```
+
+Both builds reported `Generated 90 files (12,631 lines) across 4 CLIs` and exited 0. `diff -r` produced no output and exited 0, over 113 files on each side. Note `agent_notes/dist/` is gitignored, so `git status` is not a valid check here — the recursive diff of two independently built trees is. Both worktrees were removed afterwards.
