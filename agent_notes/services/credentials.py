@@ -8,18 +8,9 @@ from __future__ import annotations
 
 import os
 import tempfile
+import tomllib
 from pathlib import Path
 from typing import Optional
-
-try:
-    import tomllib  # 3.11+
-except ImportError:
-    try:
-        import tomli as tomllib  # type: ignore[no-redef]
-    except ImportError as exc:
-        raise ImportError(
-            "tomli is required on Python < 3.11. Install it: pip install tomli"
-        ) from exc
 
 CONFIG_PATH = Path.home() / ".agent-notes" / "credentials.toml"
 SAFE_MODE = 0o600
