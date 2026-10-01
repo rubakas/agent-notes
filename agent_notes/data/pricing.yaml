@@ -90,6 +90,20 @@ providers:
         match: ["*gpt-6-astra", "*gpt-6-astra-202*"]
         price: {in: 10.00, out: 50.00, cache_read: 1.00, cache_write_5m: 0.00, cache_write_1h: 0.00}
         updated_at: "2026-09"
+      # Rates below from developers.openai.com/api/docs/pricing (standard tier),
+      # checked 2026-10-01.
+      - name: GPT-6.1 Sol
+        match: ["*gpt-6.1-sol", "*gpt-6.1-sol-202*", "*gpt-6-1-sol", "*gpt-6-1-sol-202*"]
+        price: {in: 2.00, out: 10.00, cache_read: 0.10, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-10"
+      - name: GPT-6 Sol
+        match: ["*gpt-6-sol", "*gpt-6-sol-202*"]
+        price: {in: 2.00, out: 10.00, cache_read: 0.20, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-10"
+      - name: GPT-6 Luna
+        match: ["*gpt-6-luna", "*gpt-6-luna-202*"]
+        price: {in: 0.10, out: 0.50, cache_read: 0.01, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-10"
       - name: GPT-5.6 Sol
         match: ["*gpt-5.6-sol", "*gpt-5.6-sol-202*", "*gpt-5-6-sol", "*gpt-5-6-sol-202*"]
         price: {in: 4.00, out: 20.00, cache_read: 0.40, cache_write_5m: 0.00, cache_write_1h: 0.00}

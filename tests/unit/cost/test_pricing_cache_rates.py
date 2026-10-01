@@ -42,6 +42,14 @@ DECLARED_DEVIATIONS = {
             "rate, 0.05x of its $4.00/MTok input rather than the usual 0.1x."
         ),
     },
+    ("OpenAI", "GPT-6.1 Sol"): {
+        "rates": {"cache_read": 0.10},
+        "source": (
+            "https://developers.openai.com/api/docs/pricing (checked 2026-10-01): "
+            "GPT-6.1 Sol is published with a $0.10/MTok cached-input rate, 0.05x of "
+            "its $2.00/MTok input rather than the 0.1x every other GPT row uses."
+        ),
+    },
 }
 
 # OpenAI prices cached input but does not bill cache WRITES at all, so both write
