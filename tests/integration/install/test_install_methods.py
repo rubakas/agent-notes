@@ -21,10 +21,7 @@ def built_wheel():
 
 
 def test_pyproject_declares_agent_notes_entry_point():
-    try:
-        import tomllib
-    except ImportError:
-        import tomli as tomllib
+    import tomllib
     text = (REPO_ROOT / "pyproject.toml").read_bytes()
     data = tomllib.loads(text.decode())
     scripts = data["project"]["scripts"]
@@ -33,10 +30,7 @@ def test_pyproject_declares_agent_notes_entry_point():
 
 
 def test_pyproject_dynamic_version():
-    try:
-        import tomllib
-    except ImportError:
-        import tomli as tomllib
+    import tomllib
     data = tomllib.loads((REPO_ROOT / "pyproject.toml").read_bytes().decode())
     assert "version" in data["project"]["dynamic"]
 

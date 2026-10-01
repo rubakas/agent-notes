@@ -1,12 +1,8 @@
 """Unit tests for agent_notes.data.templates.frontmatter.codex."""
-import sys
 import textwrap
 import pytest
 
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
+import tomllib
 
 from agent_notes.data.templates.frontmatter.codex import (
     emit_file,

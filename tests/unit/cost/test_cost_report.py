@@ -5,10 +5,7 @@ from pathlib import Path
 
 def test_cost_report_not_standalone_script():
     """cost-report is now a subcommand of agent-notes, not a separate console_script."""
-    try:
-        import tomllib
-    except ImportError:
-        import tomli as tomllib  # type: ignore[no-redef]
+    import tomllib
     from pathlib import Path
     pyproject = Path(__file__).parents[3] / "pyproject.toml"
     with pyproject.open("rb") as f:
