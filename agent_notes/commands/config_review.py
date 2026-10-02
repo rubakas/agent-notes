@@ -81,6 +81,7 @@ class ConfigContext:
     catalog: Catalog
     cli_registry: Any
     plugins: dict              # toggle capability -> on (staged)
+    notify: Callable[[str], None] = lambda message: None   # the form's footer, once open
 
     def scope_state(self):
         return self.ref.get(self.state)
@@ -190,10 +191,21 @@ def api_keys_row(ctx: ConfigContext) -> Row:
                           notes=["input hidden · empty keeps the current key"])
         if not key or not key.strip():
             return
-        credentials.set_value(name, "api_key", key.strip())
+        if not save(name, "api_key", key.strip()):
+            return
         base = ctx.ui.text(f"API key · {name}", "base_url", "", notes=["optional · empty to skip"])
         if base and base.strip():
-            credentials.set_value(name, "base_url", base.strip())
+            save(name, "base_url", base.strip())
+
+    def save(name: str, field: str, value: str) -> bool:
+        try:
+            credentials.set_value(name, field, value)
+        except (OSError, ValueError) as e:
+            # The type only: an error's text could carry the value.
+            ctx.notify(f"could not save the {'key' if field == 'api_key' else field}: "
+                       f"{type(e).__name__}")
+            return False
+        return True
 
     return Row("api-keys", "API keys", lines, edit=edit)
 
@@ -403,6 +415,7 @@ def _config_review(ui, state, refs: list[InstallRef], cwd: Path) -> str:
                         else "nothing flagged")
         return None
 
+    ctx.notify = lambda message: setattr(form, "message", message)
     form.commands.update({"s": save, "q": quit_, TAB: next_install, "u": use_recommended})
     return form.value if ui.form(form) == DONE else ""
 

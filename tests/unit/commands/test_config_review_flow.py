@@ -10,7 +10,7 @@ from agent_notes.domain.state import BackendState, ScopeState, State
 from agent_notes.services import state_store
 from agent_notes.services.tui.keys import DOWN, ENTER, ESCAPE, RIGHT, TAB
 from agent_notes.services.tui.session import LineSession
-from tests.unit.tui.fakes import FakeLineInput, tui_session
+from tests.unit.tui.fakes import FakeLineInput, tui_session, typed
 
 
 @pytest.fixture
@@ -156,6 +156,24 @@ def test_ctrl_c_or_a_closed_terminal_cancels_without_a_traceback(env, capsys, in
     assert "Cancelled." in capsys.readouterr().out
     assert ui.term.exited
     env["record"].assert_not_called()
+
+
+@pytest.mark.parametrize("error", [PermissionError, ValueError])
+def test_a_key_that_cannot_be_saved_is_reported_without_the_key(env, monkeypatch, error):
+    from agent_notes.services import credentials
+    monkeypatch.setattr(credentials, "list_providers", lambda: [])
+    monkeypatch.setattr(credentials, "is_configured", lambda name: False)
+
+    def failing_set_value(provider, key, value):
+        raise error(f"cannot write {value}")
+
+    monkeypatch.setattr(credentials, "set_value", failing_set_value)
+    # Models → Memory → Cost report → API keys; pick a provider, type a key.
+    ui = _run(env, "u", DOWN, DOWN, DOWN, ENTER, ENTER, *typed("sk-secret-123"), ENTER, "q", ENTER)
+    frames = ["\n".join(frame) for frame in ui.term.frames]
+    assert any(f"could not save the key: {error.__name__}" in frame for frame in frames)
+    assert not any("sk-secret" in frame for frame in frames)
+    assert any("Discard 1 change?" in frame for frame in frames)   # the staged edit survived
 
 
 def test_no_terminal_prints_the_settings_and_the_subcommands(env, capsys):
