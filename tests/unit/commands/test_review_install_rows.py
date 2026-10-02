@@ -177,3 +177,9 @@ def test_one_cli_review_fits_80_by_24(catalog):
     assert len(lines) <= 24
     assert all(visible_len(line) <= 80 for line in lines)
     assert not any(line.rstrip().endswith("…") for line in lines[2:-2])
+
+
+def test_post_install_summary_uses_the_same_memory_names():
+    from agent_notes.commands.wizard.execute import _memory_line
+    assert _memory_line("local", "/m") == "built-in  →  /m"
+    assert _memory_line("obsidian", "/v/projects") == "Obsidian  →  /v/projects"

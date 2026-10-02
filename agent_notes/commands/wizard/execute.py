@@ -137,6 +137,12 @@ def _render_configuration(role_models: Dict[str, Dict[str, str]],
           f"{Color.DIM}·{Color.NC} agent-notes config role-effort")
 
 
+def _memory_line(backend: str, path) -> str:
+    """The post-install memory line, in the names the review uses (FR-028)."""
+    name = "Obsidian" if backend == "obsidian" else "built-in"
+    return f"{name}  →  {path}"
+
+
 def _execute_install(
     clis: Set[str],
     scope: str,
@@ -293,10 +299,7 @@ def _execute_install(
     _mem_path = memory_dir_for_backend(memory_backend, memory_path)
     try:
         memory_init(memory_backend, _mem_path)
-        if memory_backend == "obsidian":
-            memory_label = f"Obsidian  →  {_mem_path}"
-        else:
-            memory_label = f"Local markdown  →  {_mem_path}"
+        memory_label = _memory_line(memory_backend, _mem_path)
     except Exception as e:
         memory_label = f"(init failed: {e})"
     print(_step_line("Memory", memory_label, _label_w))
