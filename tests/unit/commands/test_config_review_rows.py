@@ -135,3 +135,16 @@ def test_show_prints_shared_settings_once_then_each_install(catalog, tmp_path, m
     assert "⚠ deprecated  ★ claude-opus-5-5" in text
     assert "local · " in text and "no pins" in text
     assert not any(line.startswith(" ›") for line in lines) and "↑↓" not in text
+
+
+def test_show_cuts_a_long_install_label_in_the_middle(tmp_path, monkeypatch):
+    from agent_notes.commands.config_review import render_show
+    from agent_notes.services.tui.screen import visible_len
+    monkeypatch.setattr(config_review, "enabled_toggles", lambda *a: {"cost-report": False})
+    project = tmp_path / ("deep" * 10) / "services" / "payments-api"
+    project.mkdir(parents=True)
+    state = State(local_installs={f"{project}#work": ScopeState(clis={"claude": BackendState()})})
+    lines = render_show(state, 60)
+    label = next(line for line in lines if line.startswith("local · "))
+    assert visible_len(label) <= 60
+    assert label.endswith("payments-api · work") and "…" in label

@@ -411,7 +411,7 @@ def render_show(state, width: int = 100, style=None) -> list[str]:
     settings once, then each install (spec 005 FR-020)."""
     from types import SimpleNamespace
     from ..registries.cli_registry import load_registry
-    from ..services.tui.screen import BOLD, Style
+    from ..services.tui.screen import BOLD, Style, elide_middle
     style = style or Style(False)
     refs = list_installs(state)
     if not refs:
@@ -426,5 +426,5 @@ def render_show(state, width: int = 100, style=None) -> list[str]:
 
     lines = static(refs[0], "global")
     for ref in refs:
-        lines += ["", style(ref.label(), BOLD)] + static(ref, "install")
+        lines += ["", style(elide_middle(ref.label(), width), BOLD)] + static(ref, "install")
     return lines

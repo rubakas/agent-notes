@@ -34,8 +34,8 @@ def env(tmp_path, monkeypatch):
     return mocks
 
 
-def _run(env, *keys, cwd=None, width=80):
-    ui = tui_session(*keys, width=width)
+def _run(env, *keys, cwd=None):
+    ui = tui_session(*keys)
     config_review.interactive_config(session_factory=lambda: ui, cwd=cwd or env["project"])
     return ui
 
@@ -74,7 +74,7 @@ def test_tab_switches_installs_only_without_staged_edits(env, tmp_path):
     other.mkdir()
     env["state"].local_installs[str(other.resolve())] = ScopeState(clis={"claude": BackendState()})
     # TAB to the other install and back, stage an edit, then TAB is refused.
-    ui = _run(env, TAB, TAB, "u", TAB, "q", ENTER, width=300)  # wide: pytest tmp paths are long
+    ui = _run(env, TAB, TAB, "u", TAB, "q", ENTER)
     frames = ["\n".join(frame) for frame in ui.term.frames]
     assert "other" in frames[1].splitlines()[0]
     assert "other" not in frames[2].splitlines()[0]

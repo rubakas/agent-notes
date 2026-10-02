@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence
 
 from .keys import BACKSPACE, DOWN, ENTER, ESCAPE, LEFT, RIGHT, SPACE, TAB, UP
-from .screen import BOLD, CYAN, DIM, YELLOW, Style, bar, fit, pad
+from .screen import BOLD, CYAN, DIM, YELLOW, Style, bar, elide_middle, fit, pad, visible_len
 
 DONE = "done"
 CANCEL = "cancel"
@@ -150,7 +150,10 @@ class ReviewForm:
             return [fit(line, width) for line in body]
         style = self.style
         body, focus_line = self._body(show_cursor=True)
-        header = bar(f" {style(self.title, BOLD)}", f"{style(self.context, DIM)} ", width)
+        title = f" {style(self.title, BOLD)}"
+        # Cut the context in the middle: its end (project, profile) must show.
+        context = elide_middle(self.context, width - visible_len(title) - 2)
+        header = bar(title, f"{style(context, DIM)} ", width)
         rule = style("─" * width, DIM)
         notice = [f"   {line}" for line in self.notice]
         if self.message:

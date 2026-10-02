@@ -134,3 +134,21 @@ def test_a_message_takes_the_whole_footer_line():
     assert message in last and "…" not in last and "↑↓ move" not in last
     form.handle(DOWN)
     assert "↑↓ move" in form.render(80, 24)[-1]
+
+
+def test_a_long_context_is_cut_in_the_middle_so_its_end_stays_visible():
+    context = "local · ~/code/clients/acme-corporation/platform/backend/services/payments-api · work"
+    form = ReviewForm("AgentNotes 9.9.9 · config", lambda: [], context=context)
+    header = form.render(80, 24)[0]
+    assert visible_len(header) <= 80
+    assert header.startswith(" AgentNotes 9.9.9 · config")
+    assert header.rstrip().endswith("payments-api · work")
+    assert "…" in header
+
+
+def test_a_long_context_in_color_still_fits():
+    context = "local · " + "/x" * 60 + " · work"
+    form = ReviewForm("AgentNotes 9 · config", lambda: [], context=context, style=Style(True))
+    header = form.render(80, 24)[0]
+    assert visible_len(header) <= 80
+    assert header.rstrip().endswith("· work\x1b[0m")
