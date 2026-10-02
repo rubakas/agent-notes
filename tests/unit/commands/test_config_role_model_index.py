@@ -137,16 +137,18 @@ class TestRankedColumns:
         out = capsys.readouterr().out
         assert "$/M in" in out, "price column must say it is the INPUT price"
 
+        # Ordered by rank_score: the benchmark, or rules.yaml's provisional
+        # stand-in while upstream has none (spec 004).
         models = _claude_models()
-        rated = [m for m in models if m.coding_index is not None]
-        assert [m.coding_index for m in rated] == sorted(
-            (m.coding_index for m in rated), reverse=True
+        rated = [m for m in models if m.rank_score is not None]
+        assert [m.rank_score for m in rated] == sorted(
+            (m.rank_score for m in rated), reverse=True
         ), "list must read frontier-first"
-        assert all(m.coding_index is not None for m in models[:len(rated)]), \
+        assert all(m.rank_score is not None for m in models[:len(rated)]), \
             "unrated models must sort last"
 
         best = models[0]
-        assert f"{best.id}" in out and f"{best.coding_index:.1f}" in out
+        assert f"{best.id}" in out and f"{best.rank_score:.1f}" in out
         assert f"{best.price_in:.2f}" in out
 
     def test_intelligence_column_is_shown_next_to_coding(self, state_file, capsys):
@@ -181,7 +183,8 @@ class TestRankedColumns:
     def test_unrated_models_render_a_dash(self, state_file, capsys):
         from agent_notes.commands.config import model_columns
 
-        unrated = [m for m in _claude_models() if m.coding_index is None]
+        # No score at all — a provisional stand-in prints `78.1*`, not a dash.
+        unrated = [m for m in _claude_models() if m.rank_score is None]
         assert unrated, "fixture assumption: the claude catalog has unrated models"
 
         with _patch_state_file(state_file), \
@@ -222,13 +225,13 @@ class TestMultiProviderOrdering:
 
     def test_merged_list_is_globally_frontier_first(self):
         models = self._opencode_models()
-        rated = [m for m in models if m.coding_index is not None]
+        rated = [m for m in models if m.rank_score is not None]
 
         assert len(models) > len(rated), "fixture assumption: catalog has unrated models"
-        assert [m.coding_index for m in rated] == sorted(
-            (m.coding_index for m in rated), reverse=True
+        assert [m.rank_score for m in rated] == sorted(
+            (m.rank_score for m in rated), reverse=True
         ), "merged multi-provider list must be sorted by capability, not by provider block"
-        assert all(m.coding_index is not None for m in models[:len(rated)]), \
+        assert all(m.rank_score is not None for m in models[:len(rated)]), \
             "unrated models must sort last"
 
     def test_providers_interleave_rather_than_forming_blocks(self):

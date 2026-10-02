@@ -205,6 +205,7 @@ def load_catalog(
     deprecated_ids: set[str] = set(rules.get("deprecated", []))
     capabilities = rules.get("capabilities", {})
     price_overrides = rules.get("price_overrides", {}) or {}
+    provisional_coding_index = rules.get("provisional_coding_index", {}) or {}
 
     models: list[Model] = []
 
@@ -254,6 +255,7 @@ def load_catalog(
                 price_out=price_out,
                 context_length=entry.get("context_length"),
                 created_at=entry.get("created_at"),
+                provisional_coding_index=provisional_coding_index.get(model_id),
             ))
 
     return models

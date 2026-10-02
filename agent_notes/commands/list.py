@@ -28,7 +28,7 @@ def list_models() -> None:
     helper, so this table matches the wizard's and `config role-model`'s.
     """
     from ..registries.model_registry import load_model_registry
-    from .config import model_columns, MODEL_COLUMNS_HEADER
+    from .config import model_columns, MODEL_COLUMNS_HEADER, PROVISIONAL_LEGEND
 
     models = load_model_registry().all()
     by_provider: Dict[str, list] = {}
@@ -43,6 +43,9 @@ def list_models() -> None:
         print(f"    {'rank':>4}  {MODEL_COLUMNS_HEADER}")
         for m in provider_models:
             print(f"    {m.rank:>4}  {model_columns(m)}")
+
+    if any(m.coding_index is None and m.provisional_coding_index is not None for m in models):
+        print(f"\n  {PROVISIONAL_LEGEND}")
 
 
 def list_roles() -> None:

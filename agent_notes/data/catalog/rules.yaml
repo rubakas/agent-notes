@@ -54,6 +54,26 @@ price_overrides:
     price_in: 4.0
     price_out: 20.0
 
+# Per-model stand-in coding scores, indexed by normalized registry id, for a
+# model upstream has not rated yet. Role selection skips any model without a
+# score, so a new release can never become a default until Artificial Analysis
+# publishes one — on its own schedule. An entry here is consulted ONLY while the
+# seed's coding_index is null: the first refresh that brings a real score
+# retires it with no edit (Model.rank_score). It never replaces the benchmark
+# value itself, so `coding_index` and the class-tier bounds derived from it stay
+# upstream data; tables print a provisional score with a trailing `*`.
+# Pick a value that places the model just above the predecessor it supersedes,
+# and cite the check that found it unrated.
+provisional_coding_index:
+  # Successor to claude-opus-5 (78.0) at $4/M in, under reasoner's $5 budget.
+  # OpenRouter's artificial_analysis block carries intelligence_index 57.6 but
+  # coding_index null (checked 2026-10-02). 78.1 ranks it directly above Opus 5
+  # and below claude-fable-5-1 (81.6), which keeps the unbounded orchestrator.
+  claude-opus-5-5: 78.1
+  # Successor to claude-sonnet-5 (71.5) at the same $2/M in, worker's budget.
+  # intelligence_index 56.0, coding_index null (checked 2026-10-02).
+  claude-sonnet-5-5: 71.6
+
 deprecated:
   - claude-opus-4-1
   - claude-opus-4-5

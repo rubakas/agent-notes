@@ -80,6 +80,9 @@ def compatible_models_for(backend) -> list:
 
 MODEL_COLUMNS_HEADER = f"{'model':<28} {'int':>5}  {'coding':>6}  {'$/M in':>8}"
 
+PROVISIONAL_MARK = "*"
+PROVISIONAL_LEGEND = f"{PROVISIONAL_MARK} provisional score — not yet rated upstream (rules.yaml)"
+
 
 def model_columns(model) -> str:
     """One row of the shared model table: id, intelligence index, coding index,
@@ -88,13 +91,20 @@ def model_columns(model) -> str:
     Every model list in the product renders through this one function, so the
     columns cannot drift between `list models`, `config role-model` and the
     install wizard. A missing metric prints an em dash — 0.0 is a real score
-    upstream and must stay distinguishable from "not measured".
+    upstream and must stay distinguishable from "not measured". A provisional
+    stand-in from rules.yaml prints with a trailing `*` (`78.1*`) so it never
+    reads as a benchmark result.
 
     Output prices differ from input prices, so the price column is always
     labelled `$/M in` rather than a bare `$`.
     """
     intelligence = "—" if model.intelligence_index is None else f"{model.intelligence_index:.1f}"
-    coding = "—" if model.coding_index is None else f"{model.coding_index:.1f}"
+    if model.coding_index is not None:
+        coding = f"{model.coding_index:.1f}"
+    elif model.provisional_coding_index is not None:
+        coding = f"{model.provisional_coding_index:.1f}{PROVISIONAL_MARK}"
+    else:
+        coding = "—"
     price = "—" if model.price_in is None else f"{model.price_in:.2f}"
     return f"{model.id:<28} {intelligence:>5}  {coding:>6}  {price:>8}"
 
