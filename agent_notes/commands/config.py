@@ -397,90 +397,16 @@ def role_agent(role_name: str, agent_name: str, cli_filter: Optional[str] = None
 
 
 def show(state=None) -> None:
-    """Print current configuration in readable form."""
+    """Print the current configuration in the config screen's layout (FR-020)."""
+    import shutil
+    from .config_review import render_show
+    from ..services.tui.screen import Style, color_enabled
     if state is None:
         state = _load_state()
-
-    from ..registries.cli_registry import load_registry
-    from ..registries.role_registry import load_role_registry
-    from ..registries.model_registry import load_model_registry
-
-    cli_registry = load_registry()
-    role_registry = load_role_registry()
-    model_registry = load_model_registry()
-
-    # Memory
-    mem = state.memory
-    if mem.backend == "obsidian":
-        mem_label = f"Obsidian session ({mem.path})" if mem.path else "Obsidian session"
-    elif mem.backend == "local":
-        mem_label = "Local markdown"
-    else:
-        mem_label = "Disabled"
-
-    from ..services.user_config import load_user_config
-    from ..registries.plugin_registry import default_plugin_registry
-    _ucfg = load_user_config()
-    cost_report_enabled = any(
-        p.name == "cost-report" for p in default_plugin_registry().enabled(_ucfg)
-    )
-    cost_report_label = "enabled" if cost_report_enabled else "disabled"
-
     print("Current configuration:")
-    print(f"  Memory:      {mem_label}")
-    print(f"  Cost report: {cost_report_label}")
-
-    # Scopes
-    scopes = []
-    if state.global_install:
-        scopes.append(("global", state.global_install, None))
-    for path_str, ss in state.local_installs.items():
-        scopes.append(("local", ss, path_str))
-
-    if not scopes:
-        print("  (no installation found)")
-        return
-
-    for scope_name, scope_state, path_str in scopes:
-        scope_label = f"global" if scope_name == "global" else f"local ({path_str})"
-        print(f"\n  Scope: {scope_label}  [{scope_state.mode}]")
-
-        for cli_name, backend_state in sorted(scope_state.clis.items()):
-            try:
-                backend = cli_registry.get(cli_name)
-                cli_label = backend.label
-            except KeyError:
-                cli_label = cli_name
-
-            print(f"\n    {cli_label}:")
-
-            if backend_state.role_models:
-                for role_name in sorted(backend_state.role_models):
-                    model_id = backend_state.role_models[role_name]
-                    try:
-                        role = role_registry.get(role_name)
-                        role_label = role.label
-                    except KeyError:
-                        role_label = role_name
-                    try:
-                        model = model_registry.get(model_id)
-                        model_label = model.label
-                    except KeyError:
-                        model_label = model_id
-                    print(f"      {role_label:<20} {model_label}")
-            else:
-                print("      (no role assignments)")
-
-            if backend_state.role_efforts:
-                print("      Effort:")
-                for role_name in sorted(backend_state.role_efforts):
-                    effort = backend_state.role_efforts[role_name]
-                    try:
-                        role = role_registry.get(role_name)
-                        role_label = role.label
-                    except KeyError:
-                        role_label = role_name
-                    print(f"      {role_label:<20} {effort}")
+    width = shutil.get_terminal_size((100, 24)).columns
+    for line in render_show(state, width, Style(color_enabled())):
+        print(line)
 
 
 # ── Interactive wizard ───────────────────────────────────────────────────────

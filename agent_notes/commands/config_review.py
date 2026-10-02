@@ -381,3 +381,35 @@ def _config_review(ui, state, refs: list[InstallRef], cwd: Path) -> str:
 
     form.commands.update({"s": save, "q": quit_, TAB: next_install, "u": use_recommended})
     return form.value if ui.form(form) == DONE else ""
+
+
+def render_show(state, width: int = 100, style=None) -> list[str]:
+    """`config show`: the config screen without cursor or footer — shared
+    settings once, then each install (spec 005 FR-020)."""
+    import re
+    from types import SimpleNamespace
+    from ..registries.cli_registry import load_registry
+    from ..services.tui.screen import BOLD, Style
+    style = style or Style(False)
+    refs = list_installs(state)
+    if not refs:
+        return ["(no installation found)"]
+    ui = SimpleNamespace(style=style)
+    catalog, clis, plugins = Catalog(), load_registry(), enabled_toggles()
+
+    def static(ref, part) -> list[str]:
+        ctx = ConfigContext(ui, state, ref, catalog, clis, plugins)
+        rendered = ReviewForm("", config_rows(ctx, part=part), style=style).render(
+            width, 10_000, chrome=False)
+        # Remove interactive UI markers when rendering statically
+        cleaned = []
+        for line in rendered:
+            # Remove cycle_text markers: ‹ value › -> value
+            line = re.sub(r'‹\s*(.*?)\s*›', r'\1', line)
+            cleaned.append(line)
+        return cleaned
+
+    lines = static(refs[0], "global")
+    for ref in refs:
+        lines += ["", style(ref.label(), BOLD)] + static(ref, "install")
+    return lines

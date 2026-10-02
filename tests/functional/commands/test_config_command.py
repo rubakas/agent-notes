@@ -52,15 +52,17 @@ def _patch_state_file(state_file):
 
 # ── Tests ────────────────────────────────────────────────────────────────────
 
-def test_show_prints_current_state(capsys, state_file):
+def test_show_prints_current_state(capsys, tmp_path):
     from agent_notes.commands.config import show
 
-    with _patch_state_file(state_file):
+    sf = tmp_path / "state.json"
+    sf.write_text(json.dumps(_minimal_state_dict(role="worker")))
+    with _patch_state_file(sf):
         show()
 
     out = capsys.readouterr().out
-    assert "orchestrator" in out.lower() or "Orchestrator" in out
-    assert "sonnet" in out.lower()
+    assert "worker" in out
+    assert "claude-sonnet-4-6" in out
 
 
 def test_role_model_scriptable_updates_state(state_file):

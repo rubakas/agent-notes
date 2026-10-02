@@ -117,3 +117,20 @@ def test_toggles_start_from_the_saved_plugin_config(monkeypatch):
     monkeypatch.setattr(plugin_registry.PluginRegistry, "enabled",
                         lambda self, cfg: [type("P", (), {"name": "cost-report"})()])
     assert config_review.enabled_toggles() == {"cost-report": True}
+
+
+def test_show_prints_shared_settings_once_then_each_install(catalog, tmp_path, monkeypatch):
+    from agent_notes.commands.config_review import render_show
+    monkeypatch.setattr(config_review, "enabled_toggles", lambda *a: {"cost-report": False})
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    pins = BackendState(role_models={"reasoner": "claude-opus-4-6"})
+    state = State(local_installs={str(a): ScopeState(clis={"claude": pins}),
+                                  str(b): ScopeState(clis={"claude": BackendState()})})
+    text = "\n".join(render_show(state, 120))
+    assert text.count("Memory") == 1 and text.count("Cost report") == 1
+    assert "built-in" in text
+    assert "⚠ deprecated  ★ claude-opus-5-5" in text
+    assert "local · " in text and "no pins" in text
+    assert "›" not in text and "↑↓" not in text
