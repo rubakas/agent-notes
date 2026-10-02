@@ -41,10 +41,10 @@ def _interactive_install(session_factory=open_session) -> None:
     if session is None:
         # stdin or stdout is not a terminal: nothing may prompt (FR-026).
         print("No terminal attached — installing the recommended setup.")
-        error = _build(choices)
+        error = _render(choices, with_selections=True)
         if error:
             print(f"{Color.RED}Build failed — {error}{Color.NC}")
-            restore_error = _restore(choices)
+            restore_error = _render(choices, with_selections=False)
             if restore_error:
                 print(f"{Color.YELLOW}Restore failed — run agent-notes regenerate: "
                       f"{restore_error}{Color.NC}")
@@ -77,14 +77,14 @@ def _review(ui, choices: InstallChoices, catalog: Catalog, cli_registry) -> bool
         ui.progress(form, "Building…")
         error, confirmed = None, False
         try:
-            error = _build(choices)
+            error = _render(choices, with_selections=True)
             if not error:
                 question, lines = _plan_summary(choices, cli_registry)
                 confirmed = ui.confirm(form, question, lines)
         finally:
             # Anything but a yes — a failed build, a no, Ctrl-C, line mode's
             # exit on Ctrl-D — must not leave this run's picks in dist/.
-            restore_error = None if confirmed else _restore(choices)
+            restore_error = None if confirmed else _render(choices, with_selections=False)
         if confirmed:
             return DONE
         # The instruction leads: a long error is what the width cuts.
@@ -109,32 +109,19 @@ def _quiet():
         yield
 
 
-def _build(choices: InstallChoices) -> Optional[str]:
-    """Render dist/ with this run's choices, before confirming: the file count
-    must come from what this install will write. Returns the error, if any."""
+def _render(choices: InstallChoices, *, with_selections: bool) -> Optional[str]:
+    """Render dist/ quietly. Returns the error, if any.
+
+    *with_selections*: this run's picks, before confirming — the file count
+    must come from what this install will write. Without: back to the
+    persisted state pins, after anything but a yes — existing symlink installs
+    would otherwise keep serving the rejected (or half-written) picks."""
     from ...services.fs import silent_ops
+    picks = (dict(role_models=choices.role_models, role_efforts=choices.role_efforts)
+             if with_selections else {})
     try:
         with silent_ops(), _quiet():
-            build(role_models=choices.role_models, role_efforts=choices.role_efforts,
-                  scope=choices.scope,
-                  project_path=Path.cwd() if choices.scope == "local" else None,
-                  profile_label=choices.profile_label)
-    except Exception as e:
-        return str(e) or type(e).__name__
-    return None
-
-
-def _restore(choices: InstallChoices) -> Optional[str]:
-    """Re-render dist/ from persisted state pins (no in-memory selection
-    overlays), quietly. Returns the error, if any.
-
-    The pre-confirm build bakes this run's selections into dist/; if the user
-    declines (or the build aborts half-written), existing symlink installs
-    would keep serving the rejected picks."""
-    from ...services.fs import silent_ops
-    try:
-        with silent_ops(), _quiet():
-            build(scope=choices.scope,
+            build(**picks, scope=choices.scope,
                   project_path=Path.cwd() if choices.scope == "local" else None,
                   profile_label=choices.profile_label)
     except Exception as e:

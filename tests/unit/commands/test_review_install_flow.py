@@ -99,7 +99,7 @@ def test_declining_restores_the_persisted_render_and_installs_nothing(calls, cap
 
 def test_the_restore_keeps_scope_and_profile(calls, monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    orchestrator._restore(InstallChoices(scope="local", profile_label="work"))
+    orchestrator._render(InstallChoices(scope="local", profile_label="work"), with_selections=False)
     restore = calls.of("build")[0]
     assert restore["scope"] == "local" and restore["profile_label"] == "work"
     assert Path(restore["project_path"]).resolve() == tmp_path.resolve()
