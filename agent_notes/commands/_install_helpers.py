@@ -225,7 +225,7 @@ def _verify_install(scope_state, scope, project_path, registry) -> list[str]:
             present = 0
             missing_names = []
             for name, item in items.items():
-                if Path(item.target).exists() or Path(item.target).is_symlink():
+                if Path(item.target).exists():
                     present += 1
                 else:
                     missing_names.append(name)
