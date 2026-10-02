@@ -4216,7 +4216,7 @@ def _build_registry() -> CapabilityRegistry:
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run pytest -q tests/unit/commands/test_config_review_rows.py`
-Expected: 13 passed.
+Expected: 12 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -4364,7 +4364,7 @@ Expected: FAIL — `AttributeError: module 'agent_notes.commands.config_review' 
 
 - [ ] **Step 3: Implement the session**
 
-Append to `agent_notes/commands/config_review.py` (add `import contextlib, copy, io, sys` to the imports):
+Append to `agent_notes/commands/config_review.py` (add `import copy, sys` to the imports):
 
 ```python
 from ..services.tui.keys import TAB
@@ -4405,19 +4405,13 @@ def describe_changes(original, working, ref: InstallRef, plugins_before: dict,
     return lines
 
 
-@contextlib.contextmanager
-def _quiet():
-    sink = io.StringIO()
-    with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-        yield
-
-
 def apply_changes(working, ref: InstallRef, plugins_before: dict, plugins_after: dict) -> None:
     """One state write and one regenerate — of the edited install, not
     whatever regenerate would auto-detect (spec 005 Correction 3)."""
     from ..services.state_store import record_install_state
     from .plugins import disable_plugin, enable_plugin
     from .regenerate import regenerate
+    from .wizard.orchestrator import _quiet  # one output-silencing helper, not two
     with _quiet():
         record_install_state(working)
         for name in sorted(plugins_after):
