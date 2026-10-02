@@ -126,6 +126,17 @@ def test_a_failed_regenerate_keeps_the_saved_state_as_the_new_baseline(env):
     env["record"].assert_called_once()
 
 
+def test_a_failed_regenerate_also_resets_the_plugin_baseline(env):
+    env["regenerate"].side_effect = RuntimeError("boom")
+    # Cost report → on, save (regenerate fails), then s again and q: nothing is staged.
+    ui = _run(env, DOWN, DOWN, RIGHT, "s", ENTER, "s", "q")
+    frames = ["\n".join(frame) for frame in ui.term.frames]
+    assert any("regenerate failed" in frame for frame in frames)
+    assert any("no changes to save" in frame for frame in frames)
+    assert not any("Discard" in frame for frame in frames)
+    env["enable"].assert_called_once_with("cost-report")
+
+
 def test_saving_a_local_install_from_another_folder_places_files_in_that_project(
         env, tmp_path, monkeypatch):
     elsewhere = tmp_path / "elsewhere"
