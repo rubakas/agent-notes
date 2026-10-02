@@ -126,3 +126,130 @@ def test_line_mode_confirm_defaults_to_yes(monkeypatch, answer, expected):
     monkeypatch.setattr("agent_notes.services.ui._safe_input",
                         lambda prompt, default="": (answer.strip() or default))
     assert LineSession().confirm(form, "Install 3 files?") is expected
+
+
+def test_line_mode_confirm_asks_again_on_an_unclear_answer(monkeypatch, capsys):
+    form = ReviewForm("T", lambda: [])
+    answers = FakeLineInput("x", "n")
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
+    assert LineSession().confirm(form, "Install?") is False
+    assert len(answers.prompts) == 2
+    printed = capsys.readouterr().out
+    assert "please answer y or n" in printed
+
+
+def test_line_mode_pick(monkeypatch, capsys):
+    items = [PickItem("a", "alpha"), PickItem("b", "beta", tag="new")]
+    recorder = []
+    def fake_radio(title, options, default=0, **kw):
+        recorder.append({"title": title, "options": options, "default": default})
+        return options[default][1]
+    monkeypatch.setattr("agent_notes.services.ui._radio_select_fallback", fake_radio)
+
+    result = LineSession().pick("Choose", items, current="b", header="Pick one")
+    assert result == "b"  # Returns the value, not the text
+    assert len(recorder) == 1
+    assert recorder[0]["default"] == 1  # current="b" is at index 1
+    assert "beta  new" in recorder[0]["options"][1][0]  # tag formatting
+    assert "Pick one" in recorder[0]["title"]
+
+    # Empty items returns None
+    assert LineSession().pick("Choose", [], current=None) is None
+
+
+def test_line_mode_checklist(monkeypatch, capsys):
+    items = [("x", "x"), ("y", "y")]
+    recorder = []
+    def fake_checkbox(title, items, defaults=None, **kw):
+        recorder.append({"title": title, "items": items, "defaults": defaults})
+        return defaults or []
+    monkeypatch.setattr("agent_notes.services.ui._checkbox_select_fallback", fake_checkbox)
+
+    result = LineSession().checklist("Pick items", items, {"x"}, fixed=["line 1"])
+    assert result == {"x"}
+    assert recorder[0]["defaults"] == {"x"}
+    printed = capsys.readouterr().out
+    assert "line 1" in printed
+
+
+def test_line_mode_text_with_validation(monkeypatch, capsys):
+    form = ReviewForm("T", lambda: [])
+    answers = FakeLineInput("bad", "n", "good")
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
+    result = LineSession().text("Title", "Label", value="default",
+                                validate=lambda x: "no" if x == "bad" else "")
+    assert result == "good"
+    printed = capsys.readouterr().out
+    assert "⚠ no" in printed
+    # Check the prompt was asked (it has leading spaces)
+    assert any("Keep it anyway? [y/N]:" in p for p in answers.prompts)
+
+
+def test_line_mode_text_with_secret(monkeypatch, capsys):
+    form = ReviewForm("T", lambda: [])
+    answers = FakeLineInput("secret")
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
+    mock_getpass = lambda prompt: "mysecret"
+    monkeypatch.setattr("getpass.getpass", mock_getpass)
+    result = LineSession().text("Title", "Label", secret=True)
+    assert result == "mysecret"
+    printed = capsys.readouterr().out
+    assert "mysecret" not in printed
+
+
+def test_line_mode_text_with_complete(monkeypatch):
+    answers = FakeLineInput("/path/to/file")
+    monkeypatch.setattr("agent_notes.services.ui._path_input", answers)
+    result = LineSession().text("Title", "Label", complete=lambda s: [])
+    assert result == "/path/to/file"
+    assert answers.prompts[0].startswith("  Label")
+
+
+def test_line_mode_form_handles_out_of_range(monkeypatch, capsys):
+    form = ReviewForm("T", lambda: [
+        Row("a", "A", lambda: ["x"], options=[("opt", "opt")]),
+    ], commands={"i": lambda: DONE}, default_command="i", default_label="do it")
+    answers = FakeLineInput("9", "")
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
+    monkeypatch.setattr("agent_notes.services.ui._radio_select_fallback",
+                        lambda title, options, default=0, **kw: "opt")
+    assert LineSession().form(form) == DONE
+    # Verify "no such choice" message was printed
+    printed = capsys.readouterr().out
+    assert "no such choice: 9" in printed
+
+
+def test_line_mode_form_runs_line_edit(monkeypatch):
+    edited = []
+    row = Row("a", "A", lambda: ["x"], line_edit=lambda: edited.append(True))
+    form = ReviewForm("T", lambda: [row], commands={"i": lambda: DONE},
+                      default_command="i", default_label="do it")
+    answers = FakeLineInput("1", "")
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
+    assert LineSession().form(form) == DONE
+    assert edited == [True]
+
+
+def test_line_mode_form_prefers_line_edit_over_options(monkeypatch):
+    called = []
+    row = Row("a", "A", lambda: ["x"],
+              line_edit=lambda: called.append("line_edit"),
+              options=[("opt1", "opt1")],
+              get=lambda: "opt1", set=lambda v: None)
+    form = ReviewForm("T", lambda: [row], commands={"i": lambda: DONE},
+                      default_command="i", default_label="do it")
+    answers = FakeLineInput("1", "")
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
+    assert LineSession().form(form) == DONE
+    assert called == ["line_edit"]
+
+
+def test_line_mode_form_runs_edit_when_no_options(monkeypatch):
+    edited = []
+    row = Row("a", "A", lambda: ["x"], edit=lambda: edited.append(True))
+    form = ReviewForm("T", lambda: [row], commands={"i": lambda: DONE},
+                      default_command="i", default_label="do it")
+    answers = FakeLineInput("1", "")
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
+    assert LineSession().form(form) == DONE
+    assert edited == [True]

@@ -200,7 +200,13 @@ class LineSession:
         from ..ui import _safe_input
         for line in lines:
             print(f"  {line}")
-        return _safe_input(f"{question} [Y/n]: ", "Y").strip().lower() not in ("n", "no")
+        while True:
+            answer = _safe_input(f"{question} [Y/n]: ", "Y").strip().lower()
+            if answer in ("", "y", "yes"):
+                return True
+            if answer in ("n", "no"):
+                return False
+            print("  please answer y or n")
 
     def progress(self, form: ReviewForm, message: str) -> None:
         print(f"  {message}")
