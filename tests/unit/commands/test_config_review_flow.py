@@ -1,9 +1,11 @@
 """`agent-notes config` session (spec 005 FR-014, FR-016, FR-017, SC-005, SC-007)."""
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from agent_notes.commands import config_review
+from agent_notes.commands.regenerate import regenerate as real_regenerate
 from agent_notes.domain.state import BackendState, ScopeState, State
 from agent_notes.services import state_store
 from agent_notes.services.tui.keys import DOWN, ENTER, ESCAPE, RIGHT, TAB
@@ -93,6 +95,35 @@ def test_a_failed_save_says_so_and_stays_open(env):
     env["regenerate"].side_effect = RuntimeError("boom")
     ui = _run(env, "u", "s", ENTER, "q", ENTER)
     assert any("Save failed: boom" in "\n".join(frame) for frame in ui.term.frames)
+
+
+def test_saving_a_local_install_from_another_folder_places_files_in_that_project(
+        env, tmp_path, monkeypatch):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    monkeypatch.setattr("agent_notes.commands.regenerate.regenerate", real_regenerate)
+    monkeypatch.setattr("agent_notes.commands.build.generate_agent_files", MagicMock(return_value=[]))
+    monkeypatch.setattr("agent_notes.services.install_state_builder.build_install_state",
+                        MagicMock(return_value=State()))
+    placed_from = []
+    monkeypatch.setattr("agent_notes.services.installer.install_component_for_backend",
+                        lambda backend, component, scope, copy: placed_from.append(Path.cwd()))
+
+    _run(env, "u", "s", ENTER, cwd=elsewhere)
+
+    assert placed_from and set(placed_from) == {env["project"].resolve()}
+    assert Path.cwd() == elsewhere.resolve()
+
+
+def test_an_install_whose_folder_is_gone_is_not_saved(env, tmp_path):
+    install = env["state"].local_installs.pop(str(env["project"].resolve()))
+    env["state"].local_installs[str(tmp_path / "gone")] = install
+    ui = _run(env, ENTER, "u", "s", "q", ENTER)   # ENTER picks the only (missing) install
+    env["record"].assert_not_called()
+    env["regenerate"].assert_not_called()
+    assert any("this install's folder no longer exists" in "\n".join(frame)
+               for frame in ui.term.frames)
 
 
 def test_no_terminal_prints_the_settings_and_the_subcommands(env, capsys):

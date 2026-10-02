@@ -342,6 +342,9 @@ def _config_review(ui, state, refs: list[InstallRef], cwd: Path) -> str:
                       status=lambda: _changes_text(len(changes())) if changes() else "")
 
     def save():
+        if ctx.ref.missing:
+            form.message = "this install's folder no longer exists"
+            return None
         diff = changes()
         if not diff:
             form.message = "no changes to save"
