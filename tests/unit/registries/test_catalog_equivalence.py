@@ -13,7 +13,7 @@ from collections import Counter
 
 import pytest
 
-from agent_notes.registries.catalog_loader import CATALOG_DIR, load_catalog
+from agent_notes.registries.catalog_loader import CATALOG_DIR, _load_yaml, load_catalog
 from agent_notes.registries.model_registry import load_model_registry
 
 
@@ -322,16 +322,29 @@ def test_registry_all_preserves_catalog_rank_order():
 
 
 def test_enrichment_fields_reach_the_model_objects():
-    """rank / coding_index / price fields must survive the seed → Model hop."""
+    """rank / coding_index / price fields must survive the seed → Model hop.
+
+    A field pinned in rules.yaml ``price_overrides`` is expected to differ from
+    the seed — the pin is the authority, deliberately outliving a refresh that
+    reintroduces a wrong price — so it is checked against the pin instead.
+    """
     registry = load_model_registry()
     seed = json.loads((CATALOG_DIR / "seed.json").read_text())
+    price_overrides = _load_yaml(CATALOG_DIR / "rules.yaml").get("price_overrides") or {}
 
     for provider, entries in seed.get("providers", {}).items():
         for entry in entries:
             model_id = entry["id"].replace(".", "-") if provider == "openai" else entry["id"]
             model = registry.get(model_id)
+            pinned = price_overrides.get(model_id) or {}
             for field in ("rank", "coding_index", "intelligence_index", "price_in",
                           "price_out", "context_length", "created_at"):
+                if field in pinned:
+                    assert getattr(model, field) == pinned[field], (
+                        f"{model_id}.{field}: rules.yaml pins {pinned[field]!r} "
+                        f"!= model {getattr(model, field)!r}"
+                    )
+                    continue
                 assert getattr(model, field) == entry.get(field), (
                     f"{model_id}.{field}: seed {entry.get(field)!r} != model {getattr(model, field)!r}"
                 )

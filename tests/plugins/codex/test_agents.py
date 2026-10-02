@@ -1,12 +1,8 @@
 """Parametrized tests for every agent file in dist/codex/agents/."""
-import sys
 import pytest
 from pathlib import Path
 
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
+import tomllib
 
 from agent_notes.config import DIST_DIR
 

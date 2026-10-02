@@ -13,6 +13,9 @@ classes:
   # (coding_index >= 71) and so class opus.
   - {match: "gpt-*-mini", class: haiku}
   - {match: "gpt-*-nano", class: haiku}
+  # Luna is the cheap member of the GPT-6 generation too ($0.10/M, unrated):
+  # the middle tier, the same call as gpt-5-6-luna below.
+  - {match: "gpt-6-luna", class: sonnet}
   - {match: "gpt-6*",     class: opus}
   # Luna is the cheap member of the 5.6 generation, not a frontier model: at
   # coding_index 71.4 and $0.20/M it sits below every Claude model named opus

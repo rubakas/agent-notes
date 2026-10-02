@@ -128,10 +128,7 @@ def test_dump_toml_filters_none_values(tmp_creds):
     assert "None" not in toml_str
     assert "base_url" not in toml_str
     # Verify the TOML is parseable
-    try:
-        import tomllib
-    except ImportError:
-        import tomli as tomllib  # type: ignore[no-redef]
+    import tomllib
     parsed = tomllib.loads(toml_str)
     assert "base_url" not in parsed["providers"]["openrouter"]
     assert parsed["providers"]["openrouter"]["enabled"] is True
@@ -141,10 +138,7 @@ def test_empty_providers_produces_parseable_toml(tmp_creds):
     """An empty providers dict must not crash and must produce valid TOML."""
     data: dict = {"providers": {}}
     toml_str = credentials._dump_toml(data)
-    try:
-        import tomllib
-    except ImportError:
-        import tomli as tomllib  # type: ignore[no-redef]
+    import tomllib
     parsed = tomllib.loads(toml_str)
     assert parsed == {"providers": {}}
 
