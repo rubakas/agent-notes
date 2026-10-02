@@ -119,4 +119,5 @@ def test_render_without_chrome_is_the_static_rows_only():
     form, _ = _form()
     lines = form.render(80, 24, chrome=False)
     assert lines[0].startswith("   CLIs")
+    assert all(line.startswith("   ") for line in lines)
     assert not any("↑↓" in line for line in lines)
