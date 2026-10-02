@@ -258,3 +258,74 @@ class TestDeferredImportCount:
             "No agent_notes.* absolute module paths found among deferred imports; "
             "relative import resolution may be broken"
         )
+
+
+# ---------------------------------------------------------------------------
+# Every imported name, in every module
+# ---------------------------------------------------------------------------
+
+_PKG_ROOT = Path(__file__).resolve().parent.parent.parent / "agent_notes"
+
+
+def _file_package(path: Path) -> str:
+    """Dotted package a source file's relative imports resolve against."""
+    rel = path.relative_to(_PKG_ROOT.parent).with_suffix("")
+    return ".".join(rel.parts[:-1])
+
+
+def _unresolved_names(path: Path, package: str) -> List[str]:
+    """Every `from X import name` in *path* (a file of *package*) whose name is
+    neither an attribute of X nor an importable submodule of X."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    failures: List[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        if node.level:
+            module_path = _resolve_relative_import(node.level, node.module or "", package)
+        elif node.module and node.module.split(".")[0] == _MODULE_ROOT:
+            module_path = node.module
+        else:
+            continue
+        where = f"{path.name}:{node.lineno} (package {package})"
+        try:
+            module = importlib.import_module(module_path)
+        except ImportError as exc:
+            failures.append(f"{where}: module '{module_path}' cannot be imported ({exc})")
+            continue
+        for alias in node.names:
+            if alias.name == "*" or hasattr(module, alias.name):
+                continue
+            try:
+                importlib.import_module(f"{module_path}.{alias.name}")
+            except ImportError:
+                failures.append(f"{where}: '{alias.name}' is not defined in '{module_path}'")
+    return failures
+
+
+class TestEveryImportedNameResolves:
+    """`from X import name` must name something that exists, in every module and
+    at any depth, so a name that moved is caught here and not in front of a user."""
+
+    def test_every_imported_name_resolves(self):
+        failures: List[str] = []
+        for path in sorted(_PKG_ROOT.rglob("*.py")):
+            if path.name == "__main__.py":
+                continue
+            failures.extend(_unresolved_names(path, _file_package(path)))
+        assert not failures, "Unresolvable imports:\n" + "\n".join(failures)
+
+    def test_the_walk_covers_the_whole_package(self):
+        files = [p for p in _PKG_ROOT.rglob("*.py") if p.name != "__main__.py"]
+        assert len(files) > 100, f"expected the whole package, walked only {len(files)} files"
+
+    def test_a_missing_name_is_reported(self, tmp_path):
+        probe = tmp_path / "probe.py"
+        probe.write_text("from . import no_such_name_anywhere\n")
+        failures = _unresolved_names(probe, "agent_notes.services")
+        assert len(failures) == 1 and "no_such_name_anywhere" in failures[0]
+
+    def test_a_present_name_and_a_submodule_are_accepted(self, tmp_path):
+        probe = tmp_path / "probe.py"
+        probe.write_text("from . import installer, state_store\nfrom .installer import COMPONENT_TYPES\n")
+        assert _unresolved_names(probe, "agent_notes.services") == []
