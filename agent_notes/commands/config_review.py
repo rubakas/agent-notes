@@ -8,12 +8,16 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from ..domain.capability import KIND_BACKEND, KIND_PROVIDER, KIND_TOGGLE
-from ..services.tui.screen import DIM, YELLOW, tilde
+from ..services.tui.screen import DIM, YELLOW, tilde, visible_len
 from ..services.tui.keys import TAB
 from ..services.tui.widgets import CANCEL, DONE, PickItem, ReviewForm, Row
 from .wizard.role_models import (
-    Catalog, default_effort, edit_models, initial_model, role_line, roles_for, starred_model,
+    Catalog, default_effort, edit_models, initial_model, role_line, role_width, roles_for,
+    starred_model,
 )
+
+# What an 80-column row has left once the label area (3 + label + 1) is taken.
+ROW_ROOM = 80 - (3 + ReviewForm.LABEL_WIDTH + 1)
 
 
 @dataclass(frozen=True)
@@ -132,8 +136,14 @@ def config_models_rows(ctx: ConfigContext) -> list[Row]:
             for role in roles_for(backend):
                 if role.name in models:
                     flag = pin_flag(ctx.catalog, backend, role, models[role.name])
-                    color = YELLOW if flag.startswith("⚠") else DIM
-                    out.append(f"{role_line(role, models, efforts)}   {style(flag, color)}")
+                    line = role_line(role, models, efforts)
+                    # A flag the 80-column row cannot hold goes under the model, whole.
+                    if flag.startswith("⚠"):
+                        out += [line, " " * (role_width() + 1) + style(flag, YELLOW)]
+                    elif visible_len(line) + 3 + len(flag) > ROW_ROOM:
+                        out += [line, " " * (role_width() + 1) + style(flag, DIM)]
+                    else:
+                        out.append(f"{line}   {style(flag, DIM)}")
             return out or [style("no pins — the recommendation applies at build time", DIM)]
 
         rows.append(Row(f"models:{backend.name}", "Models" if index == 0 else "", lines,

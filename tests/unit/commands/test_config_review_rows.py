@@ -31,7 +31,15 @@ def _rows(ctx):
 
 
 def _model_lines(ctx):
-    return {line.split()[0]: line for line in _rows(ctx)["models:claude"].lines()}
+    """Each role's row, with its continuation line (a ⚠ flag sits under the model)."""
+    out, role = {}, None
+    for line in _rows(ctx)["models:claude"].lines():
+        if line.startswith(" "):
+            out[role] += "\n" + line
+        else:
+            role = line.split()[0]
+            out[role] = line
+    return out
 
 
 def test_rows_in_order(catalog, tmp_path):
@@ -157,3 +165,19 @@ def test_show_cuts_a_long_install_label_in_the_middle(tmp_path, monkeypatch):
     label = next(line for line in lines if line.startswith("local · "))
     assert visible_len(label) <= 60
     assert label.endswith("payments-api · work") and "…" in label
+
+
+def test_flagged_pins_show_the_whole_recommendation_at_80_columns(catalog, tmp_path):
+    from agent_notes.services.tui.screen import visible_len
+    from agent_notes.services.tui.widgets import ReviewForm
+    from agent_notes.commands.wizard.role_models import roles_for, starred_model
+    ctx = _ctx(catalog, tmp_path)
+    backend = ctx.cli_registry.get("claude")
+    roles = {role.name: role for role in roles_for(backend)}
+    form = ReviewForm("T", config_rows(ctx))
+    frame = form.render(80, 24)
+    assert all(visible_len(line) <= 80 for line in frame)
+    text = "\n".join(frame)
+    for name in ("reasoner", "scout"):
+        assert f"★ {starred_model(catalog, backend, roles[name]).id}" in text
+    assert "…" not in text

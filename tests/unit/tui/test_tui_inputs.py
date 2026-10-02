@@ -128,3 +128,9 @@ def test_long_checklists_scroll_and_keep_the_footer():
 def test_complete_path_handles_brackets_in_names(tmp_path):
     (tmp_path / "Notes [work]").mkdir()
     assert complete_path(str(tmp_path / "Notes [work]")) == str(tmp_path / "Notes [work]") + "/"
+
+
+def test_a_title_one_column_short_of_the_width_is_not_cut():
+    title = "T" * 38
+    first = Checklist(title, SKILLS, set()).render(40, 10)[0]
+    assert first.rstrip() == f" {title}" and "…" not in first

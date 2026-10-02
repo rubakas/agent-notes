@@ -170,7 +170,8 @@ class ReviewForm:
 
 def _title_bar(style: Style, title: str, width: int, right: str = "") -> list[str]:
     """The title (with *right* at the far end) and a rule: every editor's top."""
-    return [bar(f" {style(title, BOLD)}", f"{style(right, DIM)} ", width), style("─" * width, DIM)]
+    tail = f"{style(right, DIM)} " if right else ""
+    return [bar(f" {style(title, BOLD)}", tail, width), style("─" * width, DIM)]
 
 
 def _hint_bar(style: Style, hints: str, width: int) -> list[str]:

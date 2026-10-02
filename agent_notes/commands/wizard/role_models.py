@@ -170,7 +170,7 @@ def model_items(catalog, backend, role) -> list[PickItem]:
 
 
 @functools.lru_cache(maxsize=None)
-def _role_width() -> int:
+def role_width() -> int:
     """The longest role name ("orchestrator"), so model columns line up."""
     from ...registries.role_registry import load_role_registry
     return max(len(role.name) for role in load_role_registry().all())
@@ -178,7 +178,7 @@ def _role_width() -> int:
 
 def role_line(role, models, efforts) -> str:
     """One role on the review screen: name, model, effort."""
-    return (f"{pad(role.name, _role_width())} {pad(models.get(role.name, '—'), 20)} "
+    return (f"{pad(role.name, role_width())} {pad(models.get(role.name, '—'), 20)} "
             f"{efforts.get(role.name) or '—'}")
 
 
