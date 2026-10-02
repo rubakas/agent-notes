@@ -1,13 +1,16 @@
 """`agent-notes config` on the review screen (spec 005 FR-014 – FR-020)."""
 from __future__ import annotations
 
+import copy
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 from ..domain.capability import KIND_BACKEND, KIND_PROVIDER, KIND_TOGGLE
 from ..services.tui.screen import DIM, YELLOW, tilde
-from ..services.tui.widgets import PickItem, Row
+from ..services.tui.keys import TAB
+from ..services.tui.widgets import CANCEL, DONE, PickItem, ReviewForm, Row
 from .wizard.role_models import (
     Catalog, default_effort, edit_models, initial_model, role_line, roles_for, starred_model,
 )
@@ -245,3 +248,136 @@ def enabled_toggles(capabilities=None) -> dict[str, bool]:
     registry = capabilities if capabilities is not None else default_capability_registry()
     on = {plugin.name for plugin in default_plugin_registry().enabled(load_user_config())}
     return {cap.name: cap.name in on for cap in registry.by_kind(KIND_TOGGLE)}
+
+
+CONFIG_HINTS = "↑↓ move  ⏎ edit  ←→ change  u use ★  tab next install  s save  q quit"
+SUBCOMMANDS = ("show", "role-model", "role-effort", "role-agent", "provider", "providers",
+               "memory", "cost-report")
+
+
+def _changes_text(count: int) -> str:
+    return f"{count} change{'' if count == 1 else 's'}"
+
+
+def describe_changes(original, working, ref: InstallRef, plugins_before: dict,
+                     plugins_after: dict) -> list[str]:
+    """One line per staged edit: `<cli> <role>: <old> → <new>` (FR-017)."""
+    from .wizard.review import memory_label
+    lines = []
+    old_scope, new_scope = ref.get(original), ref.get(working)
+    if old_scope is not None and new_scope is not None:
+        for cli in sorted(new_scope.clis):
+            old, new = old_scope.clis.get(cli), new_scope.clis[cli]
+            if old is None:
+                continue
+            for field, suffix in (("role_models", ""), ("role_efforts", " effort")):
+                before, after = getattr(old, field), getattr(new, field)
+                for role in sorted(set(before) | set(after)):
+                    if before.get(role) != after.get(role):
+                        lines.append(f"{cli} {role}{suffix}: {before.get(role) or '—'} → "
+                                     f"{after.get(role) or '—'}")
+    if original.memory != working.memory:
+        lines.append(f"memory: {memory_label(original.memory)} → {memory_label(working.memory)}")
+    for name in sorted(set(plugins_before) | set(plugins_after)):
+        before, after = bool(plugins_before.get(name)), bool(plugins_after.get(name))
+        if before != after:
+            lines.append(f"{name}: {'on' if before else 'off'} → {'on' if after else 'off'}")
+    return lines
+
+
+def apply_changes(working, ref: InstallRef, plugins_before: dict, plugins_after: dict) -> None:
+    """One state write and one regenerate — of the edited install, not
+    whatever regenerate would auto-detect (spec 005 Correction 3)."""
+    from ..services.state_store import record_install_state
+    from .plugins import disable_plugin, enable_plugin
+    from .regenerate import regenerate
+    from .wizard.orchestrator import _quiet  # one output-silencing helper, not two
+    with _quiet():
+        record_install_state(working)
+        for name in sorted(plugins_after):
+            if bool(plugins_after[name]) != bool(plugins_before.get(name)):
+                (enable_plugin if plugins_after[name] else disable_plugin)(name)
+        regenerate(scope=ref.scope, project_path=ref.project_path, profile_label=ref.profile_label)
+
+
+def interactive_config(session_factory=None, cwd: Optional[Path] = None) -> None:
+    """`agent-notes config` with no action (spec 005 FR-014)."""
+    from ..services.state_store import load_state
+    from ..services.tui.session import open_session
+    state = load_state()
+    refs = list_installs(state) if state is not None else []
+    if not refs:
+        print("No installation found — run agent-notes install")
+        sys.exit(1)
+    session = (session_factory or open_session)()
+    if session is None:
+        from .config import show
+        show(state)
+        print("\nChange settings with: agent-notes config " + " | ".join(SUBCOMMANDS))
+        return
+    with session as ui:
+        message = _config_review(ui, state, refs, Path(cwd) if cwd else Path.cwd())
+    if message:
+        print(message)
+
+
+def _config_review(ui, state, refs: list[InstallRef], cwd: Path) -> str:
+    from ..config import get_version
+    from ..registries.cli_registry import load_registry
+    ref = default_install(refs, cwd)
+    if ref is None:
+        ref = ui.pick("Which install?", [PickItem(r, r.label(), dim=r.missing) for r in refs])
+        if ref is None:
+            return ""
+    working = copy.deepcopy(state)
+    plugins_before = enabled_toggles()
+    ctx = ConfigContext(ui, working, ref, Catalog(), load_registry(), dict(plugins_before))
+
+    def changes() -> list[str]:
+        return describe_changes(state, working, ctx.ref, plugins_before, ctx.plugins)
+
+    form = ReviewForm(f"AgentNotes {get_version()} · config", config_rows(ctx),
+                      context=ref.label(), hints=CONFIG_HINTS, default_command="s",
+                      default_label="save", style=ui.style,
+                      status=lambda: _changes_text(len(changes())) if changes() else "")
+
+    def save():
+        diff = changes()
+        if not diff:
+            form.message = "no changes to save"
+            return None
+        if not ui.confirm(form, f"Apply {_changes_text(len(diff))}?", diff):
+            return None
+        ui.progress(form, "Saving…")
+        try:
+            apply_changes(working, ctx.ref, plugins_before, ctx.plugins)
+        except (Exception, SystemExit) as e:
+            form.message = f"Save failed: {e}"
+            return None
+        form.value = f"Saved {_changes_text(len(diff))}. Restart your AI CLI to pick up changes."
+        return DONE
+
+    def quit_():
+        count = len(changes())
+        if count and not ui.confirm(form, f"Discard {_changes_text(count)}?"):
+            return None
+        return CANCEL
+
+    def next_install():
+        if len(refs) < 2:
+            return None
+        if changes():
+            form.message = "save or discard changes before switching"
+            return None
+        ctx.ref = refs[(refs.index(ctx.ref) + 1) % len(refs)]
+        form.context = ctx.ref.label()
+        return None
+
+    def use_recommended():
+        moved = upgrade_flagged(ctx)
+        form.message = (f"{moved} pin{'' if moved == 1 else 's'} moved to ★" if moved
+                        else "nothing flagged")
+        return None
+
+    form.commands.update({"s": save, "q": quit_, TAB: next_install, "u": use_recommended})
+    return form.value if ui.form(form) == DONE else ""

@@ -325,22 +325,6 @@ def _target_clis(scope_state, cli_filter: Optional[str], scope: str,
     return [cli_filter]
 
 
-def _prompt_target_clis(scope_state, scope: str, fatal: bool = True) -> Optional[list]:
-    """Ask which installed CLI a wizard branch applies to, defaulting to all.
-
-    Thin prompt around _target_clis so the wizard and the scriptable commands
-    resolve a CLI choice through exactly one code path.
-    """
-    from ..services.ui import _safe_input
-
-    cli_names = list(scope_state.clis.keys())
-    if len(cli_names) <= 1:
-        return cli_names
-    prompt = f"\nWhich CLI? ({' / '.join(cli_names)} / both) [both]: "
-    cli_choice = _safe_input(prompt, "both").strip().lower()
-    return _target_clis(scope_state, cli_choice, scope, fatal=fatal)
-
-
 def role_model(role_name: str, model_id: Optional[str] = None,
                cli_filter: Optional[str] = None) -> None:
     """Set role→model for one or both CLIs. Validates, diffs, prompts, applies.
@@ -501,118 +485,6 @@ def show(state=None) -> None:
 
 # ── Interactive wizard ───────────────────────────────────────────────────────
 
-def _wizard_role_model(state, before: str) -> bool:
-    """Branch 1: interactive role→model reassignment. Returns True if changes were applied."""
-    from ..registries.cli_registry import load_registry
-    from ..registries.role_registry import load_role_registry
-    from ..services.ui import _safe_input
-
-    scope, project_path, scope_state = _get_scope_state(state)
-
-    cli_registry = load_registry()
-    role_registry = load_role_registry()
-
-    # Show current
-    print("\nCurrent role assignments:")
-    for cli_name, backend_state in sorted(scope_state.clis.items()):
-        try:
-            label = cli_registry.get(cli_name).label
-        except KeyError:
-            label = cli_name
-        print(f"  {label.upper()}:")
-        for role_name in sorted(backend_state.role_models):
-            model_id = backend_state.role_models[role_name]
-            print(f"    {role_name:<20} {model_id}")
-
-    target_clis = _prompt_target_clis(scope_state, scope, fatal=False)
-    if target_clis is None:
-        print("No changes made.")
-        return False
-
-    role_names = role_registry.names()
-    role_choice = _safe_input(
-        f"Which role? ({'/'.join(role_names)}): ", ""
-    ).strip().lower()
-    if role_choice not in role_names:
-        print(f"Unknown role '{role_choice}'. No changes made.")
-        return False
-
-    for cli_name in target_clis:
-        _print_model_choices(cli_name)
-
-    model_choice = _safe_input("\nNew model (index or id): ", "").strip()
-    if not model_choice:
-        print("No model entered. No changes made.")
-        return False
-
-    if re.fullmatch(r"\d+", model_choice):
-        model_choice = _resolve_index(model_choice, target_clis)
-    if _validate_model(model_choice, fatal=False) is None:
-        print("No changes made.")
-        return False
-
-    for cli_name in target_clis:
-        scope_state.clis[cli_name].role_models[role_choice] = model_choice
-        print(f"Set {cli_name}: {role_choice} -> {model_choice}")
-
-    _apply_and_regenerate(state, before)
-    return True
-
-
-def _wizard_role_effort(state, before: str) -> bool:
-    """Branch 7: interactive role→effort reassignment. Returns True if changes were applied."""
-    from ..registries.cli_registry import load_registry
-    from ..registries.role_registry import load_role_registry
-    from ..services.ui import _safe_input
-
-    scope, project_path, scope_state = _get_scope_state(state)
-
-    cli_registry = load_registry()
-    role_registry = load_role_registry()
-
-    # Show current
-    print("\nCurrent effort assignments:")
-    for cli_name, backend_state in sorted(scope_state.clis.items()):
-        try:
-            label = cli_registry.get(cli_name).label
-        except KeyError:
-            label = cli_name
-        print(f"  {label.upper()}:")
-        for role_name in sorted(backend_state.role_efforts):
-            effort = backend_state.role_efforts[role_name]
-            print(f"    {role_name:<20} {effort}")
-
-    target_clis = _prompt_target_clis(scope_state, scope, fatal=False)
-    if target_clis is None:
-        print("No changes made.")
-        return False
-
-    role_names = role_registry.names()
-    role_choice = _safe_input(
-        f"Which role? ({'/'.join(role_names)}): ", ""
-    ).strip().lower()
-    if role_choice not in role_names:
-        print(f"Unknown role '{role_choice}'. No changes made.")
-        return False
-
-    effort_choice = _safe_input(f"New effort: ", "").strip().lower()
-    if not effort_choice:
-        print("No effort entered. No changes made.")
-        return False
-
-    for cli_name in target_clis:
-        if not _check_effort_valid(scope_state, cli_name, role_choice, effort_choice):
-            print("No changes made.")
-            return False
-
-    for cli_name in target_clis:
-        scope_state.clis[cli_name].role_efforts[role_choice] = effort_choice
-        print(f"Set {cli_name}: {role_choice} -> {effort_choice}")
-
-    _apply_and_regenerate(state, before)
-    return True
-
-
 def _wizard_memory(state, before: str) -> bool:
     """Branch 3: interactive memory backend change."""
     from ..services.ui import _safe_input, _path_input
@@ -715,58 +587,10 @@ def _wizard_provider_status(provider: str) -> None:
         print(f"{provider}: no key")
 
 
-def _wizard_skills(state, before: str) -> bool:
-    """Branch 4: interactive skill bundle toggle."""
-    print("\nSkill bundles are managed during install.")
-    print("To change skills, run: agent-notes install --reconfigure")
-    print("Or manually copy/remove skill directories from your CLI's skills folder.")
-    return False
-
-
 def interactive_config() -> None:
-    """Run the interactive config wizard."""
-    from ..services.ui import _safe_input
-
-    state = _load_state()
-    before = _state_snapshot(state)
-
-    # Summary header
-    show(state)
-
-    print("\nWhat do you want to change?")
-    print("  1) Role -> model assignments")
-    print("  2) Role -> agent assignments")
-    print("  3) Memory storage")
-    print("  4) Skill bundles")
-    print("  5) Show full configuration (read-only)")
-    print("  6) API keys / providers")
-    print("  7) Role -> effort assignments")
-    print("  q) Quit")
-
-    try:
-        choice = _safe_input("Choice: ", "q").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        print("\nCancelled.")
-        return
-
-    if choice == "1":
-        _wizard_role_model(state, before)
-    elif choice == "2":
-        role_agent("", "")
-    elif choice == "3":
-        _wizard_memory(state, before)
-    elif choice == "4":
-        _wizard_skills(state, before)
-    elif choice == "5":
-        show(state)
-    elif choice == "6":
-        _wizard_providers()
-    elif choice == "7":
-        _wizard_role_effort(state, before)
-    elif choice == "q":
-        print("Quit.")
-    else:
-        print(f"Unknown choice '{choice}'. Quit.")
+    """`agent-notes config` with no action: the review screen (spec 005)."""
+    from .config_review import interactive_config as review
+    review()
 
 
 def interactive_config_memory() -> None:

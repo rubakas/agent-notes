@@ -246,16 +246,12 @@ def test_apply_regenerate_skipped_on_no(state_file):
     mock_write.assert_not_called()
 
 
-def test_quit_does_nothing(state_file, capsys):
-    """Wizard with q exits without modifying state."""
-    from agent_notes.commands.config import interactive_config
-    from agent_notes.services import ui as ui_mod
+def test_quit_does_nothing(state_file):
+    """The config review quits without touching state.json."""
+    from agent_notes.commands import config_review
+    from tests.unit.tui.fakes import tui_session
 
     original = state_file.read_text()
-
-    with _patch_state_file(state_file), \
-         patch.object(ui_mod, "_safe_input", return_value="q"):
-        interactive_config()
-
-    # State file unchanged
+    with _patch_state_file(state_file):
+        config_review.interactive_config(session_factory=lambda: tui_session("q"))
     assert state_file.read_text() == original

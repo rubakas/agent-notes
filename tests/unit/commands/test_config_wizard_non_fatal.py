@@ -9,8 +9,6 @@ import json
 import pytest
 from unittest.mock import patch
 
-from agent_notes.commands.config import _wizard_role_effort, _wizard_role_model
-
 
 def _state_dict(clis=("claude", "opencode")):
     return {
@@ -41,46 +39,6 @@ def state(tmp_path):
     from agent_notes.services import state_store
     with patch.object(state_store, "state_file", return_value=sf):
         yield state_store.load_state()
-
-
-def _answers(*values):
-    replies = list(values)
-    return patch("agent_notes.services.ui._safe_input",
-                 side_effect=lambda prompt, default="": replies.pop(0))
-
-
-class TestUnknownCliStaysInteractive:
-    def test_role_model_branch_returns_false(self, state, capsys):
-        with _answers("nope"), \
-             patch("agent_notes.commands.config._apply_and_regenerate") as apply_mock:
-            result = _wizard_role_model(state, before="{}")
-
-        assert result is False
-        apply_mock.assert_not_called()
-        out = capsys.readouterr().out
-        assert "nope" in out and "No changes made." in out
-
-    def test_role_effort_branch_returns_false(self, state, capsys):
-        with _answers("nope"), \
-             patch("agent_notes.commands.config._apply_and_regenerate") as apply_mock:
-            result = _wizard_role_effort(state, before="{}")
-
-        assert result is False
-        apply_mock.assert_not_called()
-        assert "No changes made." in capsys.readouterr().out
-
-
-class TestUnknownModelStaysInteractive:
-    def test_role_model_branch_returns_false(self, state, capsys):
-        with _answers("both", "orchestrator", "no-such-model"), \
-             patch("agent_notes.commands.config._apply_and_regenerate") as apply_mock:
-            result = _wizard_role_model(state, before="{}")
-
-        assert result is False
-        apply_mock.assert_not_called()
-        out = capsys.readouterr().out
-        assert "Unknown model: no-such-model" in out
-        assert "No changes made." in out
 
 
 class TestScriptablePathsStayFatal:
