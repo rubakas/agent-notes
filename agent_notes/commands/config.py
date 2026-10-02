@@ -64,18 +64,20 @@ def _validate_model(model_id: str, fatal: bool = True):
         return None
 
 
-def compatible_models_for(backend) -> list:
+def compatible_models_for(backend, registry=None) -> list:
     """Models the given CLI backend can serve, in registry order (frontier first).
 
     The registry is already globally ordered, so this only filters — sorting
     here again would be a second, divergent ordering.
 
-    Shared by the install wizard and `config role-model` so the numbered list a
-    user sees is the same one indices are resolved against.
+    Shared by the install review and `config role-model` so the list a user
+    sees is the same one indices are resolved against. Pass *registry* to
+    reuse one already loaded.
     """
-    from ..registries.model_registry import load_model_registry
-    models = load_model_registry().all()
-    return [m for m in models if backend.first_alias_for(m.aliases) is not None]
+    if registry is None:
+        from ..registries.model_registry import load_model_registry
+        registry = load_model_registry()
+    return [m for m in registry.all() if backend.first_alias_for(m.aliases) is not None]
 
 
 MODEL_COLUMNS_HEADER = f"{'model':<28} {'int':>5}  {'coding':>6}  {'$/M in':>8}"
@@ -84,19 +86,15 @@ PROVISIONAL_MARK = "*"
 PROVISIONAL_LEGEND = f"{PROVISIONAL_MARK} provisional score — not yet rated upstream (rules.yaml)"
 
 
-def model_columns(model) -> str:
-    """One row of the shared model table: id, intelligence index, coding index,
-    USD per 1M INPUT tokens.
+def model_metrics(model) -> str:
+    """The numeric columns of the shared model table: intelligence index,
+    coding index, USD per 1M INPUT tokens.
 
-    Every model list in the product renders through this one function, so the
-    columns cannot drift between `list models`, `config role-model` and the
-    install wizard. A missing metric prints an em dash — 0.0 is a real score
-    upstream and must stay distinguishable from "not measured". A provisional
-    stand-in from rules.yaml prints with a trailing `*` (`78.1*`) so it never
-    reads as a benchmark result.
-
-    Output prices differ from input prices, so the price column is always
-    labelled `$/M in` rather than a bare `$`.
+    A missing metric prints an em dash — 0.0 is a real score upstream and must
+    stay distinguishable from "not measured". A provisional stand-in from
+    rules.yaml prints with a trailing `*` (`78.1*`) so it never reads as a
+    benchmark result. Output prices differ from input prices, so the price
+    column is always labelled `$/M in`.
     """
     intelligence = "—" if model.intelligence_index is None else f"{model.intelligence_index:.1f}"
     if model.coding_index is not None:
@@ -106,7 +104,14 @@ def model_columns(model) -> str:
     else:
         coding = "—"
     price = "—" if model.price_in is None else f"{model.price_in:.2f}"
-    return f"{model.id:<28} {intelligence:>5}  {coding:>6}  {price:>8}"
+    return f"{intelligence:>5}  {coding:>6}  {price:>8}"
+
+
+def model_columns(model) -> str:
+    """One row of the shared model table: id, then `model_metrics`. Every
+    model list in the product renders through these, so the columns cannot
+    drift between `list models`, `config role-model` and the review screen."""
+    return f"{model.id:<28} {model_metrics(model)}"
 
 
 def _backend_for(cli_name: str):
