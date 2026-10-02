@@ -163,3 +163,76 @@ class ReviewForm:
             top = min(max(0, focus_line - room + 1), len(body) - room)
             body = body[top:top + room]
         return [fit(line, width) for line in [header, rule, *body, *notice, rule, footer]]
+
+
+@dataclass
+class PickItem:
+    """One choice: *text* holds the already-formatted columns."""
+
+    value: Any
+    text: str
+    tag: str = ""
+    dim: bool = False
+
+
+class Picker:
+    """Single choice from a list that scrolls inside the screen. ⏎ picks the
+    row under the cursor, Esc leaves with nothing picked."""
+
+    def __init__(self, title: str, items: Sequence[PickItem], *, current: Any = None,
+                 header: str = "", legend: str = "",
+                 hints: str = "↑↓ move   ⏎ select   esc back",
+                 style: Optional[Style] = None):
+        self.title = title
+        self.items = list(items)
+        self.header = header
+        self.legend = legend
+        self.hints = hints
+        self.style = style or Style(False)
+        values = [item.value for item in self.items]
+        self.cursor = values.index(current) if current in values else 0
+        self.value: Any = None
+
+    def handle(self, key: str) -> Optional[str]:
+        if not self.items:
+            return CANCEL if key in (ENTER, ESCAPE) else None
+        if key == UP:
+            self.cursor = (self.cursor - 1) % len(self.items)
+        elif key == DOWN:
+            self.cursor = (self.cursor + 1) % len(self.items)
+        elif key == ENTER:
+            self.value = self.items[self.cursor].value
+            return DONE
+        elif key == ESCAPE:
+            return CANCEL
+        return None
+
+    def render(self, width: int, height: int) -> list[str]:
+        style = self.style
+        top = [bar(f" {style(self.title, BOLD)}", f"{style(self.legend, DIM)} ", width),
+               style("─" * width, DIM)]
+        if self.header:
+            top.append(style(f"     {self.header}", DIM))
+        bottom = [style("─" * width, DIM), f" {self.hints}"]
+        room = max(1, height - len(top) - len(bottom))
+        count = len(self.items)
+        if count <= room:
+            start, end = 0, count
+        else:
+            span = max(1, room - 2)  # two lines kept for the ↑/↓ markers
+            start = min(max(0, self.cursor - span // 2), count - span)
+            end = start + span
+        body = []
+        if start > 0:
+            body.append(style(f"     ↑ {start} more", DIM))
+        for index in range(start, end):
+            item = self.items[index]
+            here = index == self.cursor
+            text = item.text + (f"  {item.tag}" if item.tag else "")
+            if item.dim and not here:
+                text = style(text, DIM)
+            pointer = style("›", CYAN) if here else " "
+            body.append(f" {pointer} {'●' if here else '○'} {text}")
+        if end < count:
+            body.append(style(f"     ↓ {count - end} more", DIM))
+        return [fit(line, width) for line in top + body + bottom]
