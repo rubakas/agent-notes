@@ -6,17 +6,12 @@ import sys
 from pathlib import Path
 from typing import List, Tuple, Set
 
-try:
-    import tty
-    import termios
-    _HAS_TTY = True
-except ImportError:
-    _HAS_TTY = False
+from .tui.screen import color_enabled
 
 # Export for backward compatibility
 __all__ = ['Color', 'ok', 'warn', 'fail', 'error', 'info', 'issue', 'linked', 'removed', 'skipped',
-           '_safe_input', '_path_input', '_can_interactive',
-           '_checkbox_select_fallback', '_radio_select_fallback', '_HAS_TTY']
+           '_safe_input', '_path_input',
+           '_checkbox_select_fallback', '_radio_select_fallback']
 
 
 # --- Colors ---
@@ -40,7 +35,7 @@ class Color:
 
 
 # Disable colors off a terminal, and whenever NO_COLOR is set (no-color.org).
-if not sys.stdout.isatty() or os.environ.get("NO_COLOR"):
+if not color_enabled():
     Color.disable()
 
 
@@ -124,11 +119,6 @@ def _path_input(prompt: str, default: str = "") -> str:
     finally:
         readline.set_completer(old_completer)
         readline.set_completer_delims(old_delims)
-
-
-def _can_interactive() -> bool:
-    """Check if interactive TUI is available."""
-    return _HAS_TTY and sys.stdin.isatty()
 
 
 def _checkbox_select_fallback(title: str, options: List[Tuple[str, str]], defaults: Set[str] = None) -> Set[str]:
