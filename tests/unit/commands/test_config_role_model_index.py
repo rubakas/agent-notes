@@ -4,7 +4,6 @@ The numbered list the CLI prints must be the same list the install wizard shows,
 otherwise an index means two different things in the two places.
 """
 
-import io
 import json
 import re
 import pytest

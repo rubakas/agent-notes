@@ -3,7 +3,6 @@
 import os
 import glob
 import sys
-from pathlib import Path
 from typing import List, Tuple, Set
 
 from .tui.screen import color_enabled

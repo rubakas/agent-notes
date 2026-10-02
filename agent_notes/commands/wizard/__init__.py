@@ -7,7 +7,7 @@ This module keeps the helpers they and the post-install summary share.
 from pathlib import Path
 from typing import List, Optional
 
-from ._common import _ROLE_ANSI, _get_skill_groups, _count_rules, _role_sort_key
+from ._common import _get_skill_groups, _count_rules, _role_sort_key
 from .execute import (
     install_skills_filtered,
     install_agents_filtered,

@@ -4,7 +4,7 @@ import os
 import pytest
 
 from agent_notes.services.tui import session as session_mod
-from agent_notes.services.tui.keys import DOWN, ENTER, ESCAPE, RIGHT, SPACE
+from agent_notes.services.tui.keys import DOWN, ENTER, ESCAPE, SPACE
 from agent_notes.services.tui.session import LineSession, TuiSession, open_session
 from agent_notes.services.tui.widgets import CANCEL, DONE, PickItem, ReviewForm, Row, cycle_text
 from tests.unit.tui.fakes import FakeLineInput, FakeTerminal, ScriptedKeys, tui_session, typed

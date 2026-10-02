@@ -4,8 +4,6 @@ worker → scout, driven by the declarative `order:` field in roles/*.yaml.
 Covers the sort key and the post-install Configuration section
 (_render_configuration); the review's role ordering is tested in
 test_review_role_models.py."""
-import pytest
-
 from agent_notes.domain.role import Role, DEFAULT_ROLE_ORDER
 
 

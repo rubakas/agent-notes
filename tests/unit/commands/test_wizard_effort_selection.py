@@ -5,7 +5,6 @@ No interactive-test scaffolding needed — these are pure functions extracted
 specifically for testability (see checklist B10(e))."""
 from pathlib import Path
 
-import agent_notes.commands.wizard as wiz
 from agent_notes.commands.wizard import _effort_provider_for_model, _effort_default_choice
 from agent_notes.domain.cli_backend import CLIBackend
 from agent_notes.domain.model import Model

@@ -1,13 +1,12 @@
 """Rows of the install review screen (spec 005 FR-002, FR-003, FR-010–FR-013)."""
 import dataclasses
-from pathlib import Path
 
 import pytest
 
 from agent_notes.commands.wizard import review
 from agent_notes.commands.wizard.capabilities import _build_registry, default_capability_registry
 from agent_notes.commands.wizard.review import (
-    InstallChoices, ReviewContext, edit_obsidian, initial_choices, install_rows, memory_row,
+    ReviewContext, edit_obsidian, initial_choices, install_rows, memory_row,
     models_row, toggle_row,
 )
 from agent_notes.commands.wizard.role_models import Catalog, recommended_choices
