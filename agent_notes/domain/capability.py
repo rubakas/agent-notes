@@ -1,4 +1,4 @@
-"""Capability: a configurable unit the install wizard composes.
+"""Capability: a configurable unit the install review screen composes.
 
 Kinds:
 - backend  — multi-select AI-provider (claude/codex/...); generates dist/<name>/
@@ -6,8 +6,8 @@ Kinds:
 - toggle   — on/off subsystem (cost-report); can be disabled
 - core     — always installed, never shown (credential guard)
 
-Pure data. Behavior (wizard view + install process) lives in the code-side
-capability registry, keyed by capability name.
+Pure data. Behavior (review-screen rows + install process) lives in the
+code-side capability registry, keyed by capability name.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ class Capability:
     name: str
     kind: str
     default: bool = False   # toggle default-on / backend default-selected
-    order: int = 0          # tie-break within a wizard phase
+    order: int = 0          # position within its kind on the review screen
 
     def __post_init__(self):
         if self.kind not in CAPABILITY_KINDS:

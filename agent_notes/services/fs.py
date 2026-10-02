@@ -1,7 +1,8 @@
 """Filesystem primitives."""
 
+import io
 import shutil
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -25,6 +26,15 @@ def silent_ops():
         yield
     finally:
         silent_file_ops = previous
+
+
+@contextmanager
+def quiet_output():
+    """Discard everything printed to stdout and stderr in the block — keeps
+    build, restore and regenerate output off a full-screen view (FR-024)."""
+    sink = io.StringIO()
+    with redirect_stdout(sink), redirect_stderr(sink):
+        yield
 
 
 def _info(msg: str) -> None:

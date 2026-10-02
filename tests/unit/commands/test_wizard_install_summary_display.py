@@ -1,5 +1,5 @@
 """Unit tests for _format_role_model_display — the pure row-formatting helper
-extracted from _render_install_summary's model-map display (registry-hit vs.
+extracted from the old install summary's model-map display (registry-hit vs.
 registry-miss paths), per checklist A2."""
 from agent_notes.commands.wizard import _format_role_model_display
 from agent_notes.domain.model import Model

@@ -1,10 +1,26 @@
 """Regenerate agent files from current state.json."""
 
+import contextlib
 import sys
 from pathlib import Path
 from typing import Optional
 
 from ..config import Color
+
+
+def regenerate_instruction(scope: str, project_path: Optional[Path], profile_label: str = "") -> str:
+    """The shell command that re-renders one install (what to run after a
+    regenerate failed): plain `agent-notes regenerate` only fits a global,
+    profile-less one."""
+    import shlex
+    command = "agent-notes regenerate"
+    if scope == "local":
+        command += " --local"
+    if profile_label:
+        command += f" --profile {shlex.quote(profile_label)}"
+    if scope == "local":
+        command = f"cd {shlex.quote(str(project_path))} && {command}"
+    return command
 
 
 def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bool = False,
@@ -49,8 +65,16 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
             print("No installation found in state")
             sys.exit(1)
 
-    if project_path is None and scope == 'local':
-        project_path = Path.cwd()
+    # Local targets (rules, CLAUDE.md, skills) resolve against the working
+    # directory. An explicit project is placed from inside that project, so
+    # regenerating it from another folder never writes into that folder.
+    placement_dir = contextlib.nullcontext()
+    if scope == 'local':
+        if project_path is None:
+            project_path = Path.cwd()
+        else:
+            project_path = Path(project_path).resolve()
+            placement_dir = contextlib.chdir(project_path)
 
     scope_state = get_scope(current_state, scope, project_path, profile_label=profile_label)
     if scope_state is None:
@@ -85,55 +109,56 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
     print(f"Regenerating {scope} installation...")
     
     total_files = 0
-    
-    for cli_name in target_clis:
-        backend = registry.get(cli_name)
-        # Apply profile overrides from state
-        bs = scope_state.clis.get(cli_name)
-        if bs:
-            if bs.local_dir_override:
-                backend = backend.with_local_dir(bs.local_dir_override)
-            if bs.global_home_override:
-                backend = backend.with_global_home(Path(bs.global_home_override).expanduser())
-        print(f"\n{backend.label}:")
 
-        # Generate agents
-        if backend.supports("agents"):
-            files = generate_agent_files(
-                agents_config,
-                state=current_state,
-                scope=scope,
-                project_path=project_path,
-                profile_label=profile_label
-            )
-            # Count files for this CLI
-            try:
-                cli_files = [f for f in files if backend.name in str(f)]
-                if cli_files:
-                    print(f"  ✓ {len(cli_files)} agents regenerated")
-                    total_files += len(cli_files)
-            except (TypeError, AttributeError):
-                # Handle case where files is mocked or has unexpected structure
-                print(f"  ✓ agents regenerated")
+    with placement_dir:
+        for cli_name in target_clis:
+            backend = registry.get(cli_name)
+            # Apply profile overrides from state
+            bs = scope_state.clis.get(cli_name)
+            if bs:
+                if bs.local_dir_override:
+                    backend = backend.with_local_dir(bs.local_dir_override)
+                if bs.global_home_override:
+                    backend = backend.with_global_home(Path(bs.global_home_override).expanduser())
+            print(f"\n{backend.label}:")
+
+            # Generate agents
+            if backend.supports("agents"):
+                files = generate_agent_files(
+                    agents_config,
+                    state=current_state,
+                    scope=scope,
+                    project_path=project_path,
+                    profile_label=profile_label
+                )
+                # Count files for this CLI
+                try:
+                    cli_files = [f for f in files if backend.name in str(f)]
+                    if cli_files:
+                        print(f"  ✓ {len(cli_files)} agents regenerated")
+                        total_files += len(cli_files)
+                except (TypeError, AttributeError):
+                    # Handle case where files is mocked or has unexpected structure
+                    print(f"  ✓ agents regenerated")
         
-        # Regenerate other components as needed
-        from ..services import installer
+            # Regenerate other components as needed
+            from ..services import installer
         
-        # Regenerate rules for backends that support them
-        if backend.supports("rules"):
-            installer.install_component_for_backend(backend, "rules", scope, scope_state.mode == "copy")
-            print(f"  ✓ rules regenerated for {backend.label}")
+            # Regenerate rules for backends that support them
+            if backend.supports("rules"):
+                installer.install_component_for_backend(backend, "rules", scope, scope_state.mode == "copy")
+                print(f"  ✓ rules regenerated for {backend.label}")
         
-        # Regenerate global config files
-        if backend.layout.get("config"):
-            installer.install_component_for_backend(backend, "config", scope, scope_state.mode == "copy")
-            print(f"  ✓ config regenerated for {backend.label}")
+            # Regenerate global config files
+            if backend.layout.get("config"):
+                installer.install_component_for_backend(backend, "config", scope, scope_state.mode == "copy")
+                print(f"  ✓ config regenerated for {backend.label}")
         
-        # Regenerate skills (static files, just ensure they're synced)
-        if backend.supports("skills"):
-            installer.install_component_for_backend(backend, "skills", scope, scope_state.mode == "copy")
-            print(f"  ✓ skills regenerated for {backend.label}")
-    
+            # Regenerate skills (static files, just ensure they're synced)
+            if backend.supports("skills"):
+                installer.install_component_for_backend(backend, "skills", scope, scope_state.mode == "copy")
+                print(f"  ✓ skills regenerated for {backend.label}")
+
     # Update installed manifest to reflect current state
     try:
         # Get current role_models/role_efforts and overrides from state to preserve them

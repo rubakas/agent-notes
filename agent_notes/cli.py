@@ -21,14 +21,14 @@ USAGE = (
 # Per-command default-behavior hints shown inline next to the description.
 # These describe what happens when the command is run with no flags.
 COMMAND_DEFAULTS = {
-    "install":   "default: interactive wizard",
+    "install":   "default: review screen",
     "uninstall": "default: both scopes",
     "doctor":    "default: global scope, read-only",
 }
 
 # (command, explanation) pairs — rendered with color in _build_epilog()
 EXAMPLES = [
-    ("agent-notes install",                    "Interactive wizard (recommended)"),
+    ("agent-notes install",                    "Review screen with the recommended setup"),
     ("agent-notes install --local",            "Install into current project (Claude + OpenCode, symlinks)"),
     ("agent-notes install --local --copy",     "Same, but copy files (allows local edits)"),
     ("agent-notes doctor --fix",               "Check and repair installation"),
@@ -225,7 +225,7 @@ def main():
     p_install.add_argument("--local", action="store_true", help="Install to current project")
     p_install.add_argument("--copy", action="store_true", help="Copy instead of symlink (with --local)")
     p_install.add_argument("--reconfigure", action="store_true",
-        help="Clear existing state for this scope and re-run the wizard")
+        help="Clear existing state for this scope and open the review screen")
     p_install.add_argument("--profile", metavar="LABEL",
         help="Profile label for multi-subscription setups (e.g. work, personal)")
     p_install.add_argument("--folder", metavar="DIR",
@@ -324,7 +324,7 @@ def main():
     p_config = subparsers.add_parser("config", help="Reconfigure role/agent/model/memory/skill assignments after install")
     p_config.add_argument("action", nargs="?", default="wizard",
         choices=["wizard", "show", "role-model", "role-agent", "role-effort", "provider", "providers", "memory", "cost-report"],
-        help="Config action (default: wizard)")
+        help="Config action (default: the review screen)")
     p_config.add_argument("extra", nargs="*",
         help="Additional positional args (role, model, agent). For role-model the model may be "
              "a list index; omit it to print the numbered list")

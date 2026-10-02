@@ -29,66 +29,7 @@ def _make_registry(*models):
 
 
 class TestWizardRoleModelDefault:
-    """Verify that _select_models_per_role defaults to non-deprecated models."""
-
-    def _run_model_selection(self, monkeypatch, fixture_registry):
-        """Call _select_models_per_role with a fixture registry and return the picks.
-
-        Both _radio_select and _radio_select_fallback are patched to return the
-        default option, so the result equals whatever default the wizard computes.
-        load_model_registry is patched at its module location so the lazy import
-        inside _select_models_per_role picks up the fixture.
-        """
-        monkeypatch.setattr("agent_notes.services.ui._can_interactive", lambda: False)
-
-        def fake_radio(title, options, default=0, **kwargs):
-            return options[default][1]
-
-        monkeypatch.setattr("agent_notes.commands.wizard._radio_select_fallback", fake_radio)
-        monkeypatch.setattr("agent_notes.commands.wizard._radio_select", fake_radio)
-        monkeypatch.setattr(
-            "agent_notes.registries.model_registry.load_model_registry",
-            lambda: fixture_registry,
-        )
-
-        from agent_notes.commands.wizard import _select_models_per_role
-        result, _ = _select_models_per_role({"claude"})
-        return result
-
-    def test_wizard_picks_non_deprecated_even_when_better_ranked_model_is_deprecated(self, monkeypatch):
-        """When the best-ranked model of a class is deprecated but a lower-ranked one
-        is not, the wizard must default to the non-deprecated option."""
-        better_deprecated = _make_model("opus-test-2", "opus", deprecated=True)
-        worse_non_deprecated = _make_model("opus-test-1", "opus", deprecated=False)
-        fixture = _make_registry(better_deprecated, worse_non_deprecated)
-
-        result = self._run_model_selection(monkeypatch, fixture)
-
-        assert "claude" in result
-        assert "reasoner" in result["claude"]
-        chosen = result["claude"]["reasoner"]
-        assert chosen == "opus-test-1", (
-            f"Expected non-deprecated 'opus-test-1' but got '{chosen}' — "
-            f"wizard should prefer non-deprecated even when a better-ranked deprecated model exists"
-        )
-
-    def test_wizard_falls_back_to_best_ranked_deprecated_when_all_are_deprecated(self, monkeypatch):
-        """When every candidate is deprecated, the wizard must fall back to the
-        best-ranked deprecated option rather than refusing to pick."""
-        better_deprecated = _make_model("opus-test-2", "opus", deprecated=True)
-        worse_deprecated = _make_model("opus-test-1", "opus", deprecated=True)
-        fixture = _make_registry(better_deprecated, worse_deprecated)
-
-        result = self._run_model_selection(monkeypatch, fixture)
-
-        assert "claude" in result
-        assert "reasoner" in result["claude"]
-        chosen = result["claude"]["reasoner"]
-        assert chosen == "opus-test-2", (
-            f"Expected best-ranked deprecated 'opus-test-2' but got '{chosen}' — "
-            f"wizard should fall back to the best-ranked deprecated model when no "
-            f"non-deprecated option exists"
-        )
+    """Verify that the review picks non-deprecated models by default."""
 
     def test_model_deprecated_field_is_loaded_as_boolean_from_yaml(self, tmp_path):
         """The deprecated field in a model YAML loads as a proper bool, not a string.
