@@ -274,14 +274,29 @@ class Checklist:
 
     def render(self, width: int, height: int) -> list[str]:
         style = self.style
-        lines = [bar(f" {style(self.title, BOLD)}", "", width), style("─" * width, DIM)]
-        lines += [style(f"   {line}", DIM) for line in self.fixed]
-        for index, (label, value) in enumerate(self.items):
-            pointer = style("›", CYAN) if index == self.cursor else " "
+        top = [bar(f" {style(self.title, BOLD)}", "", width), style("─" * width, DIM)]
+        top += [style(f"   {line}", DIM) for line in self.fixed]
+        bottom = [style("─" * width, DIM), f" {self.hints}"]
+        room = max(1, height - len(top) - len(bottom))
+        count = len(self.items)
+        if count <= room:
+            start, end = 0, count
+        else:
+            span = max(1, room - 2)  # two lines kept for the ↑/↓ markers
+            start = min(max(0, self.cursor - span // 2), count - span)
+            end = start + span
+        body = []
+        if start > 0:
+            body.append(style(f"     ↑ {start} more", DIM))
+        for index in range(start, end):
+            label, value = self.items[index]
+            here = index == self.cursor
+            pointer = style("›", CYAN) if here else " "
             check = "✓" if value in self.selected else " "
-            lines.append(f" {pointer} [{check}] {label}")
-        lines += [style("─" * width, DIM), f" {self.hints}"]
-        return [fit(line, width) for line in lines[:height]]
+            body.append(f" {pointer} [{check}] {label}")
+        if end < count:
+            body.append(style(f"     ↓ {count - end} more", DIM))
+        return [fit(line, width) for line in top + body + bottom]
 
 
 class TextField:
@@ -349,7 +364,7 @@ def complete_path(text: str) -> str:
     import glob
     import os
     expanded = os.path.expanduser(text)
-    matches = sorted(glob.glob(expanded + "*"))
+    matches = sorted(glob.glob(glob.escape(expanded) + "*"))
     if not matches:
         return text
     common = os.path.commonprefix(matches)

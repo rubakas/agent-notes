@@ -99,3 +99,20 @@ def test_complete_path_keeps_a_tilde(monkeypatch, tmp_path):
 
 def test_complete_path_without_a_match_changes_nothing(tmp_path):
     assert complete_path(str(tmp_path / "zzz")) == str(tmp_path / "zzz")
+
+
+def test_long_checklists_scroll_and_keep_the_footer():
+    items = [(f"skill-{i}", f"s{i}") for i in range(30)]
+    checklist = Checklist("Skills", items, set())
+    for _ in range(25):
+        checklist.handle(DOWN)
+    lines = checklist.render(80, 12)
+    assert len(lines) <= 12
+    assert any("skill-25" in line for line in lines)
+    assert lines[-1].startswith(" ↑↓ move")
+    assert any("more" in line for line in lines)
+
+
+def test_complete_path_handles_brackets_in_names(tmp_path):
+    (tmp_path / "Notes [work]").mkdir()
+    assert complete_path(str(tmp_path / "Notes [w")) == str(tmp_path / "Notes [work]") + "/"
