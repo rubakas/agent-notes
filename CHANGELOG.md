@@ -30,9 +30,9 @@ All notable changes to this project will be documented in this file.
 
 - **Cost reporting is now opt-in (default: disabled).** Previously, the per-response token-usage table was appended to every Claude Code / OpenCode response by default. It is now disabled for new installs. Existing users whose config does not contain `cost_report_enabled` will also see reporting disabled after upgrading. To opt in, run `agent-notes config cost-report on` then `agent-notes regenerate`.
 
-- The install wizard now includes a step asking whether to enable cost reporting (default: No).
+- Cost reporting is a "Cost report" row on the install review screen (default: off).
 
-- Memory backend is now selected via a single flat menu: `default - Claude Code built-in md files` (default), `Obsidian - session`, `Obsidian - brain`, `None`.
+- Memory is a "Memory" row on the review screen: `built-in` (default) or `Obsidian` (single-brain or per-project strategy).
 
 - Chrome-test handoff uses uuid-correlated bus files (`request-<uuid>.md` / `progress-<uuid>.md` / `report-<uuid>.md`), path-only handoff, `X/N` step progress, and supports parallel requests.
 

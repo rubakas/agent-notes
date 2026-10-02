@@ -12,7 +12,7 @@ agent-notes doctor
 
 `agent-notes install` opens one review screen with every setting pre-filled. `i` installs, `⏎` edits a row, `←→` changes simple values, `q` quits. Small terminals (under 60×16) get numbered prompts instead; with no terminal, the recommended setup installs without prompts.
 
-`agent-notes config` opens the same screen on an existing install: `u` moves deprecated pins to ★, `tab` switches installs, `s` saves everything at once. The scriptable `config` subcommands are unchanged.
+`agent-notes config` opens the same screen on an existing install: `u` moves deprecated pins to ★, `tab` switches installs, `s` shows the changes and saves everything at once, and `q` asks before discarding staged edits. The scriptable `config` subcommands are unchanged.
 
 > No `pipx`? Use `uv tool install agent-notes` instead, or see **Troubleshooting: externally-managed-environment** below.
 
@@ -99,7 +99,7 @@ To produce a release artifact (wheel for distribution), use `python -m build` + 
 - **Claude Code**: install via the Claude Code plugin marketplace or copy/symlink `.claude-plugin/` into `~/.claude/plugins/agent-notes/`.
 - **OpenCode**: copy or symlink `.claude-plugin/` into `~/.config/opencode/plugins/agent-notes/` and add `"plugin": ["agent-notes"]` to `opencode.json`.
 
-The plugin runs a `session.start` hook that surfaces agent-notes context to the CLI session. It does **not** include the full `agent-notes` CLI (wizard, doctor, config, memory, etc.). For those, use install method 1 or 2.
+The plugin runs a `session.start` hook that surfaces agent-notes context to the CLI session. It does **not** include the full `agent-notes` CLI (review screen, doctor, config, memory, etc.). For those, use install method 1 or 2.
 
 ---
 
@@ -141,7 +141,7 @@ Provider API keys live in `~/.agent-notes/credentials.toml` (mode 0600, never co
 agent-notes config providers
 ```
 
-The wizard prompts for the key with hidden input; agent-notes never logs or prints the value. To check whether a provider is configured without exposing the key:
+The API keys row of `agent-notes config` and `config providers` ask for the key with hidden input; agent-notes never logs or prints the value. To check whether a provider is configured without exposing the key:
 
 ```bash
 agent-notes config provider openrouter   # prints "configured" or "no key"
@@ -329,7 +329,7 @@ agent-notes memory export             # back up to memory-backup/
 agent-notes memory import             # restore from memory-backup/
 ```
 
-**Setup:** Run `agent-notes install` and choose `Obsidian — external Obsidian vault`, then pick a strategy (`single-brain` or `per-project`). The wizard auto-detects vaults under `~/Documents`, `~/Desktop`, and `~`. Then run `agent-notes memory init`.
+**Setup:** Run `agent-notes install` and choose `Obsidian — external Obsidian vault`, then pick a strategy (`single-brain` or `per-project`). The Memory row's Obsidian editor lists vaults detected under `~/Documents`, `~/Desktop`, and `~`. Then run `agent-notes memory init`.
 
 </details>
 
@@ -460,7 +460,7 @@ agent-notes set role explorer claude-haiku-4-5-20251001
 agent-notes supports multiple API providers for routing requests. Configure providers via:
 
 ```bash
-agent-notes config providers     # interactive wizard
+agent-notes config providers     # enter a provider API key (hidden input)
 agent-notes config provider <name>      # check if configured (without exposing key)
 ```
 
@@ -508,7 +508,7 @@ This command swaps any wheel install for an editable one and clears your Claude 
 
 **Profiles:**
 
-By default, `agent-notes install` re-runs the interactive wizard and prompts for an optional profile label. To reinstall non-interactively into the same profile, use `agent-notes install --profile <label>` (e.g. `work` → installs into `~/.claude-work`).
+By default, `agent-notes install` opens the review screen, where the Profile row sets an optional label, local folder and global home. To reinstall non-interactively into the same profile, use `agent-notes install --profile <label>` (e.g. `work` → installs into `~/.claude-work`).
 
 The plugin build scripts (`scripts/build-claude-plugin.sh`, `scripts/build-opencode-plugin.sh`) automatically use `.venv/bin/python` when present, fall back to system `python3`, and honor a `PYTHON=` override.
 
