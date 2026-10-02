@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **`q` at the install confirmation quits the installer.** It ignored the key; it now restores `dist/` and prints "Installation cancelled." like `q` on the review screen (footer: `⏎ yes · esc back · q quit`, line mode `[Y/n/q]`). In `config`, `q` at "Apply N changes?" and "Discard N changes?" means no and never discards.
+
 - **Esc no longer confirms a choice, and a bare Esc no longer waits for two more keys.** Esc now always means back/cancel and is recognized immediately. `NO_COLOR` is honoured. `agent-notes config` no longer exits with "No local installation found" when run outside a project with only local installs. Config saves regenerate the install that was edited, not whichever one auto-detection finds. A failed restore after declining an install is now reported, and Ctrl-C at the install question restores `dist/`.
 
 - **Regenerating a local install from another folder writes into that install's project.** `regenerate` placed a local install's rules, `CLAUDE.md` and skills relative to the folder it ran from, so saving `agent-notes config` for a local install elsewhere wrote them into the current folder (run from `~`: into `~/.claude` and `~/CLAUDE.md`). They now go into the install's own project, and config refuses to save an install whose folder no longer exists.
