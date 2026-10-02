@@ -75,23 +75,23 @@ def _review(ui, choices: InstallChoices, catalog: Catalog, cli_registry) -> bool
             form.message = "select at least one CLI"
             return None
         ui.progress(form, "Building…")
-        error = _build(choices)
+        error, confirmed = None, False
+        try:
+            error = _build(choices)
+            if not error:
+                question, lines = _plan_summary(choices, cli_registry)
+                confirmed = ui.confirm(form, question, lines)
+        finally:
+            # Anything but a yes — a failed build, a no, Ctrl-C, line mode's
+            # exit on Ctrl-D — must not leave this run's picks in dist/.
+            restore_error = None if confirmed else _restore(choices)
+        if confirmed:
+            return DONE
         if error:
-            restore_error = _restore(choices)
             form.message = f"Build failed: {error}"
             if restore_error:
                 form.message += f"; restore failed: {restore_error} — run agent-notes regenerate"
-            return None
-        try:
-            question, lines = _plan_summary(choices, cli_registry)
-            confirmed = ui.confirm(form, question, lines)
-        except KeyboardInterrupt:
-            _restore(choices)
-            raise
-        if confirmed:
-            return DONE
-        restore_error = _restore(choices)
-        if restore_error:
+        elif restore_error:
             form.message = f"Restore failed: {restore_error} — run agent-notes regenerate"
         return None
 

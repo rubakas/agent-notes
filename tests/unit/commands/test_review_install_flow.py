@@ -207,3 +207,32 @@ def test_ctrl_c_at_confirm_restores_then_cancels(calls, capsys):
     assert calls.kinds() == ["build", "plan", "build"]
     assert "role_models" not in calls.of("build")[1]
     assert "Cancelled." in capsys.readouterr().out
+
+
+def test_ctrl_c_during_the_build_restores_then_cancels(calls, monkeypatch, capsys):
+    def interrupted_build(**kwargs):
+        calls.append(("build", kwargs))
+        if "role_models" in kwargs:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(orchestrator, "build", interrupted_build)
+    orchestrator.interactive_install(session_factory=lambda: tui_session("i"))
+    assert calls.kinds() == ["build", "build"]
+    assert "role_models" not in calls.of("build")[1]
+    assert "Cancelled." in capsys.readouterr().out
+
+
+def test_line_mode_ctrl_c_at_the_question_restores_then_exits(calls, monkeypatch):
+    answers = iter(["", SystemExit(0)])   # enter = install, then Ctrl-C at "Install …?"
+
+    def line_input(prompt, default=""):
+        answer = next(answers)
+        if isinstance(answer, BaseException):
+            raise answer   # what _safe_input does on Ctrl-C / Ctrl-D
+        return answer or default
+
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", line_input)
+    with pytest.raises(SystemExit):
+        _run(session=LineSession())
+    assert calls.kinds() == ["build", "plan", "build"]
+    assert "role_models" not in calls.of("build")[1]
