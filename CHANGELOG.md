@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **`doctor` and `doctor --fix` work again.** Both crashed with an `ImportError` in the stale-file check (the installer module had moved), so no check ever ran. A test now verifies that every `from X import name` in the package resolves.
+
+- **`set role` works again.** It crashed after saving the pin, on a wrong import for the regenerate step.
+
+- **`regenerate` restores everything after a pipx reinstall or upgrade, and no longer adds or drops CLIs.** A reinstall leaves the package without its rendered `dist/`, and `regenerate` only re-placed agents, so rules, skills, commands and `CLAUDE.md` stayed dangling links while it printed "✓" for each. It now renders `dist/` first (the same build `install` runs) and places every component, commands included. It also kept recording every CLI that had content in `dist/`, widening or shrinking the install; it now keeps exactly the CLIs you installed. The agent count no longer includes files whose path merely contains the CLI's name ("Regenerated 55 files" for 18 agents).
+
+- **A missing source is an error, not a success.** a missing agents configuration used to make `build` print "Error" and exit 0, and it now exits 1; an invalid one is now reported cleanly ("Build failed: …", exit 1) instead of a traceback; a fresh `install` whose build fails now exits 1 too; `regenerate` exits 1 naming the CLI and component when nothing was rendered for it; and `install` on an existing install reports a failed rebuild as an error instead of a warning followed by "Installation is healthy".
+
+- **`install`'s verify step reports broken links.** An installed link whose target no longer exists counted as present; it is now reported as missing.
+
 - **`q` at the install confirmation quits the installer.** It ignored the key; it now restores `dist/` and prints "Installation cancelled." like `q` on the review screen (footer: `⏎ yes · esc back · q quit`, line mode `[Y/n/q]`). In `config`, `q` at "Apply N changes?" and "Discard N changes?" means no and never discards.
 
 - **Esc no longer confirms a choice, and a bare Esc no longer waits for two more keys.** Esc now always means back/cancel and is recognized immediately. `NO_COLOR` is honoured. `agent-notes config` no longer exits with "No local installation found" when run outside a project with only local installs. Config saves regenerate the install that was edited, not whichever one auto-detection finds. A failed restore after declining an install is now reported, and Ctrl-C at the install question restores `dist/`.
