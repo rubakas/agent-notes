@@ -285,9 +285,14 @@ def describe_changes(original, working, ref: InstallRef, plugins_before: dict,
     return lines
 
 
+class RegenerateFailed(Exception):
+    """The settings were written; rendering them into the install failed."""
+
+
 def apply_changes(working, ref: InstallRef, plugins_before: dict, plugins_after: dict) -> None:
     """One state write and one regenerate — of the edited install, not
-    whatever regenerate would auto-detect (spec 005 Correction 3)."""
+    whatever regenerate would auto-detect (spec 005 Correction 3). A failure
+    after the write raises RegenerateFailed: the settings are saved by then."""
     from ..services.state_store import record_install_state
     from .plugins import disable_plugin, enable_plugin
     from .regenerate import regenerate
@@ -297,7 +302,11 @@ def apply_changes(working, ref: InstallRef, plugins_before: dict, plugins_after:
         for name in sorted(plugins_after):
             if bool(plugins_after[name]) != bool(plugins_before.get(name)):
                 (enable_plugin if plugins_after[name] else disable_plugin)(name)
-        regenerate(scope=ref.scope, project_path=ref.project_path, profile_label=ref.profile_label)
+        try:
+            regenerate(scope=ref.scope, project_path=ref.project_path,
+                       profile_label=ref.profile_label)
+        except (Exception, SystemExit) as e:
+            raise RegenerateFailed(str(e) or type(e).__name__) from e
 
 
 def interactive_config(session_factory=None, cwd: Optional[Path] = None) -> None:
@@ -356,9 +365,15 @@ def _config_review(ui, state, refs: list[InstallRef], cwd: Path) -> str:
             return None
         if not ui.confirm(form, f"Apply {_changes_text(len(diff))}?", diff):
             return None
+        nonlocal state, plugins_before
         ui.progress(form, "Saving…")
         try:
             apply_changes(working, ctx.ref, plugins_before, ctx.plugins)
+        except RegenerateFailed as e:
+            # Written, so it is what is saved now: nothing left to stage or discard.
+            state, plugins_before = copy.deepcopy(working), dict(ctx.plugins)
+            form.message = f"State saved; regenerate failed — run agent-notes regenerate: {e}"
+            return None
         except (Exception, SystemExit) as e:
             form.message = f"Save failed: {e}"
             return None

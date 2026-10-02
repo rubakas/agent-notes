@@ -91,10 +91,24 @@ def test_only_local_installs_elsewhere_ask_which_one(env, tmp_path):
     assert "Which install?" in "\n".join(ui.term.frames[0])
 
 
-def test_a_failed_save_says_so_and_stays_open(env):
-    env["regenerate"].side_effect = RuntimeError("boom")
+def test_a_failed_state_write_says_so_and_keeps_the_edits_staged(env):
+    env["record"].side_effect = OSError("read-only")
     ui = _run(env, "u", "s", ENTER, "q", ENTER)
-    assert any("Save failed: boom" in "\n".join(frame) for frame in ui.term.frames)
+    frames = ["\n".join(frame) for frame in ui.term.frames]
+    assert any("Save failed: read-only" in frame for frame in frames)
+    assert any("Discard 1 change?" in frame for frame in frames)
+    env["regenerate"].assert_not_called()
+
+
+def test_a_failed_regenerate_keeps_the_saved_state_as_the_new_baseline(env):
+    env["regenerate"].side_effect = RuntimeError("boom")
+    ui = _run(env, "u", "s", ENTER, "s", "q")   # nothing left to save, q quits at once
+    frames = ["\n".join(frame) for frame in ui.term.frames]
+    assert any("State saved; regenerate failed — run agent-notes regenerate: boom" in frame
+               for frame in frames)
+    assert any("no changes to save" in frame for frame in frames)
+    assert not any("Discard" in frame for frame in frames)
+    env["record"].assert_called_once()
 
 
 def test_saving_a_local_install_from_another_folder_places_files_in_that_project(
