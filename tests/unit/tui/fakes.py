@@ -40,3 +40,40 @@ class ScriptedKeys:
 def typed(text: str) -> list[str]:
     """Key names for typing *text* (a space is the SPACE key)."""
     return ["space" if ch == " " else ch for ch in text]
+
+
+import re as _re
+
+_ANSI = _re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+class FakeTerminal:
+    """Fixed-size terminal that keeps every painted frame, cut to width the way
+    Terminal.paint cuts it."""
+
+    def __init__(self, width: int = 80, height: int = 24):
+        self.width, self.height = width, height
+        self.frames: list[list[str]] = []
+        self.entered = self.exited = False
+
+    def __enter__(self):
+        self.entered = True
+        return self
+
+    def __exit__(self, *exc):
+        self.exited = True
+        return False
+
+    def size(self):
+        return self.width, self.height
+
+    def paint(self, lines):
+        from agent_notes.services.tui.screen import fit
+        self.frames.append([fit(line, self.width) for line in list(lines)[: self.height]])
+
+    @property
+    def last(self) -> list[str]:
+        return self.frames[-1]
+
+    def text(self, frame: int = -1) -> str:
+        return "\n".join(_ANSI.sub("", line) for line in self.frames[frame])

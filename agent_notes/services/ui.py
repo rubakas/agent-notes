@@ -41,8 +41,8 @@ class Color:
             setattr(Color, attr, "")
 
 
-# Disable colors if not a TTY
-if not sys.stdout.isatty():
+# Disable colors off a terminal, and whenever NO_COLOR is set (no-color.org).
+if not sys.stdout.isatty() or os.environ.get("NO_COLOR"):
     Color.disable()
 
 
