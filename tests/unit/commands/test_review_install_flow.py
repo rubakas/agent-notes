@@ -113,7 +113,7 @@ def test_a_failed_build_restores_shows_why_and_never_confirms(calls, monkeypatch
     monkeypatch.setattr(orchestrator, "build", failing_build)
     ui = _run("i", "q")
     assert calls.kinds() == ["build", "build"]
-    assert "Build failed: disk full" in ui.term.text()
+    assert "Build failed — disk full" in ui.term.text()
 
 
 def test_no_cli_selected_refuses_to_build(calls):
@@ -197,8 +197,35 @@ def test_a_failed_restore_is_reported(calls, monkeypatch):
 
     monkeypatch.setattr(orchestrator, "build", build_failing_on_restore)
     ui = _run("i", ESCAPE, "q")
-    assert "Restore failed: locked" in ui.term.text()
-    assert "agent-notes regenerate" in ui.term.text()
+    assert "Restore failed — run agent-notes regenerate: locked" in ui.term.text()
+
+
+LONG_ERROR = "permission denied while writing " + "/very/long/path" * 8
+
+
+def test_a_long_restore_error_keeps_the_instruction_on_screen(calls, monkeypatch):
+    def build_failing_on_restore(**kwargs):
+        calls.append(("build", kwargs))
+        if "role_models" not in kwargs:
+            raise RuntimeError(LONG_ERROR)
+
+    monkeypatch.setattr(orchestrator, "build", build_failing_on_restore)
+    ui = _run("i", ESCAPE, "q")
+    footers = [frame[-1] for frame in ui.term.frames]
+    assert any(footer.startswith(" Restore failed — run agent-notes regenerate: ")
+               for footer in footers)
+
+
+def test_a_failed_build_and_restore_lead_with_the_instruction(calls, monkeypatch):
+    def build_always_failing(**kwargs):
+        calls.append(("build", kwargs))
+        raise RuntimeError(LONG_ERROR)
+
+    monkeypatch.setattr(orchestrator, "build", build_always_failing)
+    ui = _run("i", "q")
+    footers = [frame[-1] for frame in ui.term.frames]
+    assert any(footer.startswith(" Build and restore failed — run agent-notes regenerate: ")
+               for footer in footers)
 
 
 def test_ctrl_c_at_confirm_restores_then_cancels(calls, capsys):

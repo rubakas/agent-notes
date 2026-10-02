@@ -127,7 +127,7 @@ def test_a_message_takes_the_whole_footer_line():
     hints = "↑↓ move   ⏎ edit   ←→ change   i install   q quit"
     form, _ = _form()
     form.hints = hints
-    message = "Build failed: disk full; restore failed: locked — run agent-notes regen"
+    message = "Build and restore failed — run agent-notes regenerate: disk full; locked"
     assert len(message) >= 70
     form.message = message
     last = form.render(80, 24)[-1]

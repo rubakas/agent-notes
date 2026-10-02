@@ -43,11 +43,11 @@ def _interactive_install(session_factory=open_session) -> None:
         print("No terminal attached — installing the recommended setup.")
         error = _build(choices)
         if error:
-            print(f"{Color.RED}Build failed: {error}{Color.NC}")
+            print(f"{Color.RED}Build failed — {error}{Color.NC}")
             restore_error = _restore(choices)
             if restore_error:
-                print(f"{Color.YELLOW}Restore failed: {restore_error} — "
-                      f"run agent-notes regenerate{Color.NC}")
+                print(f"{Color.YELLOW}Restore failed — run agent-notes regenerate: "
+                      f"{restore_error}{Color.NC}")
             return
         _install(choices)
         return
@@ -87,12 +87,14 @@ def _review(ui, choices: InstallChoices, catalog: Catalog, cli_registry) -> bool
             restore_error = None if confirmed else _restore(choices)
         if confirmed:
             return DONE
-        if error:
-            form.message = f"Build failed: {error}"
-            if restore_error:
-                form.message += f"; restore failed: {restore_error} — run agent-notes regenerate"
+        # The instruction leads: a long error is what the width cuts.
+        if error and restore_error:
+            form.message = (f"Build and restore failed — run agent-notes regenerate: "
+                            f"{error}; {restore_error}")
+        elif error:
+            form.message = f"Build failed — {error}"
         elif restore_error:
-            form.message = f"Restore failed: {restore_error} — run agent-notes regenerate"
+            form.message = f"Restore failed — run agent-notes regenerate: {restore_error}"
         return None
 
     form.commands.update({"i": install_command, "q": lambda: CANCEL})

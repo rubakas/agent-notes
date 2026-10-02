@@ -95,7 +95,7 @@ def test_a_failed_state_write_says_so_and_keeps_the_edits_staged(env):
     env["record"].side_effect = OSError("read-only")
     ui = _run(env, "u", "s", ENTER, "q", ENTER)
     frames = ["\n".join(frame) for frame in ui.term.frames]
-    assert any("Save failed: read-only" in frame for frame in frames)
+    assert any("Save failed — read-only" in frame for frame in frames)
     assert any("Discard 1 change?" in frame for frame in frames)
     env["regenerate"].assert_not_called()
 

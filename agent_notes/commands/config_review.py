@@ -376,7 +376,7 @@ def _config_review(ui, state, refs: list[InstallRef], cwd: Path) -> str:
             form.message = f"State saved; regenerate failed — run agent-notes regenerate: {e}"
             return None
         except (Exception, SystemExit) as e:
-            form.message = f"Save failed: {e}"
+            form.message = f"Save failed — {e}"
             return None
         form.value = f"Saved {_changes_text(len(diff))}. Restart your AI CLI to pick up changes."
         return DONE
