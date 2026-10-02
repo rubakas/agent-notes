@@ -45,13 +45,8 @@ def _get_scope_state(state, scope: Optional[str] = None, project_path: Optional[
     return scope, project_path, scope_state
 
 
-def _validate_model(model_id: str, fatal: bool = True):
-    """Validate model exists in registry.
-
-    Returns the model, or None when it is unknown and *fatal* is False. The
-    scriptable commands exit 1 on an unknown id; the wizard passes fatal=False
-    so a typo drops back to the menu instead of killing the session.
-    """
+def _validate_model(model_id: str):
+    """Return the model; an unknown id prints the known ones and exits 1."""
     from ..registries.model_registry import load_model_registry
     registry = load_model_registry()
     try:
@@ -59,9 +54,7 @@ def _validate_model(model_id: str, fatal: bool = True):
     except KeyError:
         print(f"Unknown model: {model_id}")
         print(f"Available models: {', '.join(registry.ids())}")
-        if fatal:
-            sys.exit(1)
-        return None
+        sys.exit(1)
 
 
 def compatible_models_for(backend, registry=None) -> list:
@@ -305,23 +298,19 @@ def _resolve_index(raw_index: str, target_clis: list) -> str:
     return model_id
 
 
-def _target_clis(scope_state, cli_filter: Optional[str], scope: str,
-                 fatal: bool = True) -> Optional[list]:
+def _target_clis(scope_state, cli_filter: Optional[str], scope: str) -> list:
     """CLIs a role command applies to: one named CLI, or every installed CLI.
 
     A falsy filter or the literal "both" means all of them. An unknown name is
     never silently widened to "both" — that would write the change to CLIs the
-    user did not ask for. It exits 1 for the scriptable commands, or returns
-    None when *fatal* is False so the wizard can stay interactive.
+    user did not ask for: it exits 1.
     """
     if not cli_filter or cli_filter == "both":
         return list(scope_state.clis.keys())
     if cli_filter not in scope_state.clis:
         print(f"CLI '{cli_filter}' not in {scope} installation.")
         print(f"Installed CLIs: {', '.join(scope_state.clis.keys())}")
-        if fatal:
-            sys.exit(1)
-        return None
+        sys.exit(1)
     return [cli_filter]
 
 

@@ -1,9 +1,5 @@
-"""The `config` wizard branches must never call sys.exit on user typos.
-
-`role-model` / `role-effort` are scriptable and exit 1 on an unknown CLI or model
-id. The wizard shares those helpers, but a mistyped answer there has to print a
-message and drop back to the menu — exiting would kill the whole session.
-"""
+"""`role-model` / `role-effort` are scriptable: an unknown CLI or model id
+prints why and exits 1."""
 
 import json
 import pytest
