@@ -54,6 +54,8 @@ Found while writing the implementation plan; each keeps today's behavior where t
 2. **API keys save when entered.** They live in the credentials file, outside `state.json` and regenerate, as today (`_wizard_providers`). The API-keys editor writes a key as soon as it is entered and is not part of the staged edits FR-017 counts. The optional `base_url` prompt that follows a key today is kept.
 3. **Config regenerates the install it edits.** Today's `_apply_and_regenerate` calls `regenerate()` with no arguments, which auto-detects global-else-cwd — the wrong install when the edited one is a local install elsewhere. The config save passes the edited install's scope, project path and profile label.
 4. **`_confirm_install` and `_render_install_summary` are removed** — the review screen and the inline confirmation replace them. `_format_role_model_display` stays: the post-install summary (`execute._render_configuration`) uses it.
+5. **Esc on an editor form keeps what was changed in it.** The Models table, the Obsidian editor and the Profile editor are forms whose changes apply as you make them; Esc closes the form and keeps them. Esc in a picker, a checklist or a text field cancels that one edit with no change.
+6. **Line-mode yes/no questions re-ask on an unclear answer, and discarding defaults to No.** An answer other than y/yes/n/no (any case) prints "please answer y or n" and asks again; an empty answer takes the question's default — yes for "Apply N changes?" and the install question, No for "Discard N changes?" (`[y/N]`). The full screen is unchanged: ⏎ yes, Esc no.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -217,16 +219,16 @@ Every interactive screen uses one header, one footer, one vocabulary and one mea
 
 ## Verification
 
-Measured 2026-10-02 on branch `feat/install-config-review-screen`. All ten criteria are met.
+Measured 2026-10-02 on branch `feat/install-config-review-screen`, re-run after the final review's fix wave. All ten criteria are met.
 
 | SC | Command | Result |
 |---|---|---|
 | SC-001 / SC-002 / SC-009 | `uv run --with pexpect pytest -q tests/functional/test_install_review_pty.py` | 1 passed — one review screen, `i` + ⏎ installs, no line over 80 columns, no build-log lines |
-| SC-003 / SC-004 | `uv run pytest -q tests/unit/commands/test_review_role_models.py -k "star_is or effort_options_match"` | 2 passed, 14 deselected |
-| SC-005 / SC-007 | `uv run pytest -q tests/unit/commands/test_config_review_installs.py tests/unit/commands/test_config_review_flow.py` | 18 passed |
-| SC-006 | `uv run pytest -q tests/unit/tui/test_tui_keys.py tests/unit/tui/test_tui_review_form.py tests/unit/tui/test_tui_picker.py tests/unit/tui/test_tui_inputs.py -k "escape or esc"` | 7 passed, 42 deselected (includes the real-descriptor bare-Esc-under-100 ms test) |
+| SC-003 / SC-004 | `uv run pytest -q tests/unit/commands/test_review_role_models.py -k "star_is or effort_options_match"` | 2 passed, 16 deselected |
+| SC-005 / SC-007 | `uv run pytest -q tests/unit/commands/test_config_review_installs.py tests/unit/commands/test_config_review_flow.py` | 26 passed |
+| SC-006 | `uv run pytest -q tests/unit/tui/test_tui_keys.py tests/unit/tui/test_tui_review_form.py tests/unit/tui/test_tui_picker.py tests/unit/tui/test_tui_inputs.py -k "escape or esc"` | 7 passed, 45 deselected (includes the real-descriptor bare-Esc-under-100 ms test) |
 | SC-008 | `uv run pytest -q tests/unit/tui/test_tui_screen.py -k no_color` | 3 passed, 12 deselected |
-| SC-010 | `uv run pytest -q` | 2305 passed, 1 skipped, 15 deselected (baseline on develop @ 0ebf8c6: 2241 passed, 15 deselected) |
+| SC-010 | `uv run pytest -q` | 2335 passed, 1 skipped, 15 deselected (baseline on develop @ 0ebf8c6: 2241 passed, 15 deselected) |
 | SC-010 | `git diff 0ebf8c6 -- pyproject.toml` | empty — dependencies unchanged |
 
 ### Mutation checks
@@ -239,3 +241,4 @@ Each mutation was applied alone, the named test run, and the edit reverted at on
 | `ReviewForm.handle` returns DONE on ESCAPE always | `test_escape_does_nothing_on_the_top_level_review` fails |
 | `effort_options` skips the CLI subset | `test_effort_options_match_the_config_role_effort_checks` and `test_codex_offers_only_the_efforts_the_cli_accepts` fail |
 | config save calls `regenerate()` without arguments | `test_three_edits_save_with_one_write_and_one_regenerate` fails |
+| `regenerate` places a local install's files without entering its project (the code before the fix wave) | `test_local_placement_runs_inside_the_project_not_the_cwd` and `test_saving_a_local_install_from_another_folder_places_files_in_that_project` fail: files placed from the calling folder |
