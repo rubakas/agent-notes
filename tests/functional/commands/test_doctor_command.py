@@ -564,3 +564,25 @@ class TestUpdateCommandRemoved:
             "agent_notes.commands.update still exists — "
             "the update command should have been removed"
         )
+
+
+class TestDiagnoseRunsEveryCheck:
+    def test_diagnose_global_returns_without_raising(self, tmp_path, monkeypatch, capsys):
+        """No check is mocked: a broken import inside any of them surfaces here."""
+        _patch_state(tmp_path, monkeypatch)
+        home = tmp_path / "home"
+        home.mkdir()
+        monkeypatch.setenv("HOME", str(home))
+        dist = tmp_path / "dist"
+        (dist / "claude" / "agents").mkdir(parents=True)
+        (dist / "claude" / "agents" / "lead.md").write_text("lead")
+        monkeypatch.setattr(config, "DIST_DIR", dist)
+        monkeypatch.setattr(config, "DIST_RULES_DIR", dist / "rules")
+        monkeypatch.setattr(config, "DIST_SKILLS_DIR", dist / "skills")
+        monkeypatch.setattr(config, "AGENTS_HOME", tmp_path / "agents_home")
+
+        from agent_notes.commands.doctor import diagnose
+        result = diagnose("global")
+
+        assert isinstance(result, bool)
+        assert "Traceback" not in capsys.readouterr().out

@@ -33,7 +33,7 @@ def expected_paths_for_install(
 
     Does NOT read state.json — this is "what would be installed if user ran install now".
     """
-    from ... import installer
+    from ...services import installer
     from ...config import AGENTS_HOME, DIST_SKILLS_DIR
 
     expected: list = []
@@ -156,7 +156,7 @@ def check_drift(scope, registry, issues, fix_actions, scope_state=None):
 
 def check_stale(scope, scope_state, registry, issues, fix_actions):
     """State-based check: files listed in state.json whose dist source is gone."""
-    from ... import installer
+    from ...services import installer
 
     if scope_state is None:
         return
@@ -209,7 +209,7 @@ def _find_dist_source(symlink: Path, scope: str) -> Optional[Path]:
     component and filename match the given symlink.
     """
     from ...registries.cli_registry import load_registry
-    from ... import installer
+    from ...services import installer
     registry = load_registry()
 
     symlink = symlink.resolve() if symlink.exists() else Path(os.path.abspath(symlink))
