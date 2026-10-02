@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **New models now appear after an upgrade even if you once ran `models refresh`.** The catalog loader used `~/.cache/agent-notes/catalog.json` whenever it existed, so a single old refresh hid every model a later release shipped — the install wizard, `config role-model`, `list models` and build-time selection all read the stale list (this is how `claude-opus-5-5` went missing). The cache is now used only when its `fetched_at` is at least as new as the bundled catalog's. `models refresh` follows the same rule when it merges a single provider.
+
 - **Guard-credentials no longer denies benign commands containing bare `.key`/`.pem`-style fragments** (e.g. jq selectors such as `"\(.key)"`). Secret-extension matching now requires a non-empty stem (`id_rsa.key` is still denied; a bare `.key` fragment is not), and the same stem requirement is applied to the basename patterns for `.pem`, `.p12`, `.pfx`, `.jks`, `.keystore`, and `.truststore`. The `.env` handling is unchanged — `.env` and `.env.production` remain denied via their dedicated pattern.
 
 ### Added
@@ -16,6 +18,8 @@ All notable changes to this project will be documented in this file.
 - **"Decompose before delegating" rule in lead instructions.** Before dispatching a coder/refactorer/test-writer, the lead must convert investigation findings into an ordered `file → change → reason` checklist and pass concrete `file:line` findings verbatim, so executing agents run a batch instead of re-exploring already-mapped code. Adds a matching anti-pattern and coder/refactorer directives. Run `agent-notes regenerate` to apply.
 
 ### Changed
+
+- **Recommended models for Claude Code and OpenCode: reasoner → `claude-opus-5-5`, worker → `claude-sonnet-5-5`** (were `claude-opus-5` / `claude-sonnet-5`). Both are not yet rated upstream, and an unrated model could never become a default, so `rules.yaml` gains a `provisional_coding_index` block: a hand-curated stand-in score used only while OpenRouter has no coding score, retired automatically once it does. Model tables mark it with `*` (e.g. `78.1*`). Orchestrator, scout and every Codex default are unchanged. Existing installs keep the models saved when they were installed — re-run `agent-notes install` to pick up the new recommendations.
 
 - **Refreshed vendored Matt Pocock skills from upstream:** `code-review`, `tdd`, `grill-me`, `grill-with-docs`, `improve-codebase-architecture`, `handoff`, `prototype`. Renamed to match upstream: `debugging-protocol` → `diagnosing-bugs`, `write-a-skill` → `writing-great-skills`, `setup-project-context` → `domain-modeling`, `to-prd` → `to-spec`, `to-issues` → `to-tickets`.
 - **Plugin build now vendors full skill directories** (including bundled reference files such as `tdd/mocking.md`, `codebase-design/DEEPENING.md`) and prunes retired/renamed skills from `.claude-plugin/skills/` on each build, instead of copying only `SKILL.md` and leaving stale directories behind.
