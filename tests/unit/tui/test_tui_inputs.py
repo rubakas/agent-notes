@@ -1,0 +1,101 @@
+from agent_notes.services.tui.keys import BACKSPACE, DOWN, ENTER, ESCAPE, SPACE, TAB
+from agent_notes.services.tui.widgets import CANCEL, DONE, Checklist, TextField, complete_path
+from tests.unit.tui.fakes import typed
+
+SKILLS = [("rails — Rails app conventions", "rails"), ("docker — Dockerfile and Compose", "docker")]
+
+
+def test_space_toggles_the_row_under_the_cursor():
+    checklist = Checklist("Skills", SKILLS, {"rails", "docker"})
+    checklist.handle(SPACE)
+    assert checklist.handle(ENTER) == DONE
+    assert checklist.value == {"docker"}
+
+
+def test_a_toggles_all_and_none():
+    checklist = Checklist("Skills", SKILLS, {"rails"})
+    checklist.handle("a")
+    assert checklist.selected == {"rails", "docker"}
+    checklist.handle("a")
+    assert checklist.selected == set()
+
+
+def test_escape_leaves_the_selection_unchanged():
+    checklist = Checklist("Skills", SKILLS, {"rails"})
+    checklist.handle(DOWN)
+    checklist.handle(SPACE)
+    assert checklist.handle(ESCAPE) == CANCEL
+    assert checklist.value is None
+
+
+def test_fixed_lines_are_shown_above_the_choices():
+    lines = Checklist("Skills", SKILLS, set(), fixed=["process (21) — always included"]).render(80, 24)
+    assert any("process (21) — always included" in line for line in lines)
+    assert any("[ ] rails — Rails app conventions" in line for line in lines)
+
+
+def test_typing_editing_and_unicode():
+    field = TextField("Vault", "Path", "")
+    for key in typed("~/Док x") + [BACKSPACE, BACKSPACE]:
+        field.handle(key)
+    assert field.handle(ENTER) == DONE
+    assert field.value == "~/Док"
+
+
+def test_a_warning_needs_a_second_enter_to_keep_the_value():
+    field = TextField("Vault", "Path", "/nope", validate=lambda text: "not a vault")
+    assert field.handle(ENTER) is None
+    assert "not a vault" in "\n".join(field.render(80, 24))
+    assert field.handle(ENTER) == DONE
+    assert field.value == "/nope"
+
+
+def test_editing_clears_the_warning():
+    field = TextField("Vault", "Path", "/nope", validate=lambda text: "not a vault" if "nope" in text else "")
+    field.handle(ENTER)
+    field.handle(BACKSPACE)
+    assert field.warning == ""
+
+
+def test_escape_cancels_the_edit():
+    field = TextField("Vault", "Path", "keep")
+    field.handle("x")
+    assert field.handle(ESCAPE) == CANCEL
+    assert field.value is None
+
+
+def test_secret_text_is_never_rendered():
+    field = TextField("API key", "Key", secret=True)
+    frames = []
+    for key in typed("sk-secret-123"):
+        field.handle(key)
+        frames.append("\n".join(field.render(80, 24)))
+    assert all("secret" not in frame for frame in frames)
+    assert "•" * len("sk-secret-123") in frames[-1]
+
+
+def test_tab_runs_the_completer():
+    field = TextField("Vault", "Path", "~/Ob", complete=lambda text: text + "sidian/")
+    field.handle(TAB)
+    assert field.text == "~/Obsidian/"
+
+
+def test_complete_path_extends_to_a_unique_directory(tmp_path):
+    (tmp_path / "Obsidian").mkdir()
+    assert complete_path(str(tmp_path / "Obs")) == str(tmp_path / "Obsidian") + "/"
+
+
+def test_complete_path_stops_at_the_common_prefix(tmp_path):
+    (tmp_path / "vault-a").mkdir()
+    (tmp_path / "vault-b").mkdir()
+    assert complete_path(str(tmp_path / "va")) == str(tmp_path / "vault-")
+
+
+def test_complete_path_keeps_a_tilde(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / "Documents").mkdir()
+    assert complete_path("~/Doc") == "~/Documents/"
+
+
+def test_complete_path_without_a_match_changes_nothing(tmp_path):
+    assert complete_path(str(tmp_path / "zzz")) == str(tmp_path / "zzz")

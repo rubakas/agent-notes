@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence
 
-from .keys import DOWN, ENTER, ESCAPE, LEFT, RIGHT, UP
+from .keys import BACKSPACE, DOWN, ENTER, ESCAPE, LEFT, RIGHT, SPACE, TAB, UP
 from .screen import BOLD, CYAN, DIM, YELLOW, Style, bar, fit, pad
 
 DONE = "done"
@@ -236,3 +236,127 @@ class Picker:
         if end < count:
             body.append(style(f"     ↓ {count - end} more", DIM))
         return [fit(line, width) for line in top + body + bottom]
+
+
+class Checklist:
+    """Multiple choice: space toggles, `a` toggles all, ⏎ keeps the selection,
+    Esc leaves it unchanged."""
+
+    def __init__(self, title: str, items: Sequence[tuple[str, Any]], selected, *,
+                 fixed: Sequence[str] = (),
+                 hints: str = "↑↓ move   space toggle   a all   ⏎ done   esc back",
+                 style: Optional[Style] = None):
+        self.title = title
+        self.items = list(items)
+        self.selected = set(selected)
+        self.fixed = list(fixed)
+        self.hints = hints
+        self.style = style or Style(False)
+        self.cursor = 0
+        self.value: Any = None
+
+    def handle(self, key: str) -> Optional[str]:
+        values = [value for _, value in self.items]
+        if key == UP and values:
+            self.cursor = (self.cursor - 1) % len(values)
+        elif key == DOWN and values:
+            self.cursor = (self.cursor + 1) % len(values)
+        elif key == SPACE and values:
+            self.selected ^= {values[self.cursor]}
+        elif key == "a":
+            self.selected = set() if set(values) <= self.selected else set(values)
+        elif key == ENTER:
+            self.value = set(self.selected)
+            return DONE
+        elif key == ESCAPE:
+            return CANCEL
+        return None
+
+    def render(self, width: int, height: int) -> list[str]:
+        style = self.style
+        lines = [bar(f" {style(self.title, BOLD)}", "", width), style("─" * width, DIM)]
+        lines += [style(f"   {line}", DIM) for line in self.fixed]
+        for index, (label, value) in enumerate(self.items):
+            pointer = style("›", CYAN) if index == self.cursor else " "
+            check = "✓" if value in self.selected else " "
+            lines.append(f" {pointer} [{check}] {label}")
+        lines += [style("─" * width, DIM), f" {self.hints}"]
+        return [fit(line, width) for line in lines[:height]]
+
+
+class TextField:
+    """One line of text. ⏎ accepts — after a *validate* warning, only on the
+    second ⏎, so a value can be kept on purpose. Esc leaves it unchanged.
+    *secret* shows bullets and never the text."""
+
+    def __init__(self, title: str, prompt: str, value: str = "", *,
+                 notes: Sequence[str] = (),
+                 complete: Optional[Callable[[str], str]] = None,
+                 validate: Optional[Callable[[str], str]] = None,
+                 secret: bool = False, style: Optional[Style] = None):
+        self.title = title
+        self.prompt = prompt
+        self.text = value
+        self.notes = list(notes)
+        self.complete = complete
+        self.validate = validate
+        self.secret = secret
+        self.style = style or Style(False)
+        self.warning = ""
+        self.value: Any = None
+
+    def handle(self, key: str) -> Optional[str]:
+        if key == ENTER:
+            warning = self.validate(self.text) if self.validate else ""
+            if warning and warning != self.warning:
+                self.warning = warning
+                return None
+            self.value = self.text
+            return DONE
+        if key == ESCAPE:
+            return CANCEL
+        if key == BACKSPACE:
+            self.text = self.text[:-1]
+        elif key == TAB:
+            if self.complete is None:
+                return None
+            self.text = self.complete(self.text)
+        elif key == SPACE:
+            self.text += " "
+        elif len(key) == 1 and key.isprintable():
+            self.text += key
+        else:
+            return None
+        self.warning = ""
+        return None
+
+    def render(self, width: int, height: int) -> list[str]:
+        style = self.style
+        shown = "•" * len(self.text) if self.secret else self.text
+        hints = "type   ⏎ ok   esc back" + ("   tab complete" if self.complete else "")
+        lines = [bar(f" {style(self.title, BOLD)}", "", width), style("─" * width, DIM),
+                 f"   {self.prompt}  {shown}{style('▏', CYAN)}"]
+        lines += [style(f"   {note}", DIM) for note in self.notes]
+        if self.warning:
+            lines.append(style(f"   ⚠ {self.warning} — ⏎ again to keep it", YELLOW))
+        lines += [style("─" * width, DIM), f" {hints}"]
+        return [fit(line, width) for line in lines[:height]]
+
+
+def complete_path(text: str) -> str:
+    """Tab completion: extend *text* to the longest prefix every matching path
+    shares; a single directory match gets its trailing separator. Keeps `~`."""
+    import glob
+    import os
+    expanded = os.path.expanduser(text)
+    matches = sorted(glob.glob(expanded + "*"))
+    if not matches:
+        return text
+    common = os.path.commonprefix(matches)
+    if len(matches) == 1 and os.path.isdir(common):
+        common += os.sep
+    if text.startswith("~"):
+        home = os.path.expanduser("~")
+        if common.startswith(home):
+            common = "~" + common[len(home):]
+    return common if len(common) >= len(text) else text
