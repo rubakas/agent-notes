@@ -154,10 +154,10 @@ class ReviewForm:
         rule = style("─" * width, DIM)
         notice = [f"   {line}" for line in self.notice]
         if self.message:
-            status = style(self.message, YELLOW)
+            footer = f" {style(self.message, YELLOW)}"
         else:
             status = style(self.status(), DIM) if self.status else ""
-        footer = bar(f" {self.hints}", f"{status} ", width)
+            footer = bar(f" {self.hints}", f"{status} ", width)
         room = max(1, height - 4 - len(notice))
         if len(body) > room:
             top = min(max(0, focus_line - room + 1), len(body) - room)

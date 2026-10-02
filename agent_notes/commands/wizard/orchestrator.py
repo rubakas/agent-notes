@@ -122,24 +122,13 @@ def _build(choices: InstallChoices) -> Optional[str]:
     return None
 
 
-def _restore_persisted_render(scope: str, profile_label: str) -> None:
-    """Re-render dist/ from persisted state pins (no in-memory selection overlays).
+def _restore(choices: InstallChoices) -> Optional[str]:
+    """Re-render dist/ from persisted state pins (no in-memory selection
+    overlays), quietly. Returns the error, if any.
 
     The pre-confirm build bakes this run's selections into dist/; if the user
-    declines (or the build aborts half-written), existing symlink installs would
-    keep serving the rejected picks. Rebuilding without overlays restores the
-    persisted-pin rendering."""
-    from ...services.fs import silent_ops
-    try:
-        with silent_ops():
-            build(scope=scope, project_path=Path.cwd() if scope == "local" else None,
-                  profile_label=profile_label)
-    except Exception as e:
-        print(f"{Color.YELLOW}Warning: could not restore rendered files: {e}{Color.NC}")
-
-
-def _restore(choices: InstallChoices) -> Optional[str]:
-    """Re-render from persisted pins, quietly. Returns the error, if any."""
+    declines (or the build aborts half-written), existing symlink installs
+    would keep serving the rejected picks."""
     from ...services.fs import silent_ops
     try:
         with silent_ops(), _quiet():

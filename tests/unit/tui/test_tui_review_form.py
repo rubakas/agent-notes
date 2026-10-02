@@ -121,3 +121,16 @@ def test_render_without_chrome_is_the_static_rows_only():
     assert lines[0].startswith("   CLIs")
     assert all(line.startswith("   ") for line in lines)
     assert not any("↑↓" in line for line in lines)
+
+
+def test_a_message_takes_the_whole_footer_line():
+    hints = "↑↓ move   ⏎ edit   ←→ change   i install   q quit"
+    form, _ = _form()
+    form.hints = hints
+    message = "Build failed: disk full; restore failed: locked — run agent-notes regen"
+    assert len(message) >= 70
+    form.message = message
+    last = form.render(80, 24)[-1]
+    assert message in last and "…" not in last and "↑↓ move" not in last
+    form.handle(DOWN)
+    assert "↑↓ move" in form.render(80, 24)[-1]

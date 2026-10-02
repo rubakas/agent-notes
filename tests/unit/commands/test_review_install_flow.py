@@ -189,7 +189,7 @@ def test_a_failed_restore_is_reported(calls, monkeypatch):
             raise RuntimeError("locked")
 
     monkeypatch.setattr(orchestrator, "build", build_failing_on_restore)
-    ui = _run(session=tui_session("i", ESCAPE, "q", width=160))
+    ui = _run("i", ESCAPE, "q")
     assert "Restore failed: locked" in ui.term.text()
     assert "agent-notes regenerate" in ui.term.text()
 
