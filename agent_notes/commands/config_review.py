@@ -309,8 +309,8 @@ def apply_changes(working, ref: InstallRef, plugins_before: dict, plugins_after:
     from ..services.state_store import record_install_state
     from .plugins import disable_plugin, enable_plugin
     from .regenerate import regenerate
-    from .wizard.orchestrator import _quiet  # one output-silencing helper, not two
-    with _quiet():
+    from ..services.fs import quiet_output
+    with quiet_output():
         record_install_state(working)
         for name in sorted(plugins_after):
             if bool(plugins_after[name]) != bool(plugins_before.get(name)):

@@ -2,8 +2,6 @@
 install (spec 005 FR-001, FR-005, FR-024, FR-026)."""
 from __future__ import annotations
 
-import contextlib
-import io
 import logging
 from pathlib import Path
 from typing import Optional
@@ -101,14 +99,6 @@ def _review(ui, choices: InstallChoices, catalog: Catalog, cli_registry) -> bool
     return ui.form(form) == DONE
 
 
-@contextlib.contextmanager
-def _quiet():
-    """Keep build and restore output off the screen (FR-024)."""
-    sink = io.StringIO()
-    with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-        yield
-
-
 def _render(choices: InstallChoices, *, with_selections: bool) -> Optional[str]:
     """Render dist/ quietly. Returns the error, if any.
 
@@ -116,11 +106,11 @@ def _render(choices: InstallChoices, *, with_selections: bool) -> Optional[str]:
     must come from what this install will write. Without: back to the
     persisted state pins, after anything but a yes — existing symlink installs
     would otherwise keep serving the rejected (or half-written) picks."""
-    from ...services.fs import silent_ops
+    from ...services.fs import quiet_output, silent_ops
     picks = (dict(role_models=choices.role_models, role_efforts=choices.role_efforts)
              if with_selections else {})
     try:
-        with silent_ops(), _quiet():
+        with silent_ops(), quiet_output():
             build(**picks, scope=choices.scope,
                   project_path=Path.cwd() if choices.scope == "local" else None,
                   profile_label=choices.profile_label)

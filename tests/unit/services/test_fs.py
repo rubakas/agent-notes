@@ -296,3 +296,14 @@ class TestRemoveAllSymlinksInDir:
 
         assert count == 1
         assert not (dst_dir / "managed.md").exists()
+
+
+def test_quiet_output_discards_stdout_and_stderr(capsys):
+    import sys
+    from agent_notes.services.fs import quiet_output
+    with quiet_output():
+        print("to stdout")
+        print("to stderr", file=sys.stderr)
+    print("after")
+    captured = capsys.readouterr()
+    assert captured.out == "after\n" and captured.err == ""
