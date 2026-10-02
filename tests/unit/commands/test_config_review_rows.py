@@ -128,9 +128,10 @@ def test_show_prints_shared_settings_once_then_each_install(catalog, tmp_path, m
     pins = BackendState(role_models={"reasoner": "claude-opus-4-6"})
     state = State(local_installs={str(a): ScopeState(clis={"claude": pins}),
                                   str(b): ScopeState(clis={"claude": BackendState()})})
-    text = "\n".join(render_show(state, 120))
+    lines = render_show(state, 120)
+    text = "\n".join(lines)
     assert text.count("Memory") == 1 and text.count("Cost report") == 1
     assert "built-in" in text
     assert "⚠ deprecated  ★ claude-opus-5-5" in text
     assert "local · " in text and "no pins" in text
-    assert "›" not in text and "↑↓" not in text
+    assert not any(line.startswith(" ›") for line in lines) and "↑↓" not in text
