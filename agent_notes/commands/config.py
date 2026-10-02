@@ -409,16 +409,15 @@ def show(state=None) -> None:
         print(line)
 
 
-# ── Interactive wizard ───────────────────────────────────────────────────────
+# ── Interactive line prompts (config memory, config providers) ───────────────
 
 def _wizard_memory(state, before: str) -> bool:
     """Branch 3: interactive memory backend change."""
     from ..services.ui import _safe_input, _path_input
+    from .wizard.review import MEMORY_OPTIONS   # the one name per backend (FR-028)
 
-    provider_options = {
-        "1": ("local", "default — the CLI's native memory / Claude Code built-in md files"),
-        "2": ("obsidian", "external Obsidian vault"),
-    }
+    provider_options = {str(number): (value, label)
+                        for number, (label, value) in enumerate(MEMORY_OPTIONS, 1)}
 
     print("\nMemory provider options:")
     for key, (_, label) in provider_options.items():
@@ -520,7 +519,7 @@ def interactive_config() -> None:
 
 
 def interactive_config_memory() -> None:
-    """Run the interactive memory config wizard."""
+    """`agent-notes config memory`: choose the memory backend with line prompts."""
     state = _load_state()
     before = _state_snapshot(state)
     _wizard_memory(state, before)

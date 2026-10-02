@@ -72,13 +72,13 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
             print("       agent-notes uninstall")
             print("       agent-notes install")
             print()
-            print("     Or to re-run the wizard and overwrite in place:")
+            print("     Or to review the settings again and overwrite in place:")
             print("       agent-notes install --reconfigure")
         else:
             print()
             print(f"Installation has {len(issues)} issue(s).")
             print()
-            print("Tip: Run `agent-notes doctor --fix` to repair, or `agent-notes install --reconfigure` to rewizard.")
+            print("Tip: Run `agent-notes doctor --fix` to repair, or `agent-notes install --reconfigure` to review and reinstall.")
         return
 
     if existing and reconfigure:
@@ -93,7 +93,7 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
         return
 
     # Build first — scope-aware so an existing state pin set for this scope
-    # (e.g. local install after a previous local wizard run) drives the render.
+    # (e.g. local install after a previous local install) drives the render.
     print("Building from source...")
     try:
         from ..commands.build import build

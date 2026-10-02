@@ -257,3 +257,16 @@ def test_quit_does_nothing(state_file):
     with _patch_state_file(state_file):
         config_review.interactive_config(session_factory=lambda: tui_session("q"))
     assert state_file.read_text() == original
+
+
+def test_config_memory_names_the_backends_built_in_and_obsidian(state_file, capsys):
+    """FR-028: one name per memory backend, the same as on the review screen."""
+    from agent_notes.commands.config import _wizard_memory
+    from agent_notes.services import state_store
+
+    with _patch_state_file(state_file), \
+         patch("agent_notes.services.ui._safe_input", return_value="9"):
+        assert _wizard_memory(state_store.load_state(), "") is False
+    out = capsys.readouterr().out
+    assert "1) built-in" in out and "2) Obsidian" in out
+    assert "native memory" not in out

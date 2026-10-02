@@ -329,7 +329,7 @@ agent-notes memory export             # back up to memory-backup/
 agent-notes memory import             # restore from memory-backup/
 ```
 
-**Setup:** Run `agent-notes install` and choose `Obsidian — external Obsidian vault`, then pick a strategy (`single-brain` or `per-project`). The Memory row's Obsidian editor lists vaults detected under `~/Documents`, `~/Desktop`, and `~`. Then run `agent-notes memory init`.
+**Setup:** Run `agent-notes install`, set the Memory row to `Obsidian`, then pick a strategy (`single-brain` or `per-project`). The Memory row's Obsidian editor lists vaults detected under `~/Documents`, `~/Desktop`, and `~`. Then run `agent-notes memory init`.
 
 </details>
 

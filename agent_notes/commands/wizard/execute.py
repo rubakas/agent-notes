@@ -1,4 +1,4 @@
-"""Install execution functions for the wizard."""
+"""Install execution functions for the install review screen."""
 
 from pathlib import Path
 from typing import Dict, List, Optional, Set
@@ -26,7 +26,7 @@ def install_skills_filtered(skill_names: List[str], targets: List[Path], copy_mo
 
 def install_agents_filtered(clis: Set[str], scope: str, copy_mode: bool = False,
                             folder_overrides: dict = None, global_home_override: str = "") -> None:
-    """Install agents for selected CLIs (filtered by the wizard)."""
+    """Install agents for the CLIs selected on the review screen."""
     from ...services import installer
     from ...services.installer import _apply_overrides, _agent_glob
     from ...registries.cli_registry import load_registry
@@ -96,8 +96,8 @@ def _render_configuration(role_models: Dict[str, Dict[str, str]],
                           role_efforts: Optional[Dict[str, Dict[str, str]]]) -> None:
     """Print the post-install Configuration section: role → model · effort,
     one row per role in canonical role order, using the effort the user picked
-    (state pin) with fallback to the role's typical_effort — the same display
-    logic as the confirmation summary (_format_role_model_display)."""
+    (state pin) with fallback to the role's typical_effort, formatted by
+    _format_role_model_display."""
     from . import _format_role_model_display
     from ._common import _ROLE_ANSI, _role_sort_key
     from ...registries.cli_registry import load_registry
