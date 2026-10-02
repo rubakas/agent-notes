@@ -127,12 +127,8 @@ def build(role_models=None, role_efforts=None, scope='global', project_path=None
     from ..services.state_store import load_state
     from ..registries.cli_registry import load_registry
 
-    # Read configuration
-    try:
-        agents_config = load_agents_config()
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
-        return
+    # Raises when the configuration is missing or invalid: callers must see a failed build
+    agents_config = load_agents_config()
 
     # Load state if present (no error if missing)
     state = load_state()

@@ -1,5 +1,6 @@
 """Install command."""
 
+import sys
 from pathlib import Path
 
 from ..config import Color, PKG_DIR
@@ -60,7 +61,8 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
             with silent_ops():
                 build(scope=scope, project_path=project_path, profile_label=profile_label)
         except Exception as e:
-            print(f"{Color.YELLOW}Warning: rebuild failed: {e}{Color.NC}")
+            print(f"{Color.RED}Rebuild failed: {e}{Color.NC}")
+            sys.exit(1)
         print()
         print("Verifying ...")
         issues = _verify_install(existing, scope, project_path, registry)
@@ -100,7 +102,7 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
         build(scope=scope, project_path=project_path, profile_label=profile_label)
     except Exception as e:
         print(f"{Color.RED}Build failed: {e}{Color.NC}")
-        return
+        sys.exit(1)
 
     # Execute
     label_msg = f", profile={profile_label}" if profile_label else ""

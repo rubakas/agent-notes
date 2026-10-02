@@ -344,7 +344,11 @@ def main():
     # Route to modules
     if args.command == "build":
         from .commands.build import build
-        build()
+        try:
+            build()
+        except Exception as e:
+            print(f"{Color.RED}Build failed: {e}{Color.NC}")
+            sys.exit(1)
     elif args.command == "install":
         if args.local or args.copy or args.profile or args.folder or args.global_home:
             from .commands.install import install
