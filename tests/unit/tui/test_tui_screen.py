@@ -95,6 +95,7 @@ def _color_repr(env_extra):
             stdout=slave, stderr=subprocess.PIPE, env=env, text=True,
             cwd=str(Path(__file__).resolve().parents[3]),
         )
+        assert proc.returncode == 0, f"child process failed: {proc.stderr}"
         return proc.stderr
     finally:
         os.close(master)
@@ -102,7 +103,7 @@ def _color_repr(env_extra):
 
 
 def test_ui_color_class_is_on_for_a_tty():
-    assert _color_repr({}) != "''"
+    assert _color_repr({}) == repr("\x1b[0;31m")
 
 
 def test_ui_color_class_honours_no_color():
