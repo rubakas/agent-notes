@@ -56,6 +56,7 @@ Found while writing the implementation plan; each keeps today's behavior where t
 4. **`_confirm_install` and `_render_install_summary` are removed** — the review screen and the inline confirmation replace them. `_format_role_model_display` stays: the post-install summary (`execute._render_configuration`) uses it.
 5. **Esc on an editor form keeps what was changed in it.** The Models table, the Obsidian editor and the Profile editor are forms whose changes apply as you make them; Esc closes the form and keeps them. Esc in a picker, a checklist or a text field cancels that one edit with no change.
 6. **Line-mode yes/no questions re-ask on an unclear answer, and discarding defaults to No.** An answer other than y/yes/n/no (any case) prints "please answer y or n" and asks again; an empty answer takes the question's default — yes for "Apply N changes?" and the install question, No for "Discard N changes?" (`[y/N]`). The full screen is unchanged: ⏎ yes, Esc no.
+7. **`q` at the install confirmation quits.** It restores `dist/` as any non-yes does, then exits with "Installation cancelled.", like `q` on the review screen (a failed restore stays on the review so the regenerate instruction is seen); the footer reads `⏎ yes · esc back · q quit`, and line mode asks `[Y/n/q]`. Config's "Apply N changes?" and "Discard N changes?" prompts read `q` as no, never as a discard.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -70,7 +71,7 @@ A user runs `agent-notes install`, sees every setting already filled in on one s
 **Acceptance Scenarios**:
 
 1. **Given** a fresh machine, **When** `agent-notes install` opens, **Then** the first screen is the review screen with recommended values in every row.
-2. **Given** the review screen, **When** the user presses `i`, **Then** the build runs with one progress line and the screen shows `Install N files (M backed up)? ⏎ yes · esc back`.
+2. **Given** the review screen, **When** the user presses `i`, **Then** the build runs with one progress line and the screen shows `Install N files (M backed up)? ⏎ yes · esc back · q quit`.
 3. **Given** that confirmation, **When** the user presses Esc, **Then** nothing is written, the persisted render is restored silently, and the review screen returns with every edit intact.
 4. **Given** `agent-notes install --local --copy` (or `--profile`, `--folder`, `--global-home`), **When** it runs, **Then** it installs non-interactively exactly as today — those flags route to `commands.install.install()` and never open the review (see Corrections).
 
