@@ -11,6 +11,7 @@ from ...services.tui.screen import tilde
 from ...services.tui.session import open_session
 from ...services.tui.widgets import CANCEL, DONE, ReviewForm
 from ..build import build
+from ..regenerate import regenerate_instruction
 from .._install_helpers import count_agents, count_skills
 from ._common import _count_rules
 from .execute import _execute_install
@@ -44,7 +45,8 @@ def _interactive_install(session_factory=open_session) -> None:
             print(f"{Color.RED}Build failed — {error}{Color.NC}")
             restore_error = _render(choices, with_selections=False)
             if restore_error:
-                print(f"{Color.YELLOW}Restore failed — run agent-notes regenerate: "
+                command = regenerate_instruction(choices.scope, Path.cwd(), choices.profile_label)
+                print(f"{Color.YELLOW}Restore failed — run {command}: "
                       f"{restore_error}{Color.NC}")
             return
         _install(choices)
@@ -86,13 +88,14 @@ def _review(ui, choices: InstallChoices, catalog: Catalog, cli_registry) -> bool
         if confirmed:
             return DONE
         # The instruction leads: a long error is what the width cuts.
+        command = regenerate_instruction(choices.scope, Path.cwd(), choices.profile_label)
         if error and restore_error:
-            form.message = (f"Build and restore failed — run agent-notes regenerate: "
+            form.message = (f"Build and restore failed — run {command}: "
                             f"{error}; {restore_error}")
         elif error:
             form.message = f"Build failed — {error}"
         elif restore_error:
-            form.message = f"Restore failed — run agent-notes regenerate: {restore_error}"
+            form.message = f"Restore failed — run {command}: {restore_error}"
         return None
 
     form.commands.update({"i": install_command, "q": lambda: CANCEL})

@@ -8,6 +8,21 @@ from typing import Optional
 from ..config import Color
 
 
+def regenerate_instruction(scope: str, project_path: Optional[Path], profile_label: str = "") -> str:
+    """The shell command that re-renders one install (what to run after a
+    regenerate failed): plain `agent-notes regenerate` only fits a global,
+    profile-less one."""
+    import shlex
+    command = "agent-notes regenerate"
+    if scope == "local":
+        command += " --local"
+    if profile_label:
+        command += f" --profile {shlex.quote(profile_label)}"
+    if scope == "local":
+        command = f"cd {shlex.quote(str(project_path))} && {command}"
+    return command
+
+
 def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bool = False,
                project_path: Optional[Path] = None, profile_label: str = "") -> None:
     """Rebuild agent/skill/config files from current state.json.

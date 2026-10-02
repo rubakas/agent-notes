@@ -11,6 +11,7 @@ from ..domain.capability import KIND_BACKEND, KIND_PROVIDER, KIND_TOGGLE
 from ..services.tui.screen import DIM, YELLOW, tilde, visible_len
 from ..services.tui.keys import TAB
 from ..services.tui.widgets import CANCEL, DONE, PickItem, ReviewForm, Row
+from .regenerate import regenerate_instruction
 from .wizard.role_models import (
     Catalog, default_effort, edit_models, initial_model, role_line, role_width, roles_for,
     starred_model,
@@ -328,8 +329,12 @@ def apply_changes(working, ref: InstallRef, plugins_before: dict, plugins_after:
         try:
             regenerate(scope=ref.scope, project_path=ref.project_path,
                        profile_label=ref.profile_label)
-        except (Exception, SystemExit) as e:
+        except Exception as e:
             raise RegenerateFailed(str(e) or type(e).__name__) from e
+        except SystemExit as e:
+            # exit(1) carries a code, not a reason.
+            raise RegenerateFailed(e.code if isinstance(e.code, str) and e.code
+                                   else "regenerate exited") from e
 
 
 def interactive_config(session_factory=None, cwd: Optional[Path] = None) -> None:
@@ -398,7 +403,8 @@ def _config_review(ui, state, refs: list[InstallRef], cwd: Path) -> str:
         except RegenerateFailed as e:
             # Written, so it is what is saved now: nothing left to stage or discard.
             state, plugins_before = copy.deepcopy(working), dict(ctx.plugins)
-            form.message = f"State saved; regenerate failed — run agent-notes regenerate: {e}"
+            command = regenerate_instruction(ctx.ref.scope, ctx.ref.project_path, ctx.ref.profile_label)
+            form.message = f"State saved; regenerate failed — run {command}: {e}"
             return None
         except (Exception, SystemExit) as e:
             form.message = f"Save failed — {e}"

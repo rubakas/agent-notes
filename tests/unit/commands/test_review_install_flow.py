@@ -264,3 +264,21 @@ def test_line_mode_ctrl_c_at_the_question_restores_then_exits(calls, monkeypatch
         _run(session=LineSession())
     assert calls.kinds() == ["build", "plan", "build"]
     assert "role_models" not in calls.of("build")[1]
+
+
+def test_a_failed_local_restore_names_this_installs_regenerate_command(calls, monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+
+    def build_failing_on_restore(**kwargs):
+        if "role_models" not in kwargs:
+            raise RuntimeError("locked")
+
+    monkeypatch.setattr(orchestrator, "build", build_failing_on_restore)
+    catalog, registry = Catalog(), load_registry()
+    choices = initial_choices(catalog, registry)
+    choices.scope, choices.profile_label = "local", "work"
+    ui = tui_session("i", ESCAPE, "q", width=300)
+    orchestrator._review(ui, choices, catalog, registry)
+    here = Path.cwd()
+    assert (f"Restore failed — run cd {here} && agent-notes regenerate --local --profile work: locked"
+            in ui.term.text())

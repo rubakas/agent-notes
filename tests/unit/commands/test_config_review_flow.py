@@ -38,8 +38,8 @@ def env(tmp_path, monkeypatch):
     return mocks
 
 
-def _run(env, *keys, cwd=None):
-    ui = tui_session(*keys)
+def _run(env, *keys, cwd=None, width=80):
+    ui = tui_session(*keys, width=width)
     config_review.interactive_config(session_factory=lambda: ui, cwd=cwd or env["project"])
     return ui
 
@@ -117,9 +117,10 @@ def test_a_failed_state_write_says_so_and_keeps_the_edits_staged(env):
 
 def test_a_failed_regenerate_keeps_the_saved_state_as_the_new_baseline(env):
     env["regenerate"].side_effect = RuntimeError("boom")
-    ui = _run(env, "u", "s", ENTER, "s", "q")   # nothing left to save, q quits at once
+    ui = _run(env, "u", "s", ENTER, "s", "q", width=300)   # nothing left to save, q quits at once
     frames = ["\n".join(frame) for frame in ui.term.frames]
-    assert any("State saved; regenerate failed — run agent-notes regenerate: boom" in frame
+    assert any(f"State saved; regenerate failed — run cd {env['project'].resolve()} "
+               "&& agent-notes regenerate --local: boom" in frame
                for frame in frames)
     assert any("no changes to save" in frame for frame in frames)
     assert not any("Discard" in frame for frame in frames)
@@ -135,6 +136,16 @@ def test_a_failed_regenerate_also_resets_the_plugin_baseline(env):
     assert any("no changes to save" in frame for frame in frames)
     assert not any("Discard" in frame for frame in frames)
     env["enable"].assert_called_once_with("cost-report")
+
+
+def test_a_regenerate_that_exits_says_so_and_names_this_install(env):
+    env["regenerate"].side_effect = SystemExit(1)
+    ui = _run(env, "u", "s", ENTER, "q", width=300)   # wide: a tmp path is long
+    footers = [frame[-1] for frame in ui.term.frames]
+    assert any(f"run cd {env['project'].resolve()} && agent-notes regenerate --local"
+               in footer for footer in footers)
+    text = ui.term.text()
+    assert "regenerate exited" in text and ": 1" not in text
 
 
 def test_saving_a_local_install_from_another_folder_places_files_in_that_project(
