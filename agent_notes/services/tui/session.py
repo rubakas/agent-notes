@@ -77,10 +77,11 @@ class TuiSession:
         return result if outcome == DONE else None
 
     def confirm(self, form: ReviewForm, question: str, lines: Sequence[str] = (), *,
-                default: bool = True) -> bool:
-        """Ask on the form's own screen: ⏎ yes, Esc no — whatever *default*
-        says, since neither key is an unanswered question here."""
-        form.notice, form.message = list(lines), f"{question}   ⏎ yes · esc back"
+                default: bool = True, quit: bool = False) -> Optional[bool]:
+        """⏎ yes, Esc or q no. With *quit*, q returns None: a no that also asks to
+        leave (falsy, so callers that don't opt in read it as no)."""
+        form.notice = list(lines)
+        form.message = f"{question}   ⏎ yes · esc back" + (" · q quit" if quit else "")
         try:
             while True:
                 self._paint(form)
@@ -89,6 +90,8 @@ class TuiSession:
                     return True
                 if key == ESCAPE:
                     return False
+                if key == "q":
+                    return None if quit else False
         finally:
             form.notice, form.message = [], ""
 
@@ -201,20 +204,24 @@ class LineSession:
                 return answer
 
     def confirm(self, form: ReviewForm, question: str, lines: Sequence[str] = (), *,
-                default: bool = True) -> bool:
-        """y or n; an empty answer takes *default*, shown capitalised."""
+                default: bool = True, quit: bool = False) -> Optional[bool]:
+        """y or n, or q to leave with *quit* (returns None); an empty answer
+        takes *default*, shown capitalised."""
         from ..ui import _safe_input
         for line in lines:
             print(f"  {line}")
+        choices = ("[Y/n" if default else "[y/N") + ("/q]" if quit else "]")
         while True:
-            answer = _safe_input(f"{question} {'[Y/n]' if default else '[y/N]'}: ", "").strip().lower()
+            answer = _safe_input(f"{question} {choices}: ", "").strip().lower()
             if answer == "":
                 return default
             if answer in ("y", "yes"):
                 return True
             if answer in ("n", "no"):
                 return False
-            print("  please answer y or n")
+            if answer == "q":
+                return None if quit else False
+            print("  please answer y, n or q" if quit else "  please answer y or n")
 
     def progress(self, form: ReviewForm, message: str) -> None:
         print(f"  {message}")

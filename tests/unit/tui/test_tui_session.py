@@ -68,6 +68,19 @@ def test_confirm_shows_the_question_and_clears_it_after():
     assert tui_session(ESCAPE).confirm(form, "Install?") is False
 
 
+def test_confirm_q_quits_only_when_asked_to():
+    form = ReviewForm("T", lambda: [Row("a", "A", lambda: ["x"])])
+    ui = tui_session("q")
+    assert ui.confirm(form, "Install?", quit=True) is None
+    assert "Install?   ⏎ yes · esc back · q quit" in ui.term.text()
+    assert form.message == ""
+
+
+def test_confirm_q_without_quit_is_a_no():
+    form = ReviewForm("T", lambda: [Row("a", "A", lambda: ["x"])])
+    assert tui_session("q").confirm(form, "Discard?", default=False) is False
+
+
 def test_form_runs_until_a_command_closes_it():
     form = ReviewForm("T", lambda: [Row("a", "A", lambda: ["x"])], commands={"i": lambda: DONE})
     assert tui_session(DOWN, "i").form(form) == DONE
@@ -262,6 +275,26 @@ def test_line_mode_confirm_can_default_to_no(monkeypatch, answer, expected):
     monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
     assert LineSession().confirm(form, "Discard 2 changes?", default=False) is expected
     assert answers.prompts == ["Discard 2 changes? [y/N]: "]
+
+
+@pytest.mark.parametrize("default, quit, expected, prompt", [
+    (True, True, None, "Install? [Y/n/q]: "),
+    (False, True, None, "Install? [y/N/q]: "),
+    (True, False, False, "Install? [Y/n]: "),
+])
+def test_line_mode_confirm_q_quits_only_when_asked_to(monkeypatch, default, quit, expected, prompt):
+    form = ReviewForm("T", lambda: [])
+    answers = FakeLineInput("q")
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
+    assert LineSession().confirm(form, "Install?", default=default, quit=quit) is expected
+    assert answers.prompts == [prompt]
+
+
+def test_line_mode_confirm_names_q_when_asking_again(monkeypatch, capsys):
+    form = ReviewForm("T", lambda: [])
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", FakeLineInput("x", "q"))
+    assert LineSession().confirm(form, "Install?", quit=True) is None
+    assert "please answer y, n or q" in capsys.readouterr().out
 
 
 def test_full_screen_confirm_ignores_the_default():

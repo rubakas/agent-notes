@@ -80,13 +80,16 @@ def _review(ui, choices: InstallChoices, catalog: Catalog, cli_registry) -> bool
             error = _render(choices, with_selections=True)
             if not error:
                 question, lines = _plan_summary(choices, cli_registry)
-                confirmed = ui.confirm(form, question, lines)
+                confirmed = ui.confirm(form, question, lines, quit=True)
         finally:
             # Anything but a yes — a failed build, a no, Ctrl-C, line mode's
             # exit on Ctrl-D — must not leave this run's picks in dist/.
             restore_error = None if confirmed else _render(choices, with_selections=False)
         if confirmed:
             return DONE
+        # A failed restore stays on the form: the user must see the regenerate instruction.
+        if confirmed is None and not restore_error:
+            return CANCEL
         # The instruction leads: a long error is what the width cuts.
         command = regenerate_instruction(choices.scope, Path.cwd(), choices.profile_label)
         if error and restore_error:

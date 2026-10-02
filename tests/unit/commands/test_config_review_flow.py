@@ -1,4 +1,5 @@
 """`agent-notes config` session (spec 005 FR-014, FR-016, FR-017, SC-005, SC-007)."""
+import itertools
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -73,6 +74,20 @@ def test_quit_with_staged_edits_asks_and_escape_keeps_editing(env):
     ui = _run(env, "u", "q", ESCAPE, "q", ENTER)
     env["record"].assert_not_called()
     assert any("Discard 1 change?" in "\n".join(frame) for frame in ui.term.frames)
+
+
+def test_q_at_the_discard_prompt_keeps_editing(env):
+    ui = _run(env, "u", "q", "q", "q", ENTER)   # prompt, back to the form, prompt, discard
+    assert ui.keys.consumed == 5   # the second q neither discarded nor left
+    shown = ["Discard 1 change?" in "\n".join(frame) for frame in ui.term.frames]
+    assert [k for k, _ in itertools.groupby(shown)] == [False, True, False, True]
+
+
+def test_q_at_the_apply_prompt_declines(env):
+    ui = _run(env, "u", "s", "q", "q", ENTER)   # apply prompt, declined, discard prompt, discard
+    env["record"].assert_not_called()
+    env["regenerate"].assert_not_called()
+    assert any("Apply 1 change?" in "\n".join(frame) for frame in ui.term.frames)
 
 
 def test_line_mode_discard_defaults_to_no(env, monkeypatch):

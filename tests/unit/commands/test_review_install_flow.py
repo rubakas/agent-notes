@@ -97,6 +97,27 @@ def test_declining_restores_the_persisted_render_and_installs_nothing(calls, cap
     assert "Installation cancelled." in capsys.readouterr().out
 
 
+def test_q_at_the_confirmation_restores_and_quits(calls, capsys):
+    ui = _run("i", "q")
+    assert calls.kinds() == ["build", "plan", "build"]
+    assert "role_models" not in calls.of("build")[1]
+    assert "q quit" in ui.term.text()
+    assert "Installation cancelled." in capsys.readouterr().out
+
+
+def test_q_at_the_confirmation_stays_when_the_restore_fails(calls, monkeypatch, capsys):
+    def build_failing_on_restore(**kwargs):
+        calls.append(("build", kwargs))
+        if "role_models" not in kwargs:
+            raise RuntimeError("locked")
+
+    monkeypatch.setattr(orchestrator, "build", build_failing_on_restore)
+    ui = _run("i", "q", "q")   # the second q quits from the form
+    assert "Restore failed — run agent-notes regenerate: locked" in ui.term.text()
+    assert "execute" not in calls.kinds()
+    assert "Installation cancelled." in capsys.readouterr().out
+
+
 def test_the_restore_keeps_scope_and_profile(calls, monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     orchestrator._render(InstallChoices(scope="local", profile_label="work"), with_selections=False)
@@ -188,6 +209,16 @@ def test_line_mode_installs_with_two_enters(calls, monkeypatch):
     monkeypatch.setattr("agent_notes.services.ui._safe_input", FakeLineInput("", ""))
     _run(session=LineSession())
     assert calls.kinds() == ["build", "plan", "execute"]
+
+
+def test_line_mode_q_at_the_confirmation_restores_and_quits(calls, monkeypatch, capsys):
+    answers = FakeLineInput("", "q")
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
+    _run(session=LineSession())
+    assert calls.kinds() == ["build", "plan", "build"]
+    assert "role_models" not in calls.of("build")[1]
+    assert answers.prompts[-1].endswith("[Y/n/q]: ")
+    assert "Installation cancelled." in capsys.readouterr().out
 
 
 def test_a_failed_restore_is_reported(calls, monkeypatch):
