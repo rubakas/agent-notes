@@ -169,7 +169,7 @@ def test_saving_a_local_install_from_another_folder_places_files_in_that_project
     elsewhere.mkdir()
     monkeypatch.chdir(elsewhere)
     monkeypatch.setattr("agent_notes.commands.regenerate.regenerate", real_regenerate)
-    monkeypatch.setattr("agent_notes.commands.build.generate_agent_files", MagicMock(return_value=[]))
+    monkeypatch.setattr("agent_notes.commands.build.build", MagicMock())
     monkeypatch.setattr("agent_notes.services.install_state_builder.build_install_state",
                         MagicMock(return_value=State()))
     placed_from = []

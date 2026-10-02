@@ -41,17 +41,17 @@ def _setup(tmp_path, monkeypatch, write_state: bool = True):
 class TestRegenerateCallsRenderingPipeline:
     def test_regenerate_calls_rendering_pipeline(self, tmp_path, monkeypatch):
         _setup(tmp_path, monkeypatch)
-        mock_generate = MagicMock(return_value=[])
+        mock_build = MagicMock()
 
-        # generate_agent_files is imported from .build inside regenerate(), so patch at source
-        with patch("agent_notes.commands.build.generate_agent_files", mock_generate), \
+        # build is imported from .build inside regenerate(), so patch at source
+        with patch("agent_notes.commands.build.build", mock_build), \
              patch("agent_notes.services.installer.install_component_for_backend"), \
              patch("agent_notes.services.install_state_builder.build_install_state"), \
              patch("agent_notes.services.state_store.record_install_state"):
             from agent_notes.commands.regenerate import regenerate
             regenerate()
 
-        mock_generate.assert_called_once()
+        mock_build.assert_called_once_with(scope="global", project_path=None, profile_label="")
 
 
 class TestRegenerateAbortsWhenNoState:
@@ -71,7 +71,7 @@ class TestRegeneratePerCLIFilter:
     def test_regenerate_per_cli_filter_rejects_unknown_cli(self, tmp_path, monkeypatch, capsys):
         _setup(tmp_path, monkeypatch)
 
-        with patch("agent_notes.commands.build.generate_agent_files", return_value=[]), \
+        with patch("agent_notes.commands.build.build"), \
              patch("agent_notes.services.installer.install_component_for_backend"):
             from agent_notes.commands.regenerate import regenerate
             with pytest.raises(SystemExit) as exc_info:
@@ -115,7 +115,7 @@ class TestRegeneratePreservesPins:
 
         mock_builder = MagicMock(side_effect=Exception("stop before state write"))
 
-        with patch("agent_notes.commands.build.generate_agent_files", return_value=[]), \
+        with patch("agent_notes.commands.build.build"), \
              patch("agent_notes.services.installer.install_component_for_backend"), \
              patch("agent_notes.services.install_state_builder.build_install_state", mock_builder):
             from agent_notes.commands.regenerate import regenerate

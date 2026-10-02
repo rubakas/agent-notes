@@ -18,7 +18,9 @@ def test_local_placement_runs_inside_the_project_not_the_cwd(tmp_path, monkeypat
     monkeypatch.setattr("agent_notes.services.state_store.record_install_state", MagicMock())
     monkeypatch.setattr("agent_notes.services.install_state_builder.build_install_state",
                         MagicMock(return_value=State()))
-    monkeypatch.setattr("agent_notes.commands.build.generate_agent_files", MagicMock(return_value=[]))
+    built_from = []
+    monkeypatch.setattr("agent_notes.commands.build.build",
+                        lambda **kwargs: built_from.append(Path.cwd()))
     placed_from = []
     monkeypatch.setattr("agent_notes.services.installer.install_component_for_backend",
                         lambda backend, component, scope, copy: placed_from.append(
@@ -26,6 +28,7 @@ def test_local_placement_runs_inside_the_project_not_the_cwd(tmp_path, monkeypat
 
     regenerate(scope="local", project_path=project)
 
+    assert built_from == [project], "regenerate must render from inside the project too"
     assert placed_from, "regenerate placed nothing"
     assert {(component, scope) for component, scope, _ in placed_from} >= {
         ("rules", "local"), ("config", "local"), ("skills", "local")}
@@ -42,7 +45,7 @@ def test_without_a_project_path_local_placement_stays_in_the_cwd(tmp_path, monke
     monkeypatch.setattr("agent_notes.services.state_store.record_install_state", MagicMock())
     monkeypatch.setattr("agent_notes.services.install_state_builder.build_install_state",
                         MagicMock(return_value=State()))
-    monkeypatch.setattr("agent_notes.commands.build.generate_agent_files", MagicMock(return_value=[]))
+    monkeypatch.setattr("agent_notes.commands.build.build", MagicMock())
     placed_from = []
     monkeypatch.setattr("agent_notes.services.installer.install_component_for_backend",
                         lambda backend, component, scope, copy: placed_from.append(Path.cwd()))

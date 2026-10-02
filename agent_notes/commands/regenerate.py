@@ -36,11 +36,10 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
     """
     from ..services.state_store import load_state, get_scope, record_install_state
     from ..services.install_state_builder import build_install_state
-    from ..config import DATA_DIR
-    from .build import generate_agent_files
+    from .build import build
+    from ..services import installer
     from ..registries.cli_registry import load_registry
     from ..config import PKG_DIR
-    import yaml
 
     # Load state
     current_state = load_state()
@@ -92,25 +91,18 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
     else:
         target_clis = list(scope_state.clis.keys())
     
-    # Load agent config
-    agents_yaml = DATA_DIR / "agents" / "agents.yaml"
-    if not agents_yaml.exists():
-        print(f"Error: {agents_yaml} not found")
-        sys.exit(1)
-        
-    with open(agents_yaml) as f:
-        agents_data = yaml.safe_load(f)
-    
-    agents_config = agents_data.get('agents', {})
-    
-    # Regenerate per CLI
     registry = load_registry()
-    
+
     print(f"Regenerating {scope} installation...")
-    
+
     total_files = 0
+    copy_mode = scope_state.mode == "copy"
 
     with placement_dir:
+        # The package ships no dist/ (a reinstall leaves it empty), and the
+        # placed links point into it: render it first, exactly as install does.
+        build(scope=scope, project_path=project_path, profile_label=profile_label)
+
         for cli_name in target_clis:
             backend = registry.get(cli_name)
             # Apply profile overrides from state
@@ -122,42 +114,24 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
                     backend = backend.with_global_home(Path(bs.global_home_override).expanduser())
             print(f"\n{backend.label}:")
 
-            # Generate agents
-            if backend.supports("agents"):
-                files = generate_agent_files(
-                    agents_config,
-                    state=current_state,
-                    scope=scope,
-                    project_path=project_path,
-                    profile_label=profile_label
-                )
-                # Count files for this CLI
-                try:
-                    cli_files = [f for f in files if backend.name in str(f)]
-                    if cli_files:
-                        print(f"  ✓ {len(cli_files)} agents regenerated")
-                        total_files += len(cli_files)
-                except (TypeError, AttributeError):
-                    # Handle case where files is mocked or has unexpected structure
-                    print(f"  ✓ agents regenerated")
-        
-            # Regenerate other components as needed
-            from ..services import installer
-        
-            # Regenerate rules for backends that support them
-            if backend.supports("rules"):
-                installer.install_component_for_backend(backend, "rules", scope, scope_state.mode == "copy")
-                print(f"  ✓ rules regenerated for {backend.label}")
-        
-            # Regenerate global config files
-            if backend.layout.get("config"):
-                installer.install_component_for_backend(backend, "config", scope, scope_state.mode == "copy")
-                print(f"  ✓ config regenerated for {backend.label}")
-        
-            # Regenerate skills (static files, just ensure they're synced)
-            if backend.supports("skills"):
-                installer.install_component_for_backend(backend, "skills", scope, scope_state.mode == "copy")
-                print(f"  ✓ skills regenerated for {backend.label}")
+            for component in installer.COMPONENT_TYPES:
+                # A CLI without this component (codex has no commands) has no target.
+                if installer.target_dir_for(backend, component, scope) is None:
+                    continue
+                if installer.dist_source_for(backend, component) is None:
+                    # A string code: config's quiet_output hides prints but keeps the reason.
+                    sys.exit(f"Error: nothing was rendered for {backend.label} {component}; "
+                             f"its links would dangle.")
+                planned = installer._plan_component(backend, component, scope, copy_mode)
+                installer.install_component_for_backend(backend, component, scope, copy_mode)
+                placed = [action for action in planned if action.dst.exists()]
+                if not placed:
+                    continue
+                total_files += len(placed)
+                if component == "agents":
+                    print(f"  ✓ {len(placed)} agents regenerated")
+                else:
+                    print(f"  ✓ {component} regenerated for {backend.label}")
 
     # Update installed manifest to reflect current state
     try:
@@ -183,6 +157,7 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
             role_models=existing_role_models,
             role_efforts=existing_role_efforts,
             profile_label=profile_label,
+            selected_clis=set(scope_state.clis),
             folder_overrides=folder_overrides or None,
             global_home_override=global_home_override,
         )
