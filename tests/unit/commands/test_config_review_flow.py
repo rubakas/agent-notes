@@ -126,6 +126,14 @@ def test_an_install_whose_folder_is_gone_is_not_saved(env, tmp_path):
                for frame in ui.term.frames)
 
 
+@pytest.mark.parametrize("interrupt", [KeyboardInterrupt, EOFError])
+def test_ctrl_c_or_a_closed_terminal_cancels_without_a_traceback(env, capsys, interrupt):
+    ui = _run(env, "u", interrupt)
+    assert "Cancelled." in capsys.readouterr().out
+    assert ui.term.exited
+    env["record"].assert_not_called()
+
+
 def test_no_terminal_prints_the_settings_and_the_subcommands(env, capsys):
     config_review.interactive_config(session_factory=lambda: None, cwd=env["project"])
     out = capsys.readouterr().out

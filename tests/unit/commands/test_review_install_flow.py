@@ -176,6 +176,13 @@ def test_ctrl_c_prints_cancelled(capsys):
     assert "Cancelled." in capsys.readouterr().out
 
 
+def test_a_closed_terminal_prints_cancelled(calls, capsys):
+    ui = tui_session(EOFError)
+    orchestrator.interactive_install(session_factory=lambda: ui)
+    assert "Cancelled." in capsys.readouterr().out
+    assert calls.kinds() == []
+
+
 def test_line_mode_installs_with_two_enters(calls, monkeypatch):
     monkeypatch.setattr("agent_notes.services.ui._safe_input", FakeLineInput("", ""))
     _run(session=LineSession())

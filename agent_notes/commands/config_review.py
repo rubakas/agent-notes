@@ -315,8 +315,13 @@ def interactive_config(session_factory=None, cwd: Optional[Path] = None) -> None
         show(state)
         print("\nChange settings with: agent-notes config " + " | ".join(SUBCOMMANDS))
         return
-    with session as ui:
-        message = _config_review(ui, state, refs, Path(cwd) if cwd else Path.cwd())
+    try:
+        with session as ui:
+            message = _config_review(ui, state, refs, Path(cwd) if cwd else Path.cwd())
+    except (KeyboardInterrupt, EOFError):  # Ctrl-C, or the terminal closed
+        from ..config import Color
+        print(f"\n\n  {Color.YELLOW}Cancelled.{Color.NC}")
+        return
     if message:
         print(message)
 

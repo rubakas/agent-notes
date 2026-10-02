@@ -28,7 +28,7 @@ def interactive_install(session_factory=open_session) -> None:
     """Run the install review."""
     try:
         _interactive_install(session_factory)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):  # Ctrl-C, or the terminal closed
         print(f"\n\n  {Color.YELLOW}Cancelled.{Color.NC}")
 
 
