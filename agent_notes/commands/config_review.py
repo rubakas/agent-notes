@@ -363,10 +363,13 @@ def _config_review(ui, state, refs: list[InstallRef], cwd: Path) -> str:
     def changes() -> list[str]:
         return describe_changes(state, working, ctx.ref, plugins_before, ctx.plugins)
 
+    def status() -> str:
+        count = len(changes())
+        return _changes_text(count) if count else ""
+
     form = ReviewForm(f"AgentNotes {get_version()} · config", config_rows(ctx),
                       context=ref.label(), hints=CONFIG_HINTS, default_command="s",
-                      default_label="save", style=ui.style,
-                      status=lambda: _changes_text(len(changes())) if changes() else "")
+                      default_label="save", style=ui.style, status=status)
 
     def save():
         if ctx.ref.missing:
