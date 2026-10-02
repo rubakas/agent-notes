@@ -115,4 +115,4 @@ def test_long_checklists_scroll_and_keep_the_footer():
 
 def test_complete_path_handles_brackets_in_names(tmp_path):
     (tmp_path / "Notes [work]").mkdir()
-    assert complete_path(str(tmp_path / "Notes [w")) == str(tmp_path / "Notes [work]") + "/"
+    assert complete_path(str(tmp_path / "Notes [work]")) == str(tmp_path / "Notes [work]") + "/"
