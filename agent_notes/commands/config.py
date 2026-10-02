@@ -404,7 +404,8 @@ def show(state=None) -> None:
     if state is None:
         state = _load_state()
     print("Current configuration:")
-    width = shutil.get_terminal_size((100, 24)).columns
+    # Fit a terminal; piped output stays whole (it is for grep, not a screen).
+    width = shutil.get_terminal_size((100, 24)).columns if sys.stdout.isatty() else 10_000
     for line in render_show(state, width, Style(color_enabled())):
         print(line)
 

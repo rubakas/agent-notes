@@ -259,6 +259,21 @@ def test_quit_does_nothing(state_file):
     assert state_file.read_text() == original
 
 
+def test_show_piped_prints_long_lines_whole(capsys, tmp_path, monkeypatch):
+    """Off a terminal nothing is cut: the output is for grep, not for a screen."""
+    from agent_notes.commands.config import show
+    from agent_notes.domain.state import BackendState, ScopeState, State
+
+    project = tmp_path / ("a-rather-long-folder-name-" * 6) / "payments-api"
+    project.mkdir(parents=True)
+    state = State(local_installs={str(project): ScopeState(clis={"claude": BackendState()})})
+    monkeypatch.setattr("agent_notes.commands.config_review.enabled_toggles", lambda *a: {})
+    show(state)
+    out = capsys.readouterr().out
+    assert f"local · {project}" in out
+    assert "…" not in out
+
+
 def test_config_memory_names_the_backends_built_in_and_obsidian(state_file, capsys):
     """FR-028: one name per memory backend, the same as on the review screen."""
     from agent_notes.commands.config import _wizard_memory
