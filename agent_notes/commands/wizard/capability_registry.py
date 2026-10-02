@@ -15,21 +15,24 @@ from ...domain.capability import Capability
 
 @dataclass(frozen=True)
 class CapabilityBehaviour:
-    view: Callable
+    view: Optional[Callable] = None        # legacy step view; removed in Task 9
     process: Optional[Callable] = None
-    config_view: Optional[Callable] = None
+    config_view: Optional[Callable] = None  # legacy; removed in Task 9
+    row: Optional[Callable] = None          # (ReviewContext) -> list[Row] for the install review
+    config_row: Optional[Callable] = None   # (ConfigContext) -> list[Row] for `agent-notes config`
 
 
 class CapabilityRegistry:
     def __init__(self) -> None:
         self._entries: dict[str, tuple[Capability, CapabilityBehaviour]] = {}
 
-    def register(self, capability: Capability, *, view, process=None, config_view=None) -> None:
+    def register(self, capability: Capability, *, view=None, process=None, config_view=None,
+                 row=None, config_row=None) -> None:
         if capability.name in self._entries:
             raise ValueError(f"Capability {capability.name!r} already registered")
         self._entries[capability.name] = (
             capability,
-            CapabilityBehaviour(view, process, config_view),
+            CapabilityBehaviour(view, process, config_view, row, config_row),
         )
 
     def get(self, name: str) -> CapabilityBehaviour:

@@ -49,11 +49,28 @@ def _memory_view(step, total, version="") -> dict:
     return {"backend": backend, "path": path, "strategy": strategy}
 
 
+def _backends_rows(ctx) -> list:
+    # lazy import: review imports this module for the registry
+    from .review import backends_rows
+    return backends_rows(ctx)
+
+
+def _memory_rows(ctx) -> list:
+    from .review import memory_row
+    return [memory_row(ctx.ui, ctx.choices.memory)]
+
+
+def _cost_report_rows(ctx) -> list:
+    from .review import toggle_row
+    return [toggle_row(ctx.ui, "cost-report", "Cost report", ctx.choices.plugins)]
+
+
 def _build_registry() -> CapabilityRegistry:
     reg = CapabilityRegistry()
-    reg.register(BACKENDS, view=_backends_view, config_view=_backends_config_view)
-    reg.register(COST_REPORT, view=_cost_report_view)
-    reg.register(MEMORY, view=_memory_view)
+    reg.register(BACKENDS, view=_backends_view, config_view=_backends_config_view,
+                 row=_backends_rows)
+    reg.register(COST_REPORT, view=_cost_report_view, row=_cost_report_rows)
+    reg.register(MEMORY, view=_memory_view, row=_memory_rows)
     return reg
 
 
