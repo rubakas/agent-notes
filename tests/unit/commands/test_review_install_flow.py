@@ -10,7 +10,7 @@ import pytest
 
 from agent_notes.commands.wizard import orchestrator
 from agent_notes.commands.wizard.review import InstallChoices, initial_choices
-from agent_notes.commands.wizard.role_models import Catalog
+from agent_notes.commands.wizard.role_models import Catalog, recommended_choices
 from agent_notes.registries.cli_registry import load_registry
 from agent_notes.services.tui.keys import DOWN, ENTER, ESCAPE, RIGHT, SPACE
 from agent_notes.services.tui.session import LineSession
@@ -64,7 +64,8 @@ def test_two_keypresses_install_the_recommended_setup(calls):
     assert calls.kinds() == ["build", "plan", "execute"]
     run = calls.of("execute")[0]
     assert (run["clis"], run["scope"], run["copy_mode"]) == ({"claude"}, "global", False)
-    assert run["role_models"]["claude"]["reasoner"] == "claude-opus-5-5"
+    models, efforts = recommended_choices(Catalog(), load_registry().get("claude"))
+    assert (run["role_models"]["claude"], run["role_efforts"]["claude"]) == (models, efforts)
     assert (run["memory_backend"], run["memory_path"], run["memory_strategy"]) == (
         "local", "", "single-brain")
     assert (run["profile_label"], run["folder_overrides"], run["global_home_override"]) == (

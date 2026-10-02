@@ -7,6 +7,7 @@ It renders into the repo's git-ignored agent_notes/dist/, like any build.
 import io
 import os
 import re
+import subprocess
 import sys
 
 import pytest
@@ -44,5 +45,13 @@ def test_install_review_end_to_end(tmp_path):
     assert all(len(line) <= 80 for frame in frames for line in frame.replace("\r", "").split("\n"))   # SC-002
     assert "Step 1 of" not in output                                                     # FR-001
     assert "Generating agent files" not in output                                        # SC-009
+    # The recommendation, whatever it is today, read in the same sandbox
+    # (user overrides and the catalog cache live under HOME): architect is a reasoner.
+    reasoner = subprocess.run(
+        [sys.executable, "-c",
+         "from agent_notes.commands.wizard.role_models import Catalog, recommended_choices\n"
+         "from agent_notes.registries.cli_registry import load_registry\n"
+         "print(recommended_choices(Catalog(), load_registry().get('claude'))[0]['reasoner'])"],
+        env=env, cwd=str(home), capture_output=True, text=True, check=True).stdout.strip()
     architect = home / ".claude" / "agents" / "architect.md"
-    assert "model: claude-opus-5-5" in architect.read_text()
+    assert reasoner and f"model: {reasoner}\n" in architect.read_text()

@@ -6,6 +6,9 @@ import pytest
 
 from agent_notes.commands import config_review
 from agent_notes.commands.regenerate import regenerate as real_regenerate
+from agent_notes.commands.wizard.role_models import Catalog, starred_model
+from agent_notes.registries.cli_registry import load_registry
+from agent_notes.registries.role_registry import load_role_registry
 from agent_notes.domain.state import BackendState, ScopeState, State
 from agent_notes.services import state_store
 from agent_notes.services.tui.keys import DOWN, ENTER, ESCAPE, RIGHT, TAB
@@ -53,13 +56,15 @@ def test_three_edits_save_with_one_write_and_one_regenerate(env):
     env["record"].assert_called_once()
     saved = env["record"].call_args.args[0]
     install = saved.local_installs[str(env["project"].resolve())]
-    assert install.clis["claude"].role_models["reasoner"] == "claude-opus-5-5"
+    star = starred_model(Catalog(), load_registry().get("claude"),
+                         load_role_registry().get("reasoner")).id
+    assert install.clis["claude"].role_models["reasoner"] == star
     assert saved.memory.backend == "obsidian"
     env["regenerate"].assert_called_once_with(scope="local", project_path=env["project"].resolve(),
                                               profile_label="")
     env["enable"].assert_called_once_with("cost-report")
     shown = "\n".join("\n".join(frame) for frame in ui.term.frames)
-    assert "claude reasoner: claude-opus-4-6 → claude-opus-5-5" in shown
+    assert f"claude reasoner: claude-opus-4-6 → {star}" in shown
     assert "cost-report: off → on" in shown
     assert env["state"].memory.backend == "local"  # the loaded state itself is untouched
 
