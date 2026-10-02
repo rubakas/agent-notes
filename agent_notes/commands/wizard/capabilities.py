@@ -32,11 +32,26 @@ def _cost_report_rows(ctx) -> list:
     return [toggle_row(ctx.ui, "cost-report", "Cost report", ctx.choices.plugins)]
 
 
+def _backends_config_rows(ctx) -> list:
+    from ..config_review import config_models_rows
+    return config_models_rows(ctx)
+
+
+def _memory_config_rows(ctx) -> list:
+    from .review import memory_row
+    return [memory_row(ctx.ui, ctx.state.memory)]
+
+
+def _cost_report_config_rows(ctx) -> list:
+    from .review import toggle_row
+    return [toggle_row(ctx.ui, "cost-report", "Cost report", ctx.plugins)]
+
+
 def _build_registry() -> CapabilityRegistry:
     reg = CapabilityRegistry()
-    reg.register(BACKENDS, row=_backends_rows)
-    reg.register(COST_REPORT, row=_cost_report_rows)
-    reg.register(MEMORY, row=_memory_rows)
+    reg.register(BACKENDS, row=_backends_rows, config_row=_backends_config_rows)
+    reg.register(COST_REPORT, row=_cost_report_rows, config_row=_cost_report_config_rows)
+    reg.register(MEMORY, row=_memory_rows, config_row=_memory_config_rows)
     return reg
 
 
