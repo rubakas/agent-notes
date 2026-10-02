@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-02
 
-**Status**: Approved 2026-10-02 (with the corrections recorded below)
+**Status**: Implemented 2026-10-02
 
 **Input**: User description: "make installation and config processes more useful for human, easier to select options and more visually better and compact design"
 
@@ -214,3 +214,28 @@ Every interactive screen uses one header, one footer, one vocabulary and one mea
 - `_execute_install`, `plan_install`, `_apply_and_regenerate` and the state store keep their current signatures; this spec changes how values are collected and shown, not how they are applied.
 - Test churn is expected: the 19 step-function test files are rewritten against the widgets and the review rows; where a test guards a behavior that survives (profile re-render, preflight file count, build-before-confirm order, memory path validation, effort gating), the behavior keeps a test.
 - Size: roughly 500–700 lines of widget and review code added, a similar amount of step-function and duplicate-renderer code removed — production code roughly flat; the cost is in tests.
+
+## Verification
+
+Measured 2026-10-02 on branch `feat/install-config-review-screen`. All ten criteria are met.
+
+| SC | Command | Result |
+|---|---|---|
+| SC-001 / SC-002 / SC-009 | `uv run --with pexpect pytest -q tests/functional/test_install_review_pty.py` | 1 passed — one review screen, `i` + ⏎ installs, no line over 80 columns, no build-log lines |
+| SC-003 / SC-004 | `uv run pytest -q tests/unit/commands/test_review_role_models.py -k "star_is or effort_options_match"` | 2 passed, 14 deselected |
+| SC-005 / SC-007 | `uv run pytest -q tests/unit/commands/test_config_review_installs.py tests/unit/commands/test_config_review_flow.py` | 18 passed |
+| SC-006 | `uv run pytest -q tests/unit/tui/test_tui_keys.py tests/unit/tui/test_tui_review_form.py tests/unit/tui/test_tui_picker.py tests/unit/tui/test_tui_inputs.py -k "escape or esc"` | 7 passed, 42 deselected (includes the real-descriptor bare-Esc-under-100 ms test) |
+| SC-008 | `uv run pytest -q tests/unit/tui/test_tui_screen.py -k no_color` | 3 passed, 12 deselected |
+| SC-010 | `uv run pytest -q` | 2305 passed, 1 skipped, 15 deselected (baseline on develop @ 0ebf8c6: 2241 passed, 15 deselected) |
+| SC-010 | `git diff 0ebf8c6 -- pyproject.toml` | empty — dependencies unchanged |
+
+### Mutation checks
+
+Each mutation was applied alone, the named test run, and the edit reverted at once (`git checkout -- agent_notes`; `git diff` afterwards showed no code change).
+
+| Mutation | Result |
+|---|---|
+| `decode` reads two more bytes after ESC instead of checking `has_more` | `test_bare_escape_does_not_swallow_the_next_key` and `test_longer_csi_sequences_are_swallowed_whole` fail; the real-descriptor 100 ms test blocks on the read and was killed by a 60 s alarm (it cannot pass) |
+| `ReviewForm.handle` returns DONE on ESCAPE always | `test_escape_does_nothing_on_the_top_level_review` fails |
+| `effort_options` skips the CLI subset | `test_effort_options_match_the_config_role_effort_checks` and `test_codex_offers_only_the_efforts_the_cli_accepts` fail |
+| config save calls `regenerate()` without arguments | `test_three_edits_save_with_one_write_and_one_regenerate` fails |

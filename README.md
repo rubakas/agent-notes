@@ -6,9 +6,13 @@ AI agent configuration manager for Claude Code and OpenCode — orchestrates a t
 
 ```bash
 pipx install agent-notes
-agent-notes install    # interactive wizard guides you through setup
+agent-notes install    # one review screen, every setting pre-filled
 agent-notes doctor
 ```
+
+`agent-notes install` opens one review screen with every setting pre-filled. `i` installs, `⏎` edits a row, `←→` changes simple values, `q` quits. Small terminals (under 60×16) get numbered prompts instead; with no terminal, the recommended setup installs without prompts.
+
+`agent-notes config` opens the same screen on an existing install: `u` moves deprecated pins to ★, `tab` switches installs, `s` saves everything at once. The scriptable `config` subcommands are unchanged.
 
 > No `pipx`? Use `uv tool install agent-notes` instead, or see **Troubleshooting: externally-managed-environment** below.
 
@@ -268,13 +272,13 @@ Specialized subagents with hierarchical model strategy: **Opus 4.8 reasons (high
 
 ### Reconfiguring roles, models, and effort
 
-During `agent-notes install`, wizard step 2 asks you to pick a model per role, and — for models served by a provider with a known effort vocabulary (currently `anthropic`, `openai`) — a follow-up effort prompt, pre-selected to the role's typical effort when that value is valid for the chosen provider. Providers with no effort registry entry (`github-copilot`, `openrouter`, `google`, `moonshot`) skip the effort prompt entirely.
+On the `agent-notes install` review screen, the Models row lets you pick a model per role, and — for models served by a provider with a known effort vocabulary (currently `anthropic`, `openai`) — an effort per role (←→), limited to the values the model, provider and CLI all accept. Providers with no effort registry entry (`github-copilot`, `openrouter`, `google`, `moonshot`) show no effort.
 
 To change these after install:
 ```bash
 agent-notes config role-model [--cli <cli>] <role> <model>    # e.g. role-model worker claude-sonnet-5
 agent-notes config role-effort [--cli <cli>] <role> <effort>  # e.g. role-effort worker high
-agent-notes config wizard                                     # interactive menu for both
+agent-notes config                                            # review screen for both (interactive)
 ```
 `role-effort` validates the effort against the role's currently-assigned model's provider — an invalid value prints that provider's name and its valid effort list. There's no cross-provider mapping: each provider (anthropic, openai) has its own independent effort vocabulary and default.
 
@@ -386,7 +390,7 @@ agent-notes <command> [options]
 
 | Command | Description |
 |---------|-------------|
-| `install [--local] [--copy] [--reconfigure]` | Interactive wizard or direct install |
+| `install [--local] [--copy] [--reconfigure]` | Review screen or direct install |
 | `uninstall [--local \| --global]` | Remove installed components (both scopes by default) |
 | `doctor [--local] [--fix]` | Check installation health |
 | `info` | Show status and component counts |
