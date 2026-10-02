@@ -1,4 +1,5 @@
 from agent_notes.services.tui.keys import BACKSPACE, DOWN, ENTER, ESCAPE, SPACE, TAB
+from agent_notes.services.tui.screen import visible_len
 from agent_notes.services.tui.widgets import CANCEL, DONE, Checklist, TextField, complete_path
 from tests.unit.tui.fakes import typed
 
@@ -64,14 +65,25 @@ def test_escape_cancels_the_edit():
     assert field.value is None
 
 
-def test_secret_text_is_never_rendered():
+def test_secret_text_is_never_rendered_nor_its_length():
     field = TextField("API key", "Key", secret=True)
+    assert "•" not in "\n".join(field.render(80, 24))
     frames = []
     for key in typed("sk-secret-123"):
         field.handle(key)
-        frames.append("\n".join(field.render(80, 24)))
+        frames.append(field.render(80, 24)[2])
     assert all("secret" not in frame for frame in frames)
-    assert "•" * len("sk-secret-123") in frames[-1]
+    assert len(set(frames)) == 1          # one placeholder, whatever the length
+    assert "••••••••" in frames[-1]
+
+
+def test_a_long_value_shows_its_tail_and_the_cursor():
+    value = "/".join(f"dir{i:02d}" for i in range(24))   # 119 characters
+    field = TextField("Vault", "Path", value)
+    line = field.render(80, 24)[2]
+    assert visible_len(line) <= 80
+    assert line.endswith("dir22/dir23▏")
+    assert "   Path  …" in line
 
 
 def test_tab_runs_the_completer():

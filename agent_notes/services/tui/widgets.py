@@ -305,7 +305,10 @@ class Checklist:
 class TextField:
     """One line of text. ⏎ accepts — after a *validate* warning, only on the
     second ⏎, so a value can be kept on purpose. Esc leaves it unchanged.
-    *secret* shows bullets and never the text."""
+    *secret* shows a fixed placeholder: never the text, nor its length.
+    Text longer than the line shows its tail, where the cursor is."""
+
+    SECRET_PLACEHOLDER = "••••••••"
 
     def __init__(self, title: str, prompt: str, value: str = "", *,
                  notes: Sequence[str] = (),
@@ -350,10 +353,15 @@ class TextField:
 
     def render(self, width: int, height: int) -> list[str]:
         style = self.style
-        shown = "•" * len(self.text) if self.secret else self.text
+        lead = f"   {self.prompt}  "
+        if self.secret:
+            shown = self.SECRET_PLACEHOLDER if self.text else ""
+        else:
+            room = max(2, width - visible_len(lead) - 1)   # one column for the cursor
+            shown = self.text if len(self.text) <= room else "…" + self.text[-(room - 1):]
         hints = "type   ⏎ ok   esc back" + ("   tab complete" if self.complete else "")
         lines = [bar(f" {style(self.title, BOLD)}", "", width), style("─" * width, DIM),
-                 f"   {self.prompt}  {shown}{style('▏', CYAN)}"]
+                 f"{lead}{shown}{style('▏', CYAN)}"]
         lines += [style(f"   {note}", DIM) for note in self.notes]
         if self.warning:
             lines.append(style(f"   ⚠ {self.warning} — ⏎ again to keep it", YELLOW))
