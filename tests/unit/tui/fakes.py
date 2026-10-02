@@ -77,3 +77,25 @@ class FakeTerminal:
 
     def text(self, frame: int = -1) -> str:
         return "\n".join(_ANSI.sub("", line) for line in self.frames[frame])
+
+
+class FakeLineInput:
+    """Stands in for services.ui._safe_input / _path_input: returns the next
+    scripted answer (the default when an answer is None)."""
+
+    def __init__(self, *answers):
+        self.answers = list(answers)
+        self.prompts: list[str] = []
+
+    def __call__(self, prompt: str, default: str = "") -> str:
+        self.prompts.append(prompt)
+        if not self.answers:
+            raise AssertionError(f"no scripted answer for prompt {prompt!r}")
+        answer = self.answers.pop(0)
+        return default if answer is None else answer
+
+
+def tui_session(*keys, width: int = 80, height: int = 24):
+    from agent_notes.services.tui.screen import Style
+    from agent_notes.services.tui.session import TuiSession
+    return TuiSession(ScriptedKeys(*keys), FakeTerminal(width, height), Style(False))
