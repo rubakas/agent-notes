@@ -85,6 +85,8 @@ class TtyKeys:
     def __exit__(self, *exc) -> bool:
         import termios
         if self._saved is not None:
+            # TCSAFLUSH, not TCSADRAIN: on a macOS pty a TCSADRAIN restore kept
+            # the cbreak lflags (no echo after exit). It also drops unread keys.
             termios.tcsetattr(self._fd, termios.TCSAFLUSH, self._saved)
             self._saved = None
         return False
