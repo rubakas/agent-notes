@@ -253,3 +253,18 @@ def test_line_mode_form_runs_edit_when_no_options(monkeypatch):
     monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
     assert LineSession().form(form) == DONE
     assert edited == [True]
+
+
+@pytest.mark.parametrize("answer, expected", [("", False), ("y", True), ("n", False)])
+def test_line_mode_confirm_can_default_to_no(monkeypatch, answer, expected):
+    form = ReviewForm("T", lambda: [])
+    answers = FakeLineInput(answer)
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
+    assert LineSession().confirm(form, "Discard 2 changes?", default=False) is expected
+    assert answers.prompts == ["Discard 2 changes? [y/N]: "]
+
+
+def test_full_screen_confirm_ignores_the_default():
+    form = ReviewForm("T", lambda: [Row("a", "A", lambda: ["x"])])
+    assert tui_session(ENTER).confirm(form, "Discard?", default=False) is True
+    assert tui_session(ESCAPE).confirm(form, "Discard?", default=False) is False

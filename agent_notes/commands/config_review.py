@@ -383,7 +383,7 @@ def _config_review(ui, state, refs: list[InstallRef], cwd: Path) -> str:
 
     def quit_():
         count = len(changes())
-        if count and not ui.confirm(form, f"Discard {_changes_text(count)}?"):
+        if count and not ui.confirm(form, f"Discard {_changes_text(count)}?", default=False):
             return None
         return CANCEL
 

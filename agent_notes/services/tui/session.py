@@ -74,8 +74,10 @@ class TuiSession:
                                              validate=validate, secret=secret, style=self.style))
         return result if outcome == DONE else None
 
-    def confirm(self, form: ReviewForm, question: str, lines: Sequence[str] = ()) -> bool:
-        """Ask on the form's own screen: ⏎ yes, Esc no."""
+    def confirm(self, form: ReviewForm, question: str, lines: Sequence[str] = (), *,
+                default: bool = True) -> bool:
+        """Ask on the form's own screen: ⏎ yes, Esc no — whatever *default*
+        says, since neither key is an unanswered question here."""
         form.notice, form.message = list(lines), f"{question}   ⏎ yes · esc back"
         try:
             while True:
@@ -196,13 +198,17 @@ class LineSession:
             if _safe_input("  Keep it anyway? [y/N]: ", "n").strip().lower() in ("y", "yes"):
                 return answer
 
-    def confirm(self, form: ReviewForm, question: str, lines: Sequence[str] = ()) -> bool:
+    def confirm(self, form: ReviewForm, question: str, lines: Sequence[str] = (), *,
+                default: bool = True) -> bool:
+        """y or n; an empty answer takes *default*, shown capitalised."""
         from ..ui import _safe_input
         for line in lines:
             print(f"  {line}")
         while True:
-            answer = _safe_input(f"{question} [Y/n]: ", "Y").strip().lower()
-            if answer in ("", "y", "yes"):
+            answer = _safe_input(f"{question} {'[Y/n]' if default else '[y/N]'}: ", "").strip().lower()
+            if answer == "":
+                return default
+            if answer in ("y", "yes"):
                 return True
             if answer in ("n", "no"):
                 return False

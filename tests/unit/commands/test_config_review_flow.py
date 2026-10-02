@@ -9,7 +9,8 @@ from agent_notes.commands.regenerate import regenerate as real_regenerate
 from agent_notes.domain.state import BackendState, ScopeState, State
 from agent_notes.services import state_store
 from agent_notes.services.tui.keys import DOWN, ENTER, ESCAPE, RIGHT, TAB
-from tests.unit.tui.fakes import tui_session
+from agent_notes.services.tui.session import LineSession
+from tests.unit.tui.fakes import FakeLineInput, tui_session
 
 
 @pytest.fixture
@@ -67,6 +68,15 @@ def test_quit_with_staged_edits_asks_and_escape_keeps_editing(env):
     ui = _run(env, "u", "q", ESCAPE, "q", ENTER)
     env["record"].assert_not_called()
     assert any("Discard 1 change?" in "\n".join(frame) for frame in ui.term.frames)
+
+
+def test_line_mode_discard_defaults_to_no(env, monkeypatch):
+    # u stages an edit; q then Enter keeps editing; q then y discards.
+    answers = FakeLineInput("u", "q", "", "q", "y")
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", answers)
+    config_review.interactive_config(session_factory=LineSession, cwd=env["project"])
+    assert answers.prompts.count("Discard 1 change? [y/N]: ") == 2
+    env["record"].assert_not_called()
 
 
 def test_tab_switches_installs_only_without_staged_edits(env, tmp_path):
