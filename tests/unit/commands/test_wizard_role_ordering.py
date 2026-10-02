@@ -1,9 +1,9 @@
 """Tests for canonical role ordering in the wizard: orchestrator → reasoner →
 worker → scout, driven by the declarative `order:` field in roles/*.yaml.
 
-Covers the three iteration points: _select_models_per_role, the confirmation
-summary (_render_install_summary), and the post-install Configuration section
-(_render_configuration)."""
+Covers the sort key and the post-install Configuration section
+(_render_configuration); the review's role ordering is tested in
+test_review_role_models.py."""
 import pytest
 
 from agent_notes.domain.role import Role, DEFAULT_ROLE_ORDER
@@ -32,69 +32,6 @@ class TestRoleSortKey:
         from agent_notes.commands.wizard import _role_sort_key
         assert _role_sort_key(None, "mystery") == (DEFAULT_ROLE_ORDER, "mystery")
         assert _role_sort_key(_make_role("scout", 4)) < _role_sort_key(None, "aaa")
-
-
-class TestSelectModelsPerRoleOrdering:
-    def _patch_ui(self, monkeypatch):
-        monkeypatch.setattr("agent_notes.services.ui._can_interactive", lambda: False)
-
-        def fake_radio(title, options, default=0, **kwargs):
-            return options[default][1]
-
-        monkeypatch.setattr("agent_notes.commands.wizard._radio_select_fallback", fake_radio)
-        monkeypatch.setattr("agent_notes.commands.wizard._radio_select", fake_radio)
-
-    def test_claude_iterates_canonical_order_without_orchestrator(self, monkeypatch):
-        """claude skips orchestrator (lead runs the current session); the rest
-        must appear reasoner → worker → scout, not alphabetically."""
-        self._patch_ui(monkeypatch)
-        from agent_notes.commands.wizard import _select_models_per_role
-
-        result, _ = _select_models_per_role({"claude"})
-
-        assert list(result["claude"].keys()) == ["reasoner", "worker", "scout"]
-
-    def test_non_claude_backend_iterates_orchestrator_first(self, monkeypatch):
-        from agent_notes.registries.cli_registry import load_registry
-        registry = load_registry()
-        non_claude = [b for b in registry.all() if b.name != "claude" and b.supports("agents")]
-        if not non_claude:
-            pytest.skip("No non-claude backend that supports agents found")
-        backend_name = non_claude[0].name
-
-        self._patch_ui(monkeypatch)
-        from agent_notes.commands.wizard import _select_models_per_role
-
-        result, _ = _select_models_per_role({backend_name})
-
-        if backend_name in result and result[backend_name]:
-            names = list(result[backend_name].keys())
-            assert names == ["orchestrator", "reasoner", "worker", "scout"], (
-                f"expected canonical order for {backend_name}, got {names}"
-            )
-
-
-class TestInstallSummaryOrdering:
-    def test_summary_rows_follow_canonical_role_order(self, capsys):
-        """_render_install_summary must list roles orchestrator → reasoner →
-        worker → scout regardless of dict/alphabetical order."""
-        from agent_notes.commands.wizard import _render_install_summary
-        from agent_notes.registries.cli_registry import load_registry
-
-        role_models = {"opencode": {
-            "scout": "claude-haiku-4-5",
-            "reasoner": "claude-opus-4-8",
-            "worker": "claude-sonnet-5",
-            "orchestrator": "claude-opus-4-8",
-        }}
-        _render_install_summary(
-            clis={"opencode"}, scope="global", copy_mode=False, selected_skills=[],
-            role_models=role_models, skill_groups={}, registry=load_registry(),
-        )
-        out = capsys.readouterr().out
-        positions = [out.index(label) for label in
-                     ("Orchestrator", "Reasoner", "Worker", "Scout")]
-        assert positions == sorted(positions), f"summary rows out of order:\n{out}"
 
 
 class TestConfigurationSectionOrdering:

@@ -1,0 +1,168 @@
+"""The install flow around the review screen (spec 005 FR-001, FR-005, FR-026):
+build before confirm, restore on decline, and the collected values reach build,
+plan and _execute_install unchanged."""
+import logging
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from agent_notes.commands.wizard import orchestrator
+from agent_notes.commands.wizard.review import InstallChoices
+from agent_notes.registries.cli_registry import load_registry
+from agent_notes.services.tui.keys import DOWN, ENTER, ESCAPE, RIGHT, SPACE
+from agent_notes.services.tui.session import LineSession
+from tests.unit.tui.fakes import FakeLineInput, tui_session
+
+
+class _Calls(list):
+    plan = None
+
+    def kinds(self):
+        return [kind for kind, _ in self]
+
+    def of(self, kind):
+        return [kwargs for k, kwargs in self if k == kind]
+
+
+@pytest.fixture
+def calls(monkeypatch):
+    log = _Calls()
+    log.plan = SimpleNamespace(to_install=["a", "b", "c"], overwrites=[])
+
+    def fake_plan_install(**kwargs):
+        log.append(("plan", kwargs))
+        return "manifest"
+
+    monkeypatch.setattr(orchestrator, "build", lambda **kw: log.append(("build", kw)))
+    monkeypatch.setattr(orchestrator, "_execute_install", lambda **kw: log.append(("execute", kw)))
+    monkeypatch.setattr("agent_notes.services.installer.plan_install", fake_plan_install)
+    monkeypatch.setattr("agent_notes.services.installer.summarize_plan", lambda manifest: log.plan)
+    return log
+
+
+def _run(*keys, session=None):
+    ui = session or tui_session(*keys)
+    orchestrator._interactive_install(session_factory=lambda: ui)
+    return ui
+
+
+def test_two_keypresses_install_the_recommended_setup(calls):
+    _run("i", ENTER)
+    assert calls.kinds() == ["build", "plan", "execute"]
+    run = calls.of("execute")[0]
+    assert (run["clis"], run["scope"], run["copy_mode"]) == ({"claude"}, "global", False)
+    assert run["role_models"]["claude"]["reasoner"] == "claude-opus-5-5"
+    assert (run["memory_backend"], run["memory_path"], run["memory_strategy"]) == (
+        "local", "", "single-brain")
+    assert (run["profile_label"], run["folder_overrides"], run["global_home_override"]) == (
+        "", None, "")
+    assert run["enabled_plugins"] == {"cost-report": False}
+
+
+def test_the_build_gets_the_selections_before_confirming(calls):
+    _run("i", ENTER)
+    build, run = calls.of("build")[0], calls.of("execute")[0]
+    assert build["role_models"] == run["role_models"]
+    assert build["role_efforts"] == run["role_efforts"]
+    assert (build["scope"], build["project_path"], build["profile_label"]) == ("global", None, "")
+
+
+def test_local_scope_builds_for_the_current_folder(calls):
+    _run(DOWN, DOWN, RIGHT, "i", ENTER)  # CLIs → Models → Scope, then local
+    assert calls.of("build")[0]["project_path"] == Path.cwd()
+    assert calls.of("execute")[0]["scope"] == "local"
+
+
+def test_declining_restores_the_persisted_render_and_installs_nothing(calls, capsys):
+    _run("i", ESCAPE, "q")
+    assert calls.kinds() == ["build", "plan", "build"]
+    restore = calls.of("build")[1]
+    assert "role_models" not in restore and "role_efforts" not in restore
+    assert "Installation cancelled." in capsys.readouterr().out
+
+
+def test_the_restore_keeps_scope_and_profile(calls, monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    orchestrator._restore(InstallChoices(scope="local", profile_label="work"))
+    restore = calls.of("build")[0]
+    assert restore["scope"] == "local" and restore["profile_label"] == "work"
+    assert Path(restore["project_path"]).resolve() == tmp_path.resolve()
+
+
+def test_a_failed_build_restores_shows_why_and_never_confirms(calls, monkeypatch):
+    def failing_build(**kwargs):
+        calls.append(("build", kwargs))
+        if "role_models" in kwargs:
+            raise RuntimeError("disk full")
+
+    monkeypatch.setattr(orchestrator, "build", failing_build)
+    ui = _run("i", "q")
+    assert calls.kinds() == ["build", "build"]
+    assert "Build failed: disk full" in ui.term.text()
+
+
+def test_no_cli_selected_refuses_to_build(calls):
+    ui = _run(ENTER, SPACE, ENTER, "i", "q")
+    assert calls.kinds() == []
+    assert "select at least one CLI" in ui.term.text()
+
+
+def test_plan_gets_the_skills_verbatim_and_the_profile_overrides(calls):
+    orchestrator._plan_summary(InstallChoices(clis={"claude"}, skills=[], profile_label="work"),
+                               load_registry())
+    plan = calls.of("plan")[0]
+    assert plan["selected_skills"] == []
+    assert plan["folder_overrides"] == {"claude": ".claude-work"}
+    assert plan["global_home_override"] == "~/.claude-work"
+
+
+def test_no_profile_passes_no_overrides(calls):
+    orchestrator._plan_summary(InstallChoices(clis={"claude"}), load_registry())
+    plan = calls.of("plan")[0]
+    assert plan["folder_overrides"] is None and plan["global_home_override"] is None
+
+
+def test_the_question_counts_files_and_lists_at_most_five_backups(calls):
+    calls.plan.overwrites = [SimpleNamespace(dst=f"/x/{i}.md", backup_path=f"/x/{i}.md.bak")
+                             for i in range(7)]
+    question, lines = orchestrator._plan_summary(InstallChoices(clis={"claude"}), load_registry())
+    assert question == "Install 3 files (7 backed up)?"
+    assert lines[0] == "backup  /x/0.md  →  /x/0.md.bak"
+    assert len(lines) == 6 and lines[-1] == "… 2 more"
+
+
+def test_no_backup_lines_without_overwrites(calls):
+    question, lines = orchestrator._plan_summary(InstallChoices(clis={"claude"}), load_registry())
+    assert (question, lines) == ("Install 3 files (0 backed up)?", [])
+
+
+def test_a_plan_failure_is_logged_and_the_install_can_still_go_ahead(calls, monkeypatch, caplog):
+    def broken(**kwargs):
+        raise OSError("unreadable")
+
+    monkeypatch.setattr("agent_notes.services.installer.plan_install", broken)
+    with caplog.at_level(logging.DEBUG, logger="agent_notes.commands.wizard.orchestrator"):
+        question, lines = orchestrator._plan_summary(InstallChoices(clis={"claude"}),
+                                                     load_registry())
+    assert (question, lines) == ("Install?", [])
+    assert "plan_install failed" in caplog.text
+
+
+def test_without_a_terminal_the_recommended_setup_installs_without_prompts(calls):
+    orchestrator._interactive_install(session_factory=lambda: None)
+    assert calls.kinds() == ["build", "execute"]
+
+
+def test_ctrl_c_prints_cancelled(capsys):
+    def interrupted():
+        raise KeyboardInterrupt
+
+    orchestrator.interactive_install(session_factory=interrupted)
+    assert "Cancelled." in capsys.readouterr().out
+
+
+def test_line_mode_installs_with_two_enters(calls, monkeypatch):
+    monkeypatch.setattr("agent_notes.services.ui._safe_input", FakeLineInput("", ""))
+    _run(session=LineSession())
+    assert calls.kinds() == ["build", "plan", "execute"]

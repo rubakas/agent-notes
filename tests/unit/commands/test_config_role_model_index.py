@@ -10,7 +10,6 @@ import re
 import pytest
 from unittest.mock import patch
 
-import agent_notes.commands.wizard as wiz
 from agent_notes.commands.config import compatible_models_for, role_model
 from agent_notes.registries.cli_registry import load_registry
 
@@ -194,25 +193,6 @@ class TestRankedColumns:
         out = capsys.readouterr().out
         assert model_columns(unrated[0]) in out
         assert "—" in model_columns(unrated[0])
-
-
-class TestWizardAndCliShareTheSameList:
-    def test_wizard_options_match_the_numbered_cli_list(self, monkeypatch):
-        seen = {}
-
-        def fake_radio(title, options, default=0, **kwargs):
-            seen.setdefault("options", options)
-            return options[default][1]
-
-        monkeypatch.setattr(wiz, "_can_interactive", lambda: True)
-        monkeypatch.setattr(wiz, "_select_accept_all_models", lambda **k: False)
-        monkeypatch.setattr(wiz, "_radio_select", fake_radio)
-
-        with patch("sys.stdout", io.StringIO()):
-            wiz._select_models_per_role({"claude"}, step=2, total=9, version="x")
-
-        wizard_ids = [model_id for _label, model_id in seen["options"]]
-        assert wizard_ids == [m.id for m in _claude_models()]
 
 
 class TestMultiProviderOrdering:

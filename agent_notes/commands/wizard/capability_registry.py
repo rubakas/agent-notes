@@ -1,9 +1,9 @@
-"""Code-side registry: capability name -> its wizard view + install process.
+"""Code-side registry: capability name -> its review row(s) + install process.
 
 Manifests/kinds are pure data (domain.Capability); behavior is registered here
-in code. `view(step, total, version)` runs the interactive screen and returns
-the collected value. `process` (optional) applies it at install time. Phase 1
-uses `view` only; `process` is reserved for later phases.
+in code. `row(ctx)` returns the capability's rows on the install review;
+`config_row(ctx)`, when given, its rows on `agent-notes config`. `process` is
+reserved for applying a value at install time.
 """
 from __future__ import annotations
 
@@ -15,25 +15,21 @@ from ...domain.capability import Capability
 
 @dataclass(frozen=True)
 class CapabilityBehaviour:
-    view: Optional[Callable] = None        # legacy step view; removed in Task 9
+    row: Callable
+    config_row: Optional[Callable] = None
     process: Optional[Callable] = None
-    config_view: Optional[Callable] = None  # legacy; removed in Task 9
-    row: Optional[Callable] = None          # (ReviewContext) -> list[Row] for the install review
-    config_row: Optional[Callable] = None   # (ConfigContext) -> list[Row] for `agent-notes config`
 
 
 class CapabilityRegistry:
     def __init__(self) -> None:
         self._entries: dict[str, tuple[Capability, CapabilityBehaviour]] = {}
 
-    def register(self, capability: Capability, *, view=None, process=None, config_view=None,
-                 row=None, config_row=None) -> None:
+    def register(self, capability: Capability, *, row, config_row=None, process=None) -> None:
         if capability.name in self._entries:
             raise ValueError(f"Capability {capability.name!r} already registered")
-        self._entries[capability.name] = (
-            capability,
-            CapabilityBehaviour(view, process, config_view, row, config_row),
-        )
+        if row is None:
+            raise ValueError(f"Capability {capability.name!r} has no review row")
+        self._entries[capability.name] = (capability, CapabilityBehaviour(row, config_row, process))
 
     def get(self, name: str) -> CapabilityBehaviour:
         try:

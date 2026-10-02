@@ -1,28 +1,113 @@
-"""Main wizard flow — entry point for the interactive install wizard."""
+"""Install flow: recommended values → review screen → quiet build → confirm →
+install (spec 005 FR-001, FR-005, FR-024, FR-026)."""
+from __future__ import annotations
+
+import contextlib
+import io
+import logging
+from pathlib import Path
+from typing import Optional
 
 from ...config import Color, get_version
-from ...services.ui import _clear_screen
+from ...services.tui.screen import tilde
+from ...services.tui.session import open_session
+from ...services.tui.widgets import CANCEL, DONE, ReviewForm
 from ..build import build
 from .._install_helpers import count_agents, count_skills
 from ._common import _count_rules
 from .execute import _execute_install
-from .capabilities import (
-    _compute_total_steps,
-    collect_toggle_selections,
-    collect_provider_selections,
-    collect_backend_selections,
-    collect_backend_config,
-)
+from .review import InstallChoices, ReviewContext, initial_choices, install_rows
+from .role_models import Catalog
 
-TOTAL_STEPS = _compute_total_steps()
+log = logging.getLogger(__name__)
+
+HINTS = "↑↓ move   ⏎ edit   ←→ change   i install   q quit"
 
 
-def interactive_install() -> None:
-    """Run the interactive install wizard."""
+def interactive_install(session_factory=open_session) -> None:
+    """Run the install review."""
     try:
-        _interactive_install()
+        _interactive_install(session_factory)
     except KeyboardInterrupt:
         print(f"\n\n  {Color.YELLOW}Cancelled.{Color.NC}")
+
+
+def _interactive_install(session_factory=open_session) -> None:
+    from ...registries.cli_registry import load_registry
+    cli_registry = load_registry()
+    catalog = Catalog()
+    choices = initial_choices(catalog, cli_registry)
+    session = session_factory()
+    if session is None:
+        # stdin or stdout is not a terminal: nothing may prompt (FR-026).
+        print("No terminal attached — installing the recommended setup.")
+        error = _build(choices)
+        if error:
+            print(f"{Color.RED}Build failed: {error}{Color.NC}")
+            _restore(choices)
+            return
+        _install(choices)
+        return
+    with session as ui:
+        confirmed = _review(ui, choices, catalog, cli_registry)
+    if confirmed:
+        _install(choices)
+    else:
+        print("Installation cancelled.")
+
+
+def _counts(cli_registry) -> str:
+    agents = sum(count_agents(b) for b in cli_registry.all() if b.supports("agents"))
+    return f"{agents} agents · {count_skills()} skills · {_count_rules()} rules"
+
+
+def _review(ui, choices: InstallChoices, catalog: Catalog, cli_registry) -> bool:
+    ctx = ReviewContext(choices, ui, catalog, cli_registry)
+    form = ReviewForm(f"AgentNotes {get_version()} · install", install_rows(ctx),
+                      context=_counts(cli_registry), hints=HINTS,
+                      default_command="i", default_label="install", style=ui.style)
+
+    def install_command() -> Optional[str]:
+        if not choices.clis:
+            form.message = "select at least one CLI"
+            return None
+        ui.progress(form, "Building…")
+        error = _build(choices)
+        if error:
+            _restore(choices)
+            form.message = f"Build failed: {error}"
+            return None
+        question, lines = _plan_summary(choices, cli_registry)
+        if ui.confirm(form, question, lines):
+            return DONE
+        _restore(choices)
+        return None
+
+    form.commands.update({"i": install_command, "q": lambda: CANCEL})
+    return ui.form(form) == DONE
+
+
+@contextlib.contextmanager
+def _quiet():
+    """Keep build and restore output off the screen (FR-024)."""
+    sink = io.StringIO()
+    with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+        yield
+
+
+def _build(choices: InstallChoices) -> Optional[str]:
+    """Render dist/ with this run's choices, before confirming: the file count
+    must come from what this install will write. Returns the error, if any."""
+    from ...services.fs import silent_ops
+    try:
+        with silent_ops(), _quiet():
+            build(role_models=choices.role_models, role_efforts=choices.role_efforts,
+                  scope=choices.scope,
+                  project_path=Path.cwd() if choices.scope == "local" else None,
+                  profile_label=choices.profile_label)
+    except Exception as e:
+        return str(e) or type(e).__name__
+    return None
 
 
 def _restore_persisted_render(scope: str, profile_label: str) -> None:
@@ -32,7 +117,6 @@ def _restore_persisted_render(scope: str, profile_label: str) -> None:
     declines (or the build aborts half-written), existing symlink installs would
     keep serving the rejected picks. Rebuilding without overlays restores the
     persisted-pin rendering."""
-    from pathlib import Path
     from ...services.fs import silent_ops
     try:
         with silent_ops():
@@ -42,111 +126,46 @@ def _restore_persisted_render(scope: str, profile_label: str) -> None:
         print(f"{Color.YELLOW}Warning: could not restore rendered files: {e}{Color.NC}")
 
 
-def _interactive_install() -> None:
-    """Inner implementation — called by interactive_install() with KeyboardInterrupt guard."""
-    # Import step functions at call time to avoid circular import with __init__
-    import agent_notes.commands.wizard as _wiz
+def _restore(choices: InstallChoices) -> None:
+    with _quiet():
+        _restore_persisted_render(choices.scope, choices.profile_label)
 
-    version = get_version()
-    from ...registries.cli_registry import load_registry
-    registry = load_registry()
 
-    total_agents = 0
-    for backend in registry.all():
-        if backend.supports("agents"):
-            total_agents += count_agents(backend)
-
-    n_skills = count_skills()
-    n_rules = _count_rules()
-
-    _clear_screen()
-    print(f"\n  {Color.BOLD}AgentNotes{Color.NC} {Color.CYAN}v{version}{Color.NC}")
-    print(f"  {Color.DIM}AI agent configuration manager for Claude Code and OpenCode.{Color.NC}\n")
-    print(f"  Includes {total_agents} agents, {n_skills} skills, and {n_rules} rules.\n")
-
-    # Step 1: CLI selection
-    clis = collect_backend_selections(step=1, total=TOTAL_STEPS, version=version)
-
-    if not clis:
-        print("No CLI selected. Installation cancelled.")
-        return
-
-    # Step 2: Model (and, where the provider supports it, effort) selection per role
-    role_models, role_efforts = collect_backend_config(
-        clis, step=2, total=TOTAL_STEPS, version=version
-    )
-
-    # Step 3: Install scope
-    scope = _wiz._select_scope(clis=clis, step=3, total=TOTAL_STEPS, version=version)
-
-    # Step 4: Install mode (always shown)
-    copy_mode = _wiz._select_mode(step=4, total=TOTAL_STEPS, version=version)
-
-    # Step 5: Profile (optional, for multi-subscription setups)
-    profile_label, folder_overrides, global_home_override = _wiz._select_profile(
-        step=5, total=TOTAL_STEPS, version=version)
-
-    # Step 6: Skill selection
-    selected_skills = _wiz._select_skills(step=6, total=TOTAL_STEPS, version=version)
-
-    # Step 7: Memory backend
-    provider_selections = collect_provider_selections(
-        step=7, total=TOTAL_STEPS, version=version
-    )
-    memory = provider_selections["memory"]
-    memory_backend = memory["backend"]
-    memory_path = memory["path"]
-    memory_strategy = memory["strategy"]
-
-    # Step 8: Toggle plugins (cost-report, plus any future toggle) — registry-driven
-    enabled_plugins = collect_toggle_selections(step=8, total=TOTAL_STEPS, version=version)
-
-    # Build BEFORE the confirmation step: the pre-flight file count is computed
-    # from the rendered dist/ directory, so it must reflect exactly what this
-    # install will write (a stale or missing dist would show a wrong number).
-    # The wizard's model/effort selections exist only in memory at this point
-    # (state.json is written AFTER install), so they are passed to build()
-    # explicitly — otherwise dist would render from stale/absent state pins and
-    # the install would symlink/copy frontmatter that ignores this run's choices.
-    # silent_ops: suppress per-file SKIP/LINKED noise inside the wizard flow
-    # (standalone `agent-notes build` keeps it).
-    print("\nBuilding from source...")
+def _plan_summary(choices: InstallChoices, cli_registry) -> tuple[str, list[str]]:
+    """The confirmation question and up to five backup lines."""
+    from ...services.installer import plan_install, summarize_plan
     try:
-        from pathlib import Path
-        from ...services.fs import silent_ops
-        with silent_ops():
-            build(role_models=role_models, role_efforts=role_efforts,
-                  scope=scope, project_path=Path.cwd() if scope == "local" else None,
-                  profile_label=profile_label)
-    except Exception as e:
-        print(f"{Color.RED}Build failed: {e}{Color.NC}")
-        _restore_persisted_render(scope, profile_label)
-        return
+        # skills pass as-is: an empty selection must plan zero skills (None
+        # would mean "all skills", which the install will not write).
+        manifest = plan_install(scope=choices.scope, registry=cli_registry,
+                                selected_clis=set(choices.clis), selected_skills=choices.skills,
+                                copy_mode=choices.copy_mode,
+                                folder_overrides=choices.folder_overrides,
+                                global_home_override=choices.global_home_override or None)
+        summary = summarize_plan(manifest)
+    except Exception:
+        log.debug("plan_install failed during pre-flight", exc_info=True)
+        return "Install?", []
+    backups = summary.overwrites
+    lines = [f"backup  {tilde(a.dst)}  →  {tilde(a.backup_path)}" for a in backups[:5]]
+    if len(backups) > 5:
+        lines.append(f"… {len(backups) - 5} more")
+    return f"Install {len(summary.to_install)} files ({len(backups)} backed up)?", lines
 
-    # Step 9: Confirmation
-    if not _wiz._confirm_install(clis, scope, copy_mode, selected_skills, role_models, role_efforts=role_efforts,
-                                 version=version,
-                                 memory_backend=memory_backend, memory_path=memory_path,
-                                 memory_strategy=memory_strategy,
-                                 step=9, total=TOTAL_STEPS,
-                                 folder_overrides=folder_overrides,
-                                 global_home_override=global_home_override):
-        print("Installation cancelled.")
-        _restore_persisted_render(scope, profile_label)
-        return
 
+def _install(choices: InstallChoices) -> None:
     _execute_install(
-        clis=clis,
-        scope=scope,
-        copy_mode=copy_mode,
-        selected_skills=selected_skills,
-        role_models=role_models,
-        role_efforts=role_efforts,
-        memory_backend=memory_backend,
-        memory_path=memory_path,
-        memory_strategy=memory_strategy,
-        profile_label=profile_label,
-        folder_overrides=folder_overrides,
-        global_home_override=global_home_override,
-        enabled_plugins=enabled_plugins,
+        clis=choices.clis,
+        scope=choices.scope,
+        copy_mode=choices.copy_mode,
+        selected_skills=choices.skills,
+        role_models=choices.role_models,
+        role_efforts=choices.role_efforts,
+        memory_backend=choices.memory.backend,
+        memory_path=choices.memory.path,
+        memory_strategy=choices.memory.strategy,
+        profile_label=choices.profile_label,
+        folder_overrides=choices.folder_overrides,
+        global_home_override=choices.global_home_override,
+        enabled_plugins=dict(choices.plugins),
     )
