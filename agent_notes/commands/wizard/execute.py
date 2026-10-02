@@ -139,8 +139,9 @@ def _render_configuration(role_models: Dict[str, Dict[str, str]],
 
 def _memory_line(backend: str, path) -> str:
     """The post-install memory line, in the names the review uses (FR-028)."""
-    name = "Obsidian" if backend == "obsidian" else "built-in"
-    return f"{name}  →  {path}"
+    from .review import MEMORY_OPTIONS
+    names = {value: label for label, value in MEMORY_OPTIONS}
+    return f"{names.get(backend, names['local'])}  →  {path}"
 
 
 def _execute_install(
