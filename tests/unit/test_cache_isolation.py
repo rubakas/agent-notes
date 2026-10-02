@@ -54,7 +54,10 @@ class TestHomeCacheIsolation:
         # from what we're testing here.
         bogus_id = "claude-sonnet-fake-9"
         bogus_catalog = {
-            "fetched_at": "2020-01-01T00:00:00Z",
+            # Far future on purpose: the loader ignores a cache older than the
+            # bundled seed, so an old date would lose to the seed even with
+            # isolation broken, and this test could no longer fail.
+            "fetched_at": "2999-01-01T00:00:00Z",
             "providers": {
                 "anthropic": [
                     {

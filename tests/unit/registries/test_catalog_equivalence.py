@@ -303,7 +303,12 @@ def test_model_ids_well_formed():
 
 def test_registry_all_preserves_catalog_rank_order():
     """`all()` must hand back the catalog's rank order (frontier first) — the
-    resolver walks it top-down, so a re-sort here silently inverts selection."""
+    resolver walks it top-down, so a re-sort here silently inverts selection.
+
+    A model ranked by rules.yaml's provisional_coding_index is left out of the
+    position check on purpose: the seed's rank is upstream's and knows nothing
+    of the stand-in, which exists to move that model. Where it lands is pinned
+    by TestRealRegistryResolution and the resolver's provisional tests."""
     registry = load_model_registry()
     seed = json.loads((CATALOG_DIR / "seed.json").read_text())
 
@@ -315,7 +320,12 @@ def test_registry_all_preserves_catalog_rank_order():
         ]
         assert [m.rank for m in (by_id[mid] for mid in ranked)] == list(range(1, len(ranked) + 1))
 
-        positions = [list(by_id).index(mid) for mid in ranked]
+        upstream_ranked = [
+            mid for mid in ranked
+            if not (by_id[mid].coding_index is None
+                    and by_id[mid].provisional_coding_index is not None)
+        ]
+        positions = [list(by_id).index(mid) for mid in upstream_ranked]
         assert positions == sorted(positions), (
             f"registry.all() reorders {provider} away from rank order"
         )
@@ -385,3 +395,53 @@ def test_intelligence_index_round_trips_zero_and_null_distinctly(tmp_path):
 
     assert by_id["claude-opus-4-7"].intelligence_index == 0.0
     assert by_id["claude-opus-4-8"].intelligence_index is None
+
+
+def _catalog_with_provisional(tmp_path, provisional: dict) -> dict:
+    """A one-provider catalog: claude-opus-4-8 unrated, claude-opus-4-7 rated."""
+    seed = {
+        "fetched_at": "2026-01-01T00:00:00Z",
+        "providers": {
+            "anthropic": [
+                {"id": "claude-opus-4-7", "display_name": "Claude Opus 4.7",
+                 "coding_index": 73.6, "rank": 1},
+                {"id": "claude-opus-4-8", "display_name": "Claude Opus 4.8",
+                 "rank": 2},
+            ]
+        },
+    }
+    rules = _load_yaml(CATALOG_DIR / "rules.yaml")
+    rules["provisional_coding_index"] = provisional
+    (tmp_path / "seed.json").write_text(json.dumps(seed))
+    (tmp_path / "rules.yaml").write_text(json.dumps(rules))  # JSON is valid YAML
+    return {m.id: m for m in load_catalog(catalog_dir=tmp_path)}
+
+
+def test_provisional_score_ranks_an_unrated_model(tmp_path):
+    """The provisional score is what ranks a model upstream has not rated yet —
+    but it never masquerades as the benchmark value itself."""
+    by_id = _catalog_with_provisional(tmp_path, {"claude-opus-4-8": 74.0})
+
+    assert by_id["claude-opus-4-8"].rank_score == 74.0
+    assert by_id["claude-opus-4-8"].coding_index is None
+
+
+def test_real_score_retires_the_provisional_one(tmp_path):
+    """Once upstream rates a model its real score wins with no rules.yaml edit."""
+    by_id = _catalog_with_provisional(tmp_path, {"claude-opus-4-7": 99.0})
+
+    assert by_id["claude-opus-4-7"].rank_score == 73.6
+
+
+def test_without_provisional_score_an_unrated_model_has_no_rank_score(tmp_path):
+    by_id = _catalog_with_provisional(tmp_path, {})
+
+    assert by_id["claude-opus-4-8"].rank_score is None
+
+
+def test_every_provisional_score_names_a_catalog_model():
+    """A typo'd id would silently promote nothing."""
+    provisional = _load_yaml(CATALOG_DIR / "rules.yaml").get("provisional_coding_index") or {}
+    catalog_ids = {m.id for m in load_catalog(CATALOG_DIR)}
+    unknown = sorted(set(provisional) - catalog_ids)
+    assert not unknown, f"provisional_coding_index names unknown models: {unknown}"

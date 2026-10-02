@@ -4,18 +4,13 @@ from __future__ import annotations
 
 import fnmatch
 import json
-import os
 import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-
-def _get_cache_path() -> Path:
-    xdg = os.environ.get("XDG_CACHE_HOME", "")
-    base = Path(xdg) if xdg else Path.home() / ".cache"
-    return base / "agent-notes" / "catalog.json"
+from ..registries.catalog_loader import _get_cache_path, _load_seed
 
 
 def _get_seed_path() -> Path:
@@ -178,23 +173,6 @@ def _fetch_openrouter(rules: dict, *, url: str = _OPENROUTER_URL) -> dict[str, l
     return {prov: _rank(entries) for prov, entries in out.items()}
 
 
-def _load_current_catalog() -> dict:
-    """Load current catalog: cache if present and valid, else seed.json."""
-    from ..config import DATA_DIR
-    import warnings
-
-    cache_path = _get_cache_path()
-    if cache_path.exists():
-        try:
-            return json.loads(cache_path.read_text())
-        except (json.JSONDecodeError, OSError) as e:
-            warnings.warn(f"Cache at {cache_path} is corrupt ({e}); using seed.json")
-
-    seed_path = DATA_DIR / "catalog" / "seed.json"
-    with open(seed_path) as f:
-        return json.load(f)
-
-
 def _print_diff(old: dict, new_catalog: dict, providers: list[str]) -> None:
     """Print a human-readable diff of model changes per provider."""
     any_change = False
@@ -232,7 +210,8 @@ def refresh(provider: Optional[str] = None, dry_run: bool = False) -> None:
     No credentials are used; OpenRouter's model list is public.
     """
     rules = _load_rules()
-    old_catalog = _load_current_catalog()
+    # The newer of cache and seed — the same precedence the runtime catalog uses.
+    old_catalog = _load_seed(_get_seed_path(), use_cache=True)
 
     print("Fetching from OpenRouter...")
     try:

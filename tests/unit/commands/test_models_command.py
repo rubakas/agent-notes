@@ -147,7 +147,7 @@ class TestRefreshDryRun:
         }
 
         with patch("agent_notes.commands.models._load_rules", return_value={}), \
-             patch("agent_notes.commands.models._load_current_catalog", return_value={"providers": {}}), \
+             patch("agent_notes.commands.models._load_seed", return_value={"providers": {}}), \
              patch("agent_notes.commands.models._fetch_openrouter", return_value=fake_fetched):
             from agent_notes.commands.models import refresh
             refresh(dry_run=True)
@@ -229,6 +229,84 @@ class TestCatalogLoaderCorruptCache:
         models = load_catalog(catalog_dir=DATA_DIR / "catalog")
         ids = [m.id for m in models]
         assert "poison-model" not in ids
+
+
+# ---------------------------------------------------------------------------
+# catalog_loader — the newer of cache and bundled seed wins
+# ---------------------------------------------------------------------------
+
+def _seed_fetched_at() -> str:
+    from agent_notes.registries.catalog_loader import CATALOG_DIR
+    return json.loads((CATALOG_DIR / "seed.json").read_text())["fetched_at"]
+
+
+def _write_cache(cache_root: Path, catalog: dict) -> None:
+    cache_dir = cache_root / "agent-notes"
+    cache_dir.mkdir()
+    (cache_dir / "catalog.json").write_text(json.dumps(catalog))
+
+
+_CACHE_ONLY_MODEL = {"anthropic": [
+    {"id": "claude-sonnet-cache-only", "display_name": "Cache Only", "created_at": None},
+]}
+
+
+class TestCatalogFreshness:
+    """A cache written by an old `models refresh` must not hide the models a
+    newer package ships — that is how claude-opus-5-5 went missing from the
+    install wizard on a machine with a 2026-09-09 cache."""
+
+    def test_cache_older_than_seed_is_ignored(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        _write_cache(tmp_path, {"fetched_at": "2020-01-01T00:00:00Z",
+                                "providers": _CACHE_ONLY_MODEL})
+
+        from agent_notes.registries.catalog_loader import load_catalog
+        ids = [m.id for m in load_catalog()]
+
+        assert "claude-sonnet-cache-only" not in ids
+        assert "claude-opus-5-5" in ids
+
+    def test_cache_as_new_as_seed_is_used(self, tmp_path, monkeypatch):
+        """A refresh run on the same snapshot the seed was frozen from is not stale."""
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        _write_cache(tmp_path, {"fetched_at": _seed_fetched_at(),
+                                "providers": _CACHE_ONLY_MODEL})
+
+        from agent_notes.registries.catalog_loader import load_catalog
+        ids = [m.id for m in load_catalog()]
+
+        assert "claude-sonnet-cache-only" in ids
+
+    def test_cache_without_fetched_at_loses_to_seed(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        _write_cache(tmp_path, {"providers": _CACHE_ONLY_MODEL})
+
+        from agent_notes.registries.catalog_loader import load_catalog
+        ids = [m.id for m in load_catalog()]
+
+        assert "claude-sonnet-cache-only" not in ids
+
+    def test_single_provider_refresh_does_not_resurrect_a_stale_cache(
+        self, tmp_path, monkeypatch
+    ):
+        """`refresh --provider openai` rewrites only the openai block; the
+        anthropic block it carries over must come from the newer of cache and
+        seed, or the stale cache's list is written back out as fresh."""
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        _write_cache(tmp_path, {"fetched_at": "2020-01-01T00:00:00Z",
+                                "providers": _CACHE_ONLY_MODEL})
+
+        with patch("agent_notes.commands.models._load_rules", return_value={}), \
+             patch("agent_notes.commands.models._fetch_openrouter",
+                   return_value={"openai": [{"id": "gpt-5.5"}]}):
+            from agent_notes.commands.models import refresh
+            refresh(provider="openai")
+
+        written = json.loads((tmp_path / "agent-notes" / "catalog.json").read_text())
+        anthropic_ids = [e["id"] for e in written["providers"]["anthropic"]]
+        assert "claude-sonnet-cache-only" not in anthropic_ids
+        assert "claude-opus-5-5" in anthropic_ids
 
 
 # ---------------------------------------------------------------------------

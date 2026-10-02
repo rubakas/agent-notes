@@ -21,6 +21,18 @@ class Model:
     price_out: Optional[float] = None  # USD per 1M output tokens
     context_length: Optional[int] = None
     created_at: Optional[str] = None
+    # Hand-curated stand-in from rules.yaml for a model upstream has not rated
+    # yet. Kept apart from coding_index, which stays the benchmark value only.
+    provisional_coding_index: Optional[float] = None
+
+    @property
+    def rank_score(self) -> Optional[float]:
+        """The score ranking and selection use: the benchmark when upstream has
+        one, else the provisional stand-in. A real score retires the stand-in
+        with no rules.yaml edit."""
+        if self.coding_index is not None:
+            return self.coding_index
+        return self.provisional_coding_index
 
     def has_alias_for(self, provider: str) -> bool:
         return provider in self.aliases

@@ -91,7 +91,8 @@ class TestListModels:
 
     def test_missing_metrics_render_an_em_dash(self, capsys):
         models = load_model_registry().all()
-        unrated = [m for m in models if m.coding_index is None]
+        # No score at all — a provisional stand-in prints `78.1*`, not a dash.
+        unrated = [m for m in models if m.rank_score is None]
         no_intelligence = [m for m in models if m.intelligence_index is None
                            and m.coding_index is not None]
         assert unrated and no_intelligence, "fixture assumption: catalog has gaps in both metrics"
@@ -104,6 +105,37 @@ class TestListModels:
                        if re.match(rf"\s+\d+\s+{re.escape(model.id)}\s", line))
             assert "—" in row
             assert "0.0" not in row.split()[2:4]
+
+    def test_provisional_score_is_marked_and_explained(self, capsys):
+        """A stand-in from rules.yaml must never read as a benchmark result."""
+        provisional = [m for m in load_model_registry().all()
+                       if m.coding_index is None and m.provisional_coding_index is not None]
+        assert provisional, "fixture assumption: rules.yaml ships a provisional score"
+
+        list_models()
+        out = capsys.readouterr().out
+
+        model = provisional[0]
+        row = next(line for line in out.splitlines()
+                   if re.match(rf"\s+\d+\s+{re.escape(model.id)}\s", line))
+        assert f"{model.provisional_coding_index:.1f}*" in row.split()
+        assert "* provisional score" in out
+
+    def test_no_legend_without_a_provisional_score(self, capsys, monkeypatch):
+        from dataclasses import replace
+        from agent_notes.registries import model_registry as mr
+
+        real = mr.load_model_registry()
+        stripped = mr.ModelRegistry(
+            [replace(m, provisional_coding_index=None) for m in real.all()]
+        )
+        monkeypatch.setattr(mr, "load_model_registry", lambda: stripped)
+
+        list_models()
+        out = capsys.readouterr().out
+
+        assert "provisional" not in out
+        assert "*" not in out
 
     def test_header_counts_the_catalog(self, capsys):
         list_models()
