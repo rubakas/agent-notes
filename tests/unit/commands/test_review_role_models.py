@@ -175,3 +175,10 @@ def test_role_lines_align_their_model_column_for_every_role():
     columns = {role_line(role, models, {}).index("some-model") for role in roles}
     assert len(columns) == 1
     assert columns.pop() > max(len(role.name) for role in roles)
+
+
+def test_r_with_no_role_rows_does_nothing(catalog):
+    # Claude Code hides the orchestrator, so an orchestrator-only pin set has no rows.
+    models, efforts = {"orchestrator": "claude-opus-4-6"}, {}
+    edit_models(tui_session("r", ESCAPE), catalog, _backend("claude"), models, efforts)
+    assert models == {"orchestrator": "claude-opus-4-6"} and efforts == {}

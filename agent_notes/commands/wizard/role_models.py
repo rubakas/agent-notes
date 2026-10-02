@@ -226,7 +226,10 @@ def edit_models(ui, catalog, backend, models, efforts) -> None:
                       escape_closes=True, default_label="finish", style=style)
 
     def reset() -> None:
-        role = next(role for role in roles if role.name == form.focused.key)
+        focused = form.focused
+        if focused is None:   # no role rows (e.g. only a pin this CLI hides)
+            return
+        role = next(role for role in roles if role.name == focused.key)
         reset_role(catalog, backend, role, models, efforts)
 
     form.commands["r"] = reset
