@@ -5,7 +5,7 @@ import pytest
 
 from agent_notes.commands.config import compatible_models_for
 from agent_notes.commands.wizard.role_models import (
-    Catalog, edit_models, effort_options, model_items, recommended_choices,
+    Catalog, edit_models, effort_options, model_items, recommended_choices, role_line,
     roles_for, set_model, starred_model,
 )
 from agent_notes.domain.model import Model
@@ -167,3 +167,11 @@ def test_role_table_cycles_effort_resets_and_changes_model(catalog):
     assert efforts["reasoner"] == "xhigh"
     assert models["worker"] == "claude-haiku-4-5" and "worker" not in efforts
     assert any("Worker · Claude Code · budget $2/M in" in "\n".join(f) for f in ui.term.frames)
+
+
+def test_role_lines_align_their_model_column_for_every_role():
+    roles = load_role_registry().all()
+    models = {role.name: "some-model" for role in roles}
+    columns = {role_line(role, models, {}).index("some-model") for role in roles}
+    assert len(columns) == 1
+    assert columns.pop() > max(len(role.name) for role in roles)
