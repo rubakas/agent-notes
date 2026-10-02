@@ -108,7 +108,16 @@ def test_an_empty_key_changes_nothing(catalog, tmp_path, monkeypatch):
 def test_settings_that_move_files_are_shown_read_only(catalog, tmp_path):
     row = _rows(_ctx(catalog, tmp_path))["reinstall"]
     assert row.focusable is False
-    assert "install --reconfigure" in row.lines()[0]
+    assert row.lines() == ["Claude Code · symlink", "change with: agent-notes install --reconfigure"]
+
+
+def test_the_read_only_row_fits_80_columns(catalog, tmp_path):
+    from agent_notes.services.tui.screen import visible_len
+    from agent_notes.services.tui.widgets import ReviewForm
+    row = _rows(_ctx(catalog, tmp_path))["reinstall"]
+    lines = ReviewForm("", lambda: [row]).render(80, 24, chrome=False)
+    assert all(visible_len(line) <= 80 and not line.endswith("…") for line in lines)
+    assert lines[-1].endswith("change with: agent-notes install --reconfigure")
 
 
 def test_toggles_start_from_the_saved_plugin_config(monkeypatch):

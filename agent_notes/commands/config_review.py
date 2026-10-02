@@ -207,7 +207,8 @@ def reinstall_row(ctx: ConfigContext) -> Row:
                 labels.append(ctx.cli_registry.get(name).label)
             except KeyError:
                 labels.append(name)
-        return [f"{', '.join(labels)} · {scope_state.mode} · change with: install --reconfigure"]
+        return [f"{', '.join(labels)} · {scope_state.mode}",
+                "change with: agent-notes install --reconfigure"]
 
     return Row("reinstall", "Install", lines, focusable=False)
 
