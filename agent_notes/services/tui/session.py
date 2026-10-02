@@ -32,10 +32,12 @@ class TuiSession:
         self._stack: Optional[ExitStack] = None
 
     def __enter__(self) -> "TuiSession":
-        self._stack = ExitStack()
-        for context in (self.keys, self.term):
-            if hasattr(context, "__enter__"):
-                self._stack.enter_context(context)
+        # If the terminal fails to open, the with-block leaves cbreak mode again.
+        with ExitStack() as stack:
+            for context in (self.keys, self.term):
+                if hasattr(context, "__enter__"):
+                    stack.enter_context(context)
+            self._stack = stack.pop_all()
         return self
 
     def __exit__(self, *exc) -> bool:

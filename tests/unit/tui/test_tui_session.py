@@ -268,3 +268,26 @@ def test_full_screen_confirm_ignores_the_default():
     form = ReviewForm("T", lambda: [Row("a", "A", lambda: ["x"])])
     assert tui_session(ENTER).confirm(form, "Discard?", default=False) is True
     assert tui_session(ESCAPE).confirm(form, "Discard?", default=False) is False
+
+
+def test_a_terminal_that_fails_to_open_still_restores_the_keys():
+    class _Keys(ScriptedKeys):
+        exited = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            self.exited = True
+            return False
+
+    class _BrokenTerminal(FakeTerminal):
+        def __enter__(self):
+            raise OSError("no alternate screen")
+
+    from agent_notes.services.tui.screen import Style
+    keys = _Keys()
+    with pytest.raises(OSError):
+        with TuiSession(keys, _BrokenTerminal(), Style(False)):
+            pass
+    assert keys.exited
