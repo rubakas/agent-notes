@@ -34,6 +34,8 @@ class ScriptedKeys:
             raise AssertionError(f"scripted keys exhausted after {self.consumed}: {self._keys}")
         key = self._keys[self.consumed]
         self.consumed += 1
+        if isinstance(key, type) and issubclass(key, BaseException):
+            raise key()
         return key
 
 

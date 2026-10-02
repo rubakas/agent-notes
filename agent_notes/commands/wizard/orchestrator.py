@@ -44,7 +44,10 @@ def _interactive_install(session_factory=open_session) -> None:
         error = _build(choices)
         if error:
             print(f"{Color.RED}Build failed: {error}{Color.NC}")
-            _restore(choices)
+            restore_error = _restore(choices)
+            if restore_error:
+                print(f"{Color.YELLOW}Restore failed: {restore_error} — "
+                      f"run agent-notes regenerate{Color.NC}")
             return
         _install(choices)
         return
@@ -74,13 +77,22 @@ def _review(ui, choices: InstallChoices, catalog: Catalog, cli_registry) -> bool
         ui.progress(form, "Building…")
         error = _build(choices)
         if error:
-            _restore(choices)
+            restore_error = _restore(choices)
             form.message = f"Build failed: {error}"
+            if restore_error:
+                form.message += f"; restore failed: {restore_error} — run agent-notes regenerate"
             return None
-        question, lines = _plan_summary(choices, cli_registry)
-        if ui.confirm(form, question, lines):
+        try:
+            question, lines = _plan_summary(choices, cli_registry)
+            confirmed = ui.confirm(form, question, lines)
+        except KeyboardInterrupt:
+            _restore(choices)
+            raise
+        if confirmed:
             return DONE
-        _restore(choices)
+        restore_error = _restore(choices)
+        if restore_error:
+            form.message = f"Restore failed: {restore_error} — run agent-notes regenerate"
         return None
 
     form.commands.update({"i": install_command, "q": lambda: CANCEL})
@@ -126,9 +138,17 @@ def _restore_persisted_render(scope: str, profile_label: str) -> None:
         print(f"{Color.YELLOW}Warning: could not restore rendered files: {e}{Color.NC}")
 
 
-def _restore(choices: InstallChoices) -> None:
-    with _quiet():
-        _restore_persisted_render(choices.scope, choices.profile_label)
+def _restore(choices: InstallChoices) -> Optional[str]:
+    """Re-render from persisted pins, quietly. Returns the error, if any."""
+    from ...services.fs import silent_ops
+    try:
+        with silent_ops(), _quiet():
+            build(scope=choices.scope,
+                  project_path=Path.cwd() if choices.scope == "local" else None,
+                  profile_label=choices.profile_label)
+    except Exception as e:
+        return str(e) or type(e).__name__
+    return None
 
 
 def _plan_summary(choices: InstallChoices, cli_registry) -> tuple[str, list[str]]:

@@ -3,7 +3,6 @@
 import os
 import glob
 import sys
-import shutil
 from pathlib import Path
 from typing import List, Tuple, Set
 
@@ -132,14 +131,10 @@ def _can_interactive() -> bool:
     return _HAS_TTY and sys.stdin.isatty()
 
 
-def _checkbox_select_fallback(title: str, options: List[Tuple[str, str]], defaults: Set[str] = None,
-                              step: int = 0, total: int = 0, version: str = '') -> Set[str]:
+def _checkbox_select_fallback(title: str, options: List[Tuple[str, str]], defaults: Set[str] = None) -> Set[str]:
     """Fallback checkbox using numbered input."""
     if defaults is None:
         defaults = {v for _, v in options}
-
-    if step > 0:
-        print(f"\n  {Color.BOLD}AgentNotes{Color.NC}{f' {Color.CYAN}v{version}{Color.NC}' if version else ''}  —  Step {step} of {total}\n")
 
     print(f"{title}\n")
     for i, (label, value) in enumerate(options, 1):
@@ -166,12 +161,8 @@ def _checkbox_select_fallback(title: str, options: List[Tuple[str, str]], defaul
     return selected
 
 
-def _radio_select_fallback(title: str, options: List[Tuple[str, str]], default: int = 0,
-                           step: int = 0, total: int = 0, version: str = ''):
+def _radio_select_fallback(title: str, options: List[Tuple[str, str]], default: int = 0):
     """Fallback radio using numbered input."""
-    if step > 0:
-        print(f"\n  {Color.BOLD}AgentNotes{Color.NC}{f' {Color.CYAN}v{version}{Color.NC}' if version else ''}  —  Step {step} of {total}\n")
-
     print(f"{title}\n")
     for i, (label, value) in enumerate(options, 1):
         marker = "*" if i - 1 == default else " "

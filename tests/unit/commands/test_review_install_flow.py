@@ -1,6 +1,7 @@
 """The install flow around the review screen (spec 005 FR-001, FR-005, FR-026):
 build before confirm, restore on decline, and the collected values reach build,
 plan and _execute_install unchanged."""
+import inspect
 import logging
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,7 +9,8 @@ from types import SimpleNamespace
 import pytest
 
 from agent_notes.commands.wizard import orchestrator
-from agent_notes.commands.wizard.review import InstallChoices
+from agent_notes.commands.wizard.review import InstallChoices, initial_choices
+from agent_notes.commands.wizard.role_models import Catalog
 from agent_notes.registries.cli_registry import load_registry
 from agent_notes.services.tui.keys import DOWN, ENTER, ESCAPE, RIGHT, SPACE
 from agent_notes.services.tui.session import LineSession
@@ -34,8 +36,18 @@ def calls(monkeypatch):
         log.append(("plan", kwargs))
         return "manifest"
 
-    monkeypatch.setattr(orchestrator, "build", lambda **kw: log.append(("build", kw)))
-    monkeypatch.setattr(orchestrator, "_execute_install", lambda **kw: log.append(("execute", kw)))
+    real_build, real_execute = orchestrator.build, orchestrator._execute_install
+
+    def fake_build(**kw):
+        inspect.signature(real_build).bind(**kw)
+        log.append(("build", kw))
+
+    def fake_execute(**kw):
+        inspect.signature(real_execute).bind(**kw)
+        log.append(("execute", kw))
+
+    monkeypatch.setattr(orchestrator, "build", fake_build)
+    monkeypatch.setattr(orchestrator, "_execute_install", fake_execute)
     monkeypatch.setattr("agent_notes.services.installer.plan_install", fake_plan_install)
     monkeypatch.setattr("agent_notes.services.installer.summarize_plan", lambda manifest: log.plan)
     return log
@@ -58,6 +70,8 @@ def test_two_keypresses_install_the_recommended_setup(calls):
     assert (run["profile_label"], run["folder_overrides"], run["global_home_override"]) == (
         "", None, "")
     assert run["enabled_plugins"] == {"cost-report": False}
+    expected = initial_choices(Catalog(), load_registry()).skills
+    assert expected and run["selected_skills"] == expected
 
 
 def test_the_build_gets_the_selections_before_confirming(calls):
@@ -166,3 +180,23 @@ def test_line_mode_installs_with_two_enters(calls, monkeypatch):
     monkeypatch.setattr("agent_notes.services.ui._safe_input", FakeLineInput("", ""))
     _run(session=LineSession())
     assert calls.kinds() == ["build", "plan", "execute"]
+
+
+def test_a_failed_restore_is_reported(calls, monkeypatch):
+    def build_failing_on_restore(**kwargs):
+        calls.append(("build", kwargs))
+        if "role_models" not in kwargs:
+            raise RuntimeError("locked")
+
+    monkeypatch.setattr(orchestrator, "build", build_failing_on_restore)
+    ui = _run(session=tui_session("i", ESCAPE, "q", width=160))
+    assert "Restore failed: locked" in ui.term.text()
+    assert "agent-notes regenerate" in ui.term.text()
+
+
+def test_ctrl_c_at_confirm_restores_then_cancels(calls, capsys):
+    ui = tui_session("i", KeyboardInterrupt)
+    orchestrator.interactive_install(session_factory=lambda: ui)
+    assert calls.kinds() == ["build", "plan", "build"]
+    assert "role_models" not in calls.of("build")[1]
+    assert "Cancelled." in capsys.readouterr().out
