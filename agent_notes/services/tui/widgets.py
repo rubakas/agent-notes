@@ -168,6 +168,37 @@ class ReviewForm:
         return [fit(line, width) for line in [header, rule, *body, *notice, rule, footer]]
 
 
+def _title_bar(style: Style, title: str, width: int, right: str = "") -> list[str]:
+    """The title (with *right* at the far end) and a rule: every editor's top."""
+    return [bar(f" {style(title, BOLD)}", f"{style(right, DIM)} ", width), style("─" * width, DIM)]
+
+
+def _hint_bar(style: Style, hints: str, width: int) -> list[str]:
+    """A rule and the key hints: every editor's bottom."""
+    return [style("─" * width, DIM), f" {hints}"]
+
+
+def _list_screen(style: Style, width: int, height: int, title: str, lines: list[str],
+                cursor: int, hints: str, *, right: str = "", above: Sequence[str] = ()) -> list[str]:
+    """A titled list that scrolls to keep line *cursor* on screen, with
+    ↑/↓ counts for what is cut off."""
+    top = _title_bar(style, title, width, right) + list(above)
+    bottom = _hint_bar(style, hints, width)
+    room = max(1, height - len(top) - len(bottom))
+    count = len(lines)
+    body = lines
+    if count > room:
+        span = max(1, room - 2)  # two lines kept for the ↑/↓ markers
+        start = min(max(0, cursor - span // 2), count - span)
+        end = start + span
+        body = lines[start:end]
+        if start > 0:
+            body.insert(0, style(f"     ↑ {start} more", DIM))
+        if end < count:
+            body.append(style(f"     ↓ {count - end} more", DIM))
+    return [fit(line, width) for line in top + body + bottom]
+
+
 @dataclass
 class PickItem:
     """One choice: *text* holds the already-formatted columns."""
@@ -212,33 +243,17 @@ class Picker:
 
     def render(self, width: int, height: int) -> list[str]:
         style = self.style
-        top = [bar(f" {style(self.title, BOLD)}", f"{style(self.legend, DIM)} ", width),
-               style("─" * width, DIM)]
-        if self.header:
-            top.append(style(f"     {self.header}", DIM))
-        bottom = [style("─" * width, DIM), f" {self.hints}"]
-        room = max(1, height - len(top) - len(bottom))
-        count = len(self.items)
-        if count <= room:
-            start, end = 0, count
-        else:
-            span = max(1, room - 2)  # two lines kept for the ↑/↓ markers
-            start = min(max(0, self.cursor - span // 2), count - span)
-            end = start + span
-        body = []
-        if start > 0:
-            body.append(style(f"     ↑ {start} more", DIM))
-        for index in range(start, end):
-            item = self.items[index]
+        lines = []
+        for index, item in enumerate(self.items):
             here = index == self.cursor
             text = item.text + (f"  {item.tag}" if item.tag else "")
             if item.dim and not here:
                 text = style(text, DIM)
             pointer = style("›", CYAN) if here else " "
-            body.append(f" {pointer} {'●' if here else '○'} {text}")
-        if end < count:
-            body.append(style(f"     ↓ {count - end} more", DIM))
-        return [fit(line, width) for line in top + body + bottom]
+            lines.append(f" {pointer} {'●' if here else '○'} {text}")
+        above = [style(f"     {self.header}", DIM)] if self.header else []
+        return _list_screen(style, width, height, self.title, lines, self.cursor, self.hints,
+                           right=self.legend, above=above)
 
 
 class Checklist:
@@ -277,29 +292,14 @@ class Checklist:
 
     def render(self, width: int, height: int) -> list[str]:
         style = self.style
-        top = [bar(f" {style(self.title, BOLD)}", "", width), style("─" * width, DIM)]
-        top += [style(f"   {line}", DIM) for line in self.fixed]
-        bottom = [style("─" * width, DIM), f" {self.hints}"]
-        room = max(1, height - len(top) - len(bottom))
-        count = len(self.items)
-        if count <= room:
-            start, end = 0, count
-        else:
-            span = max(1, room - 2)  # two lines kept for the ↑/↓ markers
-            start = min(max(0, self.cursor - span // 2), count - span)
-            end = start + span
-        body = []
-        if start > 0:
-            body.append(style(f"     ↑ {start} more", DIM))
-        for index in range(start, end):
-            label, value = self.items[index]
-            here = index == self.cursor
-            pointer = style("›", CYAN) if here else " "
+        lines = []
+        for index, (label, value) in enumerate(self.items):
+            pointer = style("›", CYAN) if index == self.cursor else " "
             check = "✓" if value in self.selected else " "
-            body.append(f" {pointer} [{check}] {label}")
-        if end < count:
-            body.append(style(f"     ↓ {count - end} more", DIM))
-        return [fit(line, width) for line in top + body + bottom]
+            lines.append(f" {pointer} [{check}] {label}")
+        above = [style(f"   {line}", DIM) for line in self.fixed]
+        return _list_screen(style, width, height, self.title, lines, self.cursor, self.hints,
+                           above=above)
 
 
 class TextField:
@@ -360,12 +360,11 @@ class TextField:
             room = max(2, width - visible_len(lead) - 1)   # one column for the cursor
             shown = self.text if len(self.text) <= room else "…" + self.text[-(room - 1):]
         hints = "type   ⏎ ok   esc back" + ("   tab complete" if self.complete else "")
-        lines = [bar(f" {style(self.title, BOLD)}", "", width), style("─" * width, DIM),
-                 f"{lead}{shown}{style('▏', CYAN)}"]
+        lines = _title_bar(style, self.title, width) + [f"{lead}{shown}{style('▏', CYAN)}"]
         lines += [style(f"   {note}", DIM) for note in self.notes]
         if self.warning:
             lines.append(style(f"   ⚠ {self.warning} — ⏎ again to keep it", YELLOW))
-        lines += [style("─" * width, DIM), f" {hints}"]
+        lines += _hint_bar(style, hints, width)
         return [fit(line, width) for line in lines[:height]]
 
 
