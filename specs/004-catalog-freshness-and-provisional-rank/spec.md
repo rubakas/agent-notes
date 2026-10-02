@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-02
 
-**Status**: Implemented 2026-10-02
+**Status**: Implemented 2026-10-02 (PR #46)
 
 **Input**: User description: "during install the models list is not updated, i don't see opus 5.5. also update the default map of role models"
 
