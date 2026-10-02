@@ -35,8 +35,13 @@ def test_the_current_folder_install_wins(tmp_path):
 
 
 def test_the_default_profile_beats_a_named_one_in_the_same_folder(tmp_path):
-    refs = list_installs(_state(tmp_path, locals_=[f"{tmp_path}#work", str(tmp_path)]))
+    refs = [InstallRef("local", tmp_path, "work"), InstallRef("local", tmp_path)]
     assert default_install(refs, tmp_path) == InstallRef("local", tmp_path)
+
+
+def test_a_named_profile_in_the_current_folder_is_used_when_it_is_the_only_one(tmp_path):
+    refs = [InstallRef("global", None), InstallRef("local", tmp_path, "work")]
+    assert default_install(refs, tmp_path) == InstallRef("local", tmp_path, "work")
 
 
 def test_global_when_the_current_folder_has_no_install(tmp_path):
