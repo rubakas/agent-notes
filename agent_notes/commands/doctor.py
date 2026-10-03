@@ -248,14 +248,38 @@ def diagnose(scope: str, fix: bool = False) -> bool:
     
     if fix:
         result = do_fix(issues, fix_actions)
-        # Services layer flagged that an install is needed — invoke it here
-        # (commands layer), avoiding a services→commands dependency.
-        if any(a.action == "_TRIGGER_INSTALL" for a in fix_actions):
-            from ..commands.install import install
-            install()
+        # Services layer flagged that the install needs re-placing — regenerate it here
+        # (commands layer, avoiding a services→commands dependency). Not `install`: that
+        # would reset the install's pins and always targets the global scope.
+        if result and any(a.action == "_TRIGGER_INSTALL" for a in fix_actions):
+            _regenerate_installs(scope)
         return result
     else:
         return False  # Issues found but not fixed
+
+def _regenerate_installs(scope: str) -> None:
+    """Regenerate the install(s) doctor just checked: the global default, or every profile of
+    this project."""
+    from ..services.state_store import get_profiles_for_project, label_from_key, load_current_state
+    from .regenerate import regenerate, regenerate_instruction
+
+    state = load_current_state()
+    project = Path.cwd().resolve()
+    if state is None:
+        labels = []
+    elif scope == "global":
+        labels = [""] if state.global_install else []
+    else:
+        labels = [label_from_key(key, project) for key, _ in get_profiles_for_project(state, project)]
+    if not labels:
+        print("Nothing to regenerate: no install found. Run `agent-notes install` first.")
+        return
+    for label in labels:
+        try:
+            regenerate(scope=scope, profile_label=label)
+        except SystemExit as e:
+            print(f"Regenerate failed ({e.code}); run {regenerate_instruction(scope, project, label)}")
+
 
 # Alias for backward compatibility with CLI
 def doctor(local: bool = False, fix: bool = False):
