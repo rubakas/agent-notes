@@ -100,8 +100,8 @@ class TestInstallUninstallRoundTrip:
         with patch("agent_notes.services.installer.load_registry", return_value=registry), \
              patch("agent_notes.services.installer._uninstall_session_hook"), \
              patch("agent_notes.services.installer._uninstall_universal_skills"):
-            from agent_notes.commands.uninstall import uninstall
-            uninstall(local=False)
+            from agent_notes.commands.install import uninstall
+            uninstall(global_=True)
 
         # Installed files should be gone
         remaining = list(agents_dir.glob("*.md"))
