@@ -8,7 +8,8 @@ from ... import config
 from ...config import Color
 from ...services.fs import place_file, place_dir_contents
 from ...services.state_store import StateUnreadable
-from .._install_helpers import count_agents
+from ...services.ui import printable
+from .._install_helpers import count_agents, override_problem
 from ._common import _get_skill_groups, _count_rules
 
 
@@ -163,6 +164,13 @@ def _execute_install(
     enabled_plugins: dict = None,
 ) -> None:
     """Run all installation steps after parameters have been collected and the build is done."""
+    for name, kind, value in (("local folder", "folder", (folder_overrides or {}).get("claude", "")),
+                              ("global home", "home", global_home_override)):
+        problem = override_problem(kind, value, Path.cwd()) if value else ""
+        if problem:   # the review refuses these; this is the last look before anything is placed
+            print(f"Error: the {name} {printable(value)} {problem}. Nothing was installed.", file=sys.stderr)
+            sys.exit(2)
+
     label_msg = f", profile={profile_label}" if profile_label else ""
     print(f"\nInstalling ({scope}, {'copy' if copy_mode else 'symlink'}{label_msg}) ...\n")
 
@@ -170,7 +178,15 @@ def _execute_install(
     from ...services.state_store import load_current_state
     snapshot = load_current_state()  # read-only: nothing changes state until the final write
 
-    with _fs.silent_ops():
+    from ...services.install_ownership import replacing
+    from ...services.state_store import get_scope
+    _old = get_scope(snapshot, scope, Path.cwd() if scope == "local" else None,
+                     profile_label=profile_label) if snapshot else None
+
+    from .._install_helpers import commit_install, placement_errors, wizard_recovery
+    _recovery = wizard_recovery(scope, copy_mode, profile_label, folder_overrides, global_home_override)
+
+    with _fs.silent_ops(), replacing(_old), placement_errors(_recovery):
         from ...registries.cli_registry import load_registry as _load_registry
         from ...services import installer as _installer
         from ...services.installer import _apply_overrides
@@ -255,12 +271,15 @@ def _execute_install(
                 continue
             try:
                 _hook_eff = _apply_overrides(_hook_backend, folder_overrides, global_home_override or None)
-                _install_session_hook(_hook_eff, scope, memory_backend=memory_backend, memory_path=memory_path or "")
+                _install_session_hook(_hook_eff, scope, memory_backend=memory_backend,
+                                      memory_path=memory_path or "", enabled_plugins=enabled_plugins)
                 _hooked_labels.append(_hook_backend.label)
             except StateUnreadable:
                 raise
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Error: the {_hook_backend.label} session hook could not be installed ({e}).\n"
+                      f"{_recovery}", file=sys.stderr)
+                sys.exit(1)
         if _hooked_labels:
             print(_step_line("Hook", f"SessionStart ({', '.join(_hooked_labels)})", _label_w))
 
@@ -269,7 +288,6 @@ def _execute_install(
     # then state.json: a failure while placing never reaches the cleanup.
     from ...services.install_state_builder import build_install_state
     from ...domain.state import MemoryConfig
-    from .._install_helpers import commit_install, rerun_command
     project_path = Path.cwd() if scope == "local" else None
     try:
         st = build_install_state(
@@ -290,10 +308,10 @@ def _execute_install(
         raise
     except Exception as e:
         print(f"Error: the install was placed but its manifest could not be built ({e}).\n"
-              f"Rerun to converge: {rerun_command()}", file=sys.stderr)
+              f"{_recovery}", file=sys.stderr)
         sys.exit(1)
     with _fs.silent_ops():
-        removed = commit_install(st, snapshot, scope, project_path, profile_label, rerun_command())
+        removed = commit_install(st, snapshot, scope, project_path, profile_label, _recovery)
     if removed:
         print(_step_line("Cleanup", f"{removed} stale files removed", _label_w))
 

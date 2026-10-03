@@ -63,14 +63,21 @@ class World:
         return sorted(d.name for d in (self.dist / "skills").iterdir() if d.is_dir())
 
     def wizard(self, *, scope="global", skills=None, clis=("claude",), copy=False,
-               profile="", folder_overrides=None, global_home=""):
+               profile="", folder_overrides=None, global_home="", plugins=None,
+               role_models=None, memory=("local", "")):
         with patch("agent_notes.memory.memory_router.memory_init"):
             _execute_install(
                 clis=set(clis), scope=scope, copy_mode=copy,
                 selected_skills=self.skills() if skills is None else list(skills),
-                role_models={}, memory_backend="local", memory_path="",
+                role_models=role_models or {}, memory_backend=memory[0], memory_path=memory[1],
                 profile_label=profile, folder_overrides=folder_overrides,
-                global_home_override=global_home)
+                global_home_override=global_home, enabled_plugins=plugins)
+
+    def dist_files(self) -> dict:
+        """What the shared dist/ holds for claude, rules and commands: path -> sha."""
+        return {p.relative_to(self.dist).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                for sub in ("claude", "rules") for p in sorted((self.dist / sub).rglob("*"))
+                if p.is_file()}
 
     def tree(self, name: str = None) -> dict:
         """Everything a sandbox holds: path -> link target, file sha or 'dir'.

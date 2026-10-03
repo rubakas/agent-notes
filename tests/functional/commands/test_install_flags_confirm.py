@@ -93,6 +93,7 @@ class TestThePrompt:
         out = capsys.readouterr().out
         assert f"Replacing the local install at {world.project}" in out
         assert "files will be placed." in out
+        assert "Model pins reset to the recommended ones." in out
         assert "1 stale files will be removed." in out
         assert str(stale) in out
 

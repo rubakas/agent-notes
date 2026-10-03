@@ -33,4 +33,7 @@ def render_context(agents: list[str], version: str, skills: list[Any] | None = N
 
 def write_context(dest: Path, agents: list[str], version: str, skills: list[Any] | None = None) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(render_context(agents, version, skills))
+    text = render_context(agents, version, skills)
+    if dest.is_file() and dest.read_text() == text:
+        return  # a reinstall rewrites nothing it need not
+    dest.write_text(text)

@@ -4,11 +4,17 @@ import sys
 from pathlib import Path
 
 from ..config import Color, PKG_DIR
+from ..domain.state import MemoryConfig
+from ..services.install_ownership import replacing
 from ..services.install_state_builder import build_install_state
+from ..services.ui import printable
 from ..services.state_store import (
     StateUnreadable, load_current_state, remove_install_state, label_from_key,
 )
-from ._install_helpers import commit_install, describe_install, has_terminal, rerun_command
+from ._install_helpers import (
+    commit_install, describe_install, flags_recovery, has_terminal, override_problem,
+    placement_errors, profile_label_problem, recommended_pins, render_quietly,
+)
 
 STALE_SHOWN = 10
 
@@ -29,6 +35,11 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
 
     scope = "local" if local else "global"
     project_path = Path.cwd().resolve() if local else None
+    _validate_targets(global_home, folder, project_path or Path.cwd().resolve())
+    problem = profile_label_problem(profile_label)
+    if problem:
+        print(f"Error: --profile {printable(profile_label)} is not a usable label: {problem}.")
+        sys.exit(2)
 
     # Build folder overrides from --folder / --profile
     folder_overrides = None
@@ -48,23 +59,41 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
     what = describe_install(scope, project_path, profile_label)
 
     if existing and not assume_yes and not has_terminal():
-        print(f"Refusing to replace {what} without a terminal; rerun with --yes.")
+        print(f"Refusing to replace {printable(what)} without a terminal; rerun with --yes.")
         sys.exit(2)
 
-    # Build first: the plan and the placed links both read the rendered files.
+    # Render this run's install first: the plan and the placed links both read dist/.
+    # Fresh: the recommended pins plus the flags, not the pins of the install being replaced.
+    pins, efforts = recommended_pins()
+    # Memory and plugin toggles are global and have no flag: this run renders the saved ones, or
+    # the defaults on a fresh machine, so a first install and a reinstall render the same text.
+    memory = snapshot.memory if snapshot is not None else MemoryConfig()
     print("Building from source...")
     try:
         from ..commands.build import build
-        build(scope=scope, project_path=project_path, profile_label=profile_label)
+        build(scope=scope, project_path=project_path, profile_label=profile_label,
+              role_models=pins, role_efforts=efforts, fresh=True, memory=memory)
     except StateUnreadable:
         raise
     except Exception as e:
         print(f"{Color.RED}Build failed: {e}{Color.NC}")
+        try:
+            render_quietly(scope, project_path, profile_label)
+        except Exception:
+            pass  # the same failure: the message above already says what to fix
         sys.exit(1)
 
-    if existing and not assume_yes and not _confirm_replace(
+    # dist/ is shared by every install: until this one is placed, put back what the
+    # saved install renders if the run stops here
+    try:
+        confirmed = not existing or assume_yes or _confirm_replace(
             snapshot, existing, what, scope, project_path, profile_label, copy,
-            folder_overrides, global_home):
+            folder_overrides, global_home)
+    except BaseException:
+        render_quietly(scope, project_path, profile_label)
+        raise
+    if not confirmed:
+        render_quietly(scope, project_path, profile_label)
         print("Nothing was changed.")
         return
 
@@ -74,9 +103,15 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
     print("")
 
     from ..services import installer
-    installer.install_all(scope, copy,
-                          folder_overrides=folder_overrides,
-                          global_home_override=global_home or None)
+    recovery = flags_recovery(local, copy, profile_label, folder, global_home_flag)
+    try:
+        with replacing(existing), placement_errors(recovery):
+            installer.install_all(scope, copy,
+                                  folder_overrides=folder_overrides,
+                                  global_home_override=global_home or None)
+    except installer.HookInstallError as e:
+        print(f"Error: {e}.\n{recovery}", file=sys.stderr)
+        sys.exit(1)
 
     # Record state: the manifest of what was just placed, then cleanup, then the write
     st = build_install_state(
@@ -87,12 +122,23 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
         profile_label=profile_label,
         folder_overrides=folder_overrides,
         global_home_override=global_home or None,
+        role_models=pins,
+        role_efforts=efforts,
     )
-    commit_install(st, snapshot, scope, project_path, profile_label,
-                   rerun_command(local, copy, profile_label, folder, global_home_flag))
+    commit_install(st, snapshot, scope, project_path, profile_label, recovery)
 
     print("")
     print(f"{Color.GREEN}Done.{Color.NC} Restart Claude Code / OpenCode to pick up changes.")
+
+
+def _validate_targets(global_home: str, folder: str, project: Path) -> None:
+    """--global-home and --folder name a directory agent-notes will fill and later sweep: see
+    override_problem for what it refuses."""
+    for flag, kind, value in (("--global-home", "home", global_home), ("--folder", "folder", folder)):
+        problem = override_problem(kind, value, project) if value else ""
+        if problem:
+            print(f"Error: {flag} {printable(value)} {problem}.")
+            sys.exit(2)
 
 
 def _confirm_replace(snapshot, existing, what, scope, project_path, profile_label, copy,
@@ -104,18 +150,19 @@ def _confirm_replace(snapshot, existing, what, scope, project_path, profile_labe
     from ..services.ui import _safe_input
 
     registry = load_registry()
-    plan = plan_install(scope=scope, registry=registry, copy_mode=copy,
-                        folder_overrides=folder_overrides, global_home_override=global_home or None)
+    with replacing(existing):
+        plan = plan_install(scope=scope, registry=registry, copy_mode=copy,
+                            folder_overrides=folder_overrides, global_home_override=global_home or None)
     placed = summarize_plan(plan).to_install
-    claims = cleanup.claims_of_others(snapshot, scope, project_path, profile_label, registry)
-    stale = cleanup.stale_placements(existing, scope, project_path, [a.dst for a in plan],
-                                     claims, registry)
+    stale = cleanup.planned_stale(snapshot, scope, project_path, profile_label,
+                                  [a.dst for a in plan], registry)
     print()
     print(f"Replacing the {what} (installed {existing.installed_at}, {existing.mode}).")
+    print("  Model pins reset to the recommended ones.")
     print(f"  {len(placed)} files will be placed.")
     print(f"  {len(stale)} stale files will be removed." if stale else "  Nothing stale to remove.")
     for item in stale[:STALE_SHOWN]:
-        print(f"    {item.path}")
+        print(f"    {printable(item.path)}")
     if len(stale) > STALE_SHOWN:
         print(f"    ... {len(stale) - STALE_SHOWN} more")
     print()

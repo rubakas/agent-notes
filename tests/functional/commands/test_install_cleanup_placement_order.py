@@ -130,15 +130,40 @@ class TestDroppingACli:
         assert not hooks.exists() or "agent-notes-context.md" not in hooks.read_text()
         assert "codex" not in load_state().global_install.clis
 
-    def test_everything_but_the_emptied_hooks_file_matches_installing_claude_alone(self, world):
+    def test_the_tree_matches_installing_claude_alone_exactly(self, world):
         world.use("a_then_b")
         world.wizard(clis=("claude", "codex"))
         world.wizard(clis=("claude",))
-        reinstalled = {k: v for k, v in world.tree().items() if not k.startswith("home/.codex")}
+        reinstalled = world.tree()
         world.use("b_alone")
         world.wizard(clis=("claude",))
 
         assert reinstalled == world.tree()
+        assert not (world.paths("a_then_b")["home"] / ".codex").exists()
+
+    def test_a_hooks_file_with_a_hook_of_the_users_keeps_the_file_and_the_home(self, world):
+        import json
+        world.use("main")
+        world.wizard(clis=("claude", "codex"))
+        hooks = world.home / ".codex" / "hooks.json"
+        data = json.loads(hooks.read_text())
+        data["hooks"]["Stop"] = [{"hooks": [{"type": "command", "command": "my-own-hook"}]}]
+        hooks.write_text(json.dumps(data))
+
+        world.wizard(clis=("claude",))
+
+        assert "my-own-hook" in hooks.read_text()
+        assert "agent-notes-context.md" not in hooks.read_text()
+
+    def test_a_hooks_file_that_does_not_parse_is_left_alone(self, world):
+        world.use("main")
+        world.wizard(clis=("claude", "codex"))
+        hooks = world.home / ".codex" / "hooks.json"
+        hooks.write_text("{ not json")
+
+        world.wizard(clis=("claude",))
+
+        assert hooks.read_text() == "{ not json"
 
     def test_another_global_install_that_still_lists_codex_keeps_all_of_it(self, world):
         world.use("main")
@@ -211,8 +236,9 @@ class TestPlaceThenCleanThenState:
         before_tree, before_state = world.tree(), world.state_file.read_bytes()
         self._fail_on_call(monkeypatch, 4)
 
-        with pytest.raises(OSError, match="disk full"):
+        with pytest.raises(SystemExit) as raised:
             world.wizard(skills=world.skills()[:2])
+        assert raised.value.code == 1
 
         stale = world.skills()[2:]
         assert all((world.home / ".claude" / "skills" / s).exists() for s in stale)
@@ -226,7 +252,7 @@ class TestPlaceThenCleanThenState:
         world.wizard()
         with monkeypatch.context() as m:
             self._fail_on_call(m, 4)
-            with pytest.raises(OSError):
+            with pytest.raises(SystemExit):
                 world.wizard(skills=subset)
 
         world.wizard(skills=subset)
@@ -252,8 +278,38 @@ class TestPlaceThenCleanThenState:
         err = capsys.readouterr().err
         assert raised.value.code == 1
         assert "state.json could not be written (read-only file system)" in err
-        assert "rerun to converge: agent-notes install" in err
+        assert ("Fix the cause, then rerun agent-notes install and pick the same choices.\n"
+                "To install the recommended setup on the same target instead: agent-notes install --yes") in err
         assert world.state_file.read_bytes() == before
+
+    def test_a_failed_local_copy_profile_wizard_install_names_that_target_not_the_global_one(
+            self, world, monkeypatch, capsys):
+        """`agent-notes install --yes` without a terminal would replace the GLOBAL default."""
+        world.use("main")
+        monkeypatch.setattr("agent_notes.services.state_store.record_install_state",
+                            lambda state: (_ for _ in ()).throw(OSError("read-only file system")))
+
+        with pytest.raises(SystemExit):
+            world.wizard(scope="local", copy=True, profile="work",
+                         folder_overrides={"claude": ".claude-work"}, global_home="~/.claude-work")
+
+        err = capsys.readouterr().err
+        assert ("Fix the cause, then rerun agent-notes install and pick the same choices.\n"
+                "To install the recommended setup on the same target instead: "
+                "agent-notes install --local --copy --profile=work --yes") in err
+        assert "agent-notes install --yes\n" not in err
+
+    def test_a_custom_folder_and_home_stay_in_the_flags_form(self, world, monkeypatch, capsys):
+        world.use("main")
+        monkeypatch.setattr("agent_notes.services.state_store.record_install_state",
+                            lambda state: (_ for _ in ()).throw(OSError("read-only file system")))
+
+        with pytest.raises(SystemExit):
+            world.wizard(profile="work", folder_overrides={"claude": ".claude-custom"},
+                         global_home="~/custom-home")
+
+        assert ("agent-notes install --profile=work --folder=.claude-custom --global-home=~/custom-home --yes"
+                in capsys.readouterr().err)
 
     def test_the_flags_path_fails_the_same_way(self, world, monkeypatch, capsys):
         world.use("main")
@@ -264,7 +320,8 @@ class TestPlaceThenCleanThenState:
             install(local=True, profile_label="")
 
         assert raised.value.code == 1
-        assert "agent-notes install --local --yes" in capsys.readouterr().err
+        assert ("Fix the cause, then rerun to converge: agent-notes install --local --yes"
+                in capsys.readouterr().err)
 
     def test_stale_links_are_removed_only_after_the_new_ones_are_placed(self, world, monkeypatch):
         world.use("main")
@@ -274,9 +331,9 @@ class TestPlaceThenCleanThenState:
         import agent_notes.services.state_store as store
         real_remove, real_record = cleanup.remove_stale, store.record_install_state
 
-        def remove(stale):
+        def remove(stale, **kwargs):
             order.append(("remove", sorted(p.name for p in (world.home / ".claude" / "skills").iterdir())))
-            return real_remove(stale)
+            return real_remove(stale, **kwargs)
 
         def record(state):
             order.append(("record", None))
@@ -291,3 +348,120 @@ class TestPlaceThenCleanThenState:
         assert [kind for kind, _ in order] == ["remove", "record"]
         # at removal time everything was still there: the new links were placed, the stale not yet gone
         assert order[0][1] == world.skills()
+
+
+class TestAFailedHookIsAnError:
+    def test_the_install_exits_non_zero_with_the_recovery_command(self, world, monkeypatch, capsys):
+        world.use("main")
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("settings.json is not writable")
+
+        monkeypatch.setattr("agent_notes.services.installer._install_session_hook", boom)
+        with pytest.raises(SystemExit) as raised:
+            world.wizard()
+
+        err = capsys.readouterr().err
+        assert raised.value.code == 1
+        assert "session hook could not be installed (settings.json is not writable)" in err
+        assert ("Fix the cause, then rerun agent-notes install and pick the same choices.\n"
+                "To install the recommended setup on the same target instead: agent-notes install --yes") in err
+        assert not world.state_file.exists()
+
+    def test_the_flags_path_has_the_same_handler_with_its_exact_flags(self, world, monkeypatch, capsys):
+        world.use("main")
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("settings.json is not writable")
+
+        monkeypatch.setattr("agent_notes.services.installer._install_session_hook", boom)
+        with pytest.raises(SystemExit) as raised:
+            install(local=True, copy=True, profile_label="work")
+
+        err = capsys.readouterr().err
+        assert raised.value.code == 1
+        assert "session hook could not be installed (settings.json is not writable)" in err
+        assert ("Fix the cause, then rerun to converge: "
+                "agent-notes install --local --copy --profile=work --yes") in err
+        assert "Traceback" not in err
+        assert not world.state_file.exists()
+
+
+class TestAPlacementFailureIsAnErrorNotATraceback:
+    @pytest.fixture(autouse=True)
+    def not_root(self):
+        if os.geteuid() == 0:
+            pytest.skip("chmod does not stop root")
+
+    def _lock(self, directory):
+        directory.chmod(0o555)
+
+    def _unlock(self, directory):
+        directory.chmod(0o755)
+
+    def test_the_flags_path_names_the_path_and_changes_nothing(self, world, capsys):
+        world.use("main")
+        install(local=True)
+        stale = world.project / ".claude" / "skills" / "retired-skill"
+        stale.symlink_to(world.dist / "skills" / "retired-skill")
+        tree, state = world.tree(), world.state_file.read_bytes()
+        agents = world.project / ".claude" / "agents"
+        self._lock(agents)
+        try:
+            with pytest.raises(SystemExit) as raised:
+                install(local=True, assume_yes=True)
+        finally:
+            self._unlock(agents)
+
+        err = capsys.readouterr().err
+        assert raised.value.code == 1
+        assert f"Error: could not place {agents}/" in err and "Permission denied" in err
+        assert "Fix the cause, then rerun to converge: agent-notes install --local --yes" in err
+        assert "Traceback" not in err
+        assert stale.is_symlink()
+        assert world.tree() == tree
+        assert world.state_file.read_bytes() == state
+
+    def test_the_wizard_path_does_the_same(self, world, capsys):
+        world.use("main")
+        world.wizard()
+        stale = world.home / ".claude" / "skills" / "retired-skill"
+        stale.symlink_to(world.dist / "skills" / "retired-skill")
+        tree, state = world.tree(), world.state_file.read_bytes()
+        agents = world.home / ".claude" / "agents"
+        self._lock(agents)
+        try:
+            with pytest.raises(SystemExit) as raised:
+                world.wizard()
+        finally:
+            self._unlock(agents)
+
+        err = capsys.readouterr().err
+        assert raised.value.code == 1
+        assert f"Error: could not place {agents}/" in err and "Permission denied" in err
+        assert ("Fix the cause, then rerun agent-notes install and pick the same choices.\n"
+                "To install the recommended setup on the same target instead: agent-notes install --yes") in err
+        assert stale.is_symlink()
+        assert world.tree() == tree
+        assert world.state_file.read_bytes() == state
+
+
+class TestAnEmptyMirrorIsAnAnswerNotASilence:
+    def test_a_global_install_records_the_mirror_key_even_with_no_skills(self, world):
+        world.use("main")
+
+        world.wizard(skills=[])
+
+        installed = load_state().global_install.clis["claude"].installed
+        assert installed["skills_mirror"] == {}
+
+    def test_a_zero_skill_install_does_not_freeze_the_mirror_for_the_others(self, world):
+        world.use("main")
+        world.wizard()
+        world.wizard(profile="work", folder_overrides={"claude": ".claude-work"},
+                     global_home=str(world.home / ".claude-work"), skills=[])
+        mirror = world.paths("main")["agents"] / "skills"
+
+        world.wizard(skills=world.skills()[:2])
+
+        assert sorted(p.name for p in mirror.iterdir()) == world.skills()[:2]

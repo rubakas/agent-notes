@@ -118,12 +118,14 @@ def _review(ui, choices: InstallChoices, catalog: Catalog, cli_registry) -> bool
 def _render(choices: InstallChoices, *, with_selections: bool) -> Optional[str]:
     """Render dist/ quietly. Returns the error, if any.
 
-    *with_selections*: this run's picks, before confirming — the file count
+    *with_selections*: this run's picks (models, efforts, memory, plugin toggles) and
+    nothing from the install being replaced, before confirming — the file count
     must come from what this install will write. Without: back to the
     persisted state pins, after anything but a yes — existing symlink installs
     would otherwise keep serving the rejected (or half-written) picks."""
     from ...services.fs import quiet_output, silent_ops
-    picks = (dict(role_models=choices.role_models, role_efforts=choices.role_efforts)
+    picks = (dict(role_models=choices.role_models, role_efforts=choices.role_efforts,
+                  fresh=True, memory=choices.memory, enabled_plugins=dict(choices.plugins))
              if with_selections else {})
     try:
         with silent_ops(), quiet_output():
@@ -137,16 +139,25 @@ def _render(choices: InstallChoices, *, with_selections: bool) -> Optional[str]:
 
 def _plan_summary(choices: InstallChoices, cli_registry) -> tuple[str, list[str]]:
     """The confirmation question and up to five backup lines."""
+    from ...services import install_cleanup
+    from ...services.install_ownership import replacing
     from ...services.installer import plan_install, summarize_plan
+    from ...services.state_store import get_scope, load_current_state
     try:
+        snapshot = load_current_state()
+        project = Path.cwd().resolve() if choices.scope == "local" else None
+        old = get_scope(snapshot, choices.scope, project, profile_label=choices.profile_label) if snapshot else None
         # skills pass as-is: an empty selection must plan zero skills (None
         # would mean "all skills", which the install will not write).
-        manifest = plan_install(scope=choices.scope, registry=cli_registry,
-                                selected_clis=set(choices.clis), selected_skills=choices.skills,
-                                copy_mode=choices.copy_mode,
-                                folder_overrides=choices.folder_overrides,
-                                global_home_override=choices.global_home_override or None)
+        with replacing(old):
+            manifest = plan_install(scope=choices.scope, registry=cli_registry,
+                                    selected_clis=set(choices.clis), selected_skills=choices.skills,
+                                    copy_mode=choices.copy_mode,
+                                    folder_overrides=choices.folder_overrides,
+                                    global_home_override=choices.global_home_override or None)
         summary = summarize_plan(manifest)
+        removed = len(install_cleanup.planned_stale(snapshot, choices.scope, project, choices.profile_label,
+                                                    [a.dst for a in manifest], cli_registry)) if old else 0
     except Exception:
         log.debug("plan_install failed during pre-flight", exc_info=True)
         return "Install?", []
@@ -154,7 +165,8 @@ def _plan_summary(choices: InstallChoices, cli_registry) -> tuple[str, list[str]
     lines = [f"backup  {tilde(a.dst)}  →  {tilde(a.backup_path)}" for a in backups[:5]]
     if len(backups) > 5:
         lines.append(f"… {len(backups) - 5} more")
-    return f"Install {len(summary.to_install)} files ({len(backups)} backed up)?", lines
+    detail = f"{len(backups)} backed up" + (f", {removed} removed" if removed else "")
+    return f"Install {len(summary.to_install)} files ({detail})?", lines
 
 
 def _install(choices: InstallChoices) -> None:
