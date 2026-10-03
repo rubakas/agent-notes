@@ -8,6 +8,7 @@ This module owns:
 
 from __future__ import annotations
 
+import os
 import shlex
 from pathlib import Path
 from typing import List, NamedTuple, Optional
@@ -164,16 +165,27 @@ def config_filename_for(backend: CLIBackend) -> Optional[str]:
 
 
 def _plan_file(src: Path, dst: Path, copy_mode: bool = False) -> InstallAction:
-    """Return the InstallAction for a single src→dst placement."""
-    from .fs import files_identical, _timestamped_backup_path
+    """Return the InstallAction for a single src→dst placement.
 
-    if copy_mode and dst.is_symlink() and dst.resolve() == src.resolve():
-        return InstallAction(action="skip", src=src, dst=dst, backup_path=None)
-    if dst.exists() and not dst.is_symlink():
-        if files_identical(src, dst):
+    Mirrors fs.place_file: our own unedited copy is replaced with no backup (so it is a
+    plain write), anything else that would be moved aside gets a backup path, and a
+    symlink is always rewritten because the mode may be flipping.
+    """
+    from .fs import files_identical, _timestamped_backup_path, _owned_copy
+    from .install_ownership import lexical_target, owned
+
+    if dst.is_symlink():
+        ours = owned(dst) or lexical_target(dst) == Path(os.path.normpath(src))
+        if ours:
+            return InstallAction(action="install", src=src, dst=dst, backup_path=None)
+        return InstallAction(action="overwrite", src=src, dst=dst, backup_path=_timestamped_backup_path(dst))
+    if dst.exists():
+        mine = _owned_copy(dst)
+        if files_identical(src, dst) and (copy_mode or not mine):
             return InstallAction(action="skip", src=src, dst=dst, backup_path=None)
-        backup_path = _timestamped_backup_path(dst)
-        return InstallAction(action="overwrite", src=src, dst=dst, backup_path=backup_path)
+        if mine:
+            return InstallAction(action="install", src=src, dst=dst, backup_path=None)
+        return InstallAction(action="overwrite", src=src, dst=dst, backup_path=_timestamped_backup_path(dst))
     return InstallAction(action="install", src=src, dst=dst, backup_path=None)
 
 
@@ -331,4 +343,21 @@ def plan_install(
         _hook_backend = _apply_overrides(_hook_backend, folder_overrides, global_home_override)
         actions.extend(_plan_session_hook(_hook_backend, scope))
 
-    return actions
+    return _one_backup_per_target(actions)
+
+
+def _one_backup_per_target(actions: List[InstallAction]) -> List[InstallAction]:
+    """Two CLIs can write one target (a project's AGENTS.md: codex and opencode). The first backs
+    up what the user had; by the time the second runs, what is there is ours, so it replaces
+    it without a backup. Count it that way."""
+    from .install_ownership import path_key
+    seen: set[str] = set()
+    planned = []
+    for action in actions:
+        key = path_key(action.dst)
+        if action.action == "overwrite" and key in seen:
+            action = action._replace(action="install", backup_path=None)
+        if action.action != "skip":
+            seen.add(key)
+        planned.append(action)
+    return planned

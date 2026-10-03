@@ -10,7 +10,6 @@ from agent_notes.services.fs import (
     handle_existing,
     files_identical,
     _removed,
-    remove_all_symlinks_in_dir,
     remove_symlink,
 )
 
@@ -256,48 +255,6 @@ class TestBackupPrintRespectsSilent:
         assert list(tmp_path.glob("dst.md.bak.*"))
 
 
-class TestRemoveAllSymlinksInDir:
-    def test_returns_count_of_removed_symlinks(self, tmp_path):
-        src = tmp_path / "src"
-        src.mkdir()
-        dst_dir = tmp_path / "dst"
-        dst_dir.mkdir()
-        # Create 3 symlinks
-        for name in ("a.md", "b.md", "c.md"):
-            src_file = src / name
-            src_file.write_text(name)
-            (dst_dir / name).symlink_to(src_file)
-
-        count = remove_all_symlinks_in_dir(dst_dir)
-
-        assert count == 3
-
-    def test_returns_zero_for_nonexistent_dir(self, tmp_path):
-        count = remove_all_symlinks_in_dir(tmp_path / "nonexistent")
-        assert count == 0
-
-    def test_does_not_count_skipped_files(self, tmp_path):
-        dst_dir = tmp_path / "dst"
-        dst_dir.mkdir()
-        # Plain file (not a symlink) — should be skipped, not counted
-        (dst_dir / "plain.md").write_text("user content")
-
-        count = remove_all_symlinks_in_dir(dst_dir)
-
-        assert count == 0
-        assert (dst_dir / "plain.md").exists()
-
-    def test_counts_copy_mode_plain_files(self, tmp_path):
-        dst_dir = tmp_path / "dst"
-        dst_dir.mkdir()
-        (dst_dir / "managed.md").write_text("managed content")
-
-        count = remove_all_symlinks_in_dir(dst_dir, copy_mode=True)
-
-        assert count == 1
-        assert not (dst_dir / "managed.md").exists()
-
-
 def test_quiet_output_discards_stdout_and_stderr(capsys):
     import sys
     from agent_notes.services.fs import quiet_output
@@ -307,3 +264,44 @@ def test_quiet_output_discards_stdout_and_stderr(capsys):
     print("after")
     captured = capsys.readouterr()
     assert captured.out == "after\n" and captured.err == ""
+
+
+class TestBackupPlaceholderIsPrivate:
+    def test_a_copy_that_fails_leaves_a_placeholder_only_the_owner_can_read(self, tmp_path, monkeypatch):
+        """The placeholder exists before the copy and keeps its mode if the copy dies: it must not
+        be world-readable (a settings.json holds the user's permissions and hooks)."""
+        import os
+        import stat
+        source = tmp_path / "settings.json"
+        source.write_text("{}")
+
+        def boom(*args, **kwargs):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(fs.shutil, "copy2", boom)
+        old_umask = os.umask(0o022)
+        try:
+            with pytest.raises(OSError):
+                fs.backup_copy(source)
+        finally:
+            os.umask(old_umask)
+
+        (placeholder,) = tmp_path.glob("settings.json.bak.*")
+        assert stat.S_IMODE(placeholder.stat().st_mode) == 0o600
+
+
+class TestPathsFromDiskAreEscapedWhenPrinted:
+    EVIL = "/tmp/a\x1b[2Jb"
+
+    @pytest.mark.parametrize("helper", [
+        lambda p: fs._skipped(p), lambda p: fs._linked(p), lambda p: fs._backed_up(p),
+        lambda p: fs._info(f"COPIED  {p}"), lambda p: fs._removed(p),
+    ], ids=["skipped", "linked", "backed_up", "info", "removed"])
+    def test_an_escape_in_a_path_cannot_reach_the_terminal(self, helper, monkeypatch, capsys):
+        monkeypatch.setattr(fs, "silent_file_ops", False)
+
+        helper(self.EVIL)
+
+        out = capsys.readouterr().out
+        assert "a\x1b[2Jb" not in out
+        assert "a\\x1b[2Jb" in out

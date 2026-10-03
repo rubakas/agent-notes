@@ -1,13 +1,15 @@
 """Filesystem primitives."""
 
 import io
+import os
 import shutil
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from .ui import Color as _Color
+from . import install_ownership as _ownership
+from .ui import Color as _Color, printable as _printable
 
 # Set to True to suppress per-file LINKED/COPIED/SKIP output (e.g. during wizard)
 silent_file_ops = False
@@ -39,27 +41,27 @@ def quiet_output():
 
 def _info(msg: str) -> None:
     if not silent_file_ops:
-        print(f"  {_Color.GREEN}✓{_Color.NC} {msg}")
+        print(f"  {_Color.GREEN}✓{_Color.NC} {_printable(msg)}")
 
 
 def _skipped(path: str, reason: str = "not a symlink — remove manually") -> None:
     if not silent_file_ops:
-        print(f"  {_Color.YELLOW}SKIP{_Color.NC}     {path} ({reason})")
+        print(f"  {_Color.YELLOW}SKIP{_Color.NC}     {_printable(path)} ({reason})")
 
 
 def _linked(path: str) -> None:
     if not silent_file_ops:
-        print(f"  {_Color.GREEN}LINKED{_Color.NC}  {path}")
+        print(f"  {_Color.GREEN}LINKED{_Color.NC}  {_printable(path)}")
 
 
 def _backed_up(path: str) -> None:
     if not silent_file_ops:
-        print(f"  {_Color.CYAN}BACKUP{_Color.NC}   {path}")
+        print(f"  {_Color.CYAN}BACKUP{_Color.NC}   {_printable(path)}")
 
 
 def _removed(path: str) -> None:
     if not silent_file_ops:
-        print(f"  {_Color.GREEN}REMOVED{_Color.NC}  {path}")
+        print(f"  {_Color.GREEN}REMOVED{_Color.NC}  {_printable(path)}")
 
 
 def files_identical(a: Path, b: Path) -> bool:
@@ -83,47 +85,96 @@ def _timestamped_backup_path(dst: Path) -> Path:
     return Path(str(dst) + f".bak.{ts}")
 
 
-def handle_existing(src: Path, dst: Path) -> bool:
+def _move_aside(dst: Path) -> Path:
+    """Move *dst* to a fresh timestamped backup name and return it. A directory is copied
+    with its symlinks kept as symlinks; the name is claimed exclusively, so an existing
+    backup is never overwritten (a numeric suffix is added on a collision)."""
+    base = _timestamped_backup_path(dst)
+    for attempt in range(1000):
+        candidate = base if attempt == 0 else Path(f"{base}.{attempt}")
+        try:
+            if dst.is_dir() and not dst.is_symlink():
+                shutil.copytree(dst, candidate, symlinks=True)
+                shutil.rmtree(dst)
+            else:
+                os.close(os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+                os.replace(dst, candidate)
+            return candidate
+        except FileExistsError:
+            continue
+    raise FileExistsError(f"no free backup name for {dst}")
+
+
+def backup_copy(path: Path) -> Path:
+    """Copy *path* (a file) next to itself under a fresh backup name, never overwriting one."""
+    base = _timestamped_backup_path(path)
+    for attempt in range(1000):
+        candidate = base if attempt == 0 else Path(f"{base}.{attempt}")
+        try:
+            os.close(os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+        except FileExistsError:
+            continue
+        shutil.copy2(path, candidate)
+        return candidate
+    raise FileExistsError(f"no free backup name for {path}")
+
+
+def _owned_copy(dst: Path) -> bool:
+    """A real file or directory the replaced install placed and nobody has edited since."""
+    return not dst.is_symlink() and _ownership.owned(dst)
+
+
+def handle_existing(src: Path, dst: Path, copy_mode: bool = True) -> bool:
     """Handle an existing non-symlink destination file.
 
-    Backs up the destination with a timestamped name and proceeds with install.
-    Returns True if install should proceed, False to skip (identical content).
+    Our own unedited copy (the old manifest's record still matches it) is replaced with
+    no backup; anything else that differs is backed up under a timestamped name.
+    Returns True if install should proceed, False to skip (identical content, which a
+    link install does not skip when the copy is ours: the mode would stay "copy").
     """
-    if files_identical(src, dst):
+    owned = _owned_copy(dst)
+    if files_identical(src, dst) and (copy_mode or not owned):
         _skipped(str(dst), "exists, identical content")
         return False
 
-    backup_path = _timestamped_backup_path(dst)
-    if dst.is_dir():
-        shutil.copytree(dst, backup_path)
-        shutil.rmtree(dst)
-    else:
-        dst.rename(backup_path)
-    _backed_up(str(backup_path))
+    if owned:
+        if dst.is_dir():
+            shutil.rmtree(dst)
+        else:
+            dst.unlink()
+        return True
+
+    _backed_up(str(_move_aside(dst)))
     return True
+
+
+def _clear_symlink(src: Path, dst: Path) -> None:
+    """Make room for src at a symlink dst: ours (or already pointing at src) is
+    unlinked, anyone else's is renamed to a backup so it can be restored."""
+    if _ownership.owned(dst) or _ownership.lexical_target(dst) == Path(os.path.normpath(src)):
+        dst.unlink()
+        return
+    _backed_up(str(_move_aside(dst)))
 
 
 def place_file(src: Path, dst: Path, copy_mode: bool = False) -> None:
     """Place file as symlink or copy, handling existing files."""
     dst.parent.mkdir(parents=True, exist_ok=True)
-    
+
+    if dst.exists() and not dst.is_symlink():
+        if not handle_existing(src, dst, copy_mode):
+            return
+    if dst.is_symlink():
+        _clear_symlink(src, dst)
+
     if copy_mode:
-        if dst.exists() and not dst.is_symlink():
-            if not handle_existing(src, dst):
-                return
-        if dst.is_symlink():
-            dst.unlink()
         if src.is_dir():
             shutil.copytree(src, dst, dirs_exist_ok=True)
         else:
             shutil.copy2(src, dst)
+        _ownership.note_placed(dst)
         _info(f"COPIED  {dst}")
     else:
-        if dst.exists() and not dst.is_symlink():
-            if not handle_existing(src, dst):
-                return
-        if dst.is_symlink():
-            dst.unlink()
         dst.symlink_to(src)
         _linked(str(dst))
 
@@ -151,29 +202,6 @@ def remove_symlink(target: Path, copy_mode: bool = False) -> bool:
     elif target.exists():
         _skipped(str(target))
     return False
-
-
-def remove_all_symlinks_in_dir(dir_path: Path, copy_mode: bool = False) -> int:
-    """Remove all symlinks in a directory. In copy_mode, also removes plain files (managed installs).
-    Returns the count of removed items."""
-    if not dir_path.exists():
-        return 0
-    count = 0
-    for item in dir_path.iterdir():
-        if item.is_symlink():
-            item.unlink()
-            _removed(str(item))
-            count += 1
-        elif copy_mode and item.exists():
-            if item.is_dir():
-                shutil.rmtree(item)
-            else:
-                item.unlink()
-            _removed(str(item))
-            count += 1
-        elif item.exists():
-            _skipped(str(item))
-    return count
 
 
 def remove_dir_if_empty(dir_path: Path) -> None:

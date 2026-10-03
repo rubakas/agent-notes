@@ -76,6 +76,12 @@ def skipped(path: str, reason: str = "not a symlink — remove manually") -> Non
     print(f"  {Color.YELLOW}SKIP{Color.NC}     {path} ({reason})")
 
 
+def printable(text) -> str:
+    """*text* with control characters (an ESC, a newline) escaped, for paths that came from
+    disk or state.json: a name must not be able to repaint or fake a line of our output."""
+    return "".join(ch if ch.isprintable() else ch.encode("unicode_escape").decode() for ch in str(text))
+
+
 # --- TUI primitives ---
 def _safe_input(prompt: str, default: str = "") -> str:
     """Safe input that handles EOF and interrupts."""
