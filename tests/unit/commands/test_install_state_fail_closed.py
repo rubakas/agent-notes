@@ -256,3 +256,32 @@ class TestInstallValidatesBeforeItChangesAnything:
             install(local=True, reconfigure=True, assume_yes=True)
 
         assert seen_during_build == [True]
+
+
+class TestHooksNeverBlockTheAiCli:
+    """Claude Code reads exit 2 from a hook as 'block': an unreadable state.json must not do that."""
+
+    @pytest.mark.parametrize("argv,target", [
+        (("hook", "memory-bridge"), "agent_notes.commands.hook.hook"),
+        (("hook", "session-discover"), "agent_notes.commands.hook.hook"),
+        (("cost-report",), "agent_notes.cost.cost_report.main"),
+    ], ids=lambda value: value if isinstance(value, str) else " ".join(value))
+    def test_an_unreadable_state_exits_zero_and_says_so_on_stderr(self, sandbox, monkeypatch, capsys,
+                                                                  argv, target):
+        path, _project, _dist = sandbox
+        before = _write_state(path, UNREADABLE["invalid-json"])
+
+        def unreadable(*args, **kwargs):
+            raise StateUnreadable(path, ValueError("boom"))
+
+        monkeypatch.setattr(target, unreadable)
+        monkeypatch.setattr(sys, "argv", ["agent-notes", *argv])
+        try:
+            main()
+            code = 0
+        except SystemExit as exit_:
+            code = exit_.code or 0
+
+        assert code == 0
+        assert str(path) in capsys.readouterr().err
+        assert path.read_bytes() == before

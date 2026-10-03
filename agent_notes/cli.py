@@ -210,7 +210,10 @@ def main():
         _main()
     except StateUnreadable as e:
         print(f"Error: {e}. Fix it or move it aside, then rerun.", file=sys.stderr)
-        sys.exit(2)
+        # Claude Code reads exit 2 from a hook as "block": a hook, or the cost report it runs, never does that
+        command = next((arg for arg in sys.argv[1:] if not arg.startswith("-")), "")
+        if command not in ("hook", "cost-report"):
+            sys.exit(2)
 
 
 def _main():
