@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Set
 
 from ...config import Color, AGENTS_HOME, PKG_DIR
 from ...services.fs import place_file, place_dir_contents
+from ...services.state_store import StateUnreadable
 from .._install_helpers import count_agents
 from ._common import _get_skill_groups, _count_rules
 
@@ -252,6 +253,8 @@ def _execute_install(
             _hook_eff = _apply_overrides(_hook_backend, folder_overrides, global_home_override or None)
             _install_session_hook(_hook_eff, scope, memory_backend=memory_backend, memory_path=memory_path or "")
             _hooked_labels.append(_hook_backend.label)
+        except StateUnreadable:
+            raise
         except Exception:
             pass
     if _hooked_labels:
@@ -276,9 +279,12 @@ def _execute_install(
             profile_label=profile_label,
             folder_overrides=folder_overrides,
             global_home_override=global_home_override or None,
+            selected_skills=selected_skills,
         )
         st.memory = MemoryConfig(backend=memory_backend, path=memory_path, strategy=memory_strategy)
         record_install_state(st)
+    except StateUnreadable:
+        raise
     except Exception as e:
         print(f"{Color.YELLOW}Warning: failed to write state.json: {e}{Color.NC}")
 
