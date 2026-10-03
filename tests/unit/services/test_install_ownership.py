@@ -13,7 +13,7 @@ import pytest
 import agent_notes.config as config
 from agent_notes.domain.state import BackendState, InstalledItem, ScopeState, State
 from agent_notes.services.install_ownership import (
-    is_legacy_dist, is_ours, lexical_target, tree_sha, under,
+    home_is_valid, is_legacy_dist, is_ours, lexical_target, tree_sha, under,
 )
 from agent_notes.services.state_store import save_state
 
@@ -76,20 +76,21 @@ class TestUnder:
         alias = _link(tmp_path / "alias", real)
 
         assert under(real / "dist" / "claude" / "a.md", alias / "dist")
-        assert under(alias / "dist" / "claude" / "a.md", real / "dist")
+        # the other way round is refused: a path spelled through a link is not provably inside
+        assert not under(alias / "dist" / "claude" / "a.md", real / "dist")
 
 
 class TestIsLegacyDist:
     @pytest.mark.parametrize("target", [
         "/Users/x/.local/pipx/venvs/agent-notes/lib/python3.13/site-packages/agent_notes/dist/claude/agents/x.md",
         "/opt/venv/lib/python3.9/site-packages/agent_notes/dist/skills/tdd",
-        "/Users/x/code/agent-notes/agent_notes/dist/rules/a.md",
     ])
     def test_a_dist_inside_any_agent_notes_package(self, target):
         assert is_legacy_dist(Path(target))
 
     @pytest.mark.parametrize("target", [
         "/x/agent_notes/dist-old/claude/agents/x.md",
+        "/Users/x/code/agent-notes/agent_notes/dist/rules/a.md",
         "/x/agent_notes_backup/dist/claude/agents/x.md",
         "/x/agent_notes/data/dist.md",
         "/x/dist/agent_notes/claude.md",
@@ -271,9 +272,10 @@ class TestTreeSha:
 
 
 class TestDoctorFixUsesThePredicate:
-    def _scope(self, target: Path, mode="symlink") -> ScopeState:
+    def _scope(self, target: Path, mode="symlink", **backend) -> ScopeState:
+        sha = tree_sha(target) if mode == "copy" else "x"
         return ScopeState(mode=mode, clis={"claude": BackendState(installed={
-            "agents": {"x.md": InstalledItem(sha="x", target=str(target), mode=mode)}})})
+            "agents": {"x.md": InstalledItem(sha=sha, target=str(target), mode=mode)}}, **backend)})
 
     def _fix(self, file: Path):
         from agent_notes.domain.diagnostics import FixAction
@@ -298,17 +300,25 @@ class TestDoctorFixUsesThePredicate:
         assert "UNSAFE DELETE BLOCKED" in capsys.readouterr().out
 
     def test_a_link_into_our_dist_is_deleted(self, dist, tmp_path):
-        link = _link(tmp_path / "home" / "x.md", dist / "claude" / "agents" / "gone.md")
+        link = _link(Path.home() / ".claude" / "agents" / "x.md", dist / "claude" / "agents" / "gone.md")
 
         self._fix(link)
 
         assert not link.is_symlink()
 
-    def test_a_path_recorded_by_a_named_global_profile_is_deleted(self, dist, tmp_path):
+    def test_a_link_into_our_dist_outside_every_install_dir_is_kept(self, dist, tmp_path):
+        link = _link(tmp_path / "home" / "x.md", dist / "claude" / "agents" / "gone.md")
+
+        self._fix(link)
+
+        assert link.is_symlink()
+
+    def test_a_copy_recorded_by_a_named_global_profile_is_deleted(self, dist, tmp_path):
         stale = tmp_path / "home-work" / "agents" / "x.md"
         stale.parent.mkdir(parents=True)
-        stale.write_text("user-visible copy the manifest recorded")
-        state = State(global_installs={"work": self._scope(stale, mode="copy")})
+        stale.write_text("copy the manifest recorded")
+        state = State(global_installs={"work": self._scope(
+            stale, mode="copy", global_home_override=str(stale.parent.parent))})
         save_state(state)
 
         self._fix(stale)
@@ -323,3 +333,40 @@ class TestDoctorFixUsesThePredicate:
         self._fix(stale)
 
         assert stale.exists()
+
+
+class TestHomeIsValid:
+    """A CLI home is judged by which directory it IS, not how it is spelled."""
+
+    @pytest.fixture
+    def home(self, tmp_path, monkeypatch):
+        home = tmp_path / "Home"
+        (home / ".claude").mkdir(parents=True)
+        monkeypatch.setenv("HOME", str(home))
+        return home
+
+    @staticmethod
+    def _respelled(path: Path) -> Path:
+        swapped = path.parent / path.name.swapcase()
+        if not os.path.exists(swapped):
+            pytest.skip("case-sensitive filesystem")
+        return swapped
+
+    def test_home_spelled_in_another_case_is_refused(self, home):
+        assert not home_is_valid(self._respelled(home))
+
+    def test_an_ancestor_of_home_spelled_in_another_case_is_refused(self, home):
+        assert not home_is_valid(self._respelled(home.parent))
+
+    def test_the_project_spelled_in_another_case_is_refused(self, home, tmp_path):
+        project = tmp_path / "Proj"
+        project.mkdir()
+
+        assert not home_is_valid(self._respelled(project), project)
+
+    def test_the_filesystem_root_is_refused(self, home):
+        assert not home_is_valid(Path("/"))
+
+    def test_a_home_below_home_and_one_that_does_not_exist_yet_are_fine(self, home):
+        assert home_is_valid(home / ".claude")
+        assert home_is_valid(home / ".claude-work" / "not" / "yet")
