@@ -33,6 +33,8 @@ def interactive_install(session_factory=open_session) -> None:
 
 def _interactive_install(session_factory=open_session) -> None:
     from ...registries.cli_registry import load_registry
+    from ...services.state_store import load_current_state
+    load_current_state()  # an unreadable state.json stops the run before anything renders
     cli_registry = load_registry()
     catalog = Catalog()
     choices = initial_choices(catalog, cli_registry)

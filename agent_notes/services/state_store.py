@@ -1,4 +1,8 @@
-"""State storage I/O operations."""
+"""State storage I/O operations.
+
+Concurrent installs are unsupported: each run reads state.json once, works from
+that snapshot and writes it back whole at the end.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +14,15 @@ from dataclasses import asdict
 from typing import Optional
 from ..domain.state import State, ScopeState, BackendState, InstalledItem, MemoryConfig
 from ._memory_utils import _now_iso as _memory_now_iso
+
+
+class StateUnreadable(Exception):
+    """state.json exists but cannot be read or understood."""
+
+    def __init__(self, path: Path, cause: BaseException):
+        super().__init__(f"state file {path} is unreadable ({cause})")
+        self.path = path
+        self.cause = cause
 
 
 def state_dir() -> Path:
@@ -24,17 +37,20 @@ def state_file() -> Path:
 
 
 def load_state() -> Optional[State]:
-    """Load state from disk. Return None if file absent or on any error."""
+    """Load state from disk. None only when the file is absent.
+
+    An unreadable or unparseable file raises StateUnreadable: absent state is a
+    fresh machine, unreadable state is an install we can no longer see, and
+    callers must not clean or overwrite on the strength of it.
+    """
     file_path = state_file()
     if not file_path.exists():
         return None
-    
+
     try:
-        data = json.loads(file_path.read_text())
-        state = _state_from_dict(data)
-        return state
-    except Exception:
-        return None
+        return _state_from_dict(json.loads(file_path.read_text()))
+    except Exception as e:
+        raise StateUnreadable(file_path, e) from e
 
 
 def save_state(state: State) -> None:

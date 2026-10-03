@@ -189,6 +189,8 @@ def check_version_drift(scope: str, issues: list, fix_actions: list) -> None:
 
 def diagnose(scope: str, fix: bool = False) -> bool:
     """Run all diagnostic checks and optionally apply fixes."""
+    from ..services.state_store import load_current_state as _snapshot
+    _snapshot()  # an unreadable state.json stops the run before any check or fix
     print_summary(scope)
 
     issues = []

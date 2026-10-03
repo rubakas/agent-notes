@@ -205,6 +205,15 @@ class _AgentNotesParser(argparse.ArgumentParser):
 
 
 def main():
+    from .services.state_store import StateUnreadable
+    try:
+        _main()
+    except StateUnreadable as e:
+        print(f"Error: {e}. Fix it or move it aside, then rerun.", file=sys.stderr)
+        sys.exit(2)
+
+
+def _main():
     parser = _AgentNotesParser(
         prog="agent-notes",
         description=DESCRIPTION,
@@ -344,8 +353,11 @@ def main():
     # Route to modules
     if args.command == "build":
         from .commands.build import build
+        from .services.state_store import StateUnreadable
         try:
             build()
+        except StateUnreadable:
+            raise
         except Exception as e:
             print(f"{Color.RED}Build failed: {e}{Color.NC}")
             sys.exit(1)

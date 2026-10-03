@@ -5,7 +5,9 @@ from pathlib import Path
 
 from ..config import Color, PKG_DIR
 from ..services.install_state_builder import build_install_state
-from ..services.state_store import load_current_state, record_install_state, remove_install_state, label_from_key
+from ..services.state_store import (
+    StateUnreadable, load_current_state, record_install_state, remove_install_state, label_from_key,
+)
 from ._install_helpers import _verify_install
 
 
@@ -14,6 +16,11 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
     """Build from source and install to targets."""
     from ..services.state_store import get_scope, state_file
     from pathlib import Path
+
+    if copy and not local:
+        print("Error: --copy is only valid with --local installs.")
+        print("Global installs always use symlinks.")
+        sys.exit(2)
 
     scope = "local" if local else "global"
     project_path = Path.cwd().resolve() if local else None
@@ -29,6 +36,7 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
     if profile_label and not global_home:
         global_home = f"~/.claude-{profile_label}"
 
+    # Read-only snapshot: nothing below changes state until the final write.
     state = load_current_state()
     existing = get_scope(state, scope, project_path, profile_label=profile_label) if state else None
 
@@ -60,6 +68,8 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
             from ..services.fs import silent_ops
             with silent_ops():
                 build(scope=scope, project_path=project_path, profile_label=profile_label)
+        except StateUnreadable:
+            raise
         except Exception as e:
             print(f"{Color.RED}Rebuild failed: {e}{Color.NC}")
             sys.exit(1)
@@ -83,16 +93,10 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
             print("Tip: Run `agent-notes doctor --fix` to repair, or `agent-notes install --reconfigure` to review and reinstall.")
         return
 
-    if existing and reconfigure:
-        print(f"Clearing existing {scope} state{profile_hint} (--reconfigure) ...")
-        remove_install_state(scope, project_path, profile_label=profile_label)
-        # Fall through to normal install flow
-
-    # Validate args
-    if copy and not local:
-        print("Error: --copy is only valid with --local installs.")
-        print("Global installs always use symlinks.")
-        return
+    if existing:
+        # --reconfigure: install over it. The state entry is replaced, not merged,
+        # when the new one is written at the end.
+        print(f"Reinstalling over the existing {scope} installation{profile_hint} (--reconfigure) ...")
 
     # Build first — scope-aware so an existing state pin set for this scope
     # (e.g. local install after a previous local install) drives the render.
@@ -100,6 +104,8 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
     try:
         from ..commands.build import build
         build(scope=scope, project_path=project_path, profile_label=profile_label)
+    except StateUnreadable:
+        raise
     except Exception as e:
         print(f"{Color.RED}Build failed: {e}{Color.NC}")
         sys.exit(1)
@@ -132,6 +138,8 @@ def install(local: bool = False, copy: bool = False, reconfigure: bool = False,
             global_home_override=global_home or None,
         )
         record_install_state(st)
+    except StateUnreadable:
+        raise
     except Exception as e:
         print(f"{Color.YELLOW}Warning: failed to write state.json: {e}{Color.NC}")
 
@@ -198,6 +206,8 @@ def uninstall(local: bool = False, global_: bool = False,
                                             profile_label=label)
                     try:
                         remove_install_state(scope, project_path, profile_label=label)
+                    except StateUnreadable:
+                        raise
                     except Exception as e:
                         print(f"{Color.YELLOW}Warning: failed to clear state.json: {e}{Color.NC}")
             else:
@@ -216,6 +226,8 @@ def uninstall(local: bool = False, global_: bool = False,
                                             profile_label=label)
                     try:
                         remove_install_state(scope, None, profile_label=label)
+                    except StateUnreadable:
+                        raise
                     except Exception as e:
                         print(f"{Color.YELLOW}Warning: failed to clear state.json: {e}{Color.NC}")
         print(f"{Color.GREEN}Done.{Color.NC} agent-notes components removed.")
@@ -236,6 +248,8 @@ def uninstall(local: bool = False, global_: bool = False,
         # Remove state entry for this scope
         try:
             remove_install_state(scope, project_path, profile_label=profile_label)
+        except StateUnreadable:
+            raise
         except Exception as e:
             print(f"{Color.YELLOW}Warning: failed to clear state.json: {e}{Color.NC}")
 

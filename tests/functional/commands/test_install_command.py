@@ -146,8 +146,10 @@ class TestInstallAbortsOnCopyWithoutLocal:
 
         with patch(_PATCH_BUILD):
             from agent_notes.commands.install import install
-            install(local=False, copy=True)
+            with pytest.raises(SystemExit) as raised:
+                install(local=False, copy=True)
 
+        assert raised.value.code == 2
         out = capsys.readouterr().out
         assert "copy" in out.lower() or "local" in out.lower()
 

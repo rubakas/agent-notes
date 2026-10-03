@@ -19,7 +19,9 @@ def _write_minimal_state(sf: Path) -> None:
             "clis": {
                 "claude": {
                     "role_models": {},
-                    "installed": {"agents": ["lead.md", "coder.md"]},
+                    "installed": {"agents": {
+                        name: {"sha": "x", "target": f"/t/{name}", "mode": "symlink"}
+                        for name in ("lead.md", "coder.md")}},
                 }
             },
         },
