@@ -88,6 +88,8 @@ def build_install_state(
         from ..registries.cli_registry import CLIRegistry
         registry = CLIRegistry([])
     
+    from ..services.install_plan import expanded_home, is_safe_local_dir  # install_plan loads the registries
+
     timestamp = now_iso()
 
     wanted = None if selected_skills is None else set(selected_skills)
@@ -108,12 +110,12 @@ def build_install_state(
         effective_backend = backend
         local_dir_override = ""
         global_home_override_val = ""
-        if folder_overrides and backend.name in folder_overrides:
+        if folder_overrides and is_safe_local_dir(folder_overrides.get(backend.name, "")):
             local_dir_override = folder_overrides[backend.name]
             effective_backend = effective_backend.with_local_dir(local_dir_override)
-        if global_home_override and backend.name == "claude":
+        if global_home_override and backend.name == "claude" and expanded_home(global_home_override):
             global_home_override_val = global_home_override
-            effective_backend = effective_backend.with_global_home(Path(global_home_override).expanduser())
+            effective_backend = effective_backend.with_global_home(expanded_home(global_home_override))
 
         backend_state = BackendState(
             local_dir_override=local_dir_override,
@@ -217,6 +219,8 @@ def build_install_state(
 
         # The cross-tool skills mirror every global install places
         if scope == "global":
+            # present even when empty: "no skills mirrored" is an answer, not a missing record
+            backend_state.installed.setdefault("skills_mirror", {})
             for skill_dir in placed_skills:
                 backend_state.installed.setdefault("skills_mirror", {})[skill_dir.name] = InstalledItem(
                     sha=_skill_sha(skill_dir, mode), target=str(AGENTS_HOME / "skills" / skill_dir.name), mode=mode

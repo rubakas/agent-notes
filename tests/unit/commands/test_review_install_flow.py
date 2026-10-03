@@ -312,5 +312,5 @@ def test_a_failed_local_restore_names_this_installs_regenerate_command(calls, mo
     ui = tui_session("i", ESCAPE, "q", width=300)
     orchestrator._review(ui, choices, catalog, registry)
     here = Path.cwd()
-    assert (f"Restore failed — run cd {here} && agent-notes regenerate --local --profile work: locked"
+    assert (f"Restore failed — run cd {here} && agent-notes regenerate --local --profile=work: locked"
             in ui.term.text())

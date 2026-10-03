@@ -11,6 +11,7 @@ from ...domain.capability import KIND_BACKEND, KIND_PROVIDER, KIND_TOGGLE
 from ...domain.state import MemoryConfig
 from ...services.tui.screen import DIM, YELLOW, elide_middle, tilde
 from ...services.tui.widgets import PickItem, ReviewForm, Row, complete_path, cycle_text
+from .._install_helpers import override_problem, profile_label_problem
 from .role_models import Catalog, edit_models, recommended_choices, role_line, roles_for
 
 
@@ -138,7 +139,8 @@ def _target_path(ctx: ReviewContext) -> str:
     backend = ctx.cli_registry.get(names[0])
     if choices.scope == "global":
         home = choices.global_home_override if backend.name == "claude" else ""
-        path = Path(home).expanduser() if home else backend.global_home
+        from ...services.install_plan import expanded_home
+        path = (expanded_home(home) or backend.global_home) if home else backend.global_home
     else:
         folders = choices.folder_overrides or {}
         path = Path.cwd() / folders.get(backend.name, backend.local_dir)
@@ -311,24 +313,39 @@ def edit_profile(ctx: ReviewContext) -> None:
         if not choices.profile_label:
             choices.local_folder = choices.global_home = ""
 
-    def field_row(key, label, shown, current, store) -> Row:
+    def label_problem(text: str) -> str:
+        return profile_label_problem(text.strip())
+
+    def folder_problem(text: str) -> str:
+        return override_problem("folder", text.strip(), Path.cwd()) if text.strip() else ""
+
+    def home_problem(text: str) -> str:
+        return override_problem("home", text.strip(), None) if text.strip() else ""
+
+    def field_row(key, label, shown, current, store, problem) -> Row:
+        """A refused value is warned about and, if kept anyway, ignored: the screen never holds
+        an override the install would refuse."""
         def edit() -> None:
-            value = ui.text(f"Profile · {label}", label, current())
-            if value is not None:
+            value = ui.text(f"Profile · {label}", label, current(),
+                            validate=lambda text: f"Not usable, it will be ignored: {problem(text)}"
+                            if problem(text) else "")
+            if value is not None and not problem(value):
                 store(value)
         return Row(key, label, lambda: [shown() or ui.style("—", DIM)], edit=edit)
 
     def rows() -> list[Row]:
         out = [field_row("label", "Label", lambda: choices.profile_label,
-                         lambda: choices.profile_label, set_label)]
+                         lambda: choices.profile_label, set_label, label_problem)]
         if choices.profile_label:
             out.append(field_row("folder", "Local folder",
                                  lambda: choices.folder_overrides["claude"],
                                  lambda: choices.folder_overrides["claude"],
-                                 lambda v: setattr(choices, "local_folder", v.strip())))
+                                 lambda v: setattr(choices, "local_folder", v.strip()),
+                                 folder_problem))
             out.append(field_row("home", "Global home", lambda: choices.global_home_override,
                                  lambda: choices.global_home_override,
-                                 lambda v: setattr(choices, "global_home", v.strip())))
+                                 lambda v: setattr(choices, "global_home", v.strip()),
+                                 home_problem))
         return out
 
     ui.form(ReviewForm("Profile", rows, hints="↑↓ move   ⏎ edit   esc done",

@@ -158,6 +158,43 @@ def test_a_profile_label_derives_folder_and_home(catalog):
     assert ctx.choices.global_home_override == "~/.claude-work"
 
 
+@pytest.mark.parametrize("label", ["../x", "a/b", "a\\b"])
+def test_a_profile_label_that_is_not_a_folder_name_is_not_taken(catalog, label):
+    ctx = _ctx(catalog, ENTER, *typed(label), ENTER, ENTER, ESCAPE)
+    _rows(ctx)["profile"].edit()
+    assert ctx.choices.profile_label == ""
+    assert ctx.choices.folder_overrides is None
+
+
+def _edit_profile_field(catalog, *, down, erase, text, warned=True):
+    """Open the Profile form on a "work" profile, edit the field *down* rows below the label.
+    A refused value is warned about first and needs a second Enter to be kept (and then ignored)."""
+    ctx = _ctx(catalog, *[DOWN] * down, ENTER, *[BACKSPACE] * erase, *typed(text),
+               *[ENTER] * (2 if warned else 1), ESCAPE)
+    ctx.choices.profile_label = "work"
+    _rows(ctx)["profile"].edit()
+    return ctx.choices
+
+
+@pytest.mark.parametrize("folder", ["../x", "/abs/elsewhere", "a/../../x", ".", "~/.claude-w"])
+def test_a_local_folder_that_is_not_a_folder_in_the_project_is_not_taken(catalog, folder):
+    choices = _edit_profile_field(catalog, down=1, erase=len(".claude-work"), text=folder)
+    assert choices.local_folder == ""
+    assert choices.folder_overrides == {"claude": ".claude-work"}
+
+
+@pytest.mark.parametrize("home", ["~", "/", "~/..", "~nouser_zz/x"])
+def test_a_global_home_that_is_home_or_above_it_is_not_taken(catalog, home):
+    choices = _edit_profile_field(catalog, down=2, erase=len("~/.claude-work"), text=home)
+    assert choices.global_home == ""
+    assert choices.global_home_override == "~/.claude-work"
+
+
+def test_a_folder_and_home_of_their_own_are_taken(catalog):
+    assert _edit_profile_field(catalog, down=1, erase=12, text=".claude-custom", warned=False).local_folder == ".claude-custom"
+    assert _edit_profile_field(catalog, down=2, erase=14, text="~/custom-home", warned=False).global_home == "~/custom-home"
+
+
 def test_clearing_the_profile_label_drops_the_overrides(catalog):
     ctx = _ctx(catalog, ENTER, *[BACKSPACE] * 10, ENTER, ESCAPE)
     ctx.choices.profile_label = "work"

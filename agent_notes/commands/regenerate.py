@@ -13,14 +13,27 @@ def regenerate_instruction(scope: str, project_path: Optional[Path], profile_lab
     regenerate failed): plain `agent-notes regenerate` only fits a global,
     profile-less one."""
     import shlex
+    from ._install_helpers import _shell_word
     command = "agent-notes regenerate"
     if scope == "local":
         command += " --local"
     if profile_label:
-        command += f" --profile {shlex.quote(profile_label)}"
+        command += f" --profile={_shell_word(profile_label)}"
     if scope == "local":
         command = f"cd {shlex.quote(str(project_path))} && {command}"
     return command
+
+
+def _with_state_overrides(backend, backend_state):
+    """The backend pointed where state.json's profile overrides say. A local folder that is not
+    safe (see is_safe_local_dir) is not followed; regenerate refuses it before this runs."""
+    from ..services.install_plan import expanded_home, is_safe_local_dir
+    if backend_state:
+        if is_safe_local_dir(backend_state.local_dir_override):
+            backend = backend.with_local_dir(backend_state.local_dir_override)
+        if backend_state.global_home_override and expanded_home(backend_state.global_home_override):
+            backend = backend.with_global_home(expanded_home(backend_state.global_home_override))
+    return backend
 
 
 def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bool = False,
@@ -35,6 +48,9 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
         profile_label: Named profile to regenerate
     """
     from ..services.state_store import load_state, get_scope, record_install_state
+    from ..services.install_ownership import home_is_valid
+    from ..services.install_plan import expanded_home, is_safe_local_dir
+    from ..services.ui import printable
     from ..services.install_state_builder import build_install_state
     from .build import build
     from ..services import installer
@@ -93,6 +109,27 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
     
     registry = load_registry()
 
+    # state.json can be hand-edited: never fill a "home" that is "/", HOME or the project itself
+    for cli_name in target_clis:
+        backend_state = scope_state.clis.get(cli_name)
+        folder = backend_state.local_dir_override if backend_state else ""
+        if folder and not is_safe_local_dir(folder):
+            print(f"Error: the {registry.get(cli_name).label} local folder {printable(folder)} in state.json "
+                  "is not a folder inside the project: it is absolute, starts with '~', climbs out "
+                  "with '..', or holds a control character.")
+            sys.exit(2)
+        override = backend_state.global_home_override if backend_state else ""
+        if override and expanded_home(override) is None:
+            print(f"Error: the {registry.get(cli_name).label} home {printable(override)} in state.json "
+                  "has no home directory: the user after '~' does not exist.")
+            sys.exit(2)
+        backend = _with_state_overrides(registry.get(cli_name), backend_state)
+        home = backend.global_home if scope == 'global' else Path(project_path) / backend.local_dir
+        if not home_is_valid(home, project_path):
+            print(f"Error: the {backend.label} home {printable(home)} in state.json is not a CLI directory of "
+                  "its own: it is '/', your home folder, a folder above it, or the project itself.")
+            sys.exit(2)
+
     print(f"Regenerating {scope} installation...")
 
     total_files = 0
@@ -104,14 +141,7 @@ def regenerate(scope: Optional[str] = None, cli: Optional[str] = None, local: bo
         build(scope=scope, project_path=project_path, profile_label=profile_label)
 
         for cli_name in target_clis:
-            backend = registry.get(cli_name)
-            # Apply profile overrides from state
-            bs = scope_state.clis.get(cli_name)
-            if bs:
-                if bs.local_dir_override:
-                    backend = backend.with_local_dir(bs.local_dir_override)
-                if bs.global_home_override:
-                    backend = backend.with_global_home(Path(bs.global_home_override).expanduser())
+            backend = _with_state_overrides(registry.get(cli_name), scope_state.clis.get(cli_name))
             print(f"\n{backend.label}:")
 
             for component in installer.COMPONENT_TYPES:

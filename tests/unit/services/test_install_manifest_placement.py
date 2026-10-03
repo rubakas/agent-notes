@@ -287,3 +287,38 @@ class TestDoctorDriftIgnoresTheGeneratedContextFile:
         check_drift("local", None, issues, fixes, scope_state)
 
         assert [i for i in issues if i.file.endswith("agent-notes-context.md")] == []
+
+
+def test_an_override_the_plan_refuses_is_not_recorded_in_state(world):
+    """The plan falls back to the default folder for ../x, so state must not claim it was placed."""
+    from agent_notes.services.install_state_builder import build_install_state
+    home, project, _dist = world
+
+    state = build_install_state(mode="symlink", scope="local", repo_root=project, project_path=project,
+                                folder_overrides={"claude": "../x"})
+
+    assert state.local_installs[str(project)].clis["claude"].local_dir_override == ""
+
+
+def test_a_safe_override_is_still_recorded_in_state(world):
+    from agent_notes.services.install_state_builder import build_install_state
+    home, project, _dist = world
+
+    state = build_install_state(mode="symlink", scope="local", repo_root=project, project_path=project,
+                                folder_overrides={"claude": ".claude-work"})
+
+    assert state.local_installs[str(project)].clis["claude"].local_dir_override == ".claude-work"
+
+
+@pytest.mark.parametrize("folder, home", [("~/.claude-w", None), (None, "~nouser_zz/x")])
+def test_an_override_that_cannot_be_followed_is_not_recorded_in_state(world, folder, home):
+    """A ~ folder is a literal folder name the plan refuses; ~nouser has no home to expand to."""
+    from agent_notes.services.install_state_builder import build_install_state
+    _home, project, _dist = world
+
+    state = build_install_state(mode="symlink", scope="local", repo_root=project, project_path=project,
+                                folder_overrides={"claude": folder} if folder else None,
+                                global_home_override=home)
+
+    recorded = state.local_installs[str(project)].clis["claude"]
+    assert (recorded.local_dir_override, recorded.global_home_override) == ("", "")

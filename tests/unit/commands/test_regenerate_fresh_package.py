@@ -142,3 +142,87 @@ def test_a_full_install_regenerates_without_dangling_links_in_any_cli(package):
             rendered = list((dist / name / "agents").glob(f"*.{extension}"))
             placed = list((backend.global_home / "agents").glob(f"*.{extension}"))
             assert rendered and len(placed) == len(rendered), name
+
+
+@pytest.mark.parametrize("override", ["HOME", "/"])
+def test_a_cli_home_override_at_home_or_root_is_refused_and_nothing_is_placed(package, override, capsys):
+    """A hand-edited state.json must not turn HOME or "/" into a directory we fill (install refuses
+    the same value on --global-home)."""
+    home, _dist = package
+    state = Path(os.environ["XDG_CONFIG_HOME"]) / "agent-notes" / "state.json"
+    data = json.loads(state.read_text())
+    data["global"]["clis"]["claude"]["global_home_override"] = str(home) if override == "HOME" else override
+    state.write_text(json.dumps(data))
+
+    with pytest.raises(SystemExit) as exit_info:
+        regenerate(scope="global")
+
+    assert exit_info.value.code == 2
+    assert "not a CLI directory of its own" in capsys.readouterr().out
+    assert list(home.iterdir()) == []
+
+
+@pytest.mark.parametrize("folder", ["../x", "$OUTSIDE", "a/../../x", ".claude\x1b[31m"])
+def test_a_local_folder_override_that_escapes_the_project_is_refused_and_nothing_is_placed(
+        package, tmp_path, monkeypatch, capsys, folder):
+    """A hand-edited local_dir_override of ../x would be placed outside the project (install
+    refuses the same value on --folder)."""
+    home, _dist = package
+    folder = str(tmp_path / "outside") if folder == "$OUTSIDE" else folder
+    project = tmp_path / "claude-501" / "project"
+    project.mkdir()
+    monkeypatch.chdir(project)
+    state = Path(os.environ["XDG_CONFIG_HOME"]) / "agent-notes" / "state.json"
+    data = json.loads(state.read_text())
+    data["local"] = {str(project.resolve()): {
+        "installed_at": "2025-01-01T00:00:00Z", "updated_at": "2025-01-01T00:00:00Z", "mode": "symlink",
+        "clis": {"claude": {"local_dir_override": folder, "role_models": {}, "installed": {}}}}}
+    state.write_text(json.dumps(data))
+    before = sorted(p for p in tmp_path.rglob("*"))
+
+    with pytest.raises(SystemExit) as exit_info:
+        regenerate(scope="local", project_path=project)
+
+    out = capsys.readouterr().out
+    assert exit_info.value.code == 2
+    assert "local folder" in out and "\x1b" not in out
+    assert sorted(p for p in tmp_path.rglob("*")) == before
+
+
+def test_the_refused_home_is_printed_escaped(package, capsys):
+    home, _dist = package
+    state = Path(os.environ["XDG_CONFIG_HOME"]) / "agent-notes" / "state.json"
+    data = json.loads(state.read_text())
+    data["global"]["clis"]["claude"]["global_home_override"] = str(home / "x\x1b[31my") + "/.."
+    state.write_text(json.dumps(data))
+
+    with pytest.raises(SystemExit):
+        regenerate(scope="global")
+
+    assert "\x1b" not in capsys.readouterr().out
+
+
+def test_a_home_override_of_an_unknown_user_is_refused_by_regenerate_not_a_traceback(package, capsys):
+    home, _dist = package
+    state = Path(os.environ["XDG_CONFIG_HOME"]) / "agent-notes" / "state.json"
+    data = json.loads(state.read_text())
+    data["global"]["clis"]["claude"]["global_home_override"] = "~nouser_zz/x"
+    state.write_text(json.dumps(data))
+
+    with pytest.raises(SystemExit) as exit_info:
+        regenerate(scope="global")
+
+    assert exit_info.value.code == 2
+    assert "~nouser_zz/x" in capsys.readouterr().out
+    assert list(home.iterdir()) == []
+
+
+def test_uninstall_still_runs_with_a_home_override_of_an_unknown_user(package):
+    """Hand-edited state must not lock the user out of uninstalling."""
+    from agent_notes.commands.install import uninstall
+    state = Path(os.environ["XDG_CONFIG_HOME"]) / "agent-notes" / "state.json"
+    data = json.loads(state.read_text())
+    data["global"]["clis"]["claude"]["global_home_override"] = "~nouser_zz/x"
+    state.write_text(json.dumps(data))
+
+    uninstall(global_=True)

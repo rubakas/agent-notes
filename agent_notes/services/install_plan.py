@@ -46,14 +46,26 @@ def summarize_plan(manifest: List[InstallAction]) -> PlanSummary:
     )
 
 
-def _is_safe_local_dir(value: str) -> bool:
+def expanded_home(value: str) -> Optional[Path]:
+    """Path(value) with a leading ~ expanded, or None when it cannot be: ~nouser has no home
+    directory and expanduser() raises. An override that gives None is not followed or recorded."""
+    try:
+        return Path(value).expanduser()
+    except RuntimeError:
+        return None
+
+
+def is_safe_local_dir(value: str) -> bool:
     """A local_dir override must stay a relative, non-traversing project subpath.
 
-    Values come from state.json, which is user-editable, and are resolved
-    against the process cwd. An absolute or '..'-bearing value would point the
-    install (and the uninstall sweep) outside the project.
+    Values come from --folder, the wizard and state.json (user-editable), and are resolved
+    against the process cwd. An absolute or '..'-bearing value would point the install (and
+    the uninstall sweep) outside the project; a control character would repaint our output.
+    A leading ~ is refused: nothing expands it for a folder, so it would be a folder literally
+    named "~". This is the one definition: the plan, the recorded state, regenerate and the
+    inputs use it.
     """
-    if not value:
+    if not value or not value.isprintable() or value.startswith("~"):
         return False
     p = Path(value)
     return not p.is_absolute() and ".." not in p.parts
@@ -73,16 +85,24 @@ def _apply_overrides(
     effective = backend
     if folder_overrides and backend.name in folder_overrides:
         local_dir = folder_overrides[backend.name]
-        if _is_safe_local_dir(local_dir):
+        if is_safe_local_dir(local_dir):
             effective = effective.with_local_dir(local_dir)
         else:
             print(
                 f"Refusing local directory override for {backend.name}: "
-                f"{local_dir!r} is absolute or escapes the project directory. "
+                f"{local_dir!r} is absolute, starts with '~' or escapes the project directory. "
                 f"Using default {backend.local_dir!r}."
             )
     if global_home_override and backend.name == "claude":
-        effective = effective.with_global_home(Path(global_home_override).expanduser())
+        home = expanded_home(global_home_override)
+        if home is not None:
+            effective = effective.with_global_home(home)
+        else:
+            print(
+                f"Refusing global home override for {backend.name}: "
+                f"{global_home_override!r} has no home directory to expand. "
+                f"Using default {backend.global_home}."
+            )
     return effective
 
 
