@@ -20,6 +20,9 @@ from ..domain.cli_backend import CLIBackend
 from ..registries.cli_registry import CLIRegistry, load_registry
 from .. import config
 from . import fs as _fs
+from .ui import printable
+from .install_cleanup import claims_of_others, home_claimed, is_claimed
+from .install_ownership import home_is_valid, replacing
 from .state_store import load_state, get_scope
 
 # ---------------------------------------------------------------------------
@@ -63,6 +66,14 @@ from ..registries.plugin_registry import default_plugin_registry
 # and installer.load_registry to intercept calls made inside these functions)
 # ---------------------------------------------------------------------------
 
+class HookInstallError(Exception):
+    """A CLI's session hook (or its context file) could not be written."""
+
+    def __init__(self, label: str, cause: Exception):
+        super().__init__(f"the {label} session hook could not be installed ({cause})")
+        self.label, self.cause = label, cause
+
+
 def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = None,
                 folder_overrides: Optional[dict] = None,
                 global_home_override: Optional[str] = None) -> None:
@@ -83,7 +94,20 @@ def install_all(scope: str, copy_mode: bool, registry: Optional[CLIRegistry] = N
     # SessionStart hooks — installed for every backend with features.session_hook == true
     for _hook_backend in registry.with_feature("session_hook"):
         _hook_backend = _apply_overrides(_hook_backend, folder_overrides, global_home_override)
-        _install_session_hook(_hook_backend, scope)
+        try:
+            _install_session_hook(_hook_backend, scope)
+        except Exception as e:
+            raise HookInstallError(_hook_backend.label, e) from e
+
+
+def _home_is_trusted(backend, scope: str, project_path) -> bool:
+    """Uninstall sweeps a CLI's home only when state.json's override did not point it at "/",
+    at HOME or at a directory above it."""
+    home = backend.global_home if scope == "global" else Path(project_path) / backend.local_dir
+    if home_is_valid(home, project_path):
+        return True
+    print(f"Skipping {backend.label}: its home {printable(home)} is not a CLI directory of its own.")
+    return False
 
 
 def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
@@ -94,26 +118,23 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
     if registry is None:
         registry = load_registry()
 
-    # Determine copy_mode from state so plain copy-installed files are removed too
-    copy_mode = False
+    # What this install recorded decides what is ours; other installs' claims decide what stays.
     state = load_state()
-    if state is not None:
-        scope_state = get_scope(
-            state, scope,
-            project_path=Path.cwd() if scope == "local" else None,
-            profile_label=profile_label,
-        )
-        if scope_state is not None:
-            copy_mode = (scope_state.mode == "copy")
+    project_path = Path.cwd() if scope == "local" else None
+    scope_state = get_scope(state, scope, project_path=project_path,
+                            profile_label=profile_label) if state is not None else None
+    claims = claims_of_others(state, scope, project_path, profile_label, registry)
 
-    with _fs.silent_ops():
+    with _fs.silent_ops(), replacing(scope_state, claimed=lambda p, cli: is_claimed(p, cli, claims)):
         # Track counts per (backend, component) for summary output
         summary: dict[str, int] = {}
 
         for backend in registry.all():
             effective = _apply_overrides(backend, folder_overrides, global_home_override)
+            if not _home_is_trusted(effective, scope, project_path):
+                continue
             for component in COMPONENT_TYPES:
-                count = uninstall_component_for_backend(effective, component, scope, copy_mode)
+                count = uninstall_component_for_backend(effective, component, scope)
                 if count:
                     dst = target_dir_for(effective, component, scope)
                     if dst is None and component == "skills":
@@ -123,7 +144,7 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
                         summary[key] = summary.get(key, 0) + count
 
         if scope == "global":
-            count = _uninstall_universal_skills(copy_mode)
+            count = _uninstall_universal_skills()
             if count:
                 target = config.AGENTS_HOME / "skills"
                 key = str(target)
@@ -133,12 +154,21 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
     home = Path.home()
     for path_str, count in summary.items():
         display = path_str.replace(str(home), "~")
-        print(f"  Cleaned: {display}/ ({count} files)")
+        print(f"  Cleaned: {printable(display)}/ ({count} files)")
 
     # Remove SessionStart hooks — for every backend with features.session_hook == true
     for _hook_backend in registry.with_feature("session_hook"):
         _hook_backend = _apply_overrides(_hook_backend, folder_overrides, global_home_override)
-        _uninstall_session_hook(_hook_backend, scope)
+        if not _home_is_trusted(_hook_backend, scope, project_path) \
+                or home_claimed(_hook_backend, scope, project_path, claims):
+            continue
+        if scope_state is not None and _hook_backend.name not in scope_state.clis:
+            with _fs.quiet_output():   # never installed by this install: nothing to announce
+                _uninstall_session_hook(_hook_backend, scope)
+        else:
+            _uninstall_session_hook(_hook_backend, scope)
+        _fs.remove_dir_if_empty(
+            _hook_backend.global_home if scope == "global" else Path(project_path) / _hook_backend.local_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -181,8 +211,31 @@ def _apply_plugin_settings(settings_path, backend, config) -> None:
 # to control the state lookup these functions perform)
 # ---------------------------------------------------------------------------
 
-def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
+def _one_settings_write(drop_empty: bool = False):
+    """Run a session-hook install/uninstall as one transaction on its settings file; an uninstall
+    that leaves the file empty (it was created for our hook) removes it."""
+    import functools
+
+    def decorate(fn):
+        @functools.wraps(fn)
+        def wrapper(backend, scope, *args, **kwargs):
+            from .settings_writer import drop_if_empty, transaction
+            settings_path = _session_hook_paths(backend, scope)[0]
+            with transaction(settings_path):
+                result = fn(backend, scope, *args, **kwargs)
+            if drop_empty:
+                drop_if_empty(settings_path)
+            return result
+        return wrapper
+    return decorate
+
+
+@_one_settings_write()
+def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "",
+                          enabled_plugins: Optional[dict] = None) -> None:
     """Install the SessionStart hook and write the context file.
+
+    enabled_plugins: this run's plugin toggles; None reads the persisted ones.
 
     Behaviour is driven by the backend's feature flags:
       stop_hook        — memory-bridge and Stop/cost-report hook (claude: true, codex: false)
@@ -210,11 +263,12 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         memory_path = current_state.memory.path if current_state else ""
 
     skills = _filter_skills_by_backend(default_skill_registry().available(), memory_backend)
-    from ..services.user_config import load_user_config
+    from ..services.user_config import load_user_config, with_toggles
+    user_config = with_toggles(load_user_config(), enabled_plugins)
     _preg = default_plugin_registry()
     _disabled_owned = set()
     for _p in _preg.all():
-        if _p not in _preg.enabled(load_user_config()):
+        if _p not in _preg.enabled(user_config):
             _disabled_owned.update(_p.skills)
     skills = [s for s in skills if s.name not in _disabled_owned]
 
@@ -246,9 +300,10 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         install_memory_allow_entries(settings_path, memory_backend, memory_path, current_state)
 
     # Plugin-driven hooks and allow-entries (no-op until Task 5 ships manifests)
-    _apply_plugin_settings(settings_path, backend, load_user_config())
+    _apply_plugin_settings(settings_path, backend, user_config)
 
 
+@_one_settings_write(drop_empty=True)
 def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
     """Remove the SessionStart hook and context file.
 

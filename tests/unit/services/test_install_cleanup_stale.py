@@ -9,7 +9,7 @@ import agent_notes.config as config
 from agent_notes.domain.state import BackendState, InstalledItem, ScopeState, State
 from agent_notes.registries.cli_registry import load_registry
 from agent_notes.services.install_cleanup import (
-    Claims, claims_of_others, dropped_hook_backends, manifest_targets, remove_stale,
+    Claims, claims_of_others, dropped_hook_backends, manifest_targets, prunable_dirs, remove_stale,
     stale_placements,
 )
 from agent_notes.services.install_ownership import tree_sha
@@ -192,6 +192,43 @@ class TestMarkerScan:
             project / ".claude-work" / "skills" / "old"}
 
 
+class TestAManifestCannotSteerDeletionElsewhere:
+    def test_an_item_outside_the_old_installs_roots_is_ignored_even_if_it_is_ours(self, env, tmp_path):
+        home, dist, registry = env
+        outside = tmp_path / "somewhere" / "else.md"
+        outside.parent.mkdir()
+        outside.write_text("precious")
+        link = tmp_path / "somewhere" / "link.md"
+        link.symlink_to(dist / "claude" / "agents" / "x.md")
+        old = ScopeState(mode="copy", clis={"claude": BackendState(installed={"agents": {
+            "else.md": InstalledItem(sha=tree_sha(outside), target=str(outside), mode="copy"),
+            "link.md": InstalledItem(sha="x", target=str(link), mode="symlink")}})})
+
+        assert _stale(old, registry) == set()
+
+    def test_the_home_the_config_file_and_the_mirror_are_inside_the_roots(self, env):
+        home, dist, registry = env
+        agents = _link(dist, home, "agents", "a.md")
+        (dist / "claude" / "CLAUDE.md").write_text("x")
+        (home / ".claude" / "CLAUDE.md").symlink_to(dist / "claude" / "CLAUDE.md")
+        mirror = config.AGENTS_HOME / "skills"
+        mirror.mkdir(parents=True)
+        (mirror / "s").symlink_to(dist / "skills" / "s")
+        old = _scope(agents=[agents], config=[home / ".claude" / "CLAUDE.md"], skills_mirror=[mirror / "s"])
+
+        assert _stale(old, registry) == {agents, home / ".claude" / "CLAUDE.md", mirror / "s"}
+
+    def test_a_traversing_target_does_not_escape(self, env):
+        home, dist, registry = env
+        victim = home / "victim.md"
+        victim.symlink_to(dist / "x")
+        sneaky = home / ".claude" / "agents" / ".." / ".." / "victim.md"
+        (home / ".claude" / "agents").mkdir(parents=True)
+        old = _scope(agents=[sneaky])
+
+        assert _stale(old, registry) == set()
+
+
 class TestClaimsOfOtherInstalls:
     def _claims(self, state, registry, scope="global", project=None, label=""):
         return claims_of_others(state, scope, project, label, registry)
@@ -297,9 +334,10 @@ class TestRemoveStale:
     def test_an_owned_link_is_unlinked_and_its_emptied_directory_goes(self, env):
         home, dist, registry = env
         link = _link(dist, home, "commands", "c.md")
-        stale = stale_placements(_scope(commands=[link]), "global", None, [], Claims(), registry)
+        old = _scope(commands=[link])
+        stale = stale_placements(old, "global", None, [], Claims(), registry)
 
-        removed = remove_stale(stale)
+        removed = remove_stale(stale, prune=prunable_dirs(old, "global", None, registry))
 
         assert removed == [link]
         assert not link.is_symlink()
