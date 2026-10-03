@@ -4,24 +4,12 @@ from pathlib import Path
 from typing import List, Set
 
 from ...domain.diagnostics import Issue, FixAction
+from ..install_ownership import is_ours, lexical_target
 
 
 def _is_safe_delete(file_path: Path, safe_delete_paths: Set[str]) -> bool:
     """Return True if file_path is safe to delete (in state.json or a symlink into our dist/)."""
-    if str(file_path) in safe_delete_paths:
-        return True
-    if file_path.is_symlink():
-        target = file_path.readlink()
-        if not target.is_absolute():
-            target = file_path.parent / target
-        try:
-            from ...config import DIST_DIR
-            target_resolved = target.resolve()
-            dist_resolved = DIST_DIR.resolve()
-            return str(target_resolved).startswith(str(dist_resolved))
-        except (OSError, ValueError):
-            return False
-    return False
+    return str(file_path) in safe_delete_paths or is_ours(file_path)
 
 
 def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
@@ -46,18 +34,12 @@ def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
     safe_delete_paths = set()
     if state is not None:
         # All paths in state.json are safe to delete
-        # Check global install
-        if state.global_install:
-            for backend_name, bs in state.global_install.clis.items():
-                for component_type, items in bs.installed.items():
-                    for name, item in items.items():
-                        safe_delete_paths.add(str(Path(item.target)))
-
-        # Check local installs
-        for project_path, scope_state in state.local_installs.items():
-            for backend_name, bs in scope_state.clis.items():
-                for component_type, items in bs.installed.items():
-                    for name, item in items.items():
+        scope_states = [*([state.global_install] if state.global_install else []),
+                        *state.global_installs.values(), *state.local_installs.values()]
+        for scope_state in scope_states:
+            for bs in scope_state.clis.values():
+                for items in bs.installed.values():
+                    for item in items.values():
                         safe_delete_paths.add(str(Path(item.target)))
 
     for action in fix_actions:
@@ -65,28 +47,14 @@ def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
             file_path = Path(action.file)
             # Safety check: only allow DELETE if path is in state.json or is a symlink to our dist/
             if not _is_safe_delete(file_path, safe_delete_paths):
+                print(f"  {Color.RED}UNSAFE DELETE BLOCKED:{Color.NC} {action.file}")
                 if file_path.is_symlink():
-                    target = file_path.readlink()
-                    if not target.is_absolute():
-                        target = file_path.parent / target
-                    try:
-                        from ...config import DIST_DIR
-                        target_resolved = target.resolve()
-                        dist_resolved = DIST_DIR.resolve()
-                        if not str(target_resolved).startswith(str(dist_resolved)):
-                            print(f"  {Color.RED}UNSAFE DELETE BLOCKED:{Color.NC} {action.file}")
-                            print(f"    Symlink target {target} is not in agent-notes dist/")
-                            print(f"    This appears to be a third-party file. Skipping for safety.")
-                            continue
-                    except (OSError, ValueError):
-                        print(f"  {Color.RED}UNSAFE DELETE BLOCKED:{Color.NC} {action.file}")
-                        print(f"    Cannot verify symlink target safety. Skipping.")
-                        continue
+                    print(f"    Symlink target {lexical_target(file_path)} is not in agent-notes dist/")
+                    print(f"    This appears to be a third-party file. Skipping for safety.")
                 else:
-                    print(f"  {Color.RED}UNSAFE DELETE BLOCKED:{Color.NC} {action.file}")
                     print(f"    File not in state.json and not a symlink to our dist/")
                     print(f"    This may be a user file. Skipping for safety.")
-                    continue
+                continue
 
             print(f"  {Color.RED}DELETE{Color.NC}  {action.file} ({action.details})")
         elif action.action == "RELINK":
