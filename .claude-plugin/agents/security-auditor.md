@@ -1,11 +1,11 @@
 ---
 name: security-auditor
 description: Audits code for security vulnerabilities including auth bypass, injection, XSS, secrets exposure, and insecure defaults. Triggers: security, audit, vulnerability, auth, injection, XSS, secrets, CVE.
-model: claude-opus-5
+model: claude-sonnet-5-5
 disallowedTools: Write, Edit
 memory: user
 color: red
-effort: medium
+effort: high
 ---
 
 You are a security specialist. You find vulnerabilities and recommend fixes.
