@@ -51,6 +51,15 @@ def get_patch(agent_name: str, config: dict) -> Optional[str]:
     return config.get("patches", {}).get(agent_name)
 
 
+def with_toggles(config: dict, enabled_plugins: Optional[dict]) -> dict:
+    """*config* with this run's plugin toggles over the persisted ones. Nothing is saved:
+    a toggle is persisted only when the user confirms the install."""
+    if enabled_plugins is None:
+        return config
+    return {**config, "enabled_plugins": {**(config.get("enabled_plugins") or {}),
+                                          **{name: bool(on) for name, on in enabled_plugins.items()}}}
+
+
 def save_user_config(data: dict, path: Optional[Path] = None) -> None:
     """Write user config dict to config_path() (or path if given), creating parent dirs."""
     p = path or config_path()

@@ -36,14 +36,14 @@ def prune_dist(keep) -> None:
                     entry.unlink()
 
 
-def copy_global_files() -> list[Path]:
+def copy_global_files(memory=None, enabled_plugins=None) -> list[Path]:
     """Copy global files and rules to destination."""
     from ..config import RULES_DIR, DIST_RULES_DIR
     
     copied_files = []
     
     # Use the rendering service for global files
-    copied_files.extend(render_globals())
+    copied_files.extend(render_globals(memory=memory, enabled_plugins=enabled_plugins))
     
     # Copy all rules files
     if RULES_DIR.exists():
@@ -132,7 +132,7 @@ def format_build_summary(n_files: int, n_lines: int, n_clis: int) -> str:
 
 
 def build(role_models=None, role_efforts=None, scope='global', project_path=None,
-          profile_label: str = "") -> None:
+          profile_label: str = "", fresh: bool = False, memory=None, enabled_plugins=None) -> None:
     """Build agent configuration files from source.
 
     Args:
@@ -142,6 +142,10 @@ def build(role_models=None, role_efforts=None, scope='global', project_path=None
         scope: which state.json scope's pins drive the render ('global' or 'local')
         project_path: project path for scope='local'
         profile_label: named profile whose pins drive the render ("" = default profile)
+        fresh: render an install that is being replaced from this run's inputs only
+            (pins, memory, plugin toggles), not from what state.json holds; regenerate
+            and config saves leave it off to render the install as saved
+        memory: this run's MemoryConfig; enabled_plugins: this run's plugin toggles
     """
     from ..services.state_store import load_state
     from ..registries.cli_registry import load_registry
@@ -157,11 +161,12 @@ def build(role_models=None, role_efforts=None, scope='global', project_path=None
     agent_files = generate_agent_files(agents_config, state=state,
                                        scope=scope, project_path=project_path,
                                        role_models=role_models, role_efforts=role_efforts,
-                                       profile_label=profile_label)
+                                       profile_label=profile_label, fresh=fresh, memory=memory,
+                                       enabled_plugins=enabled_plugins)
     
     # Copy global files
     print("Copying global files...")
-    global_files = copy_global_files()
+    global_files = copy_global_files(memory=memory, enabled_plugins=enabled_plugins)
     
     prune_dist([*agent_files, *global_files])
 
