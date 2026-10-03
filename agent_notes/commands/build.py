@@ -1,5 +1,6 @@
 """Build agent configuration files from source."""
 
+import os
 import yaml
 import shutil
 from pathlib import Path
@@ -17,6 +18,24 @@ def _load_frontmatter_template(template_name):
     """DEPRECATED: Use services.rendering._load_frontmatter_template instead."""
     from ..services.rendering import _load_frontmatter_template
     return _load_frontmatter_template(template_name)
+def prune_dist(keep) -> None:
+    """Remove the rendered rules and agents the render did not just write, so what the source
+    no longer has is not installed again. Runs once the agents and rules are rendered and before
+    the skills and commands are copied: a render that fails earlier prunes nothing, a later one
+    leaves dist part updated."""
+    from ..config import DIST_RULES_DIR
+    written = {os.path.abspath(p) for p in keep}
+    for directory in [DIST_RULES_DIR, *sorted(DIST_DIR.glob("*/agents"))]:
+        if directory.is_dir() and not directory.is_symlink():
+            for entry in directory.iterdir():
+                if os.path.abspath(entry) in written:
+                    continue
+                if entry.is_dir() and not entry.is_symlink():
+                    shutil.rmtree(entry)
+                else:
+                    entry.unlink()
+
+
 def copy_global_files() -> list[Path]:
     """Copy global files and rules to destination."""
     from ..config import RULES_DIR, DIST_RULES_DIR
@@ -144,6 +163,8 @@ def build(role_models=None, role_efforts=None, scope='global', project_path=None
     print("Copying global files...")
     global_files = copy_global_files()
     
+    prune_dist([*agent_files, *global_files])
+
     # Copy skills
     print("Copying skills...")
     skill_files = copy_skills()
