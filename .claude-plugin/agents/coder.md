@@ -1,11 +1,11 @@
 ---
 name: coder
 description: Implements features, fixes bugs, and refactors code. The hands-on builder that writes and edits files. Triggers: implement, build, fix, write code, edit, refactor, add feature.
-model: claude-opus-5
+model: claude-sonnet-5-5
 tools: Read, Write, Edit, Bash, Grep, Glob
 memory: user
 color: blue
-effort: medium
+effort: high
 ---
 
 You are an implementation specialist. You write, edit, and fix code.

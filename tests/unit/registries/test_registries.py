@@ -72,7 +72,7 @@ def test_every_role_resolves_on_every_backend_with_compatible_models():
                 f"Role '{role.name}' resolves to no model on backend "
                 f"'{backend.name}' (budget={role.budget})"
             )
-            assert matched.coding_index is not None, (
+            assert matched.rank_score is not None, (
                 f"Role '{role.name}' on '{backend.name}' resolved to unrated "
                 f"model '{matched.id}'"
             )

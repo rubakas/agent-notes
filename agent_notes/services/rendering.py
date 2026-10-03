@@ -327,11 +327,23 @@ def _overlay_selection_pins(scope_state, role_models, role_efforts):
     return merged
 
 
+def _render_state(memory):
+    """The state the memory text is rendered from: this run's memory choice if given,
+    else what state.json holds."""
+    if memory is None:
+        from ..services.state_store import load_state
+        return load_state()
+    from ..domain.state import State
+    return State(memory=memory)
+
+
 def generate_agent_files(agents_config: Dict[str, Any],
                          state=None, scope='global', project_path=None,
                          role_models: Optional[Dict[str, Dict[str, str]]] = None,
                          role_efforts: Optional[Dict[str, Dict[str, str]]] = None,
-                         profile_label: str = "") -> list[Path]:
+                         profile_label: str = "",
+                         fresh: bool = False, memory=None,
+                         enabled_plugins: Optional[Dict[str, bool]] = None) -> list[Path]:
     """Generate agent files for all CLI backends.
 
     Args:
@@ -343,16 +355,20 @@ def generate_agent_files(agents_config: Dict[str, Any],
             the persisted state (wizard selections not yet written to state.json)
         role_efforts: Optional explicit {cli: {role: effort}} pins, same semantics
         profile_label: Named profile whose pins drive the render ("" = default profile)
+        fresh: render for an install that is being replaced: only this run's pins count,
+            persisted pins for roles or CLIs the run did not mention are ignored
+        memory: this run's MemoryConfig (None = the persisted one)
+        enabled_plugins: this run's plugin toggles over the persisted ones (not saved)
     """
     from ..registries.cli_registry import load_registry
-    from ..services.state_store import load_state as _load_state_fn, get_scope as _get_scope
+    from ..services.state_store import get_scope as _get_scope
     from ..config import AGENTS_DIR, DIST_DIR
 
     generated_files = []
 
-    from ..services.user_config import load_user_config, get_patch, merge_configs
+    from ..services.user_config import load_user_config, get_patch, merge_configs, with_toggles
 
-    user_config = load_user_config()
+    user_config = with_toggles(load_user_config(), enabled_plugins)
     # Merge project-level config if provided
     if project_path is not None:
         project_config_file = Path(project_path) / ".claude" / "agent-notes.yaml"
@@ -368,11 +384,15 @@ def generate_agent_files(agents_config: Dict[str, Any],
     if state is not None:
         scope_state = _get_scope(state, scope, project_path, profile_label=profile_label)
 
-    # Explicit selection pins (wizard) override whatever state.json holds
-    if role_models or role_efforts:
+    # Explicit selection pins override whatever state.json holds; a fresh render
+    # takes nothing else from it
+    if fresh:
+        scope_state = _overlay_selection_pins(None, role_models, role_efforts) \
+            if role_models or role_efforts else None
+    elif role_models or role_efforts:
         scope_state = _overlay_selection_pins(scope_state, role_models, role_efforts)
 
-    _st = _load_state_fn()
+    _st = _render_state(memory)
 
     from .stability import is_visible, enabled_wip, normalize_stability
     _wip = enabled_wip()
@@ -497,21 +517,20 @@ from ..memory.instructions import (
 )
 
 
-def render_globals() -> list[Path]:
-    """Copy global files to destinations."""
+def render_globals(memory=None, enabled_plugins: Optional[Dict[str, bool]] = None) -> list[Path]:
+    """Copy global files to destinations. *memory* and *enabled_plugins* are this run's
+    choices (None = the persisted ones)."""
     from ..config import (
         GLOBAL_CLAUDE_MD, GLOBAL_OPENCODE_MD, GLOBAL_COPILOT_MD,
         DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR
     )
-    from ..services.state_store import load_state as _load_state_fn2
-
     copied_files = []
 
     # Build claude.md with includes expanded and memory instructions substituted
-    st = _load_state_fn2()
+    st = _render_state(memory)
     from ..config import AGENTS_DIR
-    from ..services.user_config import load_user_config as _load_user_config
-    _ucfg = _load_user_config()
+    from ..services.user_config import load_user_config as _load_user_config, with_toggles
+    _ucfg = with_toggles(_load_user_config(), enabled_plugins)
     _include_skip = _plugin_include_skip(_ucfg)
     claude_global_content = GLOBAL_CLAUDE_MD.read_text()
     claude_global_content = expand_includes(claude_global_content, AGENTS_DIR / "shared", skip=_include_skip)

@@ -14,11 +14,13 @@ from pathlib import Path
 
 from ..domain.cli_backend import CLIBackend
 from . import fs as _fs
+from . import install_ownership as _ownership
 from .fs import (
     place_file, place_dir_contents,
-    remove_symlink, remove_all_symlinks_in_dir, remove_dir_if_empty,
+    remove_symlink, remove_dir_if_empty,
 )
 from .. import config
+from .ui import printable
 from .install_plan import (
     _agent_glob,
     dist_source_for,
@@ -56,7 +58,7 @@ def install_component_for_backend(
         if not src_file.exists():
             return
         if not _fs.silent_file_ops:
-            print(f"Installing {backend.label} config to {dst} ...")
+            print(f"Installing {backend.label} config to {printable(dst)} ...")
         place_file(src_file, dst / filename, copy_mode)
     elif component in ("agents", "rules", "commands"):
         # Directory of agent/rule/command files — flat copy
@@ -66,7 +68,7 @@ def install_component_for_backend(
         if not files:
             return
         if not _fs.silent_file_ops:
-            print(f"Installing {backend.label} {component} to {dst} ...")
+            print(f"Installing {backend.label} {component} to {printable(dst)} ...")
         place_dir_contents(src, dst, glob, copy_mode)
     elif component == "skills":
         # Each top-level subdir of src is a skill — install each as a directory
@@ -75,7 +77,7 @@ def install_component_for_backend(
         if not skill_dirs:
             return
         if not _fs.silent_file_ops:
-            print(f"Installing {backend.label} skills to {dst} ...")
+            print(f"Installing {backend.label} skills to {printable(dst)} ...")
         for skill_dir in sorted(skill_dirs):
             place_file(skill_dir, dst / skill_dir.name, copy_mode)
 
@@ -94,20 +96,20 @@ def _is_sweepable_dir(dst: Path, backend: CLIBackend, scope: str) -> bool:
     root = _scope_root_for(backend, scope)
     if dst.is_symlink() or not dst.is_dir():
         print(
-            f"Refusing to clean {dst}: not a real directory "
+            f"Refusing to clean {printable(dst)}: not a real directory "
             f"(symlink or file). Remove it manually if it is no longer needed."
         )
         return False
     try:
         resolved = dst.resolve()
         root_resolved = root.resolve()
-    except OSError:
-        print(f"Refusing to clean {dst}: path could not be resolved.")
+    except (OSError, ValueError):
+        print(f"Refusing to clean {printable(dst)}: path could not be resolved.")
         return False
     if root_resolved != resolved and root_resolved not in resolved.parents:
         print(
-            f"Refusing to clean {dst}: it resolves to {resolved}, "
-            f"outside {root_resolved}."
+            f"Refusing to clean {printable(dst)}: it resolves to {printable(resolved)}, "
+            f"outside {printable(root_resolved)}."
         )
         return False
     return True
@@ -121,32 +123,40 @@ def _managed_skill_names() -> set:
     return {d.name for d in dist_skills_dir.iterdir() if d.is_dir()}
 
 
-def _remove_managed_skills(dst: Path, copy_mode: bool) -> int:
-    """Remove only the skills agent-notes ships; report anything left behind."""
+def _is_legacy_skill_ours(item: Path, shipped: Path) -> bool:
+    """A skill in the abandoned codex tree is ours when it is a link into our dist, or a
+    directory that is still byte-identical to the skill agent-notes ships (or to its manifest
+    record). The name alone proves nothing: a user's own copy or link keeps it."""
+    try:
+        if item.is_symlink():
+            return _ownership.is_ours(item)
+        return _ownership.owned(item) or (item.is_dir() and shipped.is_dir()
+                                         and _ownership.tree_sha(item) == _ownership.tree_sha(shipped))
+    except (OSError, ValueError):
+        return False
+
+
+def _remove_managed_skills(dst: Path, copy_mode: bool = True) -> int:
+    """Remove the skills in *dst* that are ours; report anything left behind."""
     managed = _managed_skill_names()
     foreign = []
     count = 0
     for item in sorted(dst.iterdir()):
-        if item.name not in managed:
+        if item.name not in managed or not _is_legacy_skill_ours(item, config.DIST_SKILLS_DIR / item.name):
             foreign.append(item.name)
             continue
-        if _remove_skill_entry(item, copy_mode):
-            count += 1
+        if item.is_symlink():
+            item.unlink()
+        else:
+            shutil.rmtree(item)
+        _fs._removed(str(item))
+        count += 1
     if foreign:
         print(
-            f"  Left in place under {dst}: {', '.join(foreign)} "
+            f"  Left in place under {printable(dst)}: {printable(', '.join(foreign))} "
             f"(not installed by agent-notes)"
         )
     return count
-
-
-def _remove_skill_entry(item: Path, copy_mode: bool) -> bool:
-    """Remove one installed skill (a symlink, or a whole tree under copy installs)."""
-    if not item.is_symlink() and copy_mode and item.is_dir():
-        shutil.rmtree(item)
-        _fs._removed(str(item))
-        return True
-    return remove_symlink(item, copy_mode)
 
 
 def _sweep_legacy_skills_dir(backend: CLIBackend, scope: str) -> int:
@@ -164,10 +174,33 @@ def _sweep_legacy_skills_dir(backend: CLIBackend, scope: str) -> int:
     if not _is_sweepable_dir(legacy, backend, scope):
         return 0
     if not _fs.silent_file_ops:
-        print(f"Removing abandoned {backend.label} skills from {legacy} ...")
-    count = _remove_managed_skills(legacy, copy_mode=True)
+        print(f"Removing abandoned {backend.label} skills from {printable(legacy)} ...")
+    count = _remove_managed_skills(legacy)
     remove_dir_if_empty(legacy)
     return count
+
+
+def _remove_owned(dst: Path, cli: str) -> int:
+    """Remove the entries of *dst* that are ours and that no other install uses; say what stays.
+
+    A link into our dist, or a copy still byte-identical to what the manifest recorded
+    (SKILL.md alone is not proof of a skill directory). Never a user's file, never a
+    foreign link."""
+    removed, kept = 0, []
+    for item in sorted(dst.iterdir()):
+        if not _ownership.confined(item, dst) or not _ownership.owned(item) \
+                or _ownership.claimed_by_others(item, cli):
+            kept.append(item.name)
+            continue
+        if item.is_symlink() or item.is_file():
+            item.unlink()
+        else:
+            shutil.rmtree(item)
+        _fs._removed(str(item))
+        removed += 1
+    if kept:
+        print(f"  Left in place under {printable(dst)}: {printable(', '.join(kept))} (not installed by agent-notes)")
+    return removed
 
 
 def uninstall_component_for_backend(
@@ -176,28 +209,30 @@ def uninstall_component_for_backend(
     scope: str,
     copy_mode: bool = False,
 ) -> int:
-    """Uninstall one component for one backend. Returns count of files removed."""
+    """Uninstall one component for one backend. Returns count of files removed.
+
+    copy_mode only matters for the abandoned codex skills tree (a dead layout whose copies
+    are recognised by name); everything else is judged by ownership."""
     dst = target_dir_for(backend, component, scope)
     if dst is None and component == "skills":
         dst = legacy_skills_dir_for(backend, scope)
+        legacy = True
+    else:
+        legacy = False
     if dst is None or not dst.exists():
         return 0
 
     if component == "config":
-        filename = config_filename_for(backend)
-        if filename:
-            config_file = dst / filename
-            removed = remove_symlink(config_file, copy_mode)
-            return 1 if removed else 0
-        return 0
+        config_file = dst / config_filename_for(backend) if config_filename_for(backend) else None
+        if config_file is None or not _ownership.owned(config_file) \
+                or _ownership.claimed_by_others(config_file, backend.name):
+            return 0
+        return 1 if remove_symlink(config_file, copy_mode=True) else 0
 
     if not _is_sweepable_dir(dst, backend, scope):
         return 0
 
-    if component == "skills":
-        count = _remove_managed_skills(dst, copy_mode)
-    else:
-        count = remove_all_symlinks_in_dir(dst, copy_mode)
+    count = _remove_managed_skills(dst, copy_mode) if legacy else _remove_owned(dst, backend.name)
     remove_dir_if_empty(dst)
     return count
 
@@ -223,11 +258,11 @@ def _install_universal_skills(copy_mode: bool, registry) -> None:
 
 
 def _uninstall_universal_skills(copy_mode: bool = False) -> int:
-    """Remove universal skills. Returns count of files removed."""
+    """Remove our entries from the shared ~/.agents/skills mirror. Returns the count removed."""
     target = config.AGENTS_HOME / "skills"
-    if not target.exists():
+    if not target.is_dir() or target.is_symlink():
         return 0
-    count = remove_all_symlinks_in_dir(target, copy_mode)
+    count = _remove_owned(target, "")
     remove_dir_if_empty(target)
     return count
 

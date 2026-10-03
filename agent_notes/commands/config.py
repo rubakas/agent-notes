@@ -45,13 +45,8 @@ def _get_scope_state(state, scope: Optional[str] = None, project_path: Optional[
     return scope, project_path, scope_state
 
 
-def _validate_model(model_id: str, fatal: bool = True):
-    """Validate model exists in registry.
-
-    Returns the model, or None when it is unknown and *fatal* is False. The
-    scriptable commands exit 1 on an unknown id; the wizard passes fatal=False
-    so a typo drops back to the menu instead of killing the session.
-    """
+def _validate_model(model_id: str):
+    """Return the model; an unknown id prints the known ones and exits 1."""
     from ..registries.model_registry import load_model_registry
     registry = load_model_registry()
     try:
@@ -59,44 +54,57 @@ def _validate_model(model_id: str, fatal: bool = True):
     except KeyError:
         print(f"Unknown model: {model_id}")
         print(f"Available models: {', '.join(registry.ids())}")
-        if fatal:
-            sys.exit(1)
-        return None
+        sys.exit(1)
 
 
-def compatible_models_for(backend) -> list:
+def compatible_models_for(backend, registry=None) -> list:
     """Models the given CLI backend can serve, in registry order (frontier first).
 
     The registry is already globally ordered, so this only filters — sorting
     here again would be a second, divergent ordering.
 
-    Shared by the install wizard and `config role-model` so the numbered list a
-    user sees is the same one indices are resolved against.
+    Shared by the install review and `config role-model` so the list a user
+    sees is the same one indices are resolved against. Pass *registry* to
+    reuse one already loaded.
     """
-    from ..registries.model_registry import load_model_registry
-    models = load_model_registry().all()
-    return [m for m in models if backend.first_alias_for(m.aliases) is not None]
+    if registry is None:
+        from ..registries.model_registry import load_model_registry
+        registry = load_model_registry()
+    return [m for m in registry.all() if backend.first_alias_for(m.aliases) is not None]
 
 
 MODEL_COLUMNS_HEADER = f"{'model':<28} {'int':>5}  {'coding':>6}  {'$/M in':>8}"
 
+PROVISIONAL_MARK = "*"
+PROVISIONAL_LEGEND = f"{PROVISIONAL_MARK} provisional score — not yet rated upstream (rules.yaml)"
 
-def model_columns(model) -> str:
-    """One row of the shared model table: id, intelligence index, coding index,
-    USD per 1M INPUT tokens.
 
-    Every model list in the product renders through this one function, so the
-    columns cannot drift between `list models`, `config role-model` and the
-    install wizard. A missing metric prints an em dash — 0.0 is a real score
-    upstream and must stay distinguishable from "not measured".
+def model_metrics(model) -> str:
+    """The numeric columns of the shared model table: intelligence index,
+    coding index, USD per 1M INPUT tokens.
 
-    Output prices differ from input prices, so the price column is always
-    labelled `$/M in` rather than a bare `$`.
+    A missing metric prints an em dash — 0.0 is a real score upstream and must
+    stay distinguishable from "not measured". A provisional stand-in from
+    rules.yaml prints with a trailing `*` (`78.1*`) so it never reads as a
+    benchmark result. Output prices differ from input prices, so the price
+    column is always labelled `$/M in`.
     """
     intelligence = "—" if model.intelligence_index is None else f"{model.intelligence_index:.1f}"
-    coding = "—" if model.coding_index is None else f"{model.coding_index:.1f}"
+    if model.coding_index is not None:
+        coding = f"{model.coding_index:.1f}"
+    elif model.provisional_coding_index is not None:
+        coding = f"{model.provisional_coding_index:.1f}{PROVISIONAL_MARK}"
+    else:
+        coding = "—"
     price = "—" if model.price_in is None else f"{model.price_in:.2f}"
-    return f"{model.id:<28} {intelligence:>5}  {coding:>6}  {price:>8}"
+    return f"{intelligence:>5}  {coding:>6}  {price:>8}"
+
+
+def model_columns(model) -> str:
+    """One row of the shared model table: id, then `model_metrics`. Every
+    model list in the product renders through these, so the columns cannot
+    drift between `list models`, `config role-model` and the review screen."""
+    return f"{model.id:<28} {model_metrics(model)}"
 
 
 def _backend_for(cli_name: str):
@@ -290,40 +298,20 @@ def _resolve_index(raw_index: str, target_clis: list) -> str:
     return model_id
 
 
-def _target_clis(scope_state, cli_filter: Optional[str], scope: str,
-                 fatal: bool = True) -> Optional[list]:
+def _target_clis(scope_state, cli_filter: Optional[str], scope: str) -> list:
     """CLIs a role command applies to: one named CLI, or every installed CLI.
 
     A falsy filter or the literal "both" means all of them. An unknown name is
     never silently widened to "both" — that would write the change to CLIs the
-    user did not ask for. It exits 1 for the scriptable commands, or returns
-    None when *fatal* is False so the wizard can stay interactive.
+    user did not ask for: it exits 1.
     """
     if not cli_filter or cli_filter == "both":
         return list(scope_state.clis.keys())
     if cli_filter not in scope_state.clis:
         print(f"CLI '{cli_filter}' not in {scope} installation.")
         print(f"Installed CLIs: {', '.join(scope_state.clis.keys())}")
-        if fatal:
-            sys.exit(1)
-        return None
+        sys.exit(1)
     return [cli_filter]
-
-
-def _prompt_target_clis(scope_state, scope: str, fatal: bool = True) -> Optional[list]:
-    """Ask which installed CLI a wizard branch applies to, defaulting to all.
-
-    Thin prompt around _target_clis so the wizard and the scriptable commands
-    resolve a CLI choice through exactly one code path.
-    """
-    from ..services.ui import _safe_input
-
-    cli_names = list(scope_state.clis.keys())
-    if len(cli_names) <= 1:
-        return cli_names
-    prompt = f"\nWhich CLI? ({' / '.join(cli_names)} / both) [both]: "
-    cli_choice = _safe_input(prompt, "both").strip().lower()
-    return _target_clis(scope_state, cli_choice, scope, fatal=fatal)
 
 
 def role_model(role_name: str, model_id: Optional[str] = None,
@@ -398,214 +386,28 @@ def role_agent(role_name: str, agent_name: str, cli_filter: Optional[str] = None
 
 
 def show(state=None) -> None:
-    """Print current configuration in readable form."""
+    """Print the current configuration in the config screen's layout (FR-020)."""
+    import shutil
+    from .config_review import render_show
+    from ..services.tui.screen import Style, color_enabled
     if state is None:
         state = _load_state()
-
-    from ..registries.cli_registry import load_registry
-    from ..registries.role_registry import load_role_registry
-    from ..registries.model_registry import load_model_registry
-
-    cli_registry = load_registry()
-    role_registry = load_role_registry()
-    model_registry = load_model_registry()
-
-    # Memory
-    mem = state.memory
-    if mem.backend == "obsidian":
-        mem_label = f"Obsidian session ({mem.path})" if mem.path else "Obsidian session"
-    elif mem.backend == "local":
-        mem_label = "Local markdown"
-    else:
-        mem_label = "Disabled"
-
-    from ..services.user_config import load_user_config
-    from ..registries.plugin_registry import default_plugin_registry
-    _ucfg = load_user_config()
-    cost_report_enabled = any(
-        p.name == "cost-report" for p in default_plugin_registry().enabled(_ucfg)
-    )
-    cost_report_label = "enabled" if cost_report_enabled else "disabled"
-
     print("Current configuration:")
-    print(f"  Memory:      {mem_label}")
-    print(f"  Cost report: {cost_report_label}")
-
-    # Scopes
-    scopes = []
-    if state.global_install:
-        scopes.append(("global", state.global_install, None))
-    for path_str, ss in state.local_installs.items():
-        scopes.append(("local", ss, path_str))
-
-    if not scopes:
-        print("  (no installation found)")
-        return
-
-    for scope_name, scope_state, path_str in scopes:
-        scope_label = f"global" if scope_name == "global" else f"local ({path_str})"
-        print(f"\n  Scope: {scope_label}  [{scope_state.mode}]")
-
-        for cli_name, backend_state in sorted(scope_state.clis.items()):
-            try:
-                backend = cli_registry.get(cli_name)
-                cli_label = backend.label
-            except KeyError:
-                cli_label = cli_name
-
-            print(f"\n    {cli_label}:")
-
-            if backend_state.role_models:
-                for role_name in sorted(backend_state.role_models):
-                    model_id = backend_state.role_models[role_name]
-                    try:
-                        role = role_registry.get(role_name)
-                        role_label = role.label
-                    except KeyError:
-                        role_label = role_name
-                    try:
-                        model = model_registry.get(model_id)
-                        model_label = model.label
-                    except KeyError:
-                        model_label = model_id
-                    print(f"      {role_label:<20} {model_label}")
-            else:
-                print("      (no role assignments)")
-
-            if backend_state.role_efforts:
-                print("      Effort:")
-                for role_name in sorted(backend_state.role_efforts):
-                    effort = backend_state.role_efforts[role_name]
-                    try:
-                        role = role_registry.get(role_name)
-                        role_label = role.label
-                    except KeyError:
-                        role_label = role_name
-                    print(f"      {role_label:<20} {effort}")
+    # Fit a terminal; piped output stays whole (it is for grep, not a screen).
+    width = shutil.get_terminal_size((100, 24)).columns if sys.stdout.isatty() else 10_000
+    for line in render_show(state, width, Style(color_enabled())):
+        print(line)
 
 
-# ── Interactive wizard ───────────────────────────────────────────────────────
-
-def _wizard_role_model(state, before: str) -> bool:
-    """Branch 1: interactive role→model reassignment. Returns True if changes were applied."""
-    from ..registries.cli_registry import load_registry
-    from ..registries.role_registry import load_role_registry
-    from ..services.ui import _safe_input
-
-    scope, project_path, scope_state = _get_scope_state(state)
-
-    cli_registry = load_registry()
-    role_registry = load_role_registry()
-
-    # Show current
-    print("\nCurrent role assignments:")
-    for cli_name, backend_state in sorted(scope_state.clis.items()):
-        try:
-            label = cli_registry.get(cli_name).label
-        except KeyError:
-            label = cli_name
-        print(f"  {label.upper()}:")
-        for role_name in sorted(backend_state.role_models):
-            model_id = backend_state.role_models[role_name]
-            print(f"    {role_name:<20} {model_id}")
-
-    target_clis = _prompt_target_clis(scope_state, scope, fatal=False)
-    if target_clis is None:
-        print("No changes made.")
-        return False
-
-    role_names = role_registry.names()
-    role_choice = _safe_input(
-        f"Which role? ({'/'.join(role_names)}): ", ""
-    ).strip().lower()
-    if role_choice not in role_names:
-        print(f"Unknown role '{role_choice}'. No changes made.")
-        return False
-
-    for cli_name in target_clis:
-        _print_model_choices(cli_name)
-
-    model_choice = _safe_input("\nNew model (index or id): ", "").strip()
-    if not model_choice:
-        print("No model entered. No changes made.")
-        return False
-
-    if re.fullmatch(r"\d+", model_choice):
-        model_choice = _resolve_index(model_choice, target_clis)
-    if _validate_model(model_choice, fatal=False) is None:
-        print("No changes made.")
-        return False
-
-    for cli_name in target_clis:
-        scope_state.clis[cli_name].role_models[role_choice] = model_choice
-        print(f"Set {cli_name}: {role_choice} -> {model_choice}")
-
-    _apply_and_regenerate(state, before)
-    return True
-
-
-def _wizard_role_effort(state, before: str) -> bool:
-    """Branch 7: interactive role→effort reassignment. Returns True if changes were applied."""
-    from ..registries.cli_registry import load_registry
-    from ..registries.role_registry import load_role_registry
-    from ..services.ui import _safe_input
-
-    scope, project_path, scope_state = _get_scope_state(state)
-
-    cli_registry = load_registry()
-    role_registry = load_role_registry()
-
-    # Show current
-    print("\nCurrent effort assignments:")
-    for cli_name, backend_state in sorted(scope_state.clis.items()):
-        try:
-            label = cli_registry.get(cli_name).label
-        except KeyError:
-            label = cli_name
-        print(f"  {label.upper()}:")
-        for role_name in sorted(backend_state.role_efforts):
-            effort = backend_state.role_efforts[role_name]
-            print(f"    {role_name:<20} {effort}")
-
-    target_clis = _prompt_target_clis(scope_state, scope, fatal=False)
-    if target_clis is None:
-        print("No changes made.")
-        return False
-
-    role_names = role_registry.names()
-    role_choice = _safe_input(
-        f"Which role? ({'/'.join(role_names)}): ", ""
-    ).strip().lower()
-    if role_choice not in role_names:
-        print(f"Unknown role '{role_choice}'. No changes made.")
-        return False
-
-    effort_choice = _safe_input(f"New effort: ", "").strip().lower()
-    if not effort_choice:
-        print("No effort entered. No changes made.")
-        return False
-
-    for cli_name in target_clis:
-        if not _check_effort_valid(scope_state, cli_name, role_choice, effort_choice):
-            print("No changes made.")
-            return False
-
-    for cli_name in target_clis:
-        scope_state.clis[cli_name].role_efforts[role_choice] = effort_choice
-        print(f"Set {cli_name}: {role_choice} -> {effort_choice}")
-
-    _apply_and_regenerate(state, before)
-    return True
-
+# ── Interactive line prompts (config memory, config providers) ───────────────
 
 def _wizard_memory(state, before: str) -> bool:
     """Branch 3: interactive memory backend change."""
     from ..services.ui import _safe_input, _path_input
+    from .wizard.review import MEMORY_OPTIONS   # the one name per backend (FR-028)
 
-    provider_options = {
-        "1": ("local", "default — the CLI's native memory / Claude Code built-in md files"),
-        "2": ("obsidian", "external Obsidian vault"),
-    }
+    provider_options = {str(number): (value, label)
+                        for number, (label, value) in enumerate(MEMORY_OPTIONS, 1)}
 
     print("\nMemory provider options:")
     for key, (_, label) in provider_options.items():
@@ -700,62 +502,14 @@ def _wizard_provider_status(provider: str) -> None:
         print(f"{provider}: no key")
 
 
-def _wizard_skills(state, before: str) -> bool:
-    """Branch 4: interactive skill bundle toggle."""
-    print("\nSkill bundles are managed during install.")
-    print("To change skills, run: agent-notes install --reconfigure")
-    print("Or manually copy/remove skill directories from your CLI's skills folder.")
-    return False
-
-
 def interactive_config() -> None:
-    """Run the interactive config wizard."""
-    from ..services.ui import _safe_input
-
-    state = _load_state()
-    before = _state_snapshot(state)
-
-    # Summary header
-    show(state)
-
-    print("\nWhat do you want to change?")
-    print("  1) Role -> model assignments")
-    print("  2) Role -> agent assignments")
-    print("  3) Memory storage")
-    print("  4) Skill bundles")
-    print("  5) Show full configuration (read-only)")
-    print("  6) API keys / providers")
-    print("  7) Role -> effort assignments")
-    print("  q) Quit")
-
-    try:
-        choice = _safe_input("Choice: ", "q").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        print("\nCancelled.")
-        return
-
-    if choice == "1":
-        _wizard_role_model(state, before)
-    elif choice == "2":
-        role_agent("", "")
-    elif choice == "3":
-        _wizard_memory(state, before)
-    elif choice == "4":
-        _wizard_skills(state, before)
-    elif choice == "5":
-        show(state)
-    elif choice == "6":
-        _wizard_providers()
-    elif choice == "7":
-        _wizard_role_effort(state, before)
-    elif choice == "q":
-        print("Quit.")
-    else:
-        print(f"Unknown choice '{choice}'. Quit.")
+    """`agent-notes config` with no action: the review screen (spec 005)."""
+    from .config_review import interactive_config as review
+    review()
 
 
 def interactive_config_memory() -> None:
-    """Run the interactive memory config wizard."""
+    """`agent-notes config memory`: choose the memory backend with line prompts."""
     state = _load_state()
     before = _state_snapshot(state)
     _wizard_memory(state, before)

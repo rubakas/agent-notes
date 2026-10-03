@@ -21,14 +21,14 @@ USAGE = (
 # Per-command default-behavior hints shown inline next to the description.
 # These describe what happens when the command is run with no flags.
 COMMAND_DEFAULTS = {
-    "install":   "default: interactive wizard",
+    "install":   "default: review screen",
     "uninstall": "default: both scopes",
     "doctor":    "default: global scope, read-only",
 }
 
 # (command, explanation) pairs — rendered with color in _build_epilog()
 EXAMPLES = [
-    ("agent-notes install",                    "Interactive wizard (recommended)"),
+    ("agent-notes install",                    "Review screen with the recommended setup"),
     ("agent-notes install --local",            "Install into current project (Claude + OpenCode, symlinks)"),
     ("agent-notes install --local --copy",     "Same, but copy files (allows local edits)"),
     ("agent-notes doctor --fix",               "Check and repair installation"),
@@ -205,6 +205,18 @@ class _AgentNotesParser(argparse.ArgumentParser):
 
 
 def main():
+    from .services.state_store import StateUnreadable
+    try:
+        _main()
+    except StateUnreadable as e:
+        print(f"Error: {e}. Fix it or move it aside, then rerun.", file=sys.stderr)
+        # Claude Code reads exit 2 from a hook as "block": a hook, or the cost report it runs, never does that
+        command = next((arg for arg in sys.argv[1:] if not arg.startswith("-")), "")
+        if command not in ("hook", "cost-report"):
+            sys.exit(2)
+
+
+def _main():
     parser = _AgentNotesParser(
         prog="agent-notes",
         description=DESCRIPTION,
@@ -225,7 +237,9 @@ def main():
     p_install.add_argument("--local", action="store_true", help="Install to current project")
     p_install.add_argument("--copy", action="store_true", help="Copy instead of symlink (with --local)")
     p_install.add_argument("--reconfigure", action="store_true",
-        help="Clear existing state for this scope and re-run the wizard")
+        help="Accepted for compatibility: installing over an existing install always replaces it")
+    p_install.add_argument("--yes", "-y", action="store_true",
+        help="Replace an existing install without asking (required without a terminal)")
     p_install.add_argument("--profile", metavar="LABEL",
         help="Profile label for multi-subscription setups (e.g. work, personal)")
     p_install.add_argument("--folder", metavar="DIR",
@@ -324,7 +338,7 @@ def main():
     p_config = subparsers.add_parser("config", help="Reconfigure role/agent/model/memory/skill assignments after install")
     p_config.add_argument("action", nargs="?", default="wizard",
         choices=["wizard", "show", "role-model", "role-agent", "role-effort", "provider", "providers", "memory", "cost-report"],
-        help="Config action (default: wizard)")
+        help="Config action (default: the review screen)")
     p_config.add_argument("extra", nargs="*",
         help="Additional positional args (role, model, agent). For role-model the model may be "
              "a list index; omit it to print the numbered list")
@@ -344,7 +358,14 @@ def main():
     # Route to modules
     if args.command == "build":
         from .commands.build import build
-        build()
+        from .services.state_store import StateUnreadable
+        try:
+            build()
+        except StateUnreadable:
+            raise
+        except Exception as e:
+            print(f"{Color.RED}Build failed: {e}{Color.NC}")
+            sys.exit(1)
     elif args.command == "install":
         if args.local or args.copy or args.profile or args.folder or args.global_home:
             from .commands.install import install
@@ -353,10 +374,11 @@ def main():
                 profile_label=args.profile or "",
                 folder=args.folder or "",
                 global_home=args.global_home or "",
+                assume_yes=args.yes,
             )
         else:
             from .commands.wizard import interactive_install
-            interactive_install()
+            interactive_install(assume_yes=args.yes)
     elif args.command == "uninstall":
         all_profiles = getattr(args, 'all_profiles', False)
         profile_label = getattr(args, 'profile', '') or ""

@@ -131,7 +131,7 @@ def set_role(role_name: str, model_id: str, cli: Optional[str] = None, scope: Op
     print(f"Wrote {state_file()}")
     
     # Trigger regenerate
-    from ..regenerate import regenerate
+    from .regenerate import regenerate
     
     for cli_name in target_clis:
         backend = registry.get(cli_name) 

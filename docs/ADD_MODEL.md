@@ -18,7 +18,9 @@ A **Model** (`agent_notes/domain/model.py`) has these fields. Some are supplied 
 | `capabilities` | dict[str, bool] | **DERIVED** — `rules.yaml capabilities.default` merged with `capabilities.overrides[id]` | Feature flags (vision, long_context, tool_use, effort_support) |
 | `deprecated` | bool | **DERIVED** — `id in rules.yaml deprecated` | Soft preference in the selection ladder (see `model_resolver.py`); does not filter a model out entirely |
 | `rank` | int | Seed `rank` | Author-supplied ordering *within* a provider's block; NOT the global selection order — see below |
-| `coding_index` | float or `null` | Seed `coding_index` | Benchmark score. Gates automatic selection: a model with `coding_index: null` is never auto-selected |
+| `coding_index` | float or `null` | Seed `coding_index` | Benchmark score, upstream data only — never hand-edited |
+| `provisional_coding_index` | float or `null` | `rules.yaml provisional_coding_index[id]` | Hand-curated stand-in for a model upstream has not rated yet |
+| `rank_score` (property) | float or `null` | `coding_index` if set, else `provisional_coding_index` | What ranking and automatic selection read: a model with no `rank_score` is never auto-selected |
 | `intelligence_index` | float or `null` | Seed `intelligence_index` | Benchmark score, informational |
 | `price_in` | float or `null` | Seed `price_in`, overridable per-model via `rules.yaml price_overrides[id].price_in` | USD per 1M input tokens; compared directly against `role.budget` |
 | `price_out` | float or `null` | Seed `price_out`, overridable per-model via `rules.yaml price_overrides[id].price_out` | USD per 1M output tokens |
@@ -29,7 +31,7 @@ A **Model** (`agent_notes/domain/model.py`) has these fields. Some are supplied 
 
 - **A model's `aliases` dict always has exactly one entry**, keyed by the provider block it was loaded from in `seed.json` (`agent_notes/registries/catalog_loader.py:205`). There is no way to give one model multiple provider aliases (e.g. both `anthropic` and `bedrock`) today — see the Pitfalls section.
 
-- **`class` does not drive selection.** It is derived from `rules.yaml`'s `classes` globs and is rendered into frontmatter only on backends with `use_model_class: true` (currently `claude` alone). Automatic model selection is driven entirely by `role.budget` + `coding_index` — see Section 3 and `docs/ADD_ROLE.md`.
+- **`class` does not drive selection.** It is derived from `rules.yaml`'s `classes` globs and is rendered into frontmatter only on backends with `use_model_class: true` (currently `claude` alone). Automatic model selection is driven entirely by `role.budget` + `rank_score` (`coding_index`, or a provisional stand-in) — see Section 3 and `docs/ADD_ROLE.md`.
 
 - **Compatibility** is computed automatically: a model is compatible with a CLI iff the CLI's `accepted_providers` list contains the model's single alias-provider key. For example:
   - CLI: `accepted_providers: [anthropic, bedrock, vertex]`
@@ -64,9 +66,9 @@ There is no `agent_notes/data/models/` directory and no per-model YAML file. The
 
 - **`id`** — the seed id. For `anthropic` it becomes the model's registry `id` unchanged. For `openai` it is normalized (dots → dashes) before becoming the registry `id`, e.g. `"gpt-5.5"` → `gpt-5-5`.
 - **`display_name`** (anthropic only) — becomes `Model.label` verbatim. openai has no `display_name`; its label is derived from `id` by `_derive_openai_label` (`"gpt-5.4-mini"` → `"GPT-5.4 Mini"`).
-- **`coding_index` / `intelligence_index`** — benchmark scores. `coding_index: null` (or omitted) makes the model permanently ineligible for automatic selection (`_eligible()` in `model_resolver.py` requires a non-null score) — it can still be reached by an explicit pin.
+- **`coding_index` / `intelligence_index`** — benchmark scores. `coding_index: null` (or omitted) makes the model ineligible for automatic selection (`_eligible()` in `model_resolver.py` requires a non-null `rank_score`) unless `rules.yaml provisional_coding_index` gives it a stand-in — it can still be reached by an explicit pin.
 - **`price_in` / `price_out`** — USD per 1M tokens. `price_in` is what `role.budget` is compared against.
-- **`price_overrides`** — a top-level block in `agent_notes/data/catalog/rules.yaml`, indexed by normalized registry id, that pins `price_in`/`price_out` on top of whatever the seed reports (`catalog_loader.py::_apply_price_overrides`). Two reasons to reach for it instead of editing `seed.json` directly: `seed.json` is machine-refreshed from OpenRouter by `models refresh` and would silently reintroduce a wrong price on the next refresh, and `~/.cache/agent-notes/catalog.json` shadows the bundled `seed.json` at runtime (`catalog_loader.py:173-178`) — editing `seed.json` alone can appear to do nothing on a machine that already has a cache, since `rules.yaml` (and `price_overrides` with it) is read fresh every time and always wins. The live entry:
+- **`price_overrides`** — a top-level block in `agent_notes/data/catalog/rules.yaml`, indexed by normalized registry id, that pins `price_in`/`price_out` on top of whatever the seed reports (`catalog_loader.py::_apply_price_overrides`). Two reasons to reach for it instead of editing `seed.json` directly: `seed.json` is machine-refreshed from OpenRouter by `models refresh` and would silently reintroduce a wrong price on the next refresh, and `~/.cache/agent-notes/catalog.json` is used instead of the bundled `seed.json` whenever its `fetched_at` is at least as new (`catalog_loader._load_seed`) — so a hand edit to `seed.json` that keeps its `fetched_at` can appear to do nothing on a machine with a fresh cache, while `rules.yaml` (and `price_overrides` with it) is read fresh every time and always wins. The live entry:
   ```yaml
   price_overrides:
     gpt-5-6-sol:
@@ -74,7 +76,14 @@ There is no `agent_notes/data/models/` directory and no per-model YAML file. The
       price_out: 20.0
   ```
   pins GPT-5.6 Sol to OpenAI's published $4.00/$20.00 rate after the OpenRouter-sourced seed reported $2.00/$10.00.
-- **`rank`** — 1-based position within *this provider's* array. It does not by itself decide selection order across the whole catalog: `ModelRegistry` sorts every model globally by `coding_index` descending (`_frontier_key`), unrated models last. Keep `rank` consistent with `coding_index` ordering within a provider to avoid a confusing catalog.
+- **`provisional_coding_index`** — a top-level block in `rules.yaml`, indexed by normalized registry id, giving a stand-in score to a model upstream has not rated yet. Without one, a new release can never become a role default until Artificial Analysis publishes a coding score. The stand-in is consulted only while the seed's `coding_index` is null (`Model.rank_score`), so the first refresh that brings a real score retires it with no edit; it never overwrites `coding_index`, so the class-tier bounds derived from Claude scores stay upstream data. Tables print it with a trailing `*` (`78.1*`). Pick a value just above the predecessor the model supersedes, and cite the check that found it unrated. The live entries:
+  ```yaml
+  provisional_coding_index:
+    claude-opus-5-5: 78.1    # just above claude-opus-5 (78.0)
+    claude-sonnet-5-5: 71.6  # just above claude-sonnet-5 (71.5)
+  ```
+  A model carrying one still belongs in `UNRATED_BY_DECISION` (`tests/unit/registries/test_catalog_class_tiers.py`) — it is unrated upstream.
+- **`rank`** — 1-based position within *this provider's* array. It does not by itself decide selection order across the whole catalog: `ModelRegistry` sorts every model globally by `rank_score` descending (`_frontier_key`), unrated models last. Keep `rank` consistent with `coding_index` ordering within a provider to avoid a confusing catalog.
 - **`created_at` / `context_length`** — informational, not consulted by selection logic.
 
 A brand-new **family** (not `claude-*` or `gpt-*`) needs two more things before it resolves:
@@ -144,7 +153,7 @@ Understanding the resolution chain helps verify your model works end-to-end.
      a. Load role from registry (e.g., "orchestrator" with budget=null)
      b. Filter to models compatible with the CLI's accepted_providers
         (model's single alias-provider key is in that list)
-     c. Walk a widening ladder over the catalog frontier (coding_index
+     c. Walk a widening ladder over the catalog frontier (rank_score
         descending): if the backend declares preferred_family, that family
         is tried first over the whole catalog and wins outright whenever it
         has any eligible model — only then does the ladder fall back to any
@@ -214,7 +223,7 @@ Models (N):
        ...
 ```
 
-A model with `coding_index: null` prints `—` in the `coding` column and is never auto-selected.
+A model with `coding_index: null` prints `—` in the `coding` column and is never auto-selected — unless it has a `provisional_coding_index`, which prints with a trailing `*` (e.g. `78.1*`) and ranks it like a real score; `list models` then prints a one-line legend under the table.
 
 ### 4.2 Run wizard with new model
 
@@ -236,7 +245,7 @@ Description   Plans and delegates complex multi-step tasks...
   ...
 ```
 
-`class` is not part of this decision at all — `claude-fable-5-1`'s `class` is `fable`, not `opus`, and it is still the default, and is not displayed in the picker. `worker` (`budget: 2.0`) or `scout` (`budget: 1.0`) would instead default to the highest-`coding_index` rated model priced at or under their respective ceilings — for `worker` on a `claude`-family-preferring backend, that is `claude-sonnet-5` (`coding_index: 71.5`, `price_in: 2.0`), since every pricier Sonnet/Opus lineage is either deprecated or over budget.
+`class` is not part of this decision at all — `claude-fable-5-1`'s `class` is `fable`, not `opus`, and it is still the default, and is not displayed in the picker. `worker` (`budget: 2.0`) or `scout` (`budget: 1.0`) would instead default to the highest-`coding_index` rated model priced at or under their respective ceilings — for `worker` on a `claude`-family-preferring backend, that is `claude-sonnet-5-5` (provisional `71.6`, `price_in: 2.0`), since every pricier Sonnet/Opus lineage is either deprecated or over budget.
 
 Note: the wizard skips the `orchestrator` role entirely for the `claude` backend specifically — "Claude Code controls its own lead model via `/model`" (`agent_notes/commands/wizard/__init__.py:174-178`) — so this role/backend pairing only appears for backends other than `claude`.
 
@@ -312,7 +321,7 @@ So a model only reaches `codex` if it came from the seed's `openai` block (or a 
 
 **Problem:** You expect a new `class: flash` model to become the default pick for a role because you assume `class` is compared against something on the role.
 
-**Symptom:** The model is or isn't auto-selected based purely on `coding_index` + `role.budget` — `class` never enters the decision. `class` affects only what gets written into the agent's `model:` frontmatter field, and only for the *unpinned* budget+rank fallback on backends with `use_model_class: true` (currently `claude` alone): there, `model:` is rendered as the bare class string (e.g. `sonnet`) instead of the resolved alias. Every other backend, and every explicit pin (state or `set role`) regardless of backend, always renders the exact alias string. The wizard's model picker itself never displays `class` at all (see Section 4.2).
+**Symptom:** The model is or isn't auto-selected based purely on `rank_score` (`coding_index`, or a provisional stand-in) + `role.budget` — `class` never enters the decision. `class` affects only what gets written into the agent's `model:` frontmatter field, and only for the *unpinned* budget+rank fallback on backends with `use_model_class: true` (currently `claude` alone): there, `model:` is rendered as the bare class string (e.g. `sonnet`) instead of the resolved alias. Every other backend, and every explicit pin (state or `set role`) regardless of backend, always renders the exact alias string. The wizard's model picker itself never displays `class` at all (see Section 4.2).
 
 **Solution:** To change a role's default pick, adjust `role.budget` (see `docs/ADD_ROLE.md`) — not the model's `class`.
 
@@ -380,7 +389,7 @@ Default is `true` (`capabilities.default.effort_support`). Setting it `false` un
 - [ ] If the provider needs a non-default alias format, added an `alias_overrides` (or `alias_transforms`) entry in `rules.yaml`
 - [ ] The model's alias-provider key matches at least one CLI's `accepted_providers`
   - Check with: `python3 -c "from agent_notes.registries.cli_registry import load_registry; [print(c.name, c.accepted_providers) for c in load_registry().all()]"`
-- [ ] `coding_index` set (or explicitly left `null` if genuinely unrated) — a `null` model is never auto-selected
+- [ ] `coding_index` set (or explicitly left `null` if genuinely unrated) — a `null` model is never auto-selected unless it gets a `rules.yaml provisional_coding_index` entry
 - [ ] Ran `agent-notes list models` and saw the new model under its provider
 - [ ] Ran `agent-notes install` and the model appears in step 2 for compatible CLIs
 

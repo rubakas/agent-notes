@@ -45,10 +45,12 @@ def select_model_for_role(models, role, backend):
     """The one implementation of "which model does this role get?".
 
     Walks *models* in the registry's global frontier-first order and returns the first
-    ``(model, (provider, alias))`` that the backend can serve, is rated by the
-    benchmark, and costs no more than ``role.budget`` per 1M input tokens.
-    An unrated model (``coding_index is None``) is never auto-selected; a
-    ``None`` budget is unbounded. Returns ``(None, None)`` when nothing fits.
+    ``(model, (provider, alias))`` that the backend can serve, is rated, and
+    costs no more than ``role.budget`` per 1M input tokens. "Rated" means a
+    ``rank_score``: the benchmark's coding_index, or a provisional stand-in from
+    rules.yaml while upstream has none. A model with neither is never
+    auto-selected; a ``None`` budget is unbounded. Returns ``(None, None)`` when
+    nothing fits.
 
     Family and deprecation are applied as a widening ladder:
     ``(preferred_family, non-deprecated)`` → ``(any family, non-deprecated)`` →
@@ -63,7 +65,7 @@ def select_model_for_role(models, role, backend):
     providers = list(backend.accepted_providers)
 
     def _eligible(model) -> bool:
-        if model.coding_index is None:
+        if model.rank_score is None:
             return False
         if role.budget is None:
             return True

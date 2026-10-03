@@ -3,13 +3,14 @@ from pathlib import Path
 
 import pytest
 
-from agent_notes.config import memory_dir_for_backend, MEMORY_DIR
+import agent_notes.config as config
+from agent_notes.config import memory_dir_for_backend
 
 
 class TestMemoryDirForBackendLocal:
     def test_local_returns_memory_dir_constant(self):
         result = memory_dir_for_backend("local")
-        assert result == MEMORY_DIR
+        assert result == config.MEMORY_DIR
 
     def test_local_with_custom_path_uses_custom(self, tmp_path):
         custom = tmp_path / "custom-memory"
@@ -70,5 +71,5 @@ class TestMemoryDirForBackendOther:
     def test_local_is_not_project_scoped(self, monkeypatch):
         monkeypatch.setattr(Path, "cwd", staticmethod(lambda: Path("/code/my-project")))
         result = memory_dir_for_backend("local")
-        assert result == MEMORY_DIR
+        assert result == config.MEMORY_DIR
         assert result.name != "my-project"

@@ -1,11 +1,15 @@
-"""Install execution functions for the wizard."""
+"""Install execution functions for the install review screen."""
 
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-from ...config import Color, AGENTS_HOME, PKG_DIR
+from ... import config
+from ...config import Color
 from ...services.fs import place_file, place_dir_contents
-from .._install_helpers import count_agents
+from ...services.state_store import StateUnreadable
+from ...services.ui import printable
+from .._install_helpers import count_agents, override_problem
 from ._common import _get_skill_groups, _count_rules
 
 
@@ -26,7 +30,7 @@ def install_skills_filtered(skill_names: List[str], targets: List[Path], copy_mo
 
 def install_agents_filtered(clis: Set[str], scope: str, copy_mode: bool = False,
                             folder_overrides: dict = None, global_home_override: str = "") -> None:
-    """Install agents for selected CLIs (filtered by the wizard)."""
+    """Install agents for the CLIs selected on the review screen."""
     from ...services import installer
     from ...services.installer import _apply_overrides, _agent_glob
     from ...registries.cli_registry import load_registry
@@ -96,8 +100,8 @@ def _render_configuration(role_models: Dict[str, Dict[str, str]],
                           role_efforts: Optional[Dict[str, Dict[str, str]]]) -> None:
     """Print the post-install Configuration section: role → model · effort,
     one row per role in canonical role order, using the effort the user picked
-    (state pin) with fallback to the role's typical_effort — the same display
-    logic as the confirmation summary (_format_role_model_display)."""
+    (state pin) with fallback to the role's typical_effort, formatted by
+    _format_role_model_display."""
     from . import _format_role_model_display
     from ._common import _ROLE_ANSI, _role_sort_key
     from ...registries.cli_registry import load_registry
@@ -137,6 +141,13 @@ def _render_configuration(role_models: Dict[str, Dict[str, str]],
           f"{Color.DIM}·{Color.NC} agent-notes config role-effort")
 
 
+def _memory_line(backend: str, path) -> str:
+    """The post-install memory line, in the names the review uses (FR-028)."""
+    from .review import MEMORY_OPTIONS
+    names = {value: label for label, value in MEMORY_OPTIONS}
+    return f"{names.get(backend, names['local'])}  →  {path}"
+
+
 def _execute_install(
     clis: Set[str],
     scope: str,
@@ -153,115 +164,136 @@ def _execute_install(
     enabled_plugins: dict = None,
 ) -> None:
     """Run all installation steps after parameters have been collected and the build is done."""
+    for name, kind, value in (("local folder", "folder", (folder_overrides or {}).get("claude", "")),
+                              ("global home", "home", global_home_override)):
+        problem = override_problem(kind, value, Path.cwd()) if value else ""
+        if problem:   # the review refuses these; this is the last look before anything is placed
+            print(f"Error: the {name} {printable(value)} {problem}. Nothing was installed.", file=sys.stderr)
+            sys.exit(2)
+
     label_msg = f", profile={profile_label}" if profile_label else ""
     print(f"\nInstalling ({scope}, {'copy' if copy_mode else 'symlink'}{label_msg}) ...\n")
 
     from ...services import fs as _fs
-    _fs.silent_file_ops = True
+    from ...services.state_store import load_current_state
+    snapshot = load_current_state()  # read-only: nothing changes state until the final write
 
-    from ...registries.cli_registry import load_registry as _load_registry
-    from ...services import installer as _installer
-    from ...services.installer import _apply_overrides
-    _registry = _load_registry()
+    from ...services.install_ownership import replacing
+    from ...services.state_store import get_scope
+    _old = get_scope(snapshot, scope, Path.cwd() if scope == "local" else None,
+                     profile_label=profile_label) if snapshot else None
 
-    _selected_backends = [_b for _b in _registry.all() if _b.name in clis]
+    from .._install_helpers import commit_install, placement_errors, wizard_recovery
+    _recovery = wizard_recovery(scope, copy_mode, profile_label, folder_overrides, global_home_override)
 
-    # Align all '✓ Label  desc' rows on one label column (CLI labels included).
-    _fixed_labels = ("Skills", "Agents", "Config", "Commands", "Hook", "Memory")
-    _label_w = max(len(l) for l in
-                   [*(_b.label for _b in _selected_backends), *_fixed_labels])
+    with _fs.silent_ops(), replacing(_old), placement_errors(_recovery):
+        from ...registries.cli_registry import load_registry as _load_registry
+        from ...services import installer as _installer
+        from ...services.installer import _apply_overrides
+        _registry = _load_registry()
 
-    # Install destination per CLI (the real target the files land in)
-    for _b in _selected_backends:
-        _eff = _apply_overrides(_b, folder_overrides, global_home_override or None)
-        _dest = _eff.global_home if scope == "global" else Path.cwd() / _eff.local_dir
-        print(_step_line(_b.label, f"→  {_display_path(_dest)}", _label_w))
+        _selected_backends = [_b for _b in _registry.all() if _b.name in clis]
 
-    # Skills
-    if selected_skills:
-        targets = []
+        # Align all '✓ Label  desc' rows on one label column (CLI labels included).
+        _fixed_labels = ("Skills", "Agents", "Config", "Commands", "Hook", "Cleanup", "Memory")
+        _label_w = max(len(l) for l in
+                       [*(_b.label for _b in _selected_backends), *_fixed_labels])
+
+        # Install destination per CLI (the real target the files land in)
         for _b in _selected_backends:
-            if _b.supports("skills"):
-                _eff = _apply_overrides(_b, folder_overrides, global_home_override or None)
-                _t = _installer.target_dir_for(_eff, "skills", scope)
-                if _t is not None:
-                    targets.append(_t)
-        if scope == "global":
-            targets.append(AGENTS_HOME / "skills")
-        install_skills_filtered(selected_skills, targets, copy_mode)
-        _skill_groups = _get_skill_groups()
-        _group_parts = []
-        for _gn, _gs in _skill_groups.items():
-            _cnt = sum(1 for s in selected_skills if s in _gs)
-            if _cnt:
-                _group_parts.append(f"{_gn} ({_cnt})")
-        _all_grouped = {s for gs in _skill_groups.values() for s in gs}
-        _ungrouped = sum(1 for s in selected_skills if s not in _all_grouped)
-        if _ungrouped:
-            _group_parts.append(f"Other ({_ungrouped})")
-        print(_step_line("Skills", ', '.join(_group_parts) if _group_parts else f"{len(selected_skills)} skills", _label_w))
+            _eff = _apply_overrides(_b, folder_overrides, global_home_override or None)
+            _dest = _eff.global_home if scope == "global" else Path.cwd() / _eff.local_dir
+            print(_step_line(_b.label, f"→  {_display_path(_dest)}", _label_w))
 
-    # Agents
-    install_agents_filtered(clis, scope, copy_mode,
-                            folder_overrides=folder_overrides, global_home_override=global_home_override)
-    _agent_parts = []
-    for _b in _selected_backends:
-        if _b.supports("agents"):
-            _cnt = count_agents(_b)
-            if _cnt:
-                _agent_parts.append(f"{_b.label} ({_cnt})")
-    if _agent_parts:
-        print(_step_line("Agents", ', '.join(_agent_parts), _label_w))
+        # Skills
+        if selected_skills:
+            targets = []
+            for _b in _selected_backends:
+                if _b.supports("skills"):
+                    _eff = _apply_overrides(_b, folder_overrides, global_home_override or None)
+                    _t = _installer.target_dir_for(_eff, "skills", scope)
+                    if _t is not None:
+                        targets.append(_t)
+            if scope == "global":
+                targets.append(config.AGENTS_HOME / "skills")
+            install_skills_filtered(selected_skills, targets, copy_mode)
+            _skill_groups = _get_skill_groups()
+            _group_parts = []
+            for _gn, _gs in _skill_groups.items():
+                _cnt = sum(1 for s in selected_skills if s in _gs)
+                if _cnt:
+                    _group_parts.append(f"{_gn} ({_cnt})")
+            _all_grouped = {s for gs in _skill_groups.values() for s in gs}
+            _ungrouped = sum(1 for s in selected_skills if s not in _all_grouped)
+            if _ungrouped:
+                _group_parts.append(f"Other ({_ungrouped})")
+            print(_step_line("Skills", ', '.join(_group_parts) if _group_parts else f"{len(selected_skills)} skills", _label_w))
 
-    # Config + Rules
-    install_config_filtered(clis, scope, copy_mode,
-                            folder_overrides=folder_overrides, global_home_override=global_home_override)
-    _rules_n = _count_rules()
-    _cfg_files = [_installer.config_filename_for(_b) for _b in _selected_backends if _installer.config_filename_for(_b)]
-    _cfg_desc = ", ".join(_cfg_files) if _cfg_files else "config"
-    _cfg_desc += f" + {_rules_n} rules" if _rules_n else ""
-    print(_step_line("Config", _cfg_desc, _label_w))
+        # Agents
+        install_agents_filtered(clis, scope, copy_mode,
+                                folder_overrides=folder_overrides, global_home_override=global_home_override)
+        _agent_parts = []
+        for _b in _selected_backends:
+            if _b.supports("agents"):
+                _cnt = count_agents(_b)
+                if _cnt:
+                    _agent_parts.append(f"{_b.label} ({_cnt})")
+        if _agent_parts:
+            print(_step_line("Agents", ', '.join(_agent_parts), _label_w))
 
-    # Commands
-    from ...services.installer import install_component_for_backend as _install_component
-    _cmd_names = set()
-    for _backend in _selected_backends:
-        _eff_cmd = _apply_overrides(_backend, folder_overrides, global_home_override or None)
-        _install_component(_eff_cmd, "commands", scope, copy_mode)
-        if _backend.supports("commands"):
-            _cmd_src = _installer.dist_source_for(_backend, "commands")
-            if _cmd_src is not None:
-                _cmd_names.update(f.stem for f in _cmd_src.glob("*.md"))
-    if _cmd_names:
-        print(_step_line("Commands", ', '.join(sorted(_cmd_names)), _label_w))
+        # Config + Rules
+        install_config_filtered(clis, scope, copy_mode,
+                                folder_overrides=folder_overrides, global_home_override=global_home_override)
+        _rules_n = _count_rules()
+        _cfg_files = [_installer.config_filename_for(_b) for _b in _selected_backends if _installer.config_filename_for(_b)]
+        _cfg_desc = ", ".join(_cfg_files) if _cfg_files else "config"
+        _cfg_desc += f" + {_rules_n} rules" if _rules_n else ""
+        print(_step_line("Config", _cfg_desc, _label_w))
 
-    # SessionStart hooks — for every backend with features.session_hook == true
-    from ...services.installer import _install_session_hook
-    _hooked_labels = []
-    for _hook_backend in _registry.with_feature("session_hook"):
-        if _hook_backend.name not in clis:
-            continue
-        try:
-            _hook_eff = _apply_overrides(_hook_backend, folder_overrides, global_home_override or None)
-            _install_session_hook(_hook_eff, scope, memory_backend=memory_backend, memory_path=memory_path or "")
-            _hooked_labels.append(_hook_backend.label)
-        except Exception:
-            pass
-    if _hooked_labels:
-        print(_step_line("Hook", f"SessionStart ({', '.join(_hooked_labels)})", _label_w))
+        # Commands
+        from ...services.installer import install_component_for_backend as _install_component
+        _cmd_names = set()
+        for _backend in _selected_backends:
+            _eff_cmd = _apply_overrides(_backend, folder_overrides, global_home_override or None)
+            _install_component(_eff_cmd, "commands", scope, copy_mode)
+            if _backend.supports("commands"):
+                _cmd_src = _installer.dist_source_for(_backend, "commands")
+                if _cmd_src is not None:
+                    _cmd_names.update(f.stem for f in _cmd_src.glob("*.md"))
+        if _cmd_names:
+            print(_step_line("Commands", ', '.join(sorted(_cmd_names)), _label_w))
 
-    _fs.silent_file_ops = False
+        # SessionStart hooks — for every backend with features.session_hook == true
+        from ...services.installer import _install_session_hook
+        _hooked_labels = []
+        for _hook_backend in _registry.with_feature("session_hook"):
+            if _hook_backend.name not in clis:
+                continue
+            try:
+                _hook_eff = _apply_overrides(_hook_backend, folder_overrides, global_home_override or None)
+                _install_session_hook(_hook_eff, scope, memory_backend=memory_backend,
+                                      memory_path=memory_path or "", enabled_plugins=enabled_plugins)
+                _hooked_labels.append(_hook_backend.label)
+            except StateUnreadable:
+                raise
+            except Exception as e:
+                print(f"Error: the {_hook_backend.label} session hook could not be installed ({e}).\n"
+                      f"{_recovery}", file=sys.stderr)
+                sys.exit(1)
+        if _hooked_labels:
+            print(_step_line("Hook", f"SessionStart ({', '.join(_hooked_labels)})", _label_w))
 
-    # Write state.json
+
+    # The new manifest, then cleanup of what the replaced install placed and this one does not,
+    # then state.json: a failure while placing never reaches the cleanup.
     from ...services.install_state_builder import build_install_state
-    from ...services.state_store import record_install_state
     from ...domain.state import MemoryConfig
     project_path = Path.cwd() if scope == "local" else None
     try:
         st = build_install_state(
             mode="copy" if copy_mode else "symlink",
             scope=scope,
-            repo_root=PKG_DIR.parent,
+            repo_root=config.PKG_DIR.parent,
             project_path=project_path,
             role_models=role_models,
             role_efforts=role_efforts,
@@ -269,11 +301,19 @@ def _execute_install(
             profile_label=profile_label,
             folder_overrides=folder_overrides,
             global_home_override=global_home_override or None,
+            selected_skills=selected_skills,
         )
         st.memory = MemoryConfig(backend=memory_backend, path=memory_path, strategy=memory_strategy)
-        record_install_state(st)
+    except StateUnreadable:
+        raise
     except Exception as e:
-        print(f"{Color.YELLOW}Warning: failed to write state.json: {e}{Color.NC}")
+        print(f"Error: the install was placed but its manifest could not be built ({e}).\n"
+              f"{_recovery}", file=sys.stderr)
+        sys.exit(1)
+    with _fs.silent_ops():
+        removed = commit_install(st, snapshot, scope, project_path, profile_label, _recovery)
+    if removed:
+        print(_step_line("Cleanup", f"{removed} stale files removed", _label_w))
 
     # Persist enabled-plugins selections (cost-report and any future toggle)
     if enabled_plugins:
@@ -293,10 +333,7 @@ def _execute_install(
     _mem_path = memory_dir_for_backend(memory_backend, memory_path)
     try:
         memory_init(memory_backend, _mem_path)
-        if memory_backend == "obsidian":
-            memory_label = f"Obsidian  →  {_mem_path}"
-        else:
-            memory_label = f"Local markdown  →  {_mem_path}"
+        memory_label = _memory_line(memory_backend, _mem_path)
     except Exception as e:
         memory_label = f"(init failed: {e})"
     print(_step_line("Memory", memory_label, _label_w))

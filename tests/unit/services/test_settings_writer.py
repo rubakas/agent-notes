@@ -60,14 +60,13 @@ class TestInstallAllowEntry:
         assert "hooks" in data
         assert data["permissions"]["allow"] == ["Bash(cost-report)"]
 
-    def test_corrupt_json_resets_to_empty_and_overwrites(self, tmp_path):
+    def test_corrupt_json_is_left_alone_not_overwritten(self, tmp_path):
         settings_path = tmp_path / "settings.json"
         settings_path.write_text("not valid json {{{")
 
         install_allow_entry(settings_path, "Bash(cost-report)")
 
-        data = json.loads(settings_path.read_text())
-        assert data["permissions"]["allow"] == ["Bash(cost-report)"]
+        assert settings_path.read_text() == "not valid json {{{"
 
 
 class TestInstallHook:

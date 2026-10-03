@@ -245,7 +245,7 @@ class TestUninstallCodexSessionHook:
 
         _uninstall_session_hook(codex_backend, "global")
 
-        data_after = json.loads(hooks_path.read_text())
+        data_after = json.loads(hooks_path.read_text()) if hooks_path.exists() else {}
         session_hooks = data_after.get("hooks", {}).get("SessionStart", [])
         remaining = [
             h

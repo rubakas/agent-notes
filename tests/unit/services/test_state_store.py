@@ -4,6 +4,7 @@ import pytest
 from pathlib import Path
 
 from agent_notes.services.state_store import (
+    StateUnreadable,
     load_state,
     save_state,
     clear_state,
@@ -116,19 +117,21 @@ class TestLoadState:
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
         assert load_state() is None
 
-    def test_returns_none_on_corrupted_json(self, monkeypatch, tmp_path):
+    def test_raises_on_corrupted_json(self, monkeypatch, tmp_path):
         config_dir = tmp_path / "config" / "agent-notes"
         config_dir.mkdir(parents=True)
         (config_dir / "state.json").write_text("{ not valid json {{")
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
-        assert load_state() is None
+        with pytest.raises(StateUnreadable):
+            load_state()
 
-    def test_returns_none_on_empty_file(self, monkeypatch, tmp_path):
+    def test_raises_on_empty_file(self, monkeypatch, tmp_path):
         config_dir = tmp_path / "config" / "agent-notes"
         config_dir.mkdir(parents=True)
         (config_dir / "state.json").write_text("")
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
-        assert load_state() is None
+        with pytest.raises(StateUnreadable):
+            load_state()
 
     def test_returns_state_when_file_valid(self, monkeypatch, tmp_path):
         config_dir = tmp_path / "config" / "agent-notes"

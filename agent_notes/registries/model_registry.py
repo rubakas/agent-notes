@@ -33,11 +33,13 @@ def _frontier_key(model: Model) -> tuple:
     """Global frontier-first order across every provider.
 
     seed.json ranks each provider independently, so concatenating provider
-    blocks yields two separate descending runs. Sorting on the benchmark score
-    itself merges them: rated models by capability descending, unrated last
-    (keeping their relative catalog order, since the sort is stable).
+    blocks yields two separate descending runs. Sorting on the score itself
+    merges them: rated models by capability descending, unrated last (keeping
+    their relative catalog order, since the sort is stable). The score is
+    ``rank_score``, so a provisional stand-in from rules.yaml ranks a model
+    upstream has not rated yet.
     """
-    return (model.coding_index is None, -(model.coding_index or 0.0))
+    return (model.rank_score is None, -(model.rank_score or 0.0))
 
 
 class ModelRegistry:

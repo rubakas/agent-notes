@@ -26,20 +26,31 @@ def _get_cache_path() -> Path:
 
 
 def _load_seed(seed_path: Path, use_cache: bool) -> dict:
-    """Load seed data, preferring the XDG cache when *use_cache* is True."""
+    """Load seed data, preferring the XDG cache when *use_cache* is True and the
+    cache is at least as new as the bundled seed.json.
+
+    Nothing expires the cache `models refresh` writes, so without the freshness
+    check a single old refresh hides every model a later package release ships.
+    ``fetched_at`` is ISO-8601 UTC with a ``Z`` suffix, so it orders as text; a
+    cache without one loses.
+    """
+    with open(seed_path) as f:
+        seed = json.load(f)
     if use_cache:
         cache_path = _get_cache_path()
         if cache_path.exists():
             try:
-                return json.loads(cache_path.read_text())
+                cache = json.loads(cache_path.read_text())
             except (json.JSONDecodeError, OSError) as e:
                 warnings.warn(
                     f"Model cache at {cache_path} is corrupt ({e}); "
                     "falling back to bundled seed.json",
                     stacklevel=4,
                 )
-    with open(seed_path) as f:
-        return json.load(f)
+            else:
+                if (cache.get("fetched_at") or "") >= (seed.get("fetched_at") or ""):
+                    return cache
+    return seed
 
 
 def _match(pattern: str, model_id: str) -> bool:
@@ -165,7 +176,8 @@ def load_catalog(
     """Load seed.json + rules.yaml + optional user overrides and return Model list.
 
     When *catalog_dir* is None (the default), the XDG cache at
-    ``~/.cache/agent-notes/catalog.json`` is preferred over the bundled seed.json.
+    ``~/.cache/agent-notes/catalog.json`` is preferred over the bundled seed.json
+    unless its ``fetched_at`` is older than the seed's (see :func:`_load_seed`).
     A corrupt or unparseable cache falls back to seed.json with a warning.
     When *catalog_dir* is explicitly supplied, the cache is bypassed and the
     given directory's seed.json is used directly (useful for tests).
@@ -193,6 +205,7 @@ def load_catalog(
     deprecated_ids: set[str] = set(rules.get("deprecated", []))
     capabilities = rules.get("capabilities", {})
     price_overrides = rules.get("price_overrides", {}) or {}
+    provisional_coding_index = rules.get("provisional_coding_index", {}) or {}
 
     models: list[Model] = []
 
@@ -242,6 +255,7 @@ def load_catalog(
                 price_out=price_out,
                 context_length=entry.get("context_length"),
                 created_at=entry.get("created_at"),
+                provisional_coding_index=provisional_coding_index.get(model_id),
             ))
 
     return models

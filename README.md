@@ -6,9 +6,13 @@ AI agent configuration manager for Claude Code and OpenCode — orchestrates a t
 
 ```bash
 pipx install agent-notes
-agent-notes install    # interactive wizard guides you through setup
+agent-notes install    # one review screen, every setting pre-filled
 agent-notes doctor
 ```
+
+`agent-notes install` opens one review screen with every setting pre-filled. `i` installs, `⏎` edits a row, `←→` changes simple values, `q` quits. Small terminals (under 60×16) get numbered prompts instead; with no terminal, the recommended setup installs without prompts.
+
+`agent-notes config` opens the same screen on an existing install: `u` moves deprecated pins to ★, `tab` switches installs, `s` shows the changes and saves everything at once, and `q` asks before discarding staged edits. The scriptable `config` subcommands are unchanged.
 
 > No `pipx`? Use `uv tool install agent-notes` instead, or see **Troubleshooting: externally-managed-environment** below.
 
@@ -77,6 +81,17 @@ source .venv/bin/activate
 agent-notes uninstall && pip uninstall agent-notes && pip install agent-notes && agent-notes install
 ```
 
+### Reinstalling
+
+Running `agent-notes install` again for an existing install replaces it and cleans up leftovers: deselected skills, dropped CLIs, stale symlinks, and removed agents/rules. Your own files are never deleted — only what agent-notes placed is removed, and edited copies are backed up with a `.bak.<timestamp>` suffix.
+
+Shared files (`~/.agents/skills`, `~/.codex`, project `CLAUDE.md`) used by other installs are kept. Without a terminal, `--yes` is required to replace an existing install; without it the install refuses and changes nothing. With a terminal, `--yes` skips the confirmation only for the flag forms (`--local`, `--copy`, `--profile`, `--folder`, `--global-home`). A bare `agent-notes install --yes` opens the review screen on a terminal, and without one installs the recommended setup:
+
+```bash
+agent-notes install --yes                # scripts and automation (no terminal)
+agent-notes install --local --yes        # skip the confirmation on a terminal
+```
+
 ### Local build (developers)
 
 ```bash
@@ -95,7 +110,7 @@ To produce a release artifact (wheel for distribution), use `python -m build` + 
 - **Claude Code**: install via the Claude Code plugin marketplace or copy/symlink `.claude-plugin/` into `~/.claude/plugins/agent-notes/`.
 - **OpenCode**: copy or symlink `.claude-plugin/` into `~/.config/opencode/plugins/agent-notes/` and add `"plugin": ["agent-notes"]` to `opencode.json`.
 
-The plugin runs a `session.start` hook that surfaces agent-notes context to the CLI session. It does **not** include the full `agent-notes` CLI (wizard, doctor, config, memory, etc.). For those, use install method 1 or 2.
+The plugin runs a `session.start` hook that surfaces agent-notes context to the CLI session. It does **not** include the full `agent-notes` CLI (review screen, doctor, config, memory, etc.). For those, use install method 1 or 2.
 
 ---
 
@@ -137,7 +152,7 @@ Provider API keys live in `~/.agent-notes/credentials.toml` (mode 0600, never co
 agent-notes config providers
 ```
 
-The wizard prompts for the key with hidden input; agent-notes never logs or prints the value. To check whether a provider is configured without exposing the key:
+The API keys row of `agent-notes config` and `config providers` ask for the key with hidden input; agent-notes never logs or prints the value. To check whether a provider is configured without exposing the key:
 
 ```bash
 agent-notes config provider openrouter   # prints "configured" or "no key"
@@ -268,13 +283,13 @@ Specialized subagents with hierarchical model strategy: **Opus 4.8 reasons (high
 
 ### Reconfiguring roles, models, and effort
 
-During `agent-notes install`, wizard step 2 asks you to pick a model per role, and — for models served by a provider with a known effort vocabulary (currently `anthropic`, `openai`) — a follow-up effort prompt, pre-selected to the role's typical effort when that value is valid for the chosen provider. Providers with no effort registry entry (`github-copilot`, `openrouter`, `google`, `moonshot`) skip the effort prompt entirely.
+On the `agent-notes install` review screen, the Models row lets you pick a model per role, and — for models served by a provider with a known effort vocabulary (currently `anthropic`, `openai`) — an effort per role (←→), limited to the values the model, provider and CLI all accept. Providers with no effort registry entry (`github-copilot`, `openrouter`, `google`, `moonshot`) show no effort.
 
 To change these after install:
 ```bash
 agent-notes config role-model [--cli <cli>] <role> <model>    # e.g. role-model worker claude-sonnet-5
 agent-notes config role-effort [--cli <cli>] <role> <effort>  # e.g. role-effort worker high
-agent-notes config wizard                                     # interactive menu for both
+agent-notes config                                            # review screen for both (interactive)
 ```
 `role-effort` validates the effort against the role's currently-assigned model's provider — an invalid value prints that provider's name and its valid effort list. There's no cross-provider mapping: each provider (anthropic, openai) has its own independent effort vocabulary and default.
 
@@ -293,9 +308,11 @@ Agents accumulate knowledge across sessions. Choose a backend during `agent-note
 
 **To reconfigure after install:**
 ```bash
-agent-notes install --reconfigure        # switch storage
+agent-notes install                      # review screen on existing install; replaces configuration
 agent-notes config memory               # interactive backend selector
 ```
+
+`--reconfigure` is still accepted (it's an alias for a plain reinstall) but no longer required. A reinstall now replaces the old install and cleans up leftovers.
 
 ### Local (default)
 
@@ -325,7 +342,7 @@ agent-notes memory export             # back up to memory-backup/
 agent-notes memory import             # restore from memory-backup/
 ```
 
-**Setup:** Run `agent-notes install` and choose `Obsidian — external Obsidian vault`, then pick a strategy (`single-brain` or `per-project`). The wizard auto-detects vaults under `~/Documents`, `~/Desktop`, and `~`. Then run `agent-notes memory init`.
+**Setup:** Run `agent-notes install`, set the Memory row to `Obsidian`, then pick a strategy (`single-brain` or `per-project`). The Memory row's Obsidian editor lists vaults detected under `~/Documents`, `~/Desktop`, and `~`. Then run `agent-notes memory init`.
 
 </details>
 
@@ -386,7 +403,7 @@ agent-notes <command> [options]
 
 | Command | Description |
 |---------|-------------|
-| `install [--local] [--copy] [--reconfigure]` | Interactive wizard or direct install |
+| `install [--local] [--copy] [--profile] [--folder] [--global-home] [--yes] [--reconfigure]` | Review screen or direct install |
 | `uninstall [--local \| --global]` | Remove installed components (both scopes by default) |
 | `doctor [--local] [--fix]` | Check installation health |
 | `info` | Show status and component counts |
@@ -456,7 +473,7 @@ agent-notes set role explorer claude-haiku-4-5-20251001
 agent-notes supports multiple API providers for routing requests. Configure providers via:
 
 ```bash
-agent-notes config providers     # interactive wizard
+agent-notes config providers     # enter a provider API key (hidden input)
 agent-notes config provider <name>      # check if configured (without exposing key)
 ```
 
@@ -504,7 +521,7 @@ This command swaps any wheel install for an editable one and clears your Claude 
 
 **Profiles:**
 
-By default, `agent-notes install` re-runs the interactive wizard and prompts for an optional profile label. To reinstall non-interactively into the same profile, use `agent-notes install --profile <label>` (e.g. `work` → installs into `~/.claude-work`).
+By default, `agent-notes install` opens the review screen, where the Profile row sets an optional label, local folder and global home. To reinstall non-interactively into the same profile, use `agent-notes install --profile <label>` (e.g. `work` → installs into `~/.claude-work`).
 
 The plugin build scripts (`scripts/build-claude-plugin.sh`, `scripts/build-opencode-plugin.sh`) automatically use `.venv/bin/python` when present, fall back to system `python3`, and honor a `PYTHON=` override.
 

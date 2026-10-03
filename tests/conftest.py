@@ -61,3 +61,27 @@ def built_dist():
     consume it pay only the one-time build cost.
     """
     yield DIST_DIR
+
+
+@pytest.fixture(autouse=True)
+def _no_test_touches_the_real_home(monkeypatch, tmp_path_factory):
+    """Install, cleanup and uninstall sweep ~/.agents/skills and the CLI homes of the developer's
+    real install, and read their agent-notes config. A test that forgets to pin one would delete
+    from there, so every test gets a scratch HOME and XDG_CONFIG_HOME, and the config constants
+    that were derived from the real HOME at import time (AGENTS_HOME, MEMORY_DIR, BACKUP_DIR,
+    BIN_HOME, CLAUDE_HOME, OPENCODE_HOME, GITHUB_HOME) point into the scratch directory too.
+    A test that needs its own values sets them after this fixture ran. Modules that did
+    `from config import X` keep their import-time copy: such a module has to read it
+    through `config` to be isolated."""
+    import agent_notes.config as config
+    scratch = tmp_path_factory.mktemp("guard")
+    home = scratch / "home"
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(scratch / "xdg"))
+    monkeypatch.setattr(config, "AGENTS_HOME", scratch / "agents_home")
+    monkeypatch.setattr(config, "MEMORY_DIR", home / ".claude" / "agent-memory")
+    monkeypatch.setattr(config, "BACKUP_DIR", home / ".agent-notes" / "memory-backup")
+    monkeypatch.setattr(config, "BIN_HOME", home / ".local" / "bin")
+    monkeypatch.setattr(config, "CLAUDE_HOME", home / ".claude")
+    monkeypatch.setattr(config, "OPENCODE_HOME", home / ".config" / "opencode")
+    monkeypatch.setattr(config, "GITHUB_HOME", home / ".github")

@@ -1,15 +1,10 @@
-"""Registration of the built-in capabilities and the per-kind selection runners.
-
-Phase 1 registers only the cost-report toggle. `collect_toggle_selections`
-runs every registered toggle capability's view and returns {name: enabled}.
-"""
+"""Registration of the built-in capabilities and their review rows."""
 from __future__ import annotations
 
 from functools import lru_cache
 
 from ...domain.capability import Capability, KIND_TOGGLE, KIND_PROVIDER, KIND_BACKEND
 from .capability_registry import CapabilityRegistry
-from .cost_report import _select_cost_report
 
 COST_REPORT = Capability(name="cost-report", kind=KIND_TOGGLE, default=False)
 
@@ -21,105 +16,45 @@ BACKENDS = Capability(name="backends", kind=KIND_BACKEND, default=True, order=0)
 MEMORY = Capability(name="memory", kind=KIND_PROVIDER, default=True, order=0)
 
 
-def _backends_view(step, total, version="") -> set:
-    # lazy import: avoids a circular import between wizard.__init__ and capabilities
-    from agent_notes.commands import wizard as _wiz
-
-    return _wiz._select_cli(step=step, total=total, version=version)
-
-
-def _backends_config_view(clis, step, total, version="") -> tuple:
-    # lazy import: avoids a circular import between wizard.__init__ and capabilities
-    from agent_notes.commands import wizard as _wiz
-
-    return _wiz._select_models_per_role(clis, step=step, total=total, version=version)
+def _backends_rows(ctx) -> list:
+    # lazy import: review imports this module for the registry
+    from .review import backends_rows
+    return backends_rows(ctx)
 
 
-def _cost_report_view(step, total, version) -> bool:
-    return _select_cost_report(step=step, total=total, version=version)
+def _memory_rows(ctx) -> list:
+    from .review import memory_row
+    return [memory_row(ctx.ui, ctx.choices.memory)]
 
 
-def _memory_view(step, total, version="") -> dict:
-    # lazy import: avoids a circular import between wizard.__init__ and capabilities
-    from agent_notes.commands import wizard as _wiz
+def _cost_report_rows(ctx) -> list:
+    from .review import toggle_row
+    return [toggle_row(ctx.ui, "cost-report", "Cost report", ctx.choices.plugins)]
 
-    backend, path, strategy = _wiz._select_memory(
-        step=step, total=total, version=version
-    )
-    return {"backend": backend, "path": path, "strategy": strategy}
+
+def _backends_config_rows(ctx) -> list:
+    from ..config_review import config_models_rows
+    return config_models_rows(ctx)
+
+
+def _memory_config_rows(ctx) -> list:
+    from .review import memory_row
+    return [memory_row(ctx.ui, ctx.state.memory)]
+
+
+def _cost_report_config_rows(ctx) -> list:
+    from .review import toggle_row
+    return [toggle_row(ctx.ui, "cost-report", "Cost report", ctx.plugins)]
 
 
 def _build_registry() -> CapabilityRegistry:
     reg = CapabilityRegistry()
-    reg.register(BACKENDS, view=_backends_view, config_view=_backends_config_view)
-    reg.register(COST_REPORT, view=_cost_report_view)
-    reg.register(MEMORY, view=_memory_view)
+    reg.register(BACKENDS, row=_backends_rows, config_row=_backends_config_rows)
+    reg.register(COST_REPORT, row=_cost_report_rows, config_row=_cost_report_config_rows)
+    reg.register(MEMORY, row=_memory_rows, config_row=_memory_config_rows)
     return reg
 
 
 @lru_cache(maxsize=1)
 def default_capability_registry() -> CapabilityRegistry:
     return _build_registry()
-
-
-def _compute_total_steps(registry=None) -> int:
-    """Derive the wizard step count from the capability registry.
-
-    Fixed general steps: scope, mode, profile, skills, confirm (5).
-    Capability steps: one backend-selection step (if any backend), one
-    backend-config step (if any backend declares a config_view), one step
-    per provider slot, and one combined toggle step (if any toggle).
-    """
-    reg = registry if registry is not None else default_capability_registry()
-    total = 5  # scope, mode, profile, skills, confirm
-    backends = reg.by_kind(KIND_BACKEND)
-    if backends:
-        total += 1
-        if any(reg.get(c.name).config_view for c in backends):
-            total += 1
-    total += len(reg.by_kind(KIND_PROVIDER))
-    if reg.by_kind(KIND_TOGGLE):
-        total += 1
-    return total
-
-
-def collect_toggle_selections(step, total, version, registry=None) -> dict:
-    """Run every registered toggle capability's view; return {name: enabled}."""
-    reg = registry if registry is not None else default_capability_registry()
-    result: dict = {}
-    for cap in reg.by_kind(KIND_TOGGLE):
-        result[cap.name] = reg.get(cap.name).view(step, total, version)
-    return result
-
-
-def collect_provider_selections(step, total, version, registry=None) -> dict:
-    """Run every registered provider capability's view; return {name: selection}."""
-    reg = registry if registry is not None else default_capability_registry()
-    result: dict = {}
-    for cap in reg.by_kind(KIND_PROVIDER):
-        result[cap.name] = reg.get(cap.name).view(step, total, version)
-    return result
-
-
-def collect_backend_selections(step, total, version, registry=None) -> set:
-    """Run every registered backend capability's view; return the union of selected names."""
-    reg = registry if registry is not None else default_capability_registry()
-    selected: set = set()
-    for cap in reg.by_kind(KIND_BACKEND):
-        selected |= reg.get(cap.name).view(step, total, version)
-    return selected
-
-
-def collect_backend_config(clis, step, total, version, registry=None) -> tuple:
-    """Run each backend capability's config_view; merge into (role_models, role_efforts)."""
-    reg = registry if registry is not None else default_capability_registry()
-    role_models: dict = {}
-    role_efforts: dict = {}
-    for cap in reg.by_kind(KIND_BACKEND):
-        behaviour = reg.get(cap.name)
-        if behaviour.config_view is None:
-            continue
-        models, efforts = behaviour.config_view(clis, step, total, version)
-        role_models.update(models)
-        role_efforts.update(efforts)
-    return role_models, role_efforts

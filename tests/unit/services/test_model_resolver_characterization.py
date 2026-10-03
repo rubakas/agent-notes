@@ -56,6 +56,7 @@ def _make_model(
     aliases: Optional[dict] = None,
     coding_index: Optional[float] = 50.0,
     price_in: Optional[float] = 1.0,
+    provisional_coding_index: Optional[float] = None,
 ) -> Model:
     """Fixture Model. Registries are built in rank order — first listed is rank 1."""
     return Model(
@@ -66,6 +67,7 @@ def _make_model(
         aliases=aliases or {"anthropic": model_id},
         coding_index=coding_index,
         price_in=price_in,
+        provisional_coding_index=provisional_coding_index,
     )
 
 
@@ -383,6 +385,39 @@ class TestBudgetRankFallback:
                     model_registry=registry,
                 )
 
+    def test_provisional_score_makes_an_unrated_sole_candidate_selectable(self):
+        """Eligibility reads rank_score: a provisional score is a rating."""
+        provisional = _make_model("claude-opus-5-5", model_class="opus",
+                                  aliases={"anthropic": "provisional-alias"},
+                                  coding_index=None, provisional_coding_index=78.1)
+        registry = ModelRegistry([provisional])
+
+        opus_role = Role(name="reasoner", label="Reasoner", description="", budget=5.0)
+        with patch(
+            "agent_notes.registries.role_registry.load_role_registry",
+            return_value=RoleRegistry([opus_role]),
+        ):
+            model_str, _ = _resolve(
+                agent_config={"role": "reasoner"},
+                model_registry=registry,
+            )
+        assert model_str == "provisional-alias"
+
+    def test_provisional_score_ranks_ahead_of_a_lower_rated_model(self):
+        """Ordering reads rank_score too, so the provisional model takes its slot
+        above the predecessor it scores higher than — listed last on purpose, so
+        only the sort can put it first."""
+        predecessor = _make_model("claude-opus-5", model_class="opus",
+                                  aliases={"anthropic": "predecessor-alias"},
+                                  coding_index=78.0, price_in=5.0)
+        successor = _make_model("claude-opus-5-5", model_class="opus",
+                                aliases={"anthropic": "successor-alias"},
+                                coding_index=None, provisional_coding_index=78.1,
+                                price_in=4.0)
+        registry = ModelRegistry([predecessor, successor])
+
+        assert [m.id for m in registry.all()] == ["claude-opus-5-5", "claude-opus-5"]
+
     def test_explicit_pin_to_an_unrated_model_still_resolves(self):
         """Rating and budget gate automatic selection only, not explicit user choices."""
         unrated = _make_model(
@@ -589,11 +624,22 @@ class TestRealRegistryResolution:
     These pin the model each role resolves to with no state pin and no user config.
     """
 
+    # claude-opus-5-5 and claude-sonnet-5-5 are unrated upstream; they win
+    # reasoner and worker on rules.yaml's provisional_coding_index (spec 004).
     CLAUDE_DEFAULTS = {
         "orchestrator": ("claude-fable-5-1", "fable"),
-        "reasoner": ("claude-opus-5", "opus"),
-        "worker": ("claude-sonnet-5", "sonnet"),
+        "reasoner": ("claude-opus-5-5", "opus"),
+        "worker": ("claude-sonnet-5-5", "sonnet"),
         "scout": ("claude-haiku-4-5", "haiku"),
+    }
+
+    # Multi-provider (anthropic + openai) with preferred_family claude: the
+    # same picks as claude, rendered as the alias rather than the class.
+    OPENCODE_DEFAULTS = {
+        "orchestrator": ("claude-fable-5-1", "claude-fable-5-1"),
+        "reasoner": ("claude-opus-5-5", "claude-opus-5-5"),
+        "worker": ("claude-sonnet-5-5", "claude-sonnet-5-5"),
+        "scout": ("claude-haiku-4-5", "claude-haiku-4-5"),
     }
 
     CODEX_DEFAULTS = {
@@ -615,6 +661,7 @@ class TestRealRegistryResolution:
     @pytest.mark.parametrize("backend_name,expected", [
         ("claude", CLAUDE_DEFAULTS),
         ("codex", CODEX_DEFAULTS),
+        ("opencode", OPENCODE_DEFAULTS),
     ])
     def test_role_defaults_are_pinned(self, backend_name, expected):
         """The four role defaults each backend ships with must not drift silently."""
@@ -634,6 +681,7 @@ class TestRealRegistryResolution:
     @pytest.mark.parametrize("backend_name,expected", [
         ("claude", CLAUDE_DEFAULTS),
         ("codex", CODEX_DEFAULTS),
+        ("opencode", OPENCODE_DEFAULTS),
     ])
     def test_wizard_and_resolver_agree(self, backend_name, expected):
         """The wizard's pre-selection is the same model the resolver would build."""

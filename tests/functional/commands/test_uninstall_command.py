@@ -63,6 +63,7 @@ class TestUninstallRemovesManagedFiles:
         source_dir = tmp_path / "dist_agents"
         registry = CLIRegistry([_make_backend("claude", backend_home)])
         installed = _seed_installed_files(backend_home, source_dir)
+        monkeypatch.setattr(config, "DIST_DIR", source_dir)  # the links point into our dist
 
         xdg = tmp_path / "config"
         xdg.mkdir()
@@ -72,8 +73,8 @@ class TestUninstallRemovesManagedFiles:
         with patch("agent_notes.services.installer.load_registry", return_value=registry), \
              patch("agent_notes.services.installer._uninstall_universal_skills"), \
              patch("agent_notes.services.installer._uninstall_session_hook"):
-            from agent_notes.commands.uninstall import uninstall
-            uninstall(local=False)
+            from agent_notes.commands.install import uninstall
+            uninstall(global_=True)
 
         for f in installed:
             assert not f.exists(), f"{f.name} should have been removed by uninstall"
@@ -97,8 +98,8 @@ class TestUninstallLeavesUserFilesIntact:
         with patch("agent_notes.services.installer.load_registry", return_value=registry), \
              patch("agent_notes.services.installer._uninstall_universal_skills"), \
              patch("agent_notes.services.installer._uninstall_session_hook"):
-            from agent_notes.commands.uninstall import uninstall
-            uninstall(local=False)
+            from agent_notes.commands.install import uninstall
+            uninstall(global_=True)
 
         assert user_file.exists(), "pre-existing CLAUDE.md should not be removed"
         assert user_file.read_text() == "# My notes"
@@ -118,8 +119,8 @@ class TestUninstallClearsStateJson:
         with patch("agent_notes.services.installer.load_registry", return_value=registry), \
              patch("agent_notes.services.installer._uninstall_universal_skills"), \
              patch("agent_notes.services.installer._uninstall_session_hook"):
-            from agent_notes.commands.uninstall import uninstall
-            uninstall(local=False)
+            from agent_notes.commands.install import uninstall
+            uninstall(global_=True)
 
         # State file should be gone (only scope → whole file deleted) or global set to null
         if sf.exists():
@@ -130,7 +131,7 @@ class TestUninstallClearsStateJson:
 
 class TestUninstallRemovesCopyModeFiles:
     def test_uninstall_removes_copy_mode_files(self, tmp_path, monkeypatch):
-        """Plain files written by --copy install must be removed on uninstall."""
+        """A copy the manifest recorded, still unedited, is removed on uninstall."""
         backend_home = tmp_path / "claude_home"
         agents_dir = backend_home / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
@@ -143,8 +144,10 @@ class TestUninstallRemovesCopyModeFiles:
         monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
 
         sf = xdg / "agent-notes" / "state.json"
+        from agent_notes.services.install_ownership import tree_sha
+        recorded = {"agents": {"lead.md": {"sha": tree_sha(copy_file), "target": str(copy_file), "mode": "copy"}}}
         scope_dict = {"installed_at": "2025-01-01T00:00:00Z", "updated_at": "2025-01-01T00:00:00Z",
-                      "mode": "copy", "clis": {"claude": {"role_models": {}, "installed": {}}}}
+                      "mode": "copy", "clis": {"claude": {"role_models": {}, "installed": recorded}}}
         data = {"source_path": "", "source_commit": "", "global": scope_dict, "local": {}, "memory": {"backend": "local", "path": ""}}
         sf.parent.mkdir(parents=True, exist_ok=True)
         sf.write_text(json.dumps(data))
@@ -152,10 +155,35 @@ class TestUninstallRemovesCopyModeFiles:
         with patch("agent_notes.services.installer.load_registry", return_value=registry), \
              patch("agent_notes.services.installer._uninstall_universal_skills"), \
              patch("agent_notes.services.installer._uninstall_session_hook"):
-            from agent_notes.commands.uninstall import uninstall
-            uninstall(local=False)
+            from agent_notes.commands.install import uninstall
+            uninstall(global_=True)
 
         assert not copy_file.exists(), "copy-installed file should be removed"
+
+
+class TestUninstallKeepsCopiesItCannotProve:
+    def test_a_copy_the_manifest_does_not_record_is_kept_even_in_copy_mode(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(config, "AGENTS_HOME", tmp_path / "agents_home")
+        backend_home = tmp_path / "claude_home"
+        (backend_home / "agents").mkdir(parents=True)
+        user_file = backend_home / "agents" / "mine.md"
+        user_file.write_text("# mine")
+        registry = CLIRegistry([_make_backend("claude", backend_home)])
+        xdg = tmp_path / "config"
+        xdg.mkdir()
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+        sf = xdg / "agent-notes" / "state.json"
+        _write_minimal_state(sf)
+        data = json.loads(sf.read_text())
+        data["global"]["mode"] = "copy"
+        sf.write_text(json.dumps(data))
+
+        with patch("agent_notes.services.installer.load_registry", return_value=registry), \
+             patch("agent_notes.services.installer._uninstall_session_hook"):
+            from agent_notes.commands.install import uninstall
+            uninstall(global_=True)
+
+        assert user_file.read_text() == "# mine"
 
 
 class TestUninstallPreservesUnmanagedFiles:
@@ -175,8 +203,8 @@ class TestUninstallPreservesUnmanagedFiles:
         with patch("agent_notes.services.installer.load_registry", return_value=registry), \
              patch("agent_notes.services.installer._uninstall_universal_skills"), \
              patch("agent_notes.services.installer._uninstall_session_hook"):
-            from agent_notes.commands.uninstall import uninstall
-            uninstall(local=False)
+            from agent_notes.commands.install import uninstall
+            uninstall(global_=True)
 
         assert unmanaged.exists(), "unmanaged file should not be removed"
 
@@ -196,8 +224,8 @@ class TestUninstallIdempotent:
             with patch("agent_notes.services.installer.load_registry", return_value=registry), \
                  patch("agent_notes.services.installer._uninstall_universal_skills"), \
                  patch("agent_notes.services.installer._uninstall_session_hook"):
-                from agent_notes.commands.uninstall import uninstall
-                uninstall(local=False)
+                from agent_notes.commands.install import uninstall
+                uninstall(global_=True)
 
         do_uninstall()
         do_uninstall()  # must not raise
@@ -258,7 +286,7 @@ class TestUninstallLocalScopeDoesNotCrash:
         with patch("agent_notes.services.installer.load_registry", return_value=registry), \
              patch("agent_notes.services.installer._uninstall_session_hook"), \
              patch("agent_notes.services.state_store.remove_install_state"):
-            from agent_notes.commands.uninstall import uninstall
+            from agent_notes.commands.install import uninstall
             uninstall(local=True)  # must not raise
 
     def test_uninstall_all_local_with_no_state_does_not_raise(self, tmp_path, monkeypatch):
@@ -282,53 +310,38 @@ class TestUninstallLocalScopeDoesNotCrash:
              patch("agent_notes.services.installer._uninstall_session_hook"):
             uninstall_all("local", registry=registry)  # must not raise
 
-    def test_uninstall_all_local_reads_copy_mode_from_state(self, tmp_path, monkeypatch):
-        """When local state records mode='copy', uninstall_all resolves copy_mode correctly
-        without raising ValueError. The regression test is that get_scope is called with
-        project_path so it does not crash."""
+    def test_uninstall_all_local_judges_ownership_by_the_projects_manifest(self, tmp_path, monkeypatch):
+        """The local scope's own manifest decides which copies are ours (and get_scope
+        gets the project path, so it does not raise ValueError)."""
         project_dir = tmp_path / "myproject"
-        project_dir.mkdir()
+        (project_dir / ".claude" / "agents").mkdir(parents=True)
+        recorded_copy = project_dir / ".claude" / "agents" / "lead.md"
+        recorded_copy.write_text("# lead")
+        user_file = project_dir / ".claude" / "agents" / "mine.md"
+        user_file.write_text("# mine")
 
-        backend_home = tmp_path / "claude_home"
-        registry = CLIRegistry([_make_backend("claude", backend_home)])
-
+        registry = CLIRegistry([_make_backend("claude", tmp_path / "claude_home")])
         xdg = tmp_path / "config"
         xdg.mkdir()
         monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
-
-        # Write local state with mode=copy
-        sf = xdg / "agent-notes" / "state.json"
+        from agent_notes.services.install_ownership import tree_sha
         scope_dict = {
-            "installed_at": "2025-01-01T00:00:00Z",
-            "updated_at": "2025-01-01T00:00:00Z",
-            "mode": "copy",
-            "clis": {"claude": {"role_models": {}, "installed": {}}},
+            "installed_at": "2025-01-01T00:00:00Z", "updated_at": "2025-01-01T00:00:00Z", "mode": "copy",
+            "clis": {"claude": {"role_models": {}, "installed": {"agents": {"lead.md": {
+                "sha": tree_sha(recorded_copy), "target": str(recorded_copy), "mode": "copy"}}}}},
         }
-        data = {
-            "source_path": "",
-            "source_commit": "",
-            "global": None,
-            "local": {str(project_dir.resolve()): scope_dict},
-            "memory": {"backend": "local", "path": ""},
-        }
+        sf = xdg / "agent-notes" / "state.json"
         sf.parent.mkdir(parents=True, exist_ok=True)
-        sf.write_text(__import__("json").dumps(data))
-
+        sf.write_text(json.dumps({"source_path": "", "source_commit": "", "global": None,
+                                  "local": {str(project_dir.resolve()): scope_dict},
+                                  "memory": {"backend": "local", "path": ""}}))
         monkeypatch.chdir(project_dir)
 
         from agent_notes.services.installer import uninstall_all
 
-        # Track whether uninstall_component_for_backend is called with copy_mode=True,
-        # confirming the copy_mode was correctly resolved from local state.
-        called_with_copy_mode = []
-
-        def record_copy_mode(backend, component, scope, copy_mode=False):
-            called_with_copy_mode.append(copy_mode)
-
         with patch("agent_notes.services.installer.load_registry", return_value=registry), \
-             patch("agent_notes.services.installer._uninstall_session_hook"), \
-             patch("agent_notes.services.installer.uninstall_component_for_backend", side_effect=record_copy_mode):
-            # Must not raise ValueError("project_path required for local scope")
+             patch("agent_notes.services.installer._uninstall_session_hook"):
             uninstall_all("local", registry=registry)
 
-        assert any(called_with_copy_mode), "copy_mode should have been resolved as True from local state"
+        assert not recorded_copy.exists()
+        assert user_file.read_text() == "# mine"

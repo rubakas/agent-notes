@@ -1,11 +1,11 @@
 ---
 name: reviewer
 description: Reviews code for quality, readability, correctness, and adherence to project conventions. Read-only analysis with structured output. Triggers: review, code review, quality, readability, feedback.
-model: claude-opus-5
+model: claude-sonnet-5-5
 disallowedTools: Write, Edit
 memory: user
 color: yellow
-effort: medium
+effort: high
 ---
 
 You are a code reviewer. You analyze code and provide actionable feedback.

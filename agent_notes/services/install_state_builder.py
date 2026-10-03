@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 from ..domain.state import State, ScopeState, BackendState, InstalledItem
+from ..services.install_ownership import tree_sha
 from ..services.state_store import load_state, now_iso, sha256_of, set_scope
+
+CONTEXT_FILE = "agent-notes-context.md"
 
 
 def git_head_short(repo_root: Path) -> str:
@@ -42,6 +45,9 @@ def build_install_state(
     profile_label: str = "",
     folder_overrides: Optional[dict[str, str]] = None,
     global_home_override: Optional[str] = None,
+    selected_skills: Optional[Iterable[str]] = None,
+    # ^^ The skills this install placed. None = every skill in dist/ (the flags
+    # path installs them all); an empty list = none.
 ) -> State:
     """Build a complete State snapshot.
     
@@ -49,7 +55,10 @@ def build_install_state(
       clobbering other installs. E.g. installing globally doesn't erase existing
       local installs.
     - Constructs a ScopeState for the requested (scope, project_path).
-    - Scans dist/ for each backend; fills BackendState.installed.
+    - Scans dist/ for each backend; fills BackendState.installed with what this
+      install placed: agents, the selected skills, rules, commands, config, the
+      session-hook context file and, for a global install, the ~/.agents/skills mirror.
+      A copy install records the sha of each file's or directory's whole tree.
     - BackendState.role_models comes from the `role_models` arg if provided,
       else empty dict (will be populated by wizard in Phase E).
     - BackendState.role_efforts comes from the `role_efforts` arg if provided,
@@ -69,7 +78,7 @@ def build_install_state(
     
     # Import here to avoid circular import
     from ..registries.cli_registry import load_registry
-    from ..config import PKG_DIR, DIST_SKILLS_DIR, DIST_RULES_DIR
+    from ..config import PKG_DIR, DIST_DIR, DIST_SKILLS_DIR, DIST_RULES_DIR, AGENTS_HOME
 
     # Build scope-specific install
     try:
@@ -79,7 +88,15 @@ def build_install_state(
         from ..registries.cli_registry import CLIRegistry
         registry = CLIRegistry([])
     
+    from ..services.install_plan import expanded_home, is_safe_local_dir  # install_plan loads the registries
+
     timestamp = now_iso()
+
+    wanted = None if selected_skills is None else set(selected_skills)
+    placed_skills = sorted(
+        d for d in (DIST_SKILLS_DIR.iterdir() if DIST_SKILLS_DIR.exists() else ())
+        if d.is_dir() and (wanted is None or d.name in wanted)
+    )
     
     # Build CLIs dict for this scope
     clis = {}
@@ -93,12 +110,12 @@ def build_install_state(
         effective_backend = backend
         local_dir_override = ""
         global_home_override_val = ""
-        if folder_overrides and backend.name in folder_overrides:
+        if folder_overrides and is_safe_local_dir(folder_overrides.get(backend.name, "")):
             local_dir_override = folder_overrides[backend.name]
             effective_backend = effective_backend.with_local_dir(local_dir_override)
-        if global_home_override and backend.name == "claude":
+        if global_home_override and backend.name == "claude" and expanded_home(global_home_override):
             global_home_override_val = global_home_override
-            effective_backend = effective_backend.with_global_home(Path(global_home_override).expanduser())
+            effective_backend = effective_backend.with_global_home(expanded_home(global_home_override))
 
         backend_state = BackendState(
             local_dir_override=local_dir_override,
@@ -118,7 +135,7 @@ def build_install_state(
         if effective_backend.supports("agents"):
             agents_dir = PKG_DIR / "dist" / effective_backend.name / "agents"
             if agents_dir.exists():
-                for agent_file in agents_dir.glob("*.md"):
+                for agent_file in agents_dir.glob(f"*.{effective_backend.layout.get('agent_extension', 'md')}"):
                     try:
                         sha = sha256_of(agent_file)
                         target = _get_target_path(agent_file, effective_backend, "agents", scope, project_path)
@@ -135,28 +152,16 @@ def build_install_state(
         # Check skills
         if effective_backend.supports("skills"):
             # Skills are in dist/skills/, not dist/<backend>/skills/
-            skills_dir = DIST_SKILLS_DIR
-            if skills_dir.exists():
-                for skill_dir in skills_dir.iterdir():
-                    if skill_dir.is_dir():
-                        try:
-                            # Use SKILL.md as the file to hash for consistency
-                            skill_md = skill_dir / "SKILL.md"
-                            if skill_md.exists():
-                                sha = sha256_of(skill_md)
-                            else:
-                                # If no SKILL.md, use empty string sha
-                                sha = ""
-                            target = _get_target_path(skill_dir, effective_backend, "skills", scope, project_path)
-                            if "skills" not in backend_state.installed:
-                                backend_state.installed["skills"] = {}
-                            backend_state.installed["skills"][skill_dir.name] = InstalledItem(
-                                sha=sha, target=str(target), mode=mode
-                            )
-                            backend_has_content = True
-                        except Exception:
-                            continue
-        
+            for skill_dir in placed_skills:
+                try:
+                    target = _get_target_path(skill_dir, effective_backend, "skills", scope, project_path)
+                    backend_state.installed.setdefault("skills", {})[skill_dir.name] = InstalledItem(
+                        sha=_skill_sha(skill_dir, mode), target=str(target), mode=mode
+                    )
+                    backend_has_content = True
+                except Exception:
+                    continue
+
         # Check rules
         if effective_backend.supports("rules"):
             # Rules come from dist/rules/
@@ -190,9 +195,37 @@ def build_install_state(
             except Exception:
                 pass
         
-        # Check commands (future enhancement)
-        # Check settings (future enhancement)
-        
+        # Check commands
+        commands_dir = DIST_DIR / effective_backend.name / "commands"
+        if effective_backend.supports("commands") and commands_dir.exists():
+            for command_file in commands_dir.glob("*.md"):
+                try:
+                    target = _get_target_path(command_file, effective_backend, "commands", scope, project_path)
+                    backend_state.installed.setdefault("commands", {})[command_file.name] = InstalledItem(
+                        sha=sha256_of(command_file), target=str(target), mode=mode
+                    )
+                    backend_has_content = True
+                except Exception:
+                    continue
+
+        # The context file the session hook writes: generated, never linked
+        if effective_backend.supports("session_hook"):
+            context_file = _get_target_path(Path(CONTEXT_FILE), effective_backend, "context", scope, project_path)
+            if context_file.is_file():
+                backend_state.installed["context"] = {CONTEXT_FILE: InstalledItem(
+                    sha=sha256_of(context_file), target=str(context_file), mode="copy"
+                )}
+                backend_has_content = True
+
+        # The cross-tool skills mirror every global install places
+        if scope == "global":
+            # present even when empty: "no skills mirrored" is an answer, not a missing record
+            backend_state.installed.setdefault("skills_mirror", {})
+            for skill_dir in placed_skills:
+                backend_state.installed.setdefault("skills_mirror", {})[skill_dir.name] = InstalledItem(
+                    sha=_skill_sha(skill_dir, mode), target=str(AGENTS_HOME / "skills" / skill_dir.name), mode=mode
+                )
+
         if backend_has_content:
             clis[backend.name] = backend_state
     
@@ -213,6 +246,15 @@ def build_install_state(
     return state
 
 
+def _skill_sha(skill_dir: Path, mode: str) -> str:
+    """A copied skill is hashed by its whole tree, so an edit anywhere in it shows.
+    A linked one keeps the SKILL.md hash older manifests carry."""
+    if mode == "copy":
+        return tree_sha(skill_dir)
+    skill_md = skill_dir / "SKILL.md"
+    return sha256_of(skill_md) if skill_md.exists() else ""
+
+
 def _get_target_path(source_path: Path, backend, component_type: str, scope: str, project_path: Optional[Path] = None) -> Path:
     """Get the target installation path for a source file/directory."""
     if scope == "global":
@@ -229,7 +271,7 @@ def _get_target_path(source_path: Path, backend, component_type: str, scope: str
             root = project_path if project_path else Path.cwd()
             return root / source_path.name
         return base_dir / source_path.name
-    elif component_type in ["agents", "rules", "skills"]:
+    elif component_type in ["agents", "rules", "skills", "commands"]:
         # These go into subdirectories according to backend layout
         if component_type in backend.layout:
             subdir = backend.layout[component_type].rstrip("/")

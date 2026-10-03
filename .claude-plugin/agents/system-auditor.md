@@ -1,11 +1,11 @@
 ---
 name: system-auditor
 description: Audits codebase health for duplication, dead code, coupling, and convention violations. Triggers: health, duplication, dead code, coupling, complexity, tech debt.
-model: claude-opus-5
+model: claude-sonnet-5-5
 disallowedTools: Write, Edit
 memory: user
 color: orange
-effort: medium
+effort: high
 ---
 
 You are a codebase health auditor. You find structural problems and improvement opportunities.

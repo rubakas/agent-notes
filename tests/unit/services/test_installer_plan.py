@@ -146,7 +146,8 @@ class TestPlanFileDifferingContent:
 
 
 class TestPlanFileCopyModeSymlink:
-    def test_copy_mode_skip_when_symlink_points_to_src(self, tmp_path):
+    def test_copy_mode_writes_over_a_symlink_that_points_to_src(self, tmp_path):
+        """The symlink becomes a copy: planning it as a skip said 'Install 0 files'."""
         src = tmp_path / "src.md"
         dst = tmp_path / "dst.md"
         src.write_bytes(b"content")
@@ -154,7 +155,7 @@ class TestPlanFileCopyModeSymlink:
 
         action = _plan_file(src, dst, copy_mode=True)
 
-        assert action.action == "skip"
+        assert action.action == "install"
 
     def test_copy_mode_overwrite_when_symlink_points_elsewhere(self, tmp_path):
         src = tmp_path / "src.md"
@@ -166,12 +167,12 @@ class TestPlanFileCopyModeSymlink:
 
         action = _plan_file(src, dst, copy_mode=True)
 
-        # symlink points elsewhere — should be install (dst.exists() is True via symlink,
-        # but it IS a symlink so the exists-and-not-symlink branch is skipped → install)
-        assert action.action == "install"
+        # a foreign symlink is renamed to a backup, never unlinked
+        assert action.action == "overwrite"
+        assert action.backup_path is not None
 
-    def test_symlink_mode_false_treats_existing_symlink_as_install(self, tmp_path):
-        """In symlink mode (copy_mode=False), existing symlink pointing elsewhere → install."""
+    def test_symlink_mode_backs_up_a_foreign_symlink(self, tmp_path):
+        """In symlink mode (copy_mode=False), an existing symlink pointing elsewhere is backed up."""
         src = tmp_path / "src.md"
         other = tmp_path / "other.md"
         dst = tmp_path / "dst.md"
@@ -181,7 +182,8 @@ class TestPlanFileCopyModeSymlink:
 
         action = _plan_file(src, dst, copy_mode=False)
 
-        assert action.action == "install"
+        assert action.action == "overwrite"
+        assert action.backup_path is not None
 
 
 # ---------------------------------------------------------------------------
