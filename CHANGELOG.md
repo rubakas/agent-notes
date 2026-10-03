@@ -32,6 +32,12 @@ All notable changes to this project will be documented in this file.
 
 - **Guard-credentials no longer denies benign commands containing bare `.key`/`.pem`-style fragments** (e.g. jq selectors such as `"\(.key)"`). Secret-extension matching now requires a non-empty stem (`id_rsa.key` is still denied; a bare `.key` fragment is not), and the same stem requirement is applied to the basename patterns for `.pem`, `.p12`, `.pfx`, `.jks`, `.keystore`, and `.truststore`. The `.env` handling is unchanged — `.env` and `.env.production` remain denied via their dedicated pattern.
 
+- **Memory and plugin choices apply in the same install,** not one install later. Before, a memory or plugin toggle changed the saved state *after* the confirm step, so the new value didn't reach the render or the session hook until the next install. They are now persisted only after a successful confirm, and the hook reads the newly saved values immediately.
+
+- **An unreadable `state.json` stops the command** with exit 2 and a message naming the file, instead of being treated as empty, which could overwrite other installs' records.
+
+- **`build` no longer keeps rules or agents that were removed from the package.** Removed items are now pruned from `dist/rules` and `dist/<cli>/agents` once the agents and rules are rendered, before the skills and commands are copied, so they stop being installed.
+
 ### Added
 
 - **Synced Matt Pocock skills from upstream ([`391a270`](https://github.com/mattpocock/skills/commit/391a2701dd948f94f56a39f7533f8eea9a859c87), 2026-07-10).** New skills: `codebase-design`, `domain-modeling`, `grilling`, `research`, `triage`, `wayfinder`, `to-spec`, `to-tickets`, `diagnosing-bugs`, `writing-great-skills`, and `setup-agent-tracker` (the per-repo issue-tracker/triage/domain setup skill, de-branded from upstream's `setup-matt-pocock-skills`). Every imported skill was reviewed for prompt-injection, exfiltration, and destructive commands by an adversarial multi-agent pass before import. Run `agent-notes regenerate` to apply.
@@ -55,6 +61,26 @@ All notable changes to this project will be documented in this file.
 - Memory is a "Memory" row on the review screen: `built-in` (default) or `Obsidian` (single-brain or per-project strategy).
 
 - Chrome-test handoff uses uuid-correlated bus files (`request-<uuid>.md` / `progress-<uuid>.md` / `report-<uuid>.md`), path-only handoff, `X/N` step progress, and supports parallel requests.
+
+- **A reinstall replaces the install.** Running `agent-notes install` again for the same target (same scope, project and profile) replaces it. This run's choices win: model pins start from the recommended ones, as on a first install.
+
+- **Leftovers are removed:** deselected skills (also in `~/.agents/skills`), a dropped CLI's agents, config, context file and session hook, copy↔symlink leftovers, and skills, rules or agents removed from the package.
+
+- **What counts as ours:** only what agent-notes placed is removed, meaning links into its own package and unedited copies it recorded. Your own files and links are never deleted. Edited copies are moved to `<name>.bak.<timestamp>` when a new file takes their place.
+
+- **Shared files:** files another install still uses (`~/.codex`, `~/.agents/skills`, a project's `CLAUDE.md`/`AGENTS.md`) are kept.
+
+- **The confirmation says what will be removed:** `Install N files (M backed up, K removed)?`.
+
+- **The flags path:** `install --local/--copy/--profile/--folder/--global-home` on an existing install shows what will be replaced and removed and asks first. `--yes` skips the prompt. Without a terminal and without `--yes` it refuses (exit 2). The old "Installation is healthy" check on an existing install is gone; use `agent-notes doctor`. `--reconfigure` is still accepted and does the same as a plain reinstall.
+
+- **Our own unedited copies are replaced without a `.bak`.** A link you made yourself at a target is moved to `.bak`, never deleted. The "N backed up" count is accurate.
+
+- **`uninstall` removes only what agent-notes placed.** In copy mode it no longer deletes your own files, and it leaves foreign links in `~/.agents/skills` alone.
+
+- **One-time note:** copy-mode skill folders installed before this release are backed up once on the next reinstall, because their old records cannot prove they are unedited.
+
+- **Concurrent installs are not supported.** State and other installs' claims are read from one snapshot per run.
 
 ### Removed
 

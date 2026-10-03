@@ -81,6 +81,17 @@ source .venv/bin/activate
 agent-notes uninstall && pip uninstall agent-notes && pip install agent-notes && agent-notes install
 ```
 
+### Reinstalling
+
+Running `agent-notes install` again for an existing install replaces it and cleans up leftovers: deselected skills, dropped CLIs, stale symlinks, and removed agents/rules. Your own files are never deleted — only what agent-notes placed is removed, and edited copies are backed up with a `.bak.<timestamp>` suffix.
+
+Shared files (`~/.agents/skills`, `~/.codex`, project `CLAUDE.md`) used by other installs are kept. Without a terminal, `--yes` is required to replace an existing install; without it the install refuses and changes nothing. With a terminal, `--yes` skips the confirmation only for the flag forms (`--local`, `--copy`, `--profile`, `--folder`, `--global-home`). A bare `agent-notes install --yes` opens the review screen on a terminal, and without one installs the recommended setup:
+
+```bash
+agent-notes install --yes                # scripts and automation (no terminal)
+agent-notes install --local --yes        # skip the confirmation on a terminal
+```
+
 ### Local build (developers)
 
 ```bash
@@ -297,9 +308,11 @@ Agents accumulate knowledge across sessions. Choose a backend during `agent-note
 
 **To reconfigure after install:**
 ```bash
-agent-notes install --reconfigure        # switch storage
+agent-notes install                      # review screen on existing install; replaces configuration
 agent-notes config memory               # interactive backend selector
 ```
+
+`--reconfigure` is still accepted (it's an alias for a plain reinstall) but no longer required. A reinstall now replaces the old install and cleans up leftovers.
 
 ### Local (default)
 
@@ -390,7 +403,7 @@ agent-notes <command> [options]
 
 | Command | Description |
 |---------|-------------|
-| `install [--local] [--copy] [--reconfigure]` | Review screen or direct install |
+| `install [--local] [--copy] [--profile] [--folder] [--global-home] [--yes] [--reconfigure]` | Review screen or direct install |
 | `uninstall [--local \| --global]` | Remove installed components (both scopes by default) |
 | `doctor [--local] [--fix]` | Check installation health |
 | `info` | Show status and component counts |

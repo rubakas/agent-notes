@@ -291,7 +291,7 @@ installer.install_all(backends=registry.all(), scope="global")
 **Examples:**
 ```
 agent_notes/commands/
-├── install.py         # install command — calls services.installer.install_all()
+├── install.py         # install and uninstall commands — calls services.installer
 ├── doctor.py          # doctor command — calls services.diagnostics.check_health()
 ├── list.py            # list command — queries registries
 ├── wizard/            # install wizard — calls services.install_state_builder
@@ -301,7 +301,6 @@ agent_notes/commands/
 ├── memory/            # memory command — calls services for state manipulation
 ├── regenerate.py      # regenerate command — rebuilds agents from state
 ├── set_role.py        # set role command — updates state, calls services
-├── uninstall.py       # uninstall command
 ├── info.py            # info command
 ├── _install_helpers.py # Shared helpers for install/uninstall/verify
 └── __init__.py         # Public command exports
@@ -357,8 +356,7 @@ Each shim ≤150 lines. They only re-export:
 ```python
 """DEPRECATED shim. Import from agent_notes.commands.install instead."""
 
-from agent_notes.commands.install import install
-from agent_notes.commands.uninstall import uninstall
+from agent_notes.commands.install import install, uninstall
 from agent_notes.commands.info import show_info
 from agent_notes.services.fs import place_file, remove_symlink
 from agent_notes.config import DIST_DIR, BIN_HOME
