@@ -243,3 +243,64 @@ def _verify_install(scope_state, scope, project_path, registry) -> list[str]:
                         comp_label = f"{backend.label} {component_type}"
                     print(f"  ✓ {total} {comp_label} present")
     return issues
+
+def describe_install(scope: str, project_path, profile_label: str = "") -> str:
+    """'local install at /p (profile work)': how messages name the install being replaced."""
+    where = "global install" if scope == "global" else f"local install at {project_path}"
+    return where + (f" (profile {profile_label})" if profile_label else "")
+
+
+def has_terminal() -> bool:
+    """True when both stdin and stdout are a terminal: only then may anything prompt."""
+    import sys
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def commit_install(new_state, snapshot, scope: str, project_path, profile_label: str,
+                   rerun: str) -> int:
+    """The tail of every install, after the new files are placed and the new manifest is built:
+    recompute the stale set from that manifest, remove it, then write state.json.
+
+    A failed state write is an error with a recovery command, not a warning: the files are
+    placed, so rerunning the same install converges. Returns how many stale paths were removed.
+    """
+    import sys
+    from ..registries.cli_registry import load_registry
+    from ..services import install_cleanup as cleanup
+    from ..services.state_store import StateUnreadable, get_scope, record_install_state
+
+    registry = load_registry()
+    old = get_scope(snapshot, scope, project_path, profile_label=profile_label) if snapshot else None
+    new = get_scope(new_state, scope, project_path, profile_label=profile_label)
+    claims = cleanup.claims_of_others(snapshot, scope, project_path, profile_label, registry)
+    stale = cleanup.stale_placements(old, scope, project_path, cleanup.manifest_targets(new),
+                                     claims, registry)
+    removed = cleanup.remove_stale(stale)
+    cleanup.remove_dropped_hooks(
+        cleanup.dropped_hook_backends(old, new.clis, scope, project_path, claims, registry), scope)
+    try:
+        record_install_state(new_state)
+    except StateUnreadable:
+        raise
+    except Exception as e:
+        print(f"Error: the install was placed but state.json could not be written ({e}).\n"
+              f"Fix the cause, then rerun to converge: {rerun}", file=sys.stderr)
+        sys.exit(1)
+    return len(removed)
+
+
+def rerun_command(local: bool = False, copy: bool = False, profile_label: str = "",
+                  folder: str = "", global_home: str = "") -> str:
+    """The command that repeats an install, for recovery messages."""
+    parts = ["agent-notes install"]
+    if local:
+        parts.append("--local")
+    if copy:
+        parts.append("--copy")
+    if profile_label:
+        parts.append(f"--profile {profile_label}")
+    if folder:
+        parts.append(f"--folder {folder}")
+    if global_home:
+        parts.append(f"--global-home {global_home}")
+    return " ".join(parts + ["--yes"])

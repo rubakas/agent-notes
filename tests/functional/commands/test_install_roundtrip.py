@@ -59,6 +59,7 @@ def _setup(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(config, "DIST_SKILLS_DIR", dist / "skills")
     monkeypatch.setattr(config, "DIST_RULES_DIR", dist / "rules")
     monkeypatch.setattr(config, "AGENTS_HOME", tmp_path / "agents_home")
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
 
     return registry, dist
 
@@ -89,9 +90,8 @@ class TestInstallUninstallRoundTrip:
         # Second install is non-destructive (idempotent)
         with patch(_PATCH_BUILD), \
              patch("agent_notes.services.installer.load_registry", return_value=registry), \
-             patch("agent_notes.services.installer._install_session_hook"), \
-             patch("agent_notes.commands.install._verify_install", return_value=[]):
-            install(local=False, copy=False)
+             patch("agent_notes.services.installer._install_session_hook"):
+            install(local=False, copy=False, assume_yes=True)
 
         # Files must still be there after second install
         assert list(agents_dir.glob("*.md")), "files must survive a second install"

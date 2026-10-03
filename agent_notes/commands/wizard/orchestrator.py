@@ -3,6 +3,7 @@ install (spec 005 FR-001, FR-005, FR-024, FR-026)."""
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -12,7 +13,7 @@ from ...services.tui.session import open_session
 from ...services.tui.widgets import CANCEL, DONE, ReviewForm
 from ..build import build
 from ..regenerate import regenerate_instruction
-from .._install_helpers import count_agents, count_skills
+from .._install_helpers import count_agents, count_skills, describe_install
 from ._common import _count_rules
 from .execute import _execute_install
 from .review import InstallChoices, ReviewContext, initial_choices, install_rows
@@ -23,24 +24,31 @@ log = logging.getLogger(__name__)
 HINTS = "↑↓ move   ⏎ edit   ←→ change   i install   q quit"
 
 
-def interactive_install(session_factory=open_session) -> None:
-    """Run the install review."""
+def interactive_install(session_factory=open_session, assume_yes: bool = False) -> None:
+    """Run the install review. *assume_yes* only matters without a terminal: there
+    the recommended setup replaces an existing install only when told to."""
     try:
-        _interactive_install(session_factory)
+        _interactive_install(session_factory, assume_yes)
     except (KeyboardInterrupt, EOFError):  # Ctrl-C, or the terminal closed
         print(f"\n\n  {Color.YELLOW}Cancelled.{Color.NC}")
 
 
-def _interactive_install(session_factory=open_session) -> None:
+def _interactive_install(session_factory=open_session, assume_yes: bool = False) -> None:
     from ...registries.cli_registry import load_registry
-    from ...services.state_store import load_current_state
-    load_current_state()  # an unreadable state.json stops the run before anything renders
+    from ...services.state_store import get_scope, load_current_state
+    snapshot = load_current_state()  # an unreadable state.json stops the run before anything renders
     cli_registry = load_registry()
     catalog = Catalog()
     choices = initial_choices(catalog, cli_registry)
     session = session_factory()
     if session is None:
         # stdin or stdout is not a terminal: nothing may prompt (FR-026).
+        project = Path.cwd().resolve() if choices.scope == "local" else None
+        if (snapshot and not assume_yes
+                and get_scope(snapshot, choices.scope, project, profile_label=choices.profile_label)):
+            print(f"Refusing to replace {describe_install(choices.scope, project, choices.profile_label)} "
+                  "without a terminal; rerun with --yes.")
+            sys.exit(2)
         print("No terminal attached — installing the recommended setup.")
         error = _render(choices, with_selections=True)
         if error:

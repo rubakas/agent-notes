@@ -237,7 +237,7 @@ class TestInstallValidatesBeforeItChangesAnything:
         _write_state(path, _valid_state(
             str(project), clis={"claude": {"role_models": {}, "installed": ghost}}))
 
-        install(local=True, reconfigure=True)
+        install(local=True, reconfigure=True, assume_yes=True)
 
         entry = load_state().local_installs[str(project)]
         assert entry.installed_version != "0.0.0-old"
@@ -253,6 +253,6 @@ class TestInstallValidatesBeforeItChangesAnything:
             seen_during_build.append(path.exists())
 
         with patch("agent_notes.commands.build.build", side_effect=spy):
-            install(local=True, reconfigure=True)
+            install(local=True, reconfigure=True, assume_yes=True)
 
         assert seen_during_build == [True]

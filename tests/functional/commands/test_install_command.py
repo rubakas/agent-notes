@@ -52,6 +52,7 @@ def _setup(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DIST_SKILLS_DIR", dist / "skills")
     monkeypatch.setattr(config, "DIST_RULES_DIR", dist / "rules")
     monkeypatch.setattr(config, "AGENTS_HOME", tmp_path / "agents_home")
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     return registry, dist
 
 
@@ -126,12 +127,11 @@ class TestInstallIdempotent:
 
         with patch(_PATCH_BUILD), \
              patch("agent_notes.services.installer.load_registry", return_value=registry), \
-             patch("agent_notes.services.installer._install_session_hook"), \
-             patch("agent_notes.commands.install._verify_install", return_value=[]):
+             patch("agent_notes.services.installer._install_session_hook"):
             from agent_notes.commands.install import install
             install(local=False, copy=False)
-            # Second call detects existing install; must not corrupt state
-            install(local=False, copy=False)
+            # Second call replaces the existing install; must not corrupt state
+            install(local=False, copy=False, assume_yes=True)
 
         from agent_notes.services.state_store import load_state
         state = load_state()

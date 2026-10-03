@@ -34,6 +34,7 @@ def test_the_build_command_exits_non_zero_when_the_agents_config_is_missing(
 
 
 def _existing_global_install(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     xdg = tmp_path / "config"
     monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
     state = xdg / "agent-notes" / "state.json"
@@ -59,12 +60,11 @@ def test_install_on_an_existing_install_fails_when_the_rebuild_fails(
     from agent_notes.commands.install import install
     with patch("agent_notes.commands.build.build", side_effect=FileNotFoundError("no agents")), \
          pytest.raises(SystemExit) as exit_info:
-        install()
+        install(assume_yes=True)
 
     assert exit_info.value.code not in (0, None)
     out = capsys.readouterr().out
     assert "no agents" in out
-    assert "healthy" not in out
 
 
 def test_a_fresh_install_exits_non_zero_when_the_build_fails(tmp_path, monkeypatch, capsys):

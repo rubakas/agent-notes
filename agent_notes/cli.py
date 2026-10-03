@@ -234,7 +234,9 @@ def _main():
     p_install.add_argument("--local", action="store_true", help="Install to current project")
     p_install.add_argument("--copy", action="store_true", help="Copy instead of symlink (with --local)")
     p_install.add_argument("--reconfigure", action="store_true",
-        help="Clear existing state for this scope and open the review screen")
+        help="Accepted for compatibility: installing over an existing install always replaces it")
+    p_install.add_argument("--yes", "-y", action="store_true",
+        help="Replace an existing install without asking (required without a terminal)")
     p_install.add_argument("--profile", metavar="LABEL",
         help="Profile label for multi-subscription setups (e.g. work, personal)")
     p_install.add_argument("--folder", metavar="DIR",
@@ -369,10 +371,11 @@ def _main():
                 profile_label=args.profile or "",
                 folder=args.folder or "",
                 global_home=args.global_home or "",
+                assume_yes=args.yes,
             )
         else:
             from .commands.wizard import interactive_install
-            interactive_install()
+            interactive_install(assume_yes=args.yes)
     elif args.command == "uninstall":
         all_profiles = getattr(args, 'all_profiles', False)
         profile_label = getattr(args, 'profile', '') or ""

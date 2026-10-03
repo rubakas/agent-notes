@@ -133,7 +133,7 @@ def build_install_state(
         if effective_backend.supports("agents"):
             agents_dir = PKG_DIR / "dist" / effective_backend.name / "agents"
             if agents_dir.exists():
-                for agent_file in agents_dir.glob("*.md"):
+                for agent_file in agents_dir.glob(f"*.{effective_backend.layout.get('agent_extension', 'md')}"):
                     try:
                         sha = sha256_of(agent_file)
                         target = _get_target_path(agent_file, effective_backend, "agents", scope, project_path)

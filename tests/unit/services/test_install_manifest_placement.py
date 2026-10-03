@@ -8,7 +8,6 @@ import pytest
 
 import agent_notes.config as config
 import agent_notes.commands.build as build_module
-import agent_notes.commands.wizard.execute as wizard_execute
 from agent_notes.commands.install import install
 from agent_notes.commands.wizard.execute import _execute_install
 from agent_notes.services.install_ownership import is_ours, tree_sha
@@ -34,9 +33,6 @@ def world(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DIST_OPENCODE_DIR", dist / "opencode")
     monkeypatch.setattr(config, "DIST_GITHUB_DIR", dist / "copilot")
     monkeypatch.setattr(config, "AGENTS_HOME", root / "agents_home")
-    # The wizard binds both by value at import: without these it writes to the real ~/.agents.
-    monkeypatch.setattr(wizard_execute, "AGENTS_HOME", root / "agents_home")
-    monkeypatch.setattr(wizard_execute, "PKG_DIR", pkg)
     monkeypatch.chdir(project)
     build_module.build()
     return home, project, dist

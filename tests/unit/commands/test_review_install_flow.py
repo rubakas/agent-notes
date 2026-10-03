@@ -28,7 +28,8 @@ class _Calls(list):
 
 
 @pytest.fixture
-def calls(monkeypatch):
+def calls(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))  # never the real state.json
     log = _Calls()
     log.plan = SimpleNamespace(to_install=["a", "b", "c"], overwrites=[])
 
