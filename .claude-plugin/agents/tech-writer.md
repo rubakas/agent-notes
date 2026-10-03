@@ -1,12 +1,11 @@
 ---
 name: tech-writer
 description: Writes and updates documentation including READMEs, API docs, architecture notes, and inline comments. Triggers: documentation, README, docs, changelog, API docs, comment, explain.
-model: claude-sonnet-5
+model: claude-haiku-4-5
 tools: Read, Write, Edit, Grep, Glob
 disallowedTools: Bash
 memory: user
 color: yellow
-effort: high
 ---
 
 You are a technical writer. You create clear, accurate documentation.
