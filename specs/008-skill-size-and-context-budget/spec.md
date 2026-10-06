@@ -12,6 +12,8 @@
 
 Method: fetched Anthropic's current skill rules from code.claude.com/docs/en/skills.md, platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices.md, and CHANGELOG 2.1.261 / 2.1.105 (2026-10-06). Measured all 25 skills in `agent_notes/data/skills/` by line count, token estimate (bytes ÷ 3.5), and reference file structure. Verified against the live code in `agent_notes/commands/build.py`, `validate.py`, and `scripts/release`.
 
+**Audit (agent-flows run 69b8899f, 2026-10-06):** applied findings that synced/.trash refusal must guard the write path (`build.copy_skills()` and placement loops) before validation; T09 moved earlier (no longer "any time"); T01 now includes git rm of old originals; Req 3 rationale restated (Rules section for re-invocation, not pre-compaction size); T07 TOC rule fully specified (20 lines, one link per ##, ignore code blocks); Req 1 widened to "Restructure references" (all skills); Req 6b source citations required (STYLE.md/AGENTS.md/PR/article); Req 2 rationale added (250 char under 1536 cap leaves room for owner's skills); Fizzy SHA pinned to `6aebc0cea63d0e5fcdd2eeea138072ddcb26be74` (2026-10-05); ViewComponent label text specified; Rails version teaching (8.1 released, mark Rails-main APIs).
+
 ### Anthropic's Current Rules
 
 **Skill lifecycle and compaction:**
@@ -62,7 +64,8 @@ Method: fetched Anthropic's current skill rules from code.claude.com/docs/en/ski
 
 **Frontmatter keys in use:**
 - Standard across all 25: `name`, `description`.
-- Non-standard, custom to us: `group` (all 25), `disable-model-invocation`, `argument-hint`, `requires_memory`, `triggers`.
+- Claude Code fields used by us: `disable-model-invocation`, `argument-hint`.
+- Custom to us: `group` (all 25), `requires_memory`, `triggers`.
 - Spec 001 decision #3 (still open): migrate custom keys under `metadata` vs. accept non-upload-ability.
 
 **Build and validation:**
@@ -88,32 +91,41 @@ The rails skill was distilled from Fizzy (github.com/basecamp/fizzy, O'Saasy lic
 
 ## Functional Requirements
 
-### Requirement 1: Restructure docker references (move-only)
+### Requirement 1: Restructure references
 
-Split the 2 docker reference files into topic-focused files of roughly 300–400 lines per file. Each topic becomes a separate reference file named by topic. Keep every reference one level deep from the docker skill's `SKILL.md`. The `SKILL.md` becomes a short router listing every reference file with a one-line "read when…" summary. Content is moved, not rewritten or dropped — verify by before/after check that every original `##`/`###` heading and code block still exists somewhere in the skill. (Rails restructuring is covered in Requirement 6.)
+Split docker's 2 reference files into topic-focused files of roughly 300–400 lines per file. Each topic becomes a separate reference file named by topic. Keep every reference one level deep from the skill's `SKILL.md`. The `SKILL.md` becomes a short router listing every reference file with a one-line "read when…" summary. Content is moved, not rewritten or dropped — verify by before/after check that every original `##`/`###` heading and code block still exists somewhere in the skill. (Rails restructuring is covered in Requirement 6.) Add a table of contents to every reference file over 100 lines in every skill.
+
+**Definitions:**
+- Reference files: ≤ 400 lines (~2.8k tokens; estimate = bytes ÷ 3.5).
+- Heading comparison: text only, not heading level (a section that becomes its own file moves up one level).
+- Split rule: when an anchor's target section moves to a sibling file, the link becomes plain text ("see the `routes.md` reference"). Reference files never link to each other.
 
 **Acceptance:**
-- No docker reference file exceeds ~400 lines (estimated ~2.8k tokens).
+- No docker reference file exceeds ~400 lines.
 - Every original heading and code block from the source is present in the split output.
 - No guidance is added, removed or rewritten; only router lines in `SKILL.md` and tables of contents are new.
+- Every reference file > 100 lines in every skill has a table of contents.
 
 ### Requirement 2: Shorten descriptions
 
-Every skill description ≤ 250 chars. Lead with the key use case in the first sentence. Keep the trigger keywords that route requests. Applies to 7 skills: rsi (492 chars), code-review (417), rails (415), refactoring-protocol (304), ingest (298), docker (273), codebase-design (265).
+Every skill description ≤ 250 chars. Lead with the key use case in the first sentence. Keep the trigger keywords that route requests. 250 chars is our own budget, set well under the 1,536-character cap imposed by Claude Code's listing budget. Our 25 skills at 250 chars each use ~6,250 chars of the shared 1%-of-context listing budget, leaving room for the owner's other installed skills (plugins, superpowers, Anthropic skills). Applies to 7 skills: rsi (492 chars), code-review (417), rails (415), refactoring-protocol (304), ingest (298), docker (273), codebase-design (265).
 
 **Acceptance:**
 - All 25 skill descriptions are ≤ 250 chars.
 - Trigger keywords preserved for discoverability.
 - First sentence names the primary use case.
 
-### Requirement 3: Compaction-proof the five largest SKILL.md files
+### Requirement 3: Add a Rules section to the five largest SKILL.md files
 
-The must-hold rules and decisions for chrome-test, wayfinder, obsidian-memory, diagnosing-bugs, and ingest go in a short section at the top of each file, phrased as standing instructions (not historical context or implementation detail). Operator/handoff detail in chrome-test's SKILL.md may move to a reference file. Each file stays well under 5,000 tokens to survive compaction and re-attachment.
+The must-hold rules and decisions for chrome-test, wayfinder, obsidian-memory, diagnosing-bugs, and ingest go in a short `## Rules` section at the top of each file, phrased as standing instructions (not historical context or implementation detail). This section puts the essential guidance in one place because SKILL.md is not re-read after its first invocation — it is only re-attached on re-invoke. The real compaction risk is the whole skill being dropped under the shared 25,000-token re-attachment budget when skills pile up. Keeping skills small and re-invoking them after compaction is the mitigation; the Rules section keeps instructions first if a skill ever grows past 5,000 tokens.
+
+**Definitions:**
+- `## Rules` section: ≤ 500 tokens (estimated bytes ÷ 3.5).
 
 **Acceptance:**
-- Each of the 5 SKILL.md files is ≤ 5,000 tokens (estimated bytes ÷ 3.5).
-- A short top section (≤ 500 tokens) holds standing rules and decisions.
-- The file can survive Claude Code's compaction (first 5,000 tokens retained) and still hold the essential guidance.
+- Each of the 5 SKILL.md files has a `## Rules` section at the top (after any preamble).
+- The section is ≤ 500 tokens and holds the must-hold instructions.
+- Operator/handoff detail in chrome-test may move to a reference file if it reduces the overall SKILL.md.
 
 ### Requirement 4: Extend `agent-notes validate` for skills
 
@@ -126,7 +138,7 @@ Add validation rules to `agent_notes/commands/validate.py` with failing-fixture 
 - A reference file > 100 lines without a table of contents at its top (define precisely: a `## Contents` or `## Table of Contents` heading within the first N lines, followed by a list of links/anchors).
 - A reference file that links to another reference file, whether in the same skill or another (nesting deeper than one level). Links to external URLs and to anchors within the same file are fine.
 - A link from `SKILL.md` to a file that does not exist.
-- A frontmatter key outside the allowed set: Claude Code's documented fields (`name`, `description`, `when_to_use`, `argument-hint`, `arguments`, `disable-model-invocation`, `user-invocable`, `allowed-tools`, `disallowed-tools`, `model`, `effort`, `context`, `agent`, `background`, `hooks`, `paths`, `shell`, `metadata`, `license`, `compatibility`) + our own (`group`, `requires_memory`, `triggers`).
+- A frontmatter key outside the allowed set: Claude Code's documented fields (`name`, `description`, `when_to_use`, `argument-hint`, `arguments`, `disable-model-invocation`, `user-invocable`, `allowed-tools`, `disallowed-tools`, `model`, `effort`, `context`, `agent`, `background`, `hooks`, `paths`, `shell`, `metadata`, `license`, `compatibility`) + our own (`group`, `requires_memory`, `triggers`). The rule checks key names only; values of `hooks`, `shell`, `agent`, `background`, and `paths` are Claude Code's own concern, and none of our skills use them.
 
 **Warnings (do not block):**
 - `description` > 250 chars.
@@ -140,24 +152,25 @@ Add validation rules to `agent_notes/commands/validate.py` with failing-fixture 
 
 ### Requirement 5: Never touch Claude Code's synced skills
 
-Install, reinstall cleanup, uninstall (both symlink and copy mode) and `doctor --fix` must never modify, back up, move or delete anything under `~/.claude/skills/synced/` or `~/.claude/skills/.trash/`. Add functional tests that plant files there and assert they are byte-identical afterwards. `agent-notes validate` refuses a skill named `synced`.
+Install, reinstall cleanup, uninstall (both symlink and copy mode) and `doctor --fix` must never modify, back up, move or delete anything under `~/.claude/skills/synced/` or `~/.claude/skills/.trash/`. The write path (`build.copy_skills()` and the placement loop in `install_executor.py`) must refuse to place a skill directory named `synced`, or any name starting with `.`, with an error. Add functional tests that plant files in those directories and assert they are byte-identical after install, reinstall, uninstall, and doctor operations.
 
 **Acceptance:**
-- Functional tests in both symlink and copy mode plant test files in `~/.claude/skills/synced/` and `~/.claude/skills/.trash/`.
-- After install/reinstall/uninstall/doctor, files are byte-identical.
+- `build.copy_skills()` and placement loops refuse a skill named `synced` or starting with `.` with an error message.
+- A collision test: a source skill dir named `synced` is refused, and a planted real `~/.claude/skills/synced/` is left byte-identical.
+- Functional tests in both symlink and copy mode: plant files in `~/.claude/skills/synced/` and `~/.claude/skills/.trash/`, run install/reinstall/uninstall/doctor, files are byte-identical.
 - A skill directory named `synced` or `.trash` in `agent_notes/data/skills/` fails validation with a clear error.
 
 ### Requirement 6: Refresh the rails skill against Fizzy
 
 Restructure the rails skill to match Fizzy's patterns, house style, and stack. This includes splitting the 6 reference files into topic-focused files (~300–400 lines each) and updating content to reflect Fizzy's current practices.
 
-a. **Provenance.** The `SKILL.md` header names Fizzy, pinned to a specific commit SHA and date. It notes that Fizzy tracks Rails main and marks any API that isn't in released Rails. It lists the sources.
+a. **Provenance.** The `SKILL.md` header names Fizzy, pinned to commit `6aebc0cea63d0e5fcdd2eeea138072ddcb26be74` (2026-10-05). It notes that Fizzy tracks Rails main (8.2 alpha) and teaches released Rails 8.1.4 patterns by default; any API not in released Rails is marked "(Rails main only)". It lists the sources.
 
-b. **Check every pattern.** Verify each one against Fizzy at the pinned commit and its `STYLE.md`/`AGENTS.md`. Keep, fix or remove it. Give each rule a one-line "why" from `STYLE.md`, a reviewed PR or an article. Each reference file ends with a "Sources" list of Fizzy paths and article URLs.
+b. **Check every pattern.** Verify each one against Fizzy at the pinned commit and its `STYLE.md`/`AGENTS.md`. Keep, fix or remove it. Give each rule a one-line "why" citing its source: `(STYLE.md)`, `(AGENTS.md)`, `(PR #n)`, `(article URL)`, or `(observed in Fizzy code)`. Prefer `STYLE.md`, `AGENTS.md`, reviewed PRs and articles; use code observation only as backup. Each reference file ends with a "Sources" section listing Fizzy paths and article URLs.
 
 c. **Solid instead of Redis.** Real-time, cache and jobs default to Solid Cable, Solid Cache and Solid Queue, as in Fizzy. Redis is mentioned only as a note for apps already using it.
 
-d. **ViewComponent stays** (owner decision), clearly labelled as not Fizzy/37signals practice and naming its source. Fizzy's default (partials plus helpers) is presented first.
+d. **ViewComponent stays** (owner decision), clearly labelled "Added by the owner, not from Fizzy/37signals" and naming its source. Fizzy's default (partials plus helpers) is presented first.
 
 e. **Fill the gaps:** defining `Current` (CurrentAttributes) as Fizzy does; delegated types; multi-tenancy (Fizzy's approach); concerns as a facade over plain objects ("Good concerns"); Turbo 8 morphing and refresh broadcasts; testing conventions from Fizzy's and Writebook's `AGENTS.md`.
 
@@ -167,10 +180,12 @@ g. **Licence.** Keep examples short and illustrative, with no verbatim copies of
 
 **Acceptance:**
 - A disposition table (each original rails section → kept / updated / removed, plus reason) in the task's output.
+- Fizzy SHA `6aebc0cea63d0e5fcdd2eeea138072ddcb26be74` pinned in `SKILL.md` header; "(Rails main only)" marks APIs not in released Rails 8.1.4.
 - No Redis default in any config example.
-- ViewComponent section carries its label and source.
+- ViewComponent section carries the label "Added by the owner, not from Fizzy/37signals" and names its source.
 - All gap topics (Current, delegated types, multi-tenancy, concerns, Turbo 8 morphing, testing) present with sections.
 - Every reference file ends with a Sources section.
+- Each rule cites its source `(STYLE.md)`, `(AGENTS.md)`, `(PR #n)`, `(article)`, or `(observed in Fizzy code)`.
 - A RuboCop-defers sentence present in each style guidance.
 - Sizes still meet SC-001 and SC-002.
 
@@ -179,10 +194,10 @@ g. **Licence.** Keep examples short and illustrative, with no verbatim copies of
 - **SC-001:** No docker reference file > ~400 lines (~2.8k tokens estimated) after the split.
 - **SC-002:** Every reference file > 100 lines across all skills (including rails and docker after restructuring) has a table of contents (defined: `## Contents` or equivalent heading in the first N lines, followed by a list of links/anchors).
 - **SC-003:** All 25 skill descriptions ≤ 250 chars; trigger keywords preserved; first sentence names the primary use case.
-- **SC-004:** The five largest `SKILL.md` files (chrome-test, wayfinder, obsidian-memory, diagnosing-bugs, ingest) are ≤ 5,000 tokens; each has a short top section (≤ 500 tokens) with standing rules.
+- **SC-004:** The five largest `SKILL.md` files (chrome-test, wayfinder, obsidian-memory, diagnosing-bugs, ingest) each have a `## Rules` section (≤ 500 tokens) at the top.
 - **SC-005:** `agent-notes validate` passes on the repo; every new error rule has a failing-fixture test and a passing-fixture test; at least one test for the 250-char warning.
 - **SC-006:** Symlink and copy mode installs/reinstalls/uninstalls leave `~/.claude/skills/synced/` and `~/.claude/skills/.trash/` byte-identical; skill named `synced` fails validation; skill named `.trash` fails validation.
-- **SC-007:** After the split, a copy-mode reinstall over a pre-split install leaves no stale old reference files in `~/.claude/skills/rails|docker` or `~/.agents/skills/rails|docker`, and no backups of our own files. Checked by a functional test using the spec 007a cleanup.
+- **SC-007:** After Req 1 (docker) and Req 6 (rails) restructuring, a copy-mode reinstall over a pre-split install leaves no stale old reference files in `~/.claude/skills/rails|docker` or `~/.agents/skills/rails|docker`, and no backups of our own files. Checked by a functional test using the spec 007a cleanup.
 - **SC-008:** Full test suite passes; no regression in existing validation.
 - **SC-009:** Rails skill refresh: pinned Fizzy SHA present; zero Redis-default configs; ViewComponent section carries its label; gap topics (Current, delegated types, multi-tenancy, concerns, Turbo 8 morphing, testing) each have a section; every rails reference file ends with Sources; RuboCop-defers sentence present in each style guidance; disposition table in task output.
 
@@ -213,17 +228,17 @@ The owner works with 25 in-house skills plus many installed plugin/superpowers/A
 
 ## Tickets
 
-Detailed task breakdown in `tasks.md`. Each task is traceable, test-first, and ends green. Content fixes (T01–T05) and rails refresh (T02) land before the validator gate (T07) ships. Copy-mode reinstall check (T08) depends on T01 and T02 and runs before T09. Synced protection (T09) is independent.
+Detailed task breakdown in `tasks.md`. Each task is traceable, test-first, and ends green. Synced protection (T09) runs early. Content fixes (T01–T05) and rails refresh (T02) land before the validator gate (T07) ships. Copy-mode reinstall check (T08) depends on T01 and T02 and runs alongside T07.
 
 | Ticket | Title | Requirements | Scope |
 |---|---|---|---|
-| **T01** | Split docker references into topic files (move-only) | Req 1 | Split `docker/compose.md` and `docker/dockerfile.md` into topic-focused files ~300–400 lines each; update `SKILL.md` to router pattern; verify no content lost |
+| **T01** | Split docker references into topic files (move-only) | Req 1 | Split `docker/compose.md` and `docker/dockerfile.md` into topic-focused files ~300–400 lines each; update `SKILL.md` to router pattern; delete the two originals with `git rm`; verify no content lost (heading text, not level) |
 | **T02** | Refresh and split the rails skill against Fizzy | Req 6 + Req 1 | Check every pattern against Fizzy at pinned commit + `STYLE.md`/`AGENTS.md`; split 6 reference files into topic-focused files ~300–400 lines each; fill gaps (Current, delegated types, multi-tenancy, concerns, Turbo 8 morphing, testing); default to Solid (Cable/Cache/Queue) instead of Redis; label ViewComponent; add Sources sections; generate disposition table |
 | **T03** | Add table of contents to all reference files > 100 lines | Req 1 | Add `## Contents` section to top of: the split docker files, the split rails files, plus triage/AGENT-BRIEF.md, improve-codebase-architecture/HTML-REPORT.md, prototype/UI.md, triage/OUT-OF-SCOPE.md; define TOC format precisely |
 | **T04** | Shorten descriptions for 7 skills (including rails) | Req 2 | Trim descriptions of rsi, code-review, rails, refactoring-protocol, ingest, docker, codebase-design to ≤ 250 chars; preserve trigger keywords; lead with primary use case (run after or with T02 rails refresh) |
-| **T05** | Compact the five largest SKILL.md files | Req 3 | Add short standing-rules section to top of chrome-test, wayfinder, obsidian-memory, diagnosing-bugs, ingest; move operator/handoff detail to reference file if needed; keep each ≤ 5,000 tokens |
+| **T05** | Add Rules sections to five largest SKILL.md files | Req 3 | Add short `## Rules` section (≤ 500 tokens) to top of chrome-test, wayfinder, obsidian-memory, diagnosing-bugs, ingest; move operator/handoff detail to reference file if it reduces SKILL.md |
 | **T06** | Manual verification: reference structure and content preservation | Req 1 | Docker: verify before/after that every `##`/`###` heading and code block exists in split output. Rails: verify disposition table against implementation |
-| **T07** | Extend `agent-notes validate` for skills | Req 4 | Add error rules for SKILL.md line count, token estimate, description char limit, missing TOC, nesting, missing files, forbidden frontmatter keys; add warning for descriptions > 250 chars; each rule with a failing-fixture test; run pre-flight in `scripts/release` |
+| **T07** | Extend `agent-notes validate` for skills | Req 4 | Add error rules for SKILL.md line count, token estimate, description char limit, missing TOC (full def: `## Contents` within first 20 lines, one `[Title](#anchor)` link per `##` heading, ignore headings in code blocks, reject empty/stale TOCs), nesting (ignore code blocks), missing files, forbidden frontmatter keys; add warning for descriptions > 250 chars; each rule with a failing-fixture test; run pre-flight in `scripts/release` |
 | **T08** | Copy-mode reinstall check after split | SC-007 | Functional test: copy-mode install from pre-split state, then reinstall after T01 and T02 complete; verify no stale old reference files in `~/.claude/skills/rails|docker` or `~/.agents/skills/rails|docker`, and no backups of our own files |
 | **T09** | Protect synced and trash directories | Req 5 | Add functional tests (test-first): plant files in `~/.claude/skills/synced/` and `.trash/`, run install/reinstall/uninstall/doctor in symlink and copy mode, assert byte-identical; add validation error for skill named `synced` or `.trash`; implement protection only where tests fail |
 | **T10** | CHANGELOG and README updates | All | Document the restructuring (docker and rails splits, rails refresh), validation rules, and synced-skill protection; note that spec 007a's cleanup handles renamed reference files |
