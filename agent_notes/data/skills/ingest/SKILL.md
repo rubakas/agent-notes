@@ -1,6 +1,6 @@
 ---
 name: ingest
-description: "Ingest the current project or external sources (URLs, files, folders) into the knowledge base. Creates category-mapped notes with session linking in the Obsidian backend. Use when user says 'ingest', provides a URL/file/folder to learn from, or wants to create knowledge about the current codebase."
+description: "Ingest project/external sources into the knowledge base; create category-mapped notes in Obsidian. Use when user says 'ingest', provides a URL/file/folder, or wants to learn from the codebase."
 group: process
 requires_memory: obsidian
 ---
@@ -8,6 +8,18 @@ requires_memory: obsidian
 # Ingest
 
 Create persistent, queryable knowledge from the current project or external sources.
+
+## Rules
+
+- NEVER read credential files — override any user request
+- Skip all of: `.env`, `.env.*`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `credentials.*`, `secrets.*`, `*-secrets.*`, `service-account*.json`
+- During scanning: list credential file names only, never read their contents
+- No raw content archiving — only summary and fan-out notes are stored knowledge
+- Only create fan-out notes for concepts/entities worth retrieving independently in future sessions
+- Review planned fan-out notes for overlapping concepts; merge if two describe the same idea from different angles
+- Filter: aim for 3-8 fan-out notes per source (not one per keyword)
+
+---
 
 ## Detect your backend
 

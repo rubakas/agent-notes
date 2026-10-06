@@ -10,6 +10,20 @@ A discipline for hard bugs. Skip phases only when explicitly justified.
 
 When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
 
+## Rules
+
+- Build a tight feedback loop first (red-capable, deterministic, fast, agent-runnable)
+- Never jump to hypothesis or code without a red-capable feedback loop
+- Always reproduce the user's exact symptom (not a nearby bug)
+- Minimize to smallest scenario that still fails (every element must be load-bearing)
+- Generate and rank 3-5 hypotheses before testing any one
+- Change one variable at a time during instrumentation
+- Tag every debug log with a unique prefix for cleanup (e.g., `[DEBUG-a4f2]`)
+- Write regression test before the fix (only if a correct seam exists)
+- Re-run Phase 1 loop against the original scenario after the fix
+
+---
+
 ## Phase 1 — Build a feedback loop
 
 **This is the skill.** Everything else is mechanical. If you have a **tight** pass/fail signal for the bug — one that goes red on _this_ bug — you will find the cause; bisection, hypothesis-testing, and instrumentation all just consume it. If you don't have one, no amount of staring at code will save you.

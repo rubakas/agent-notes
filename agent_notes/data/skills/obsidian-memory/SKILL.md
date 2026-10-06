@@ -9,6 +9,18 @@ requires_memory: obsidian
 
 Use when you need to persist a discovery, decision, or pattern for future sessions, or retrieve existing knowledge from the vault.
 
+## Rules
+
+- Always use the CLI (`agent-notes memory add`) — never write vault files directly
+- Always use UTC timestamps in ISO 8601 format with "Z" suffix
+- Always include `created_at` in frontmatter (required)
+- Save only non-obvious discoveries that would cost future sessions time to re-derive
+- Never save things already in code (git log, grep results), standard framework behavior, in-progress task state, or CLAUDE.md docs
+- Session notes append on re-run with `type=session` (one file per session, not per-message)
+- Always pass `--description` to optimize index routing
+
+---
+
 ## Single rule for ALL records
 
 This skill is the **single source of truth** for memory record format. The CLI implements these rules; do not deviate.

@@ -13,6 +13,19 @@ triggers:
 
 Coordinates browser testing between this dev session and a separate `claude --chrome` session via a profile-aware file bus. Two legs: **Generate** (write a handoff prompt + scenarios to the bus) and **Ingest** (consume the report the chrome session writes back).
 
+## Rules
+
+- Always resolve the bus dir at runtime from the profile (respects claude profile, not agent-notes state.json)
+- Always mint a unique 8-character UUID for each handoff
+- Always substitute resolved paths and UUID into request file (no shell variables survive)
+- Never inline real secrets; use placeholders (`<<PASSWORD>>`) and instruct tester to ask operator
+- Always create the bus dir on demand before writing
+- Always read report-<uuid>.md from the bus file directly, not paste-back from operator
+- Always write complete handoff prompt with all resolved paths, UUIDs, and step count
+- Mint a new UUID and write new request-<uuid>.md after triaging each report
+
+---
+
 ## Precondition — `claude --chrome` is unverified
 
 Everything below assumes an operator can start a `claude --chrome` session. That flag is a community pattern, not an officially documented Anthropic workflow, and nothing here pins or verifies it. Confirm with the operator before relying on it.

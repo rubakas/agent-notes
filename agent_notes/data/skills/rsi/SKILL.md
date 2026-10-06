@@ -1,6 +1,6 @@
 ---
 name: rsi
-description: "Recursive code-improvement loop: iteratively harden an existing codebase across bugs, performance, quality, consistency/homogeneity, pattern adherence, tests, atomicity, independence, and DRY — strictly without adding functionality. Use when the user wants to improve, clean up, or harden existing code, says 'rsi', or asks to raise code quality without new features. For a single one-shot refactor use refactoring-protocol; for module or interface redesign use improve-codebase-architecture."
+description: "Iterative code-quality loop: harden existing code across bugs, performance, consistency, tests, and DRY—never add features. Use when user says 'rsi', asks to improve/clean code quality, or wants hardening without new features."
 group: process
 argument-hint: "[path or scope, optional]"
 ---

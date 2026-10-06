@@ -9,6 +9,17 @@ A loose idea has arrived — too big for one agent session, and wrapped in fog: 
 
 The destination varies per effort, and naming it is the first act of charting — it shapes every ticket. It might be a spec to hand off and iterate on, a decision to lock before planning starts, or a change made in place like a data-structure migration. The map is domain-agnostic — engineering work, course content, whatever fits the shape.
 
+## Rules
+
+- Never resolve more than one ticket per session
+- Always claim a ticket before starting work (assign it to yourself first)
+- Always use the tracker's native blocking for ticket dependencies
+- Record the answer as a resolution comment on the ticket; close the ticket; add one line to Decisions-so-far
+- Never pre-slice fog into ticket-sized pieces (fog is coarser than tickets; one patch may graduate into several tickets or none)
+- Out-of-scope work never graduates—the frontier stops at the destination
+
+---
+
 ## Plan, don't do
 
 Wayfinder is **planning** by default: each ticket resolves a decision, and the map is done when the way is clear — nothing left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. An effort can override this in its **Notes** — carrying execution into the map itself — but absent that, produce decisions, not deliverables.
