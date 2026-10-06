@@ -45,6 +45,14 @@ All notable changes to this project will be documented in this file.
 
 - **"Decompose before delegating" rule in lead instructions.** Before dispatching a coder/refactorer/test-writer, the lead must convert investigation findings into an ordered `file → change → reason` checklist and pass concrete `file:line` findings verbatim, so executing agents run a batch instead of re-exploring already-mapped code. Adds a matching anti-pattern and coder/refactorer directives. Run `agent-notes regenerate` to apply.
 
+- **`agent-notes validate` now checks skills.** Errors (block release): `SKILL.md` over 500 lines or 5,000 tokens; `description` over 1,024 chars; reference files over 100 lines without a table of contents (defined as `## Contents` heading in first 20 lines, listing sections with `[Title](#anchor)` links); reference files linking to other reference files; broken relative links; unknown frontmatter keys (allowed: `name`, `description`, `when_to_use`, `argument-hint`, `arguments`, `disable-model-invocation`, `user-invocable`, `allowed-tools`, `disallowed-tools`, `model`, `effort`, `context`, `agent`, `background`, `hooks`, `paths`, `shell`, `metadata`, `license`, `compatibility`, `group`, `requires_memory`, `triggers`). Warnings: `description` over 250 chars. These checks run at release pre-flight and are enforced by `scripts/release`.
+
+- **Long reference files (over 100 lines) across all skills now include a table of contents at the top,** listing major sections with anchor links to improve navigation.
+
+- **Skill descriptions shortened to 250 characters or fewer** to leave room in Claude Code's shared skill listing, which is capped at 1% of the context window and drops the least-used skills' descriptions first. Affected: `rsi`, `code-review`, `rails`, `refactoring-protocol`, `ingest`, `docker`, `codebase-design`. Trigger keywords preserved; first sentence names the primary use case.
+
+- **The five largest SKILL.md files now open with a `## Rules` section** holding must-hold instructions for re-invocation. Affected: `chrome-test`, `wayfinder`, `obsidian-memory`, `diagnosing-bugs`, `ingest`. The Rules section puts the must-hold instructions first, phrased as standing rules, because Claude Code does not re-read a skill after invoking it.
+
 ### Changed
 
 - **The install wizard and the interactive `config` menu are replaced by one review screen.** `agent-notes install` opens it with every setting pre-filled: ↑↓ move, ⏎ edits a row, ←→ changes simple values, `i` installs (quiet build, then "Install N files (M backed up)?"), `q` quits. `agent-notes config` opens the same screen on an existing install (the current folder's, else global, else a picker): `tab` switches installs, `u` moves deprecated or unknown pins to the recommended model, `s` shows the diff and saves everything with one state write and one regenerate; API keys save as soon as entered. Terminals under 60×16 (or without `termios`) get numbered prompts. With no terminal, `install` installs the recommended setup without prompts — piped answers are no longer read. Scriptable `config` subcommands and `install --local/--copy/--profile/--folder/--global-home` are unchanged. `config show` uses the same layout and flags outdated pins.
@@ -81,6 +89,14 @@ All notable changes to this project will be documented in this file.
 - **One-time note:** copy-mode skill folders installed before this release are backed up once on the next reinstall, because their old records cannot prove they are unedited.
 
 - **Concurrent installs are not supported.** State and other installs' claims are read from one snapshot per run.
+
+- **Rails skill refreshed against Fizzy** (basecamp/fizzy, pinned commit `6aebc0cea63d0e5fcdd2eeea138072ddcb26be74`, 2026-10-05). Split into 29 focused reference files with a router `SKILL.md`. Teaches released Rails 8.1.4; Fizzy's Rails-main-only APIs (e.g. `Migration[8.2]`) are labelled as such. Defaults to Solid Queue, Solid Cache, and Solid Cable instead of Redis (mentioned only for apps already using it). All examples copied from Fizzy or marked illustrative. ViewComponent labeled "Added by the owner, not from Fizzy/37signals" and names its source. Fills gaps: `Current`/CurrentAttributes, delegated types, multi-tenancy, concerns, Turbo 8 morphing, testing conventions. Every reference file ends with a Sources section listing Fizzy paths and articles. Style guidance defers to the project's `.rubocop.yml` config; Fizzy's house preferences are noted as the 37signals default when the project has no rule. Each coding rule cites its source.
+
+- **Docker skill split into 9 topic-focused reference files,** each under 300 lines. Replaces the 2 large reference files (`compose.md`, `dockerfile.md`). The `SKILL.md` becomes a router listing each reference with a one-line "read when…" summary. All original headings and code examples preserved in the split output. Every reference file over 100 lines includes a table of contents.
+
+- A new test confirms that a copy-mode reinstall replaces a skill's directory, so reference files renamed by the docker and rails splits leave no stale copies.
+
+- **Install, reinstall, uninstall, and `doctor --fix` never modify, move, back up, or delete anything under `~/.claude/skills/synced/` or `~/.claude/skills/.trash/`.** A skill directory named `synced` (any letter case) or starting with `.` is refused at build and install, and by `agent-notes validate` with an error message. This protects Claude Code's synced skills from accidental overwrite.
 
 ### Removed
 
