@@ -73,12 +73,14 @@ def install_component_for_backend(
     elif component == "skills":
         # Each top-level subdir of src is a skill — install each as a directory
         # Only print if there are skills to install
-        skill_dirs = [d for d in src.iterdir() if d.is_dir()]
+        # Build already refuses reserved names; a stale one in dist must still never
+        # reach ~/.claude/skills/synced or .../.trash.
+        skill_dirs = config.placeable_skill_dirs(src)
         if not skill_dirs:
             return
         if not _fs.silent_file_ops:
             print(f"Installing {backend.label} skills to {printable(dst)} ...")
-        for skill_dir in sorted(skill_dirs):
+        for skill_dir in skill_dirs:
             place_file(skill_dir, dst / skill_dir.name, copy_mode)
 
 
@@ -117,10 +119,7 @@ def _is_sweepable_dir(dst: Path, backend: CLIBackend, scope: str) -> bool:
 
 def _managed_skill_names() -> set:
     """Names of the skill directories agent-notes ships."""
-    dist_skills_dir = config.DIST_SKILLS_DIR
-    if not dist_skills_dir.exists():
-        return set()
-    return {d.name for d in dist_skills_dir.iterdir() if d.is_dir()}
+    return {d.name for d in config.placeable_skill_dirs(config.DIST_SKILLS_DIR)}
 
 
 def _is_legacy_skill_ours(item: Path, shipped: Path) -> bool:
@@ -249,11 +248,11 @@ def _install_universal_skills(copy_mode: bool, registry) -> None:
 
     target = config.AGENTS_HOME / "skills"
     target.mkdir(parents=True, exist_ok=True)
-    skill_dirs = [d for d in dist_skills_dir.iterdir() if d.is_dir()]
+    skill_dirs = config.placeable_skill_dirs(dist_skills_dir)
     if not skill_dirs:
         return
     print(f"Installing universal skills to {target} ...")
-    for skill_dir in sorted(skill_dirs):
+    for skill_dir in skill_dirs:
         place_file(skill_dir, target / skill_dir.name, copy_mode)
 
 

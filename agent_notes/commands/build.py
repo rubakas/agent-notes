@@ -57,18 +57,35 @@ def copy_global_files(memory=None, enabled_plugins=None) -> list[Path]:
     return copied_files
 
 
+def check_skill_names(skill_dirs) -> None:
+    """Refuse a skill named like one of Claude Code's own places (synced, .trash, a dot name)."""
+    from ..config import is_reserved_skill_name
+    from ..services.ui import printable
+
+    reserved = sorted(d.name for d in skill_dirs if is_reserved_skill_name(d.name))
+    if reserved:
+        raise ValueError(
+            f"skill name(s) {', '.join(printable(name) for name in reserved)} are reserved by "
+            f"Claude Code (synced skills or its trash) and cannot be shipped"
+        )
+
+
 def copy_skills() -> list[Path]:
     """Copy skill directories to dist/skills/."""
     from ..config import find_skill_dirs
-    
+
+    skill_dirs = find_skill_dirs()
+    # Checked before anything is touched, so a reserved name never wipes a good dist/skills/.
+    check_skill_names(skill_dirs)
+
     dist_skills = DIST_DIR / "skills"
     # Clean and recreate
     if dist_skills.exists():
         shutil.rmtree(dist_skills)
     dist_skills.mkdir(parents=True, exist_ok=True)
-    
+
     copied = []
-    for skill_dir in find_skill_dirs():
+    for skill_dir in skill_dirs:
         dest = dist_skills / skill_dir.name
         shutil.copytree(skill_dir, dest)
         copied.append(dest)
@@ -149,6 +166,10 @@ def build(role_models=None, role_efforts=None, scope='global', project_path=None
     """
     from ..services.state_store import load_state
     from ..registries.cli_registry import load_registry
+    from ..config import find_skill_dirs
+
+    # A bad skill name fails before any dist/ file is regenerated or pruned
+    check_skill_names(find_skill_dirs())
 
     # Raises when the configuration is missing or invalid: callers must see a failed build
     agents_config = load_agents_config()
