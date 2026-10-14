@@ -12,7 +12,7 @@ Refactoring means improving the structure of code without changing its behavior.
 
 1. **Tests must be green.** If the code has no tests, write characterization tests first that document what it currently does (not what it should do). Do not refactor untested code.
 2. **Understand what you're changing.** Read the code and identify exactly which smell you're addressing.
-3. **One session, one concern.** Name the refactor before starting: "extract payment logic into a service", "rename variables to match domain language", "remove duplication in validation". If you find yourself listing more than one, finish one, commit, then start the next.
+3. **One session, one concern.** Name the refactor before starting: "extract payment logic into a service", "rename variables to match domain language", "remove duplication in validation". If you find yourself listing more than one, finish one, commit, then start the next. If the change needs a module or interface redesign, stop and suggest the user run `/improve-codebase-architecture`.
 
 ## Code smells worth addressing
 

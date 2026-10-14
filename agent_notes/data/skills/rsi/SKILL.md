@@ -52,6 +52,7 @@ Each dimension: what to **hunt**, what to **fix**, what to **leave alone**.
 
 - **Green-before / green-after.** A red suite halts the loop.
 - **No-feature gate.** If a change adds capability, it is out of scope — reject it.
+- **No-redesign gate.** If the change needs a module or interface redesign, stop and suggest the user run `/improve-codebase-architecture`.
 - **Atomic & independent changes.** On regression, if the change was committed, revert it with `git revert`; if it is uncommitted, discard that one change instead. Never `reset --hard` or force-push.
 - **Max 2 review rounds per change,** then accept or drop it.
 - **Fail-first, anti-gaming.** Every regression/characterization test must be shown to FAIL on the unfixed code (it must actually reproduce the bug) BEFORE the fix lands. Reject any "fix" that games the test rather than addressing root cause — hardcoded expected values, weakened/removed assertions, special-casing the asserted inputs, or operator/equality overloading. A test that passes regardless of the fix proves nothing. The reviewer confirms the test genuinely falsifies the bug.
