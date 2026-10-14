@@ -7,7 +7,7 @@ group: process
 
 This skill takes the current conversation context and codebase understanding and produces a spec (you may know this document as a PRD). Do NOT interview the user — just synthesize what you already know.
 
-The issue tracker and triage label vocabulary should have been provided to you — run `/setup-agent-tracker` if not.
+Read `docs/agents/issue-tracker.md`; if it is missing, ask the user to run `/setup-agent-tracker`. The triage label mapping is in `docs/agents/triage-labels.md`.
 
 ## Process
 

@@ -6,7 +6,7 @@ Issues and PRDs for this repo live as GitLab issues. Use the [`glab`](https://gi
 
 ## Conventions
 
-- **Create an issue**: `glab issue create --title "<title>" --description-file - <<'EOF'`, then the description, then `EOF`. Pass every body on stdin through a single-quoted heredoc (`<<'EOF'`), never inside a double-quoted shell argument. To change a description later, use `glab issue update <number> --description-file - <<'EOF'` … `EOF`.
+- **Create an issue**: `glab issue create --title '<title>' --description-file - <<'EOF'`, then the description, then `EOF`. Pass every body on stdin through a single-quoted heredoc (`<<'EOF'`), never inside a double-quoted shell argument. Titles are single-quoted (write an embedded `'` as `'\''`) because a title may quote untrusted text. To change a description later, use `glab issue update <number> --description-file - <<'EOF'` … `EOF`.
 - **Read an issue**: `glab issue view <number> --comments`. Use `-F json` for machine-readable output.
 - **List issues**: `glab issue list -F json` with appropriate `--label` filters.
 - **Comment on an issue**: GitLab calls comments "notes". `glab issue note` only takes `-m/--message` (a string argument, no file or stdin option), so post the note through the API with the body on stdin:
