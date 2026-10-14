@@ -7,7 +7,7 @@ group: process
 
 # Setup Agent Tracker
 
-Scaffold the per-repo configuration that the engineering skills assume:
+Scaffold the per-repo configuration that the skills assume:
 
 - **Issue tracker** — where issues live (GitHub by default; local markdown is also supported out of the box)
 - **Triage labels** — the strings used for the five canonical triage roles
@@ -21,7 +21,8 @@ This is a prompt-driven skill, not a deterministic script. Explore, present what
 
 Look at the current repo to understand its starting state. Read whatever exists; don't assume:
 
-- `git remote -v` and `.git/config` — is this a GitHub repo? Which one?
+- `git remote get-url origin` (and `git remote -v`) — is this a GitHub or GitLab repo? Which one?
+- Tracker preflight — for GitHub run `gh --version` and `gh auth status`; for GitLab run `glab --version` and `glab auth status`. If the CLI is missing or unauthenticated, tell the user and offer the local-markdown tracker.
 - `AGENTS.md` and `CLAUDE.md` at the repo root — does either exist? Is there already an `## Agent skills` section in either?
 - `CONTEXT.md` and `CONTEXT-MAP.md` at the repo root
 - `docs/adr/` and any `src/*/docs/adr/` directories
@@ -125,4 +126,4 @@ List the labels that already exist (GitHub `gh label list --limit 200 --json nam
 
 ### 6. Done
 
-Tell the user the setup is complete and which engineering skills will now read from these files. Mention they can edit `docs/agents/*.md` directly later — re-running this skill is only necessary if they want to switch issue trackers or restart from scratch.
+Tell the user the setup is complete and which skills will now read from these files. Mention they can edit `docs/agents/*.md` directly later — re-running this skill is only necessary if they want to switch issue trackers or restart from scratch.
