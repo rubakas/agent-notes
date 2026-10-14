@@ -1,6 +1,6 @@
 # 009 — Skill Quality and Safety
 
-**Feature Branch**: `develop` (direct)
+**Feature Branch**: `feat/skill-quality-and-safety`
 
 **Created**: 2026-10-06
 
