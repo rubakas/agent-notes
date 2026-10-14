@@ -37,7 +37,6 @@ Commands:
   vault            Show current backend and memory path
   index            Regenerate Index.md for the current backend
   add <title> <body>  Add a note (obsidian backend); or add <title> [type] --body-file PATH|-
-  migrate          Migrate old per-project layout to new shared flat layout
   size             Total disk usage
   show <name>      Show memory contents for one agent/category
   reset            Clear ALL memories (requires confirmation)
@@ -49,7 +48,6 @@ Examples:
   agent-notes memory                    List all memories
   agent-notes memory vault              Show backend configuration
   agent-notes memory index              Regenerate Index.md
-  agent-notes memory migrate            Migrate to new flat layout
   agent-notes memory add 'Title' pattern --body-file - <<'EOF'
                                         Add a multi-line note read from stdin
   agent-notes memory show coder         View coder agent's memory
