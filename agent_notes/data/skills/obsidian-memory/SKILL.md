@@ -72,8 +72,11 @@ All timestamps everywhere are **UTC**. Local time is never written. The CLI uses
 Always use the CLI — never write vault files directly:
 
 ```bash
-agent-notes memory add "<title>" "<body>" [type] [agent] [project] [--description "<one-liner>"]
+agent-notes memory add '<title>' '<body>' [type] [agent] [project] [--description '<one-liner>']
+agent-notes memory add '<title>' [type] [agent] [project] --body-file <path|-> [--description '<one-liner>']
 ```
+
+Use the second form for multi-line bodies; `[type] [agent] [project]` go before `--body-file`: `--body-file -` reads the body from stdin (pair it with a quoted heredoc), `--body-file <path>` reads a file. Do not also pass a positional body.
 
 The title is positional, not a named argument — `body`, `type`, `agent`, and `project` are positional too, in that order. `--description` is the only named argument.
 
@@ -93,13 +96,13 @@ The title is positional, not a named argument — `body`, `type`, `agent`, and `
 
 Examples:
 ```bash
-agent-notes memory add "Rails enum prefix" \
-  "Always use _prefix: true to avoid method name collisions" \
+agent-notes memory add 'Rails enum prefix' \
+  'Always use _prefix: true to avoid method name collisions' \
   pattern coder
 
-agent-notes memory add "Auth middleware rewrite rationale" \
-  "Driven by legal/compliance requirements around session token storage, not tech debt" \
-  decision lead
+agent-notes memory add 'Auth middleware rewrite rationale' decision lead --body-file - <<'EOF'
+Driven by legal/compliance requirements around session token storage, not tech debt.
+EOF
 ```
 
 ## What to save
@@ -186,7 +189,7 @@ The session note becomes the navigable hub for everything written during the ses
 This is a model-discretion convention, not a harness hook — nothing enforces it. Apply it yourself whenever you exit plan mode:
 
 1. Check the configured memory storage. `{{MEMORY_PATH}}` is NOT substituted inside skills — only agent prompts get that substitution, so the token reaches you literally here. Resolve the storage yourself with `agent-notes memory vault`; if it reports an Obsidian vault path, the storage is Obsidian.
-2. If Obsidian: write the plan content as a Decision note via `agent-notes memory add "<plan-title>" "<plan-body>" decision lead`. The local plan file at `~/.claude/plans/<file>.md` stays for harness compatibility.
+2. If Obsidian: write the plan content as a Decision note via `agent-notes memory add '<plan-title>' decision lead --body-file -` with the plan on stdin (quoted heredoc). The local plan file at `~/.claude/plans/<file>.md` stays for harness compatibility.
 3. If local storage or memory disabled: skip the mirror entirely. The plan stays at its harness path; nothing else needs to happen.
 
 When mirrored, the new Decision participates in the Linking rule above — the active session note (if any) gets a wikilink to it.

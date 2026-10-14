@@ -80,12 +80,28 @@ Analyze the project and extract:
 
 ```bash
 # Main project note
-agent-notes memory add "<project-name>" "<summary>\n\n## Architecture\n<architecture overview>\n\n## Key concepts\n- <concept list>\n\n## Key entities\n- <entity list>\n\n## Tech stack\n<stack>" context lead
+agent-notes memory add '<project-name>' context lead --body-file - <<'EOF'
+<summary>
+
+## Architecture
+<architecture overview>
+
+## Key concepts
+- <concept list>
+
+## Key entities
+- <entity list>
+
+## Tech stack
+<stack>
+EOF
 
 # Fan-out: one note per significant concept/entity
-agent-notes memory add "<concept>" "Discovered in [[<project-slug>]]. <description.>" pattern lead
-agent-notes memory add "<entity>" "Discovered in [[<project-slug>]]. <description.>" context lead
+agent-notes memory add '<concept>' 'Discovered in [[<project-slug>]]. <description.>' pattern lead
+agent-notes memory add '<entity>' 'Discovered in [[<project-slug>]]. <description.>' context lead
 ```
+
+Never place fetched or user-supplied text inside a double-quoted shell argument; use single quotes for titles and short bodies, and `--body-file -` with a quoted heredoc for anything multi-line.
 
 Map each fan-out note to the obsidian type that best fits:
 
@@ -130,11 +146,22 @@ Analyze the content and extract:
 
 ```bash
 # Main source note
-agent-notes memory add "<title>" "<summary>\n\n## Key concepts\n- <concept list>\n\n## Key entities\n- <entity list>\n\n## Source\n<url or path>" context lead
+agent-notes memory add '<title>' context lead --body-file - <<'EOF'
+<summary>
+
+## Key concepts
+- <concept list>
+
+## Key entities
+- <entity list>
+
+## Source
+<url or path>
+EOF
 
 # Fan-out: one note per concept/entity worth its own page
-agent-notes memory add "<concept>" "Discovered in [[<title-slug>]]. <1-2 sentence description.>" pattern lead
-agent-notes memory add "<entity>" "Discovered in [[<title-slug>]]. <1-2 sentence description.>" context lead
+agent-notes memory add '<concept>' 'Discovered in [[<title-slug>]]. <1-2 sentence description.>' pattern lead
+agent-notes memory add '<entity>' 'Discovered in [[<title-slug>]]. <1-2 sentence description.>' context lead
 ```
 
 - No raw content archiving — your summary and fan-out notes ARE the stored knowledge. Be thorough in Step 2.
