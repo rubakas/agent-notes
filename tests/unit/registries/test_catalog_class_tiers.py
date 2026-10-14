@@ -75,6 +75,9 @@ UNRATED_BY_DECISION = {
     "gpt-5-2": "unrated GPT falls through to the middle tier, the deliberate default in rules.yaml",
     "claude-opus-5-5": "new Opus, not yet rated upstream; its tier comes from Anthropic's own name",
     "claude-sonnet-5-5": "new Sonnet, not yet rated upstream; its tier comes from Anthropic's own name",
+    "claude-haiku-5-5": "new Haiku, not yet rated upstream; its tier comes from Anthropic's own name",
+    "gpt-5-mini": "upstream dropped its coding score on the 2026-10 refresh; "
+                  "size suffix keeps it in the small tier",
     "gpt-6-sol": "unrated GPT-6 generation member classed opus by the gpt-6* rule; "
                  "unrated models are never chosen as a role default, so the class cannot move one",
     "gpt-6-1-sol": "unrated GPT-6 generation member classed opus by the gpt-6* rule; "
