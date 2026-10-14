@@ -16,13 +16,7 @@ Refactoring means improving the structure of code without changing its behavior.
 
 ## Code smells worth addressing
 
-- **Long method** — does more than one thing; split by responsibility.
-- **Duplicated logic** — same decision made in multiple places; extract to one location.
-- **Misleading names** — name describes something other than what the code does.
-- **Deep nesting** — more than two levels of if/for; extract guard clauses or methods.
-- **Large class** — handles multiple concerns; split by cohesion.
-- **Primitive obsession** — using raw strings or ints for domain concepts; introduce a value object.
-- **Feature envy** — a method that uses more of another class than its own; move it.
+Work from the smell baseline in the `code-review` skill; pick one smell from it and address only that.
 
 ## Process
 

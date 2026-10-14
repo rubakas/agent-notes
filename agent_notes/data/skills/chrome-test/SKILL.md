@@ -29,9 +29,9 @@ Coordinates browser testing between this dev session and a separate `claude --ch
 
 ---
 
-## Precondition — `claude --chrome` is unverified
+## Precondition — an operator must be able to run `claude --chrome`
 
-Everything below assumes an operator can start a `claude --chrome` session. That flag is a community pattern, not an officially documented Anthropic workflow, and nothing here pins or verifies it. Confirm with the operator before relying on it.
+Everything below assumes an operator can start a `claude --chrome` session. `--chrome` is a documented Claude Code CLI flag that attaches the session to the user's Chrome. Confirm with the operator that Chrome and the extension are set up before relying on it.
 
 If `claude --chrome` is unavailable, the operator leg does not exist and this gate cannot close. Still write `request-<uuid>.md` to the bus, then record the browser test as **DEFERRED — pending operator** and report the Done Gate as partial, per the lead's chrome-test gate rule. Never skip the gate silently, and never call it closed without a `report-<uuid>.md`.
 
@@ -284,4 +284,3 @@ Report: what failed, the fix applied, what passed, what (if anything) remains op
 - `claude --chrome` drives the user's real visible Chrome/Edge and shares their logged-in browser state.
 - JS modal dialogs (`alert` / `confirm` / `prompt`) freeze the chrome session — the operator must dismiss them by hand.
 - Browser state does not auto-reset between runs — the handoff prompt must instruct the tester to start fresh.
-- This is a community pattern, not an officially documented Anthropic workflow.

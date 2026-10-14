@@ -39,7 +39,7 @@ Each dimension: what to **hunt**, what to **fix**, what to **leave alone**.
 
 - **Bugs & correctness** — off-by-one, nil/None, races, missing error handling, unhandled edge cases. Fix minimally + add a regression test. Don't redesign.
 - **Performance** — measured hot paths, N+1 queries, redundant work, bad complexity, unbounded growth. Don't micro-optimize cold paths or trade clarity for guesswork.
-- **Code quality** — long methods, deep nesting, unclear names, magic values. Extract, apply guard clauses, rename. Don't gold-plate.
+- **Code quality** — the smells in the `code-review` skill's smell baseline, plus deep nesting and magic values. Extract, apply guard clauses, rename. Don't gold-plate.
 - **Consistency / homogeneity** — the same kind of thing implemented multiple different ways: mixed styles for one object type, divergent shapes for one concept, inconsistent signatures or return types. Converge on one canonical form and reduce needless variation. Distinct from DRY — this targets divergent *expression* of one concept, not duplicated *logic*. Don't force genuinely different things into a false-common shape.
 - **Pattern adherence** — match the project's dominant idioms, structure, and conventions. Align outliers. Don't invent new patterns.
 - **Tests** — cover changed or risky code, fix flaky/slow tests, add missing edge cases. Don't test trivial getters.
