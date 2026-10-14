@@ -15,7 +15,7 @@ from agent_notes.services.skill_validation import _relative_targets, check_skill
 SKILL = "my-skill"
 
 
-def _frontmatter(extra="", description="A valid skill."):
+def _frontmatter(extra="", description="A valid skill. Use when testing."):
     return f"---\nname: {SKILL}\ndescription: {description}\ngroup: process\n{extra}---\n"
 
 
@@ -118,11 +118,11 @@ class TestDescriptionLength:
                    for f in _warns(findings)), findings
 
     def test_description_of_250_chars_has_no_warning(self, run_validate):
-        assert run_validate({"SKILL.md": _frontmatter(description="a" * 250)}) == []
+        assert run_validate({"SKILL.md": _frontmatter(description="Use when " + "a" * 241)}) == []
 
     def test_length_is_measured_on_the_folded_value(self, run_validate):
         # Raw text is > 250 characters (long indentation), folded value is 29.
-        folded = '"first part\n' + " " * 300 + 'second part"'
+        folded = '"Use when first part\n' + " " * 300 + 'second part"'
         assert run_validate({"SKILL.md": _frontmatter(description=folded)}) == []
 
     def test_length_is_measured_on_a_block_scalar(self, run_validate):
@@ -130,6 +130,22 @@ class TestDescriptionLength:
             f"  {'w' * 99}\n" for _ in range(3)) + "group: process\n---\n"
         findings = run_validate({"SKILL.md": text})
         assert any("description-length" in f and "299" in f for f in _warns(findings)), findings
+
+
+class TestDescriptionWhenClause:
+    def test_description_without_use_when_warns(self, run_validate):
+        findings = run_validate({"SKILL.md": _frontmatter(description="Does a thing.")})
+        assert _fails(findings) == []
+        assert len(_warns(findings)) == 1, findings
+        assert "my-skill/SKILL.md" in findings[0] and "description-when" in findings[0] \
+            and 'no "Use when" clause' in findings[0]
+
+    def test_description_with_use_when_has_no_warning(self, run_validate):
+        assert run_validate({"SKILL.md": _frontmatter(description="Does a thing. Use when asked.")}) == []
+
+    def test_triggers_key_is_no_longer_allowed(self, run_validate):
+        findings = run_validate({"SKILL.md": _frontmatter(extra="triggers:\n  - one\n")})
+        assert any("frontmatter-key" in f and "'triggers'" in f for f in _fails(findings)), findings
 
 
 class TestReferenceTableOfContents:
@@ -287,7 +303,6 @@ class TestFrontmatterKeys:
                  "disallowed-tools: Bash\nmodel: sonnet\neffort: low\ncontext: fork\n"
                  "agent: explorer\nbackground: false\nhooks: {}\npaths: ['*.rb']\nshell: bash\n"
                  "license: MIT\ncompatibility: any\nrequires_memory: obsidian\n"
-                 "triggers:\n  - one\n  - two\n"
                  "metadata:\n  anything: goes\n")
         assert run_validate({"SKILL.md": _frontmatter(extra=extra)}) == []
 

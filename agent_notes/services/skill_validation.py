@@ -31,7 +31,7 @@ ALLOWED_FRONTMATTER_KEYS = (
     "disable-model-invocation", "user-invocable", "allowed-tools", "disallowed-tools",
     "model", "effort", "context", "agent", "background", "hooks", "paths", "shell",
     "metadata", "license", "compatibility",
-    "group", "requires_memory", "triggers",
+    "group", "requires_memory",
 )
 
 Finding = Tuple[str, str]
@@ -212,6 +212,12 @@ def _check_description_brevity(frontmatter: Dict) -> List[Finding]:
     return [("description-length", f"description is {length} characters, over the recommended {WARN_DESCRIPTION_CHARS}")]
 
 
+def _check_description_when(frontmatter: Dict) -> List[Finding]:
+    if "Use when" in str(frontmatter.get("description") or ""):
+        return []
+    return [("description-when", 'description has no "Use when" clause')]
+
+
 def _check_frontmatter_keys(frontmatter: Dict) -> List[Finding]:
     return [
         ("frontmatter-key", f"key '{key}' is not allowed; allowed keys: {', '.join(ALLOWED_FRONTMATTER_KEYS)}")
@@ -344,6 +350,7 @@ def check_skill_dir(skill_path: Path) -> Tuple[List[ValidationError], List[Valid
             add(label, _check_frontmatter_keys(frontmatter), errors, ValidationError)
             add(label, _check_description_length(frontmatter), errors, ValidationError)
             add(label, _check_description_brevity(frontmatter), warnings, ValidationWarning)
+            add(label, _check_description_when(frontmatter), warnings, ValidationWarning)
         add(label, _check_skill_size(text), errors, ValidationError)
         add(label, _check_links(skill_md, text, False, skill_path), errors, ValidationError)
 
