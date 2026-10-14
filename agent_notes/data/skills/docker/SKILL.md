@@ -1,15 +1,7 @@
 ---
 name: docker
 group: domain
-description: "Dockerfiles and Compose reference: multi-stage builds, health checks, services. Use when writing/debugging Dockerfiles, docker-compose files, or containerizing apps."
-triggers:
-  - docker
-  - Dockerfile
-  - docker-compose
-  - container
-  - multi-stage build
-  - health check
-  - Docker Compose
+description: "Provides Dockerfile and Compose reference: multi-stage builds, health checks, services. Use when writing or debugging Dockerfiles and docker-compose files, or containerizing an app."
 ---
 
 # Docker Reference

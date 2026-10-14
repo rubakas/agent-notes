@@ -1,6 +1,7 @@
 ---
 name: code-review
-description: "Review code since a fixed point on two axes: Standards (follows conventions?) and Spec (matches requirements?). Use when reviewing branches, PRs, or says 'review since X'."
+description: "Reviews the changes since a fixed point on two axes: Standards (follows conventions?) and Spec (matches requirements?). Use when reviewing a branch or PR, or the user says 'review since X'. For a quick quality pass use the `reviewer` agent."
+argument-hint: "[fixed point, e.g. main or HEAD~5]"
 group: process
 ---
 

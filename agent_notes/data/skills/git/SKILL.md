@@ -1,6 +1,6 @@
 ---
 name: git
-description: "Git workflow: analyzing changes, chunking commits, conventional commit messages. Use when user asks to commit, create a PR, or says 'git'."
+description: "Guides git work: analyzing changes, chunking commits, writing conventional commit messages and pull requests. Use when the user asks to commit, create a PR, or says 'git'."
 group: process
 ---
 

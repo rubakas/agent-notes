@@ -1,6 +1,7 @@
 ---
 name: ingest
-description: "Ingest project/external sources into the knowledge base; create category-mapped notes in Obsidian. Use when user says 'ingest', provides a URL/file/folder, or wants to learn from the codebase."
+description: Ingests project and external sources into the knowledge base as category-mapped Obsidian notes. Use when the user says 'ingest', provides a URL, file or folder, or wants to learn from the codebase.
+argument-hint: "[url | file | folder]"
 group: process
 requires_memory: obsidian
 ---

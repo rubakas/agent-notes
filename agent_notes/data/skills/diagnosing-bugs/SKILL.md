@@ -1,6 +1,6 @@
 ---
 name: diagnosing-bugs
-description: Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow.
+description: Drives a reproduce, hypothesise, instrument, fix loop for hard bugs and performance regressions. Use when the user says 'diagnose' or 'debug this', or reports something broken, throwing, failing or slow. The `debugger` agent investigates one failure.
 group: process
 ---
 

@@ -1,6 +1,7 @@
 ---
 name: wayfinder
-description: Plan a huge chunk of work — more than one agent session can hold — as a shared map of investigation tickets on your issue tracker, and resolve them one at a time until the way to the destination is clear.
+description: Plans work too large for one agent session as a shared map of investigation tickets on the issue tracker, resolving them one at a time. Use when the user has a huge loose idea or an existing map to continue.
+argument-hint: "[loose idea | map issue number or URL]"
 disable-model-invocation: true
 group: process
 ---

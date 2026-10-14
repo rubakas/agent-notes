@@ -1,39 +1,7 @@
 ---
 name: rails
 group: domain
-description: "Rails reference distilled from 37signals' Fizzy: ActiveRecord models, concerns, migrations, controllers, routes, views, Hotwire (Turbo/Stimulus), Solid Queue/Cache/Cable, Kamal, minitest. Use when working in a Rails codebase."
-triggers:
-  - rails
-  - ActiveRecord
-  - controller
-  - model
-  - migration
-  - route
-  - view
-  - ERB
-  - partial
-  - ViewComponent
-  - Stimulus
-  - Turbo
-  - morph
-  - Action Cable
-  - Solid Queue
-  - Solid Cache
-  - Solid Cable
-  - Active Job
-  - Active Storage
-  - Action Mailer
-  - Kamal
-  - Thruster
-  - Propshaft
-  - Importmap
-  - Current
-  - multi-tenant
-  - concern
-  - scope
-  - validation
-  - callback
-  - association
+description: "Provides Rails reference distilled from 37signals' Fizzy: models, concerns, migrations, controllers, Hotwire, Solid Queue/Cache/Cable, Kamal, minitest. Use when working in a Rails codebase."
 ---
 
 # Rails Reference

@@ -1,12 +1,8 @@
 ---
 name: chrome-test
-description: Browser-test handoff via a profile-aware file bus between this dev session and a `claude --chrome` session. Use after frontend work is locally testable or on /chrome-test.
+description: Hands browser tests to a `claude --chrome` session through a profile-aware file bus between the dev session and the browser session. Use when frontend work is locally testable, or the user says 'chrome-test' or 'browser test'.
+argument-hint: "[scenario, optional]"
 group: process
-triggers:
-  - chrome-test
-  - browser test
-  - browser-test handoff
-  - test in browser
 ---
 
 # chrome-test — Browser-Test Handoff

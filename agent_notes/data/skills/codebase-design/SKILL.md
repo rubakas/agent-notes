@@ -1,6 +1,6 @@
 ---
 name: codebase-design
-description: "Design deep modules with shared vocabulary. Use when designing/improving module interfaces, finding deepening opportunities, placing seams, or making code testable."
+description: Teaches deep-module design with a shared vocabulary of interfaces, seams and depth. Use when designing module interfaces, placing seams or making code testable. To scan a codebase for opportunities use improve-codebase-architecture.
 group: domain
 ---
 

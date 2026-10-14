@@ -1,6 +1,6 @@
 ---
 name: rsi
-description: "Iterative code-quality loop: harden existing code across bugs, performance, consistency, tests, and DRY—never add features. Use when user says 'rsi', asks to improve/clean code quality, or wants hardening without new features."
+description: Runs an iterative code-quality loop that hardens existing code across bugs, performance, consistency, tests and DRY, never adding features. Use when the user says 'rsi' or wants hardening. For one refactor use refactoring-protocol.
 group: process
 argument-hint: "[path or scope, optional]"
 ---

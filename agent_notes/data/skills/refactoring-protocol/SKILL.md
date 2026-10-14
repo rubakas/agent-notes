@@ -1,6 +1,6 @@
 ---
 name: refactoring-protocol
-description: "Safe refactoring: green tests first, one extraction at a time, no behavior changes. Use when refactoring code, reducing duplication, or says 'clean this up'."
+description: "Guides safe refactoring: green tests first, one extraction at a time, no behavior changes. Use when refactoring code, reducing duplication, or the user says 'clean this up'. For an iterative multi-pass loop use rsi."
 group: process
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Move issues and external PRs through a state machine of triage roles — categorise, verify, grill if needed, and write agent-ready briefs.
+description: "Moves issues and external PRs through a state machine of triage roles: categorise, verify, grill if needed, write agent-ready briefs. Use when the user wants to triage the backlog, an issue or a PR."
 disable-model-invocation: true
 group: process
 argument-hint: "[#issue-or-PR | what to look at]"

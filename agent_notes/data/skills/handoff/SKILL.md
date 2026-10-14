@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Compact the current conversation into a handoff document for another agent to pick up.
+description: Compacts the current conversation into a handoff document for another agent to pick up. Use when the user wants to pause or end a session and continue it in a fresh one.
 argument-hint: "What will the next session be used for?"
 disable-model-invocation: true
 group: process

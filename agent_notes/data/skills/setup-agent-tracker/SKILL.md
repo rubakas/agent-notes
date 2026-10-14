@@ -1,6 +1,6 @@
 ---
 name: setup-agent-tracker
-description: Configure this repo for the engineering skills — set up its issue tracker, triage label vocabulary, and domain doc layout. Run once before first use of the other engineering skills.
+description: Configures a repo's issue tracker, triage label vocabulary and domain doc layout for the agent-notes workflow skills. Use when starting in a new repo, once, before triage, to-spec, to-tickets or wayfinder.
 disable-model-invocation: true
 group: process
 ---

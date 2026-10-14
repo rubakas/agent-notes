@@ -1,6 +1,6 @@
 ---
 name: obsidian-memory
-description: "Save and retrieve agent memory in the Obsidian vault using agent-notes CLI. Defines the single record format for all memory notes. Use when saving decisions, patterns, or session state to the vault."
+description: Saves and retrieves agent memory in the Obsidian vault via the agent-notes CLI, and defines the single record format for memory notes. Use when saving decisions, patterns or session state to the vault.
 group: process
 requires_memory: obsidian
 ---

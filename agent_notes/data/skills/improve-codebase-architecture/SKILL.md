@@ -1,6 +1,6 @@
 ---
 name: improve-codebase-architecture
-description: Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick. For a single one-shot refactor use refactoring-protocol; for an iterative multi-dimensional cleanup loop use rsi.
+description: Scans a codebase for deepening opportunities, shows them as a visual HTML report, then grills through the one picked. Use when the user wants module or interface redesign. For one refactor use refactoring-protocol; for a cleanup loop use rsi.
 disable-model-invocation: true
 group: process
 ---
