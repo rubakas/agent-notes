@@ -95,8 +95,8 @@ def test_a_model_without_effort_support_or_an_unknown_model_offers_none(catalog)
 def test_recommended_choices_are_the_shipped_defaults(catalog):
     models, efforts = recommended_choices(catalog, _backend("claude"))
     assert models == {"reasoner": "claude-opus-5-5", "worker": "claude-sonnet-5-5",
-                      "scout": "claude-haiku-4-5"}
-    assert efforts == {"reasoner": "high", "worker": "medium"}
+                      "scout": "claude-haiku-5-5"}
+    assert efforts == {"reasoner": "high", "worker": "medium", "scout": "low"}
 
 
 def test_the_model_list_is_the_config_role_model_list_in_order(catalog):

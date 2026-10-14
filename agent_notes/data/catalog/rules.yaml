@@ -73,6 +73,10 @@ provisional_coding_index:
   # Successor to claude-sonnet-5 (71.5) at the same $2/M in, worker's budget.
   # intelligence_index 56.0, coding_index null (checked 2026-10-02).
   claude-sonnet-5-5: 71.6
+  # Successor to claude-haiku-4-5 (43.9) at $0.10/M in, well under scout's $1 budget.
+  # OpenRouter's artificial_analysis block carries intelligence_index 43.4 but
+  # coding_index null (checked 2026-10-15). 44.0 ranks it directly above Haiku 4.5.
+  claude-haiku-5-5: 44.0
 
 deprecated:
   - claude-opus-4-1

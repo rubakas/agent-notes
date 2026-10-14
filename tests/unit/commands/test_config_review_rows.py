@@ -61,7 +61,7 @@ def test_a_current_pin_that_differs_only_hints(catalog, tmp_path):
 
 
 def test_a_pin_missing_from_the_catalog_is_flagged_not_fatal(catalog, tmp_path):
-    assert "⚠ unknown model  ★ claude-haiku-4-5" in _model_lines(_ctx(catalog, tmp_path))["scout"]
+    assert "⚠ unknown model  ★ claude-haiku-5-5" in _model_lines(_ctx(catalog, tmp_path))["scout"]
 
 
 def test_u_moves_every_flagged_pin_to_its_star(catalog, tmp_path):
@@ -69,8 +69,8 @@ def test_u_moves_every_flagged_pin_to_its_star(catalog, tmp_path):
     assert upgrade_flagged(ctx) == 2
     backend = ctx.scope_state().clis["claude"]
     assert backend.role_models == {"reasoner": "claude-opus-5-5", "worker": "claude-sonnet-5-5",
-                                   "scout": "claude-haiku-4-5"}
-    assert backend.role_efforts == {"reasoner": "high"}
+                                   "scout": "claude-haiku-5-5"}
+    assert backend.role_efforts == {"reasoner": "high", "scout": "low"}
 
 
 def test_memory_and_cost_report_edit_the_working_copy(catalog, tmp_path, monkeypatch):
