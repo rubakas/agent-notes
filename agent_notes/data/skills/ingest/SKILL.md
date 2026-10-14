@@ -24,9 +24,23 @@ Create persistent, queryable knowledge from the current project or external sour
 
 ## Detect your backend
 
+First step, before reading or fetching anything:
+
 ```bash
 agent-notes memory vault
 ```
+
+If the backend is not Obsidian, stop and tell the user that ingest needs the Obsidian backend (`memory add` fails with exit 1 on any other backend).
+
+## Check for a prior ingest
+
+Before writing, see whether this source was already ingested:
+
+```bash
+agent-notes memory list
+```
+
+Also grep the vault for the line `Source (external): <url or path>` (the vault path comes from `memory vault`). If the source is already ingested, stop and tell the user; offer to update the existing notes instead of creating duplicates.
 
 ## Credential safety — ABSOLUTE RULE
 
@@ -124,11 +138,11 @@ Map each fan-out note to the obsidian type that best fits:
 
 ### Step 4 — Report
 
-Report to the user:
+Run `agent-notes memory list` (or `agent-notes memory show <Category>`, e.g. `Context`) to confirm the new notes exist, then report to the user:
 - What was ingested (project name, file count, key findings)
 - Concepts and entities extracted
-- Number of notes created
-- Confirm notes are linked to active session
+- Number of notes confirmed in the vault
+- The session link (the session note's `## Linked notes` entries), or that no session was detected
 
 ## With arguments — Ingest external sources
 
@@ -187,17 +201,17 @@ Never skip the `Source (external):` line — future agents rely on it to treat t
 
 ### Step 4 — Report
 
-Report to the user:
+Run `agent-notes memory list` (or `agent-notes memory show <Category>`, e.g. `Context`) to confirm the new notes exist, then report to the user:
 - What was ingested (title, source type)
 - Key concepts and entities extracted
-- Number of notes created/updated
-- Confirm notes are linked to active session
+- Number of notes confirmed in the vault
+- The session link (the session note's `## Linked notes` entries), or that no session was detected
 
 ## Example — No-args (ingest CWD)
 
 User: `/ingest`
 
-1. `agent-notes memory vault` → obsidian, path: `/Users/me/Obsidian/agent-notes/projects/my-app`
+1. `agent-notes memory vault` → obsidian, path: `/Users/me/Obsidian/agent-notes`; `memory list` shows `my-app` not yet ingested
 2. Scan CWD: find 42 files (.py, .md, .toml)
 3. Read README.md, pyproject.toml, key modules
 4. Analyze: Title="my-app", Summary="A FastAPI service for...", Concepts=["dependency injection", "repository pattern"], Entities=["FastAPI", "PostgreSQL", "Alembic"]

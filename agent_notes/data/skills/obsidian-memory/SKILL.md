@@ -32,12 +32,13 @@ All notes use `YYYY-MM-DD_<slug>.md`. The folder encodes the type — no type se
 - **Session notes** (`type=session`): `YYYY-MM-DD_<session-id>.md`
   - Claude Code session ID: stem of the active JSONL at `~/.claude/projects/<cwd-slug>/<session-id>.jsonl`
   - OpenCode: the session row's `id`
-  - If no session ID can be detected, falls back to `YYYY-MM-DD_<slug>.md` (slug of the title)
+  - Claude Code is detected from the `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` environment variables plus the newest JSONL under `~/.claude/projects/<cwd-slug>/`
+  - If no session ID can be detected, falls back to `Sessions/YYYY-MM-DD_<title-slug>.md` (slug of the title)
 - **All other types**: `YYYY-MM-DD_<slug>.md` where slug is the slugified title
 
 **Collision rule**: if the target filename already exists, `_HHMMSS` is appended before `.md` (e.g. `2026-04-30_fix-foo_142231.md`).
 
-A session note is **per-session**, not per-message. Re-running `memory add` with `type=session` for the same session appends an `## Update <UTC ISO>` block to the existing file rather than creating a new one.
+A session note is **per-session**, not per-message. Re-running `memory add` with `type=session` for the same session appends an `## Update <UTC ISO>` block to the existing note (whatever its date prefix) rather than creating a new file.
 
 ### Frontmatter rule
 
@@ -50,6 +51,7 @@ type: pattern                       # pattern|decision|mistake|context|session|f
 description: "..."                  # one-line summary optimized for index routing — optional; omitted from frontmatter entirely if not passed
 session: 2026-04-28_<session-id>   # wikilink target (no brackets); absent on session notes themselves
 agent: lead                         # optional
+project: my-app                     # defaults to the current directory name; metadata only, never selects a folder
 ---
 ```
 
@@ -90,7 +92,7 @@ The title is positional, not a named argument — `body`, `type`, `agent`, and `
 
 **Agent:** your agent name (`lead`, `coder`, `reviewer`, etc.)
 
-**Project:** optional override for the project folder; defaults to the current directory name.
+**Project:** optional; sets only the `project:` frontmatter field and defaults to the current directory name. It does not move the file or choose a folder.
 
 **`--description`:** one-line summary written to the `description:` field and used when rendering `Index.md`. Always pass it — if omitted the index falls back to the title.
 
@@ -124,26 +126,30 @@ Do NOT save:
 
 ```bash
 agent-notes memory list              # all notes by category
-agent-notes memory show <agent>      # one agent's notes
+agent-notes memory show <Category>   # one category's notes (obsidian); case-sensitive: Patterns, not patterns
 agent-notes memory vault             # confirm storage and path
 ```
 
-The vault is structured as:
+On the obsidian backend `memory show` takes a category folder name (`Patterns`, `Decisions`, `Mistakes`, `Context`, `Feedback`, `Sessions`), case-sensitive. On the local backend it takes an agent name instead. `memory add` on a non-obsidian backend prints an error and exits 1.
+
+The vault layout depends on the configured strategy. The default, `single-brain`, is flat:
 ```
-vault/agent-notes/projects/
-├── <project-name>/
-│   ├── Patterns/     — reusable solutions        YYYY-MM-DD_<slug>.md
-│   ├── Decisions/    — architectural choices     YYYY-MM-DD_<slug>.md
-│   ├── Mistakes/     — errors to avoid           YYYY-MM-DD_<slug>.md
-│   ├── Context/      — project background        YYYY-MM-DD_<slug>.md
-│   ├── Feedback/     — user guidance on approach YYYY-MM-DD_<slug>.md
-│   ├── Sessions/     — one file per session      YYYY-MM-DD_<session-id>.md
-│   └── Index.md      — chronological list, newest first
-└── <another-project>/
-    └── ...
+<vault>/
+├── Patterns/     — reusable solutions        YYYY-MM-DD_<slug>.md
+├── Decisions/    — architectural choices     YYYY-MM-DD_<slug>.md
+├── Mistakes/     — errors to avoid           YYYY-MM-DD_<slug>.md
+├── Context/      — project background        YYYY-MM-DD_<slug>.md
+├── Feedback/     — user guidance on approach YYYY-MM-DD_<slug>.md
+├── Sessions/     — one file per session      YYYY-MM-DD_<session-id>.md
+└── Index.md      — chronological list, newest first
 ```
 
-Where `<project-name>` is the last component of the current working directory (`Path.cwd().name`). Each project gets its own isolated subfolder.
+The optional `per-project` strategy nests the same category folders under a folder named after the current working directory:
+```
+<vault>/<cwd-name>/Patterns/…   (and Decisions/, Mistakes/, Context/, Feedback/, Sessions/)
+```
+
+`<cwd-name>` is `Path.cwd().name`, so two projects whose directories share a name share one folder. Writes go to the configured layout; reads search both layouts.
 
 ## Regenerate the index
 
@@ -201,8 +207,8 @@ When mirrored, the new Decision participates in the Linking rule above — the a
 Any dispatched agent that needs context about the project's current state — recent decisions, patterns, mistakes, or what the lead has done so far — MUST read the Obsidian vault before starting work:
 
 1. Read `<vault>/Index.md` to see what categories have content and which notes are most recent.
-2. If the task is about an in-flight initiative, read the current session note (`<vault>/Sessions/<session-id>.md`) for the latest progress.
-3. If the task involves a category (decisions, patterns, mistakes, context), read the 3–5 most recent files in that folder.
+2. If the task is about an in-flight initiative, read the current session note (`<vault>/Sessions/*_<session-id>.md`, or `<vault>/<cwd-name>/Sessions/*_<session-id>.md` under per-project; match the `_<session-id>` suffix, since the filename starts with a date) for the latest progress.
+3. If the task involves a category (decisions, patterns, mistakes, context), read the 3–5 most recent files in that folder (`<vault>/<Category>/`, or `<vault>/<cwd-name>/<Category>/` under per-project).
 
 The vault path is substituted into agent prompts at build time as `{{MEMORY_PATH}}`. If `{{MEMORY_PATH}}` resolves to "disabled", skip this protocol — memory is not configured.
 
