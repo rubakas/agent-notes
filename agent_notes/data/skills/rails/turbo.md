@@ -59,19 +59,7 @@ Declare morphing once in the head partial; every page then morphs on refresh. Fi
   <% turbo_refreshes_with method: :morph, scroll: :preserve %>
 ```
 
-Models send refresh broadcasts with `broadcasts_refreshes` and `broadcasts_refreshes_to`. Fizzy's `Board::Broadcastable` concern declares both: one for the board's own stream and one for every board in the account.
-
-```ruby
-# app/models/board/broadcastable.rb
-module Board::Broadcastable
-  extend ActiveSupport::Concern
-
-  included do
-    broadcasts_refreshes
-    broadcasts_refreshes_to ->(board) { [ board.account, :all_boards ] }
-  end
-end
-```
+Models send refresh broadcasts with `broadcasts_refreshes` and `broadcasts_refreshes_to`. Fizzy's `Board::Broadcastable` concern declares both: one for the board's own stream and one for every board in the account. The concern body is excerpted in broadcasting.md.
 
 Protect client state that a morph would overwrite. `data-turbo-permanent` keeps an element as is, and `turbo:morph-element` or `turbo:before-morph-attribute` listeners adjust or veto changes:
 
@@ -80,13 +68,7 @@ Protect client state that a morph would overwrite. `data-turbo-permanent` keeps 
         <div class="comment__body lexxy-content" data-controller="syntax-highlight retarget-links" data-turbo-permanent>
 ```
 
-```ruby
-# app/helpers/time_helper.rb
-  def local_datetime_tag(datetime, style: :time, **attributes)
-    # Render empty space to ensure it takes height until the local time is loaded via JS
-    tag.time "&nbsp;".html_safe, **attributes, datetime: datetime.to_i, data: { local_time_target: style, action: "turbo:morph-element->local-time#refreshTarget" }
-  end
-```
+`local_datetime_tag` (helpers.md) sets that `turbo:morph-element` action so the displayed time refreshes after a morph.
 
 ```erb
 <%# app/views/cards/display/perma/_tags.html.erb %>

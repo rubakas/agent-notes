@@ -234,28 +234,7 @@ end
 
 `parallelize` runs test processes in parallel (`work_stealing` can be turned off with `WORK_STEALING=false`), and `fixtures :all` loads every fixture file. Helper modules are included once for all tests.
 
-```ruby
-# test/test_helper.rb
-    # Jobs must carry their own account context via AccountTenanted,
-    # not rely on Current.account leaking from the test setup.
-    def perform_enqueued_jobs(...)
-      saved_account = Current.account
-      Current.account = nil
-      super
-    ensure
-      Current.account = saved_account
-    end
-
-    setup do
-      Current.account = accounts("37s")
-    end
-
-    teardown do
-      Current.clear_all
-    end
-```
-
-`setup` puts the fixture account in `Current`, and `teardown` calls `Current.clear_all`. The `perform_enqueued_jobs` override clears `Current.account` while jobs run, so a job that depends on a leaked account fails in the test instead of in production.
+In the same file, `setup` puts the fixture account in `Current`, and `teardown` calls `Current.clear_all`. The `perform_enqueued_jobs` override clears `Current.account` while jobs run, so a job that depends on a leaked account fails in the test instead of in production. multi-tenancy.md ("Testing Tenancy") shows that excerpt.
 
 Why: jobs carry their own account through `AccountTenanted` (Fizzy: the comment in `test/test_helper.rb`: "Jobs must carry their own account context").
 

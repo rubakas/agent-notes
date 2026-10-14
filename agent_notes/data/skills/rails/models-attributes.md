@@ -8,6 +8,7 @@
 - [Serialization](#serialization)
 - [Secure Tokens](#secure-tokens)
 - [Action Text (Rich Text)](#action-text-rich-text)
+- [Primary Keys: UUIDs (Fizzy-Specific)](#primary-keys-uuids-fizzy-specific)
 - [Common Patterns](#common-patterns)
 - [Sources](#sources)
 
@@ -177,6 +178,42 @@ For search, Fizzy joins models to the index with `has_search` from ActiveSearch,
 
 Why: rich text lives in a separate table, so a list view needs the preload to avoid one query per record (Fizzy: `app/models/card.rb`).
 
+## Primary Keys: UUIDs (Fizzy-Specific)
+
+"All tables use UUIDv7 keys, base36-encoded to 25 characters." (AGENTS.md "UUID primary keys") This is not a Rails default. Fizzy registers a custom `ActiveRecord::Type::Uuid`, stores it as `binary(16)` on MySQL and `blob(16)` on SQLite, and teaches the adapters and the table definition about a `:uuid` column type:
+
+```ruby
+# lib/rails_ext/active_record_uuid_type.rb
+BASE36_LENGTH = 25 # 36^25 > 2^128
+# ...
+  def generate
+    uuid = SecureRandom.uuid_v7
+    hex = uuid.delete("-")
+    hex_to_base36(hex)
+  end
+```
+
+```ruby
+# config/initializers/uuid_primary_keys.rb
+  class_methods do
+    def native_database_types
+      @native_database_types_with_uuid ||= super.merge(uuid: { name: "binary", limit: 16 })
+    end
+  end
+# ...
+module TableDefinitionUuidSupport
+  def uuid(name, **options)
+    column(name, :uuid, **options)
+  end
+end
+```
+
+In migrations, declare the table with `id: :uuid` and foreign keys with `t.uuid`; models-migrations.md has a full example.
+
+Fixture ids are generated so that they sort older than any record created at runtime, which keeps `.first` and `.last` deterministic in tests. A fixture label ending in `_uuid` resolves to the same generated id; testing-models-fixtures.md shows the YAML and the `identify` override.
+
+Why: ordering in tests stays stable without comparing insertion order to id order (AGENTS.md "UUID primary keys").
+
 ## Common Patterns
 
 ### State as a record (one-to-one child)
@@ -185,23 +222,14 @@ A state such as "closed" or "golden" is a child record, not a boolean column:
 
 ```ruby
 # app/models/card/closeable.rb
-included do
-  has_one :closure, dependent: :destroy
-
-  scope :closed, -> { joins(:closure) }
-  scope :open, -> { where.missing(:closure) }
-
-  scope :recently_closed_first, -> { closed.order(closures: { created_at: :desc }) }
-  scope :closed_at_window, ->(window) { closed.where(closures: { created_at: window }) }
-  scope :closed_by, ->(users) { closed.where(closures: { user_id: Array(users) }) }
-end
+has_one :closure, dependent: :destroy
 # ...
 def closed?
   closure.present?
 end
 ```
 
-The child stores the metadata (`Closure` has `user` and timestamps) and the parent reads its presence. `closures.card_id` has a unique index, so a card has at most one closure. `Closure` declares `belongs_to :card, touch: true`; see the `models-structure.md` reference.
+`Card::Closeable` (models-concerns.md) holds the full concern. The child stores the metadata (`Closure` has `user` and timestamps) and the parent reads its presence. `closures.card_id` has a unique index, so a card has at most one closure. `Closure` declares `belongs_to :card, touch: true`; see the `models-structure.md` reference.
 
 Why: a record can be queried and carries who and when, which a boolean cannot (Fizzy: `app/models/card/closeable.rb`).
 
@@ -211,6 +239,7 @@ Why: a record can be queried and carries who and when, which a boolean cannot (F
 - Fizzy: `app/models/identity.rb`, `app/models/identity/access_token.rb`, `app/models/magic_link.rb`
 - Fizzy: `app/models/webhook.rb`, `app/models/signup.rb`, `app/models/export.rb`, `app/models/account/import.rb`
 - Fizzy: `app/models/user/role.rb`, `app/models/board/publication.rb`, `db/schema.rb`
-- AGENTS.md "Search is sharded on MySQL, single-index on SQLite"
+- Fizzy: `lib/rails_ext/active_record_uuid_type.rb`, `config/initializers/uuid_primary_keys.rb`
+- AGENTS.md "Search is sharded on MySQL, single-index on SQLite", "UUID primary keys"
 - https://api.rubyonrails.org/classes/ActiveModel/Attributes/Normalization/ClassMethods.html
 - https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html

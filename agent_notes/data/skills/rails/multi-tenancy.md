@@ -7,6 +7,7 @@
 - [Current Context](#current-context)
 - [Broadcasting & Jobs](#broadcasting--jobs)
 - [Mailers & Action Cable](#mailers--action-cable)
+- [Testing Tenancy](#testing-tenancy)
 - [Sources](#sources)
 
 ## URL-Based Tenancy
@@ -68,6 +69,14 @@ Why: a helper that ignores `SCRIPT_NAME` would generate URLs that leave the tena
 class Current < ActiveSupport::CurrentAttributes
   attribute :session, :user, :identity, :account
   attribute :http_method, :request_id, :user_agent, :ip_address, :referrer
+# ...
+  def identity=(identity)
+    super(identity)
+
+    if identity.present?
+      self.user = identity.users.find_by(account: account)
+    end
+  end
 # ...
   def with_account(value, &)
     with(account: value, &)
@@ -167,19 +176,7 @@ Why: AGENTS.md says "Background jobs serialize and restore `Current.account` the
 
 ## Mailers & Action Cable
 
-`ApplicationMailer` adds the account slug as `script_name` whenever a `Current.account` exists, so links in emails carry the prefix. `MailDeliveryJob` gets `AccountTenanted` in the initializer shown above.
-
-```ruby
-# app/mailers/application_mailer.rb
-  private
-    def default_url_options
-      if Current.account
-        super.merge(script_name: Current.account.slug)
-      else
-        super
-      end
-    end
-```
+`ApplicationMailer` adds the account slug as `script_name` whenever a `Current.account` exists, so links in emails carry the prefix. `MailDeliveryJob` gets `AccountTenanted` in the initializer shown above. The `default_url_options` override that does this is shown in mailers.md.
 
 For Action Cable, the browser must connect under the same prefix. A helper builds the meta tag from `request.script_name` plus the cable mount path:
 
@@ -204,6 +201,35 @@ It is rendered from the shared head partial:
 For an account whose slug is `/123` and a cable mount path of `/cable`, the tag has `content="/123/cable"`.
 
 Why: without the prefix, the cable connection would be made at the bare root and lose the tenant (Fizzy: `app/helpers/tenanting_helper.rb`).
+
+## Testing Tenancy
+
+In tests, the global setup sets the account and the global teardown clears everything. `perform_enqueued_jobs` is overridden to clear `Current.account` while jobs run, so a job that relies on a leaked account fails in the test instead of in production:
+
+```ruby
+# test/test_helper.rb
+# Jobs must carry their own account context via AccountTenanted,
+# not rely on Current.account leaking from the test setup.
+def perform_enqueued_jobs(...)
+  saved_account = Current.account
+  Current.account = nil
+  super
+ensure
+  Current.account = saved_account
+end
+
+setup do
+  Current.account = accounts("37s")
+end
+
+teardown do
+  Current.clear_all
+end
+```
+
+Add `Current.session = sessions(:david)` in a test that needs a signed-in user.
+
+Why: `Current` is reset between requests by Rails, and tests must reset it themselves so state does not leak between them; jobs carry their own account through `AccountTenanted` (Fizzy: the comment in `test/test_helper.rb`).
 
 ## Sources
 

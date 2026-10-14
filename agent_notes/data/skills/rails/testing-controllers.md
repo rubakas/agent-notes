@@ -150,16 +150,7 @@ Why: with all earlier sessions gone, the next request can only authenticate as t
 
 ### Assert Turbo Stream changes
 
-`assert_turbo_stream action:, target:` checks that the response contains a turbo-stream tag with that action and target. It comes from turbo-rails, and Fizzy wraps it in a named helper:
-
-```ruby
-# test/test_helpers/card_test_helper.rb
-module CardTestHelper
-  def assert_card_container_rerendered(card)
-    assert_turbo_stream action: :replace, target: dom_id(card, :card_container)
-  end
-end
-```
+`assert_turbo_stream action:, target:` checks that the response contains a turbo-stream tag with that action and target. It comes from turbo-rails, and Fizzy wraps it in a named helper, `assert_card_container_rerendered`, which asserts `assert_turbo_stream action: :replace, target: dom_id(card, :card_container)`; testing-models-fixtures.md shows the helper in full.
 
 Why: the helper names the intent, and the closure tests call it with the card (Fizzy: `test/test_helpers/card_test_helper.rb`).
 

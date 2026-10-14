@@ -114,9 +114,48 @@ class Reaction < ApplicationRecord
   belongs_to :reacter, class_name: "User", default: -> { Current.user }
 ```
 
-`Event#eventable`, `Notification#source` and `Mention#source` follow the same shape. For a guide to the delegated-type pattern, see https://dev.37signals.com/the-rails-delegated-type-pattern/.
+`Event#eventable`, `Notification#source` and `Mention#source` follow the same shape.
 
 Why: a plain polymorphic `belongs_to` covers these cases without extra machinery, in line with the vanilla Rails approach (STYLE.md "Controller and model interactions").
+
+### Delegated types (not used by Fizzy)
+
+In the delegated-type pattern, a concrete "superclass" table holds the metadata every kind of record shares, and each kind keeps its own columns in its own table. The superclass row stores `<role>_type` and `<role>_id` and delegates to the concrete record. Compared with the two usual alternatives:
+
+- Single-table inheritance puts every kind's columns in one table, so the table grows wider with each new kind and gets slower to migrate. Adding a kind to a delegated type is a new table, and the superclass table does not change.
+- A plain polymorphic `belongs_to` lets many things point at one target, but it gives no shared table to query, paginate or hang common behaviour on. Basecamp still uses a polymorphic association for boosts, because a boost can target things that are not recordings.
+
+Rails adds the helpers: `entry.message` (nil unless the entry is a message), `entry.message?`, `entry.entryable_name`, and a scope per type (`Entry.messages`).
+
+```ruby
+# Illustrative (not from Fizzy)
+class Entry < ApplicationRecord
+  belongs_to :account
+  belongs_to :creator
+  delegated_type :entryable, types: %w[ Message Comment ]
+end
+
+module Entryable
+  extend ActiveSupport::Concern
+
+  included do
+    has_one :entry, as: :entryable, touch: true
+  end
+end
+
+class Message < ApplicationRecord
+  include Entryable
+end
+
+class Comment < ApplicationRecord
+  include Entryable
+end
+
+Entry.create! entryable: Comment.new(content: "Hello!"), creator: Current.user, account: Current.account
+Entry.messages.order(created_at: :desc).limit(50)
+```
+
+Why: the superclass table can be queried and paginated across every kind, which separate per-kind tables cannot do, and a new kind needs no change to it (37signals dev blog, "The Rails Delegated Type Pattern": https://dev.37signals.com/the-rails-delegated-type-pattern/; Rails API `ActiveRecord::DelegatedType`).
 
 ## Scopes
 
@@ -177,4 +216,6 @@ Why: filter-name-to-scope mapping lives in one place, so a new filter is one mor
 - Fizzy: `app/models/card.rb`, `app/models/card/closeable.rb`, `app/models/closure.rb`
 - Fizzy: `app/models/reaction.rb`, `app/models/event.rb`
 - STYLE.md "Methods ordering", "Invocation order", "Controller and model interactions"
-- Delegated types: https://dev.37signals.com/the-rails-delegated-type-pattern/
+- Fizzy: `app/models/notification.rb`, `app/models/mention.rb`
+- 37signals dev blog, "The Rails Delegated Type Pattern": https://dev.37signals.com/the-rails-delegated-type-pattern/
+- Rails API `ActiveRecord::DelegatedType` (activerecord 8.1.3, `lib/active_record/delegated_type.rb`)

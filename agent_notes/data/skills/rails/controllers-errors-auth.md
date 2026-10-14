@@ -320,7 +320,7 @@ module RequestForgeryProtection
 end
 ```
 
-Fizzy tracks Rails `main` (`gem "rails", github: "rails/rails", branch: "main"` in the Gemfile), and `using: :header_only` is a `main`-only option. On released Rails 8.1 use the stock `protect_from_forgery with: :exception`. The concern also lets JSON requests that carry no `Sec-Fetch-Site` header (API clients) through.
+Fizzy tracks Rails `main` (`gem "rails", github: "rails/rails", branch: "main"` in the Gemfile), and `using: :header_only` is a `main`-only option. As of 2026-10, on released Rails 8.1 use the stock `protect_from_forgery with: :exception`. The concern also lets JSON requests that carry no `Sec-Fetch-Site` header (API clients) through.
 
 Why: API clients cannot send a browser CSRF token, so the check has a narrow JSON exception (Fizzy: `app/controllers/concerns/request_forgery_protection.rb`).
 

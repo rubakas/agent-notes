@@ -193,29 +193,7 @@ Why: the model stays the domain abstraction, and a plain object is used only whe
 
 ## Testing Concerns
 
-Test a concern through the model it is mixed into:
-
-```ruby
-# test/models/card/closeable_test.rb
-class Card::CloseableTest < ActiveSupport::TestCase
-  setup do
-    Current.session = sessions(:david)
-  end
-# ...
-  test "close cards" do
-    assert_not cards(:logo).closed?
-
-    assert_difference -> { cards(:logo).events.count }, +1 do
-      cards(:logo).close(user: users(:kevin))
-    end
-
-    assert cards(:logo).closed?
-    assert cards(:logo).events.last.action.card_closed?
-    assert_equal users(:kevin), cards(:logo).closed_by
-  end
-# ...
-end
-```
+Test a concern through the model it is mixed into. `Card::CloseableTest` sets `Current.session` in `setup`, closes a fixture card and asserts the recorded event and `closed_by`; testing-models-fixtures.md shows the test in full.
 
 **Key patterns:**
 - The global `setup` in `test/test_helper.rb` sets `Current.account`; add `Current.session = sessions(:david)` where the code reads `Current.user`.

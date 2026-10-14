@@ -151,45 +151,7 @@ Why: a job enqueued inside a transaction can run before the commit and miss the 
 
 ## Queue Configuration
 
-Production uses Solid Queue, with its tables in a separate queue database:
-
-```ruby
-# config/environments/production.rb
-  config.active_job.queue_adapter = :solid_queue
-  config.solid_queue.connects_to = { database: { writing: :queue, reading: :queue } }
-```
-
-Workers and dispatchers are configured in `config/queue.yml`. The same defaults apply to every environment through an anchor:
-
-```yaml
-# config/queue.yml
-default: &default
-  dispatchers:
-    - polling_interval: 1
-      batch_size: 500
-  workers:
-    - queues: [ "default", "solid_queue_recurring", "backend", "webhooks", "*" ]
-      threads: 3
-      processes: <%= Integer(ENV.fetch("JOB_CONCURRENCY") { Concurrent.physical_processor_count }) %>
-      polling_interval: 0.1
-
-development: *default
-test: *default
-beta: *default
-staging: *default
-production: *default
-```
-
-Jobs run inside Puma through the Solid Queue plugin, except on SaaS, in local environments, or when `SOLID_QUEUE_IN_PUMA=false`. `bin/jobs` starts a separate supervisor (`SolidQueue::Cli.start(ARGV)`):
-
-```ruby
-# config/puma.rb
-# Only production configures a queue database, so a local supervisor dies on the missing
-# solid_queue_recurring_tasks and takes Puma down with it.
-unless Fizzy.saas? || Rails.env.local? || ENV["SOLID_QUEUE_IN_PUMA"] == "false"
-  plugin :solid_queue
-end
-```
+Production uses Solid Queue, with its tables in a separate queue database. `config/environments/production.rb` sets `queue_adapter = :solid_queue` and `connects_to`, and `config/queue.yml` configures workers and dispatchers through one `default` anchor that every environment reuses. Jobs run inside Puma through the Solid Queue plugin, except on SaaS, in local environments, or when `SOLID_QUEUE_IN_PUMA=false`; `bin/jobs` starts a separate supervisor (`SolidQueue::Cli.start(ARGV)`). The excerpts of all three files are in solid-stack.md.
 
 Mission Control Jobs uses the app's `AdminController` as its base controller (`config/initializers/mission_control.rb`).
 
@@ -271,57 +233,9 @@ Why: the schedule lives in one file, and the work lives on the model (Fizzy: `co
 
 ## Job Tenancy
 
-`ApplicationJob` prepends `AccountTenanted`. It stores `Current.account` when the job is built, serializes the account's GlobalID into the job data, and wraps `perform` in `Current.with_account`:
+`ApplicationJob` prepends `AccountTenanted`. It stores `Current.account` when the job is built, serializes the account's GlobalID into the job data, and wraps `perform` in `Current.with_account`. Jobs never set `Current.account` by hand. A job whose account no longer exists raises `ActiveJob::DeserializationError` inside `perform`, where `discard_on` can handle it (the comment in `account_tenanted.rb` says so). Jobs from gems (`ActionMailer::MailDeliveryJob`, the Turbo broadcast jobs) get the same behavior by prepending the concern in `config/initializers/active_job.rb`.
 
-```ruby
-# app/jobs/application_job.rb
-class ApplicationJob < ActiveJob::Base
-  prepend AccountTenanted
-# ...
-end
-```
-
-```ruby
-# app/jobs/concerns/account_tenanted.rb
-module AccountTenanted
-# ...
-  prepended do
-# ...
-    around_perform :with_account_context
-  end
-# ...
-  def serialize
-    super.merge({ "account" => @account&.to_gid })
-  end
-# ...
-  private
-    def with_account_context(&block)
-      resolve_account!
-
-      if account.present?
-        Current.with_account(account, &block)
-      else
-        yield
-      end
-    end
-# ...
-end
-```
-
-Jobs never set `Current.account` by hand. A job whose account no longer exists raises `ActiveJob::DeserializationError` inside `perform`, where `discard_on` can handle it (the comment in `account_tenanted.rb` says so). Jobs from gems get the same behavior by prepending the concern:
-
-```ruby
-# config/initializers/active_job.rb
-ActiveSupport.on_load(:action_mailer) do
-  ActionMailer::MailDeliveryJob.prepend AccountTenanted
-end
-
-Rails.application.config.after_initialize do
-  Turbo::Streams::ActionBroadcastJob.prepend AccountTenanted
-  Turbo::Streams::BroadcastJob.prepend AccountTenanted
-  Turbo::Streams::BroadcastStreamJob.prepend AccountTenanted
-end
-```
+Tenancy: see multi-tenancy.md for the `AccountTenanted` excerpts and the initializer.
 
 Why: a job runs in the account that enqueued it, whatever `Current` holds in the worker (AGENTS.md: "Background jobs serialize and restore `Current.account` themselves").
 

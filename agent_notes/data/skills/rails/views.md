@@ -155,19 +155,7 @@ Forms use `form_with model:` plus Fizzy's Stimulus controllers on the form eleme
     <% end %>
 ```
 
-```ruby
-# app/helpers/forms_helper.rb
-  def auto_submit_form_with(**attributes, &)
-    data = attributes.delete(:data) || {}
-    data[:controller] = "auto-submit #{data[:controller]}".strip
-
-    if block_given?
-      form_with **attributes, data: data, &
-    else
-      form_with(**attributes, data: data) { }
-    end
-  end
-```
+The two form helpers are excerpted in helpers.md.
 
 Why: form behavior is declared with `data-controller` instead of per-form JavaScript (Fizzy: `app/helpers/forms_helper.rb`).
 
@@ -199,35 +187,7 @@ Why: Turbo shows its confirm prompt before submitting the form (Fizzy: `app/view
 
 ## Helpers in Views
 
-Helpers build tag attributes. `card_article_tag` computes CSS classes from card state, and `local_datetime_tag` emits a `<time>` that a Stimulus controller formats in the browser, so the markup stays cacheable across time zones.
-
-```ruby
-# app/helpers/cards_helper.rb
-  def card_article_tag(card, id: dom_id(card, :article), data: {}, **options, &block)
-    classes = [
-      options.delete(:class),
-      ("golden-effect" if card.golden?),
-      ("card--postponed" if card.postponed?),
-      ("card--active" if card.active?)
-    ].compact.join(" ")
-# ...
-    tag.article \
-      id: id,
-      style: "--card-color: #{card.color}; view-transition-name: #{id}",
-      class: classes,
-      data: data,
-      **options,
-      &block
-  end
-```
-
-```ruby
-# app/helpers/time_helper.rb
-  def local_datetime_tag(datetime, style: :time, **attributes)
-    # Render empty space to ensure it takes height until the local time is loaded via JS
-    tag.time "&nbsp;".html_safe, **attributes, datetime: datetime.to_i, data: { local_time_target: style, action: "turbo:morph-element->local-time#refreshTarget" }
-  end
-```
+Helpers build tag attributes. `card_article_tag` computes CSS classes from card state, and `local_datetime_tag` emits a `<time>` that a Stimulus controller formats in the browser, so the markup stays cacheable across time zones. Both helpers are excerpted in helpers.md.
 
 Why: the same markup serves every user while the browser localizes it (Fizzy: `app/helpers/time_helper.rb`).
 
@@ -241,20 +201,7 @@ json.partial! "cards/card", card: @card
 json.steps @card.steps, partial: "cards/steps/step", as: :step
 ```
 
-```ruby
-# app/views/cards/_card.json.jbuilder
-json.cache! card do
-  json.(card, :id, :number, :title, :status)
-  json.description card.description.to_plain_text
-  json.description_html card.description.to_s
-# ...
-end
-```
-
-```ruby
-# app/views/notifications/index.json.jbuilder
-json.array! (@unread || []) + @page.records, partial: "notifications/notification", as: :notification, cached: true
-```
+The `_card.json.jbuilder` partial and the cached collection render for notifications are excerpted in view-caching.md.
 
 Why: JSON responses reuse the same fragment cache and partials as the HTML views (Fizzy: `app/views/cards/_card.json.jbuilder`).
 

@@ -86,14 +86,7 @@ Why: a no-build asset pipeline leaves the browser to do the work that Sass or Po
 
 ## Thruster
 
-Thruster is a small proxy in front of Puma. It adds HTTP/2, automatic TLS (when `TLS_DOMAIN` is set), caching of public assets, and X-Sendfile and compression for static files. Run Puma through it by prefixing the server command with `thrust`. Fizzy's Dockerfile exposes port 80 and starts the server through `bin/thrust`:
-
-```dockerfile
-# Dockerfile
-# Start server via Thruster by default, this can be overwritten at runtime
-EXPOSE 80
-CMD ["./bin/thrust", "./bin/rails", "server"]
-```
+Thruster is a small proxy in front of Puma. It adds HTTP/2, automatic TLS (when `TLS_DOMAIN` is set), caching of public assets, and X-Sendfile and compression for static files. Run Puma through it by prefixing the server command with `thrust`. Fizzy's Dockerfile exposes port 80 and starts the server through `bin/thrust`; deploy-kamal.md excerpts the `EXPOSE 80` and `CMD` lines from the Dockerfile.
 
 Thruster's settings are environment variables, optionally prefixed with `THRUSTER_`. Fizzy's deployment guide (`docs/docker-deployment.md`) tells operators importing very large exports to raise `THRUSTER_HTTP_READ_TIMEOUT` (seconds), because Thruster drops slow uploads after its read timeout.
 

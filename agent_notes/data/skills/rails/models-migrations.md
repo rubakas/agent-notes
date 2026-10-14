@@ -1,5 +1,7 @@
 # Migrations
 
+Fizzy runs Rails main (8.2 alpha). Write your project's Rails version, e.g. `Migration[8.1]`.
+
 ## Contents
 
 - [File Structure](#file-structure)
@@ -49,8 +51,6 @@ end
 ```
 
 Indexes can be declared inside the `create_table` block (as here) or separately with `add_index`.
-
-**Note:** Fizzy runs Rails from `rails/rails` main and writes `Migration[8.2]`. On released Rails 8.1, write `Migration[8.1]`.
 
 Why: declaring the indexes in the block creates them together with the table (Fizzy: `db/migrate/20260828120000_create_identity_transfers.rb`).
 

@@ -53,12 +53,8 @@ Why: a named predicate reads as a sentence and can be reused (Fizzy: `app/models
 
 ```ruby
 # app/models/card/broadcastable.rb
-included do
-  broadcasts_refreshes
-
-  before_update :remember_if_preview_changed
-end
-
+before_update :remember_if_preview_changed
+# ...
 private
   def remember_if_preview_changed
     @preview_changed ||= title_changed? || column_id_changed? || board_id_changed?
@@ -135,12 +131,6 @@ included do
   after_update_commit :broadcast_pin_updates_later, if: :preview_changed?
 end
 # ...
-def broadcast_pin_updates
-  pins.where(user: board.users).find_each do |pin|
-    pin.broadcast_replace_to [ pin.user, :pins_tray ], partial: "my/pins/pin"
-  end
-end
-
 private
   def broadcast_pin_updates_later
     Card::BroadcastPinUpdatesJob.perform_later(self)
@@ -160,7 +150,7 @@ class Card::BroadcastPinUpdatesJob < ApplicationJob
 end
 ```
 
-Here `broadcast_pin_updates_later` is private; `Webhook::Delivery#deliver_later` and `Export#build_later` are public. `discard_on ActiveJob::DeserializationError` drops the job when the record is gone before it runs. The account context is restored for every job by `AccountTenanted`; see the `models-current-tenancy.md` reference.
+Here `broadcast_pin_updates_later` is private; `Webhook::Delivery#deliver_later` and `Export#build_later` are public. `discard_on ActiveJob::DeserializationError` drops the job when the record is gone before it runs. The account context is restored for every job by `AccountTenanted`; see multi-tenancy.md.
 
 Why: "we write shallow job classes that delegate the logic itself to domain models" (STYLE.md "Run async operations in jobs")
 
@@ -172,14 +162,7 @@ Why: STYLE.md and the code disagree, and the code is what a contributor will fin
 
 ### Enqueue after transaction commit
 
-```ruby
-# config/initializers/active_job.rb
-ActiveSupport.on_load(:active_job) do
-  self.enqueue_after_transaction_commit = true
-end
-```
-
-Fizzy sets `enqueue_after_transaction_commit = true` explicitly for every Active Job class, so a job enqueued inside a transaction waits for the commit. Set it in the application's own initializer rather than assuming it is on.
+`config/initializers/active_job.rb` sets `self.enqueue_after_transaction_commit = true` inside `ActiveSupport.on_load(:active_job)`; jobs.md shows the excerpt. Fizzy sets it explicitly for every Active Job class, so a job enqueued inside a transaction waits for the commit. Set it in the application's own initializer rather than assuming it is on.
 
 Why: the job can then always read the row that triggered it (Fizzy: `config/initializers/active_job.rb`).
 

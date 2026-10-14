@@ -206,14 +206,7 @@ Models call the mailer and `deliver_later`. `Identity#send_magic_link` creates t
   end
 ```
 
-The delivery job needs the account, so `ActionMailer::MailDeliveryJob` is prepended with `AccountTenanted` when Action Mailer loads:
-
-```ruby
-# config/initializers/active_job.rb
-ActiveSupport.on_load(:action_mailer) do
-  ActionMailer::MailDeliveryJob.prepend AccountTenanted
-end
-```
+The delivery job needs the account, so `ActionMailer::MailDeliveryJob` is prepended with `AccountTenanted` when Action Mailer loads (excerpt in multi-tenancy.md).
 
 SMTP error handling is added to the same job in a separate `to_prepare` hook (see the `jobs.md` reference).
 

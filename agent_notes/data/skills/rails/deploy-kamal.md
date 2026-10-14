@@ -109,7 +109,7 @@ Why: one commented file lets a self-hoster edit a handful of values and nothing 
 
 ## Dockerfile
 
-Fizzy's `Dockerfile` is multi-stage: a `base` stage with runtime packages and production environment variables, a throw-away `build` stage that installs gems and precompiles bootsnap and assets, and a final stage that copies only the gems and the app and runs as a non-root user. These are the structural lines, copied from it:
+Fizzy's `Dockerfile` is multi-stage: a `base` stage with runtime packages and production environment variables, a throw-away `build` stage that installs gems and precompiles bootsnap and assets, and a final stage that copies only the gems and the app and runs as a non-root user. These are the structural lines, copied from it. The Ruby version `3.4.8` is an example as of 2026-10; use your project's Ruby version.
 
 ```dockerfile
 # Dockerfile

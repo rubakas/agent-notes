@@ -56,7 +56,7 @@ Why: one command reproduces the whole pipeline before a push (Fizzy: `config/ci.
 
 ## GitHub Actions
 
-Fizzy pins every third-party action to a commit SHA and keeps the version in a trailing comment. The lint job in `ci-checks.yml` shows the pattern, with `ruby-version` read from `.ruby-version`:
+Fizzy pins every third-party action to a commit SHA and keeps the version in a trailing comment. The lint job in `ci-checks.yml` shows the pattern, with `ruby-version` read from `.ruby-version`. The action SHAs and versions are examples as of 2026-10; use your project's versions.
 
 ```yaml
 # .github/workflows/ci-checks.yml

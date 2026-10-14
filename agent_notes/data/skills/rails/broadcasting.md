@@ -44,40 +44,14 @@ Why: a refresh broadcast keeps every open page in sync without hand-written stre
 
 ## Manual Broadcasting
 
-When a stream needs a custom partial or a specific recipient list, call `broadcast_*_to` yourself. Fizzy's `Card::Pinnable` enqueues a job after an update commit, and the job calls a model method that broadcasts to each pinned user's tray.
+When a stream needs a custom partial or a specific recipient list, call `broadcast_*_to` yourself. Fizzy's `Card::Pinnable` enqueues a job after an update commit, and the job calls a model method that broadcasts to each pinned user's tray:
 
 ```ruby
 # app/models/card/pinnable.rb
     after_update_commit :broadcast_pin_updates_later, if: :preview_changed?
 ```
 
-```ruby
-# app/models/card/pinnable.rb
-  def broadcast_pin_updates
-    pins.where(user: board.users).find_each do |pin|
-      pin.broadcast_replace_to [ pin.user, :pins_tray ], partial: "my/pins/pin"
-    end
-  end
-```
-
-```ruby
-# app/models/card/pinnable.rb
-  private
-    def broadcast_pin_updates_later
-      Card::BroadcastPinUpdatesJob.perform_later(self)
-    end
-```
-
-```ruby
-# app/jobs/card/broadcast_pin_updates_job.rb
-class Card::BroadcastPinUpdatesJob < ApplicationJob
-  discard_on ActiveJob::DeserializationError
-
-  def perform(card)
-    card.broadcast_pin_updates
-  end
-end
-```
+The `broadcast_pin_updates_later` method and `Card::BroadcastPinUpdatesJob` follow the `_later` pattern in models-callbacks-jobs.md. The model method `broadcast_pin_updates` loops over the card's pins and calls `pin.broadcast_replace_to [ pin.user, :pins_tray ], partial: "my/pins/pin"` for each; models-concerns.md shows it in full.
 
 Why: the job keeps rendering out of the request, and the model method decides who receives what (Fizzy: `app/models/card/pinnable.rb`).
 
@@ -127,36 +101,7 @@ Why: the `_later` variants move rendering out of the request or callback (Turbo 
 
 ## Solid Cable Configuration
 
-Solid Cable stores Action Cable messages in the database, so Redis is not required. Fizzy defines one `cable` entry and reuses it for each environment:
-
-```yaml
-# config/cable.yml
-cable: &cable
-  adapter: solid_cable
-  connects_to:
-    database:
-      writing: cable
-      reading: cable
-  polling_interval: 0.1.seconds
-  message_retention: 1.day
-
-development: *cable
-test:
-  adapter: test
-beta: *cable
-staging: *cable
-production: *cable
-```
-
-The `cable` database is a separate connection with its own migrations path. In `config/database.sqlite.yml`:
-
-```yaml
-# config/database.sqlite.yml
-  cable:
-    <<: *default
-    database: storage/development_cable.sqlite3
-    migrations_paths: db/cable_migrate
-```
+Solid Cable stores Action Cable messages in the database, so Redis is not required. Fizzy defines one `cable` entry in `config/cable.yml` and reuses it for each environment except `test`, and gives Solid Cable its own database in `config/database.sqlite.yml`; both files are excerpted in solid-stack.md.
 
 If the app already runs Redis, Action Cable's Redis adapter also works. This is not from Fizzy:
 
@@ -171,50 +116,9 @@ Why: a database-backed adapter removes a moving part from the stack (Solid Cable
 
 ## Multi-Tenant Broadcasting
 
-Turbo renders broadcast partials in background jobs, outside a request. In a multi-tenant app those jobs must run with the right account. Fizzy prepends its `AccountTenanted` concern onto Turbo's broadcast jobs, and `render_format` renders with the account's `script_name` so generated URLs carry the account prefix.
+Turbo renders broadcast partials in background jobs, outside a request. In a multi-tenant app those jobs must run with the right account. Fizzy prepends its `AccountTenanted` concern onto Turbo's broadcast jobs, and `render_format` renders with the account's `script_name` so generated URLs carry the account prefix. The layout also adds the Action Cable URL, including the script name, as a meta tag.
 
-```ruby
-# config/initializers/active_job.rb
-Rails.application.config.after_initialize do
-  Turbo::Streams::ActionBroadcastJob.prepend AccountTenanted
-  Turbo::Streams::BroadcastJob.prepend AccountTenanted
-  Turbo::Streams::BroadcastStreamJob.prepend AccountTenanted
-end
-```
-
-```ruby
-# config/initializers/tenanting/turbo.rb
-module TurboStreamsJobExtensions
-  extend ActiveSupport::Concern
-
-  class_methods do
-    def render_format(format, **rendering)
-      if Current.account.present?
-        ApplicationController.renderer.new(script_name: Current.account.slug).render(formats: [ format ], **rendering)
-      else
-        super
-      end
-    end
-  end
-end
-
-Rails.application.config.after_initialize do
-  Turbo::StreamsChannel.prepend TurboStreamsJobExtensions
-end
-```
-
-The layout adds the Action Cable URL, including the script name, as a meta tag:
-
-```ruby
-# app/helpers/tenanting_helper.rb
-module TenantingHelper
-  def tenanted_action_cable_meta_tag
-    tag "meta",
-        name: "action-cable-url",
-        content: "#{request.script_name}#{ActionCable.server.config.mount_path}"
-  end
-end
-```
+Tenancy: see multi-tenancy.md for the initializer, the `TurboStreamsJobExtensions` module and the `tenanted_action_cable_meta_tag` helper.
 
 Why: without the account context, the job cannot resolve tenant-scoped records or URLs (Fizzy: `config/initializers/active_job.rb`, `AGENTS.md`).
 
