@@ -1,5 +1,7 @@
 # Examples and Best Practices
 
+Version tags are examples as of 2026-10; use current releases.
+
 ## Contents
 
 - [Development vs Production](#development-vs-production)
@@ -179,7 +181,7 @@ services:
 
   # Reverse Proxy
   traefik:
-    image: traefik:v2.10
+    image: traefik:v3.7
     restart: unless-stopped
     command:
       - "--providers.docker=true"
@@ -190,6 +192,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      # :ro only stops writes to the socket file; it does not limit Docker API calls.
+      # Anything that can reach the socket has root-equivalent control of the host.
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - app_network
@@ -211,7 +215,7 @@ networks:
 ### DO
 
 1. **Remove version field** - It's obsolete in Compose v2
-2. **Use health checks** - Essential for orchestration
+2. **Use health checks** - Unless an orchestrator or proxy already checks health (Kubernetes probes, Kamal proxy, ECS)
 3. **Use named volumes** - Data persistence
 4. **Set resource limits** - Prevent resource exhaustion
 5. **Use restart policies** - Automatic recovery
@@ -285,5 +289,3 @@ This guide is based on official Docker Compose documentation:
 - [Docker Compose Health Checks](https://docs.docker.com/reference/compose-file/services/#healthcheck)
 - [Docker Compose depends_on](https://docs.docker.com/reference/compose-file/services/#depends_on)
 - [Docker Compose Legacy Versions](https://docs.docker.com/reference/compose-file/legacy-versions/)
-
-Last updated: December 2025

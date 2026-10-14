@@ -1,5 +1,7 @@
 # Language-Specific Patterns
 
+Version tags are examples as of 2026-10; use current releases.
+
 ## Contents
 
 - [Node.js with Multi-Stage Build](#nodejs-with-multi-stage-build)
@@ -13,7 +15,7 @@
 ## Node.js with Multi-Stage Build
 
 ```dockerfile
-FROM node:20.11.0-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -26,7 +28,7 @@ COPY . .
 RUN npm run build
 
 # Production stage - only production dependencies
-FROM node:20.11.0-alpine AS production
+FROM node:24-alpine AS production
 
 RUN addgroup -g 10001 -S nodejs && \
     adduser -S nodejs -u 10001
@@ -47,6 +49,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 CMD ["node", "dist/server.js"]
 ```
+
+Keep the `HEALTHCHECK` only when no orchestrator or proxy already checks health (Kubernetes probes, Kamal proxy, ECS, Compose healthcheck).
 
 ## Python with Virtual Environment
 
@@ -82,60 +86,102 @@ CMD ["python", "app.py"]
 
 ## Ruby/Rails Application
 
+Source: the Dockerfile `rails new` generates (railties 8.1.3.1, Ruby 3.4.4), unmodified.
+
 ```dockerfile
-FROM ruby:3.3-alpine AS builder
+# syntax=docker/dockerfile:1
+# check=error=true
 
-# Install build dependencies
-RUN apk add --no-cache \
-    build-base \
-    postgresql-dev \
-    nodejs \
-    yarn
+# This Dockerfile is designed for production, not development. Use with Kamal or build'n'run by hand:
+# docker build -t demo .
+# docker run -d -p 80:80 -e RAILS_MASTER_KEY=<value from config/master.key> --name demo demo
 
-WORKDIR /app
+# For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
 
-# Install gems
+# Make sure RUBY_VERSION matches the Ruby version in .ruby-version
+ARG RUBY_VERSION=3.4.4
+FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
+
+# Rails app lives here
+WORKDIR /rails
+
+# Install base packages
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y curl libjemalloc2 libvips sqlite3 && \
+    ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
+    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
+# Set production environment variables and enable jemalloc for reduced memory usage and latency.
+ENV RAILS_ENV="production" \
+    BUNDLE_DEPLOYMENT="1" \
+    BUNDLE_PATH="/usr/local/bundle" \
+    BUNDLE_WITHOUT="development" \
+    LD_PRELOAD="/usr/local/lib/libjemalloc.so"
+
+# Throw-away build stage to reduce size of final image
+FROM base AS build
+
+# Install packages needed to build gems
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y build-essential git libvips libyaml-dev pkg-config && \
+    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
+# Install application gems
+COPY vendor/* ./vendor/
 COPY Gemfile Gemfile.lock ./
-RUN bundle config set --local deployment 'true' && \
-    bundle config set --local without 'development test' && \
-    bundle install
 
-# Install node packages and build assets
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+RUN bundle install && \
+    rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \
+    # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
+    bundle exec bootsnap precompile -j 1 --gemfile
 
+# Copy application code
 COPY . .
 
-# Precompile assets
-RUN SECRET_KEY_BASE=dummy bundle exec rails assets:precompile
+# Precompile bootsnap code for faster boot times.
+# -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
+RUN bundle exec bootsnap precompile -j 1 app/ lib/
 
-# Production
-FROM ruby:3.3-alpine
+# Precompiling assets for production without requiring secret RAILS_MASTER_KEY
+RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 
-# Install runtime dependencies only
-RUN apk add --no-cache \
-    postgresql-client \
-    nodejs \
-    tzdata
 
-RUN addgroup -g 10001 -S rails && \
-    adduser -S rails -u 10001
 
-WORKDIR /app
 
-# Copy gems and application
-COPY --from=builder /usr/local/bundle /usr/local/bundle
-COPY --from=builder --chown=rails:rails /app /app
+# Final stage for app image
+FROM base
 
-USER rails
+# Run and own only the runtime files as a non-root user for security
+RUN groupadd --system --gid 1000 rails && \
+    useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash
+USER 1000:1000
 
-EXPOSE 3000
+# Copy built artifacts: gems, application
+COPY --chown=rails:rails --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
+COPY --chown=rails:rails --from=build /rails /rails
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1
+# Entrypoint prepares the database.
+ENTRYPOINT ["/rails/bin/docker-entrypoint"]
 
-CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0"]
+# Start server via Thruster by default, this can be overwritten at runtime
+EXPOSE 80
+CMD ["./bin/thrust", "./bin/rails", "server"]
 ```
+
+The `bin/docker-entrypoint` that Dockerfile points at, also unmodified:
+
+```bash
+#!/bin/bash -e
+
+# If running the rails server then create or migrate existing database
+if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
+  ./bin/rails db:prepare
+fi
+
+exec "${@}"
+```
+
+The base is Debian slim (not Alpine, whose musl libc breaks many native gems). The app is served by Thruster on port 80, and `bin/docker-entrypoint` runs `db:prepare` before the server starts. There is no `HEALTHCHECK` because Kamal's proxy health-checks Rails' built-in `/up` route. When versions move, regenerate with your own `rails new` rather than copying this one.
 
 ---
 
@@ -158,6 +204,8 @@ RUN if [ "$NODE_ENV" = "production" ]; then \
 # docker build --build-arg NODE_ENV=development -t my-app .
 ```
 
+Build args are for non-secret settings; their values persist in image metadata and history (use BuildKit secret mounts instead; see the Dockerfile security reference).
+
 ### Environment Variables
 
 ```dockerfile
@@ -175,7 +223,7 @@ ENV NODE_ENV=production \
 
 ```dockerfile
 # Development stage
-FROM node:20-alpine AS development
+FROM node:24-alpine AS development
 
 WORKDIR /app
 
@@ -187,7 +235,7 @@ COPY . .
 CMD ["npm", "run", "dev"]
 
 # Production stage
-FROM node:20-alpine AS production
+FROM node:24-alpine AS production
 
 RUN addgroup -g 10001 -S nodejs && \
     adduser -S nodejs -u 10001

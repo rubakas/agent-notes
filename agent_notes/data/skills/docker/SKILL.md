@@ -20,9 +20,8 @@ Based on the user's current task, read the relevant reference file(s) from this 
 
 - [dockerfile-base-and-structure.md](dockerfile-base-and-structure.md) — Read when: choosing a base image or structuring a Dockerfile
 - [dockerfile-multistage-and-layers.md](dockerfile-multistage-and-layers.md) — Read when: using multi-stage builds or optimizing layers
-- [dockerfile-security.md](dockerfile-security.md) — Read when: securing a Dockerfile or adding health checks
+- [dockerfile-security.md](dockerfile-security.md) — Read when: securing a Dockerfile or adding health checks, or rebuilding and testing images
 - [dockerfile-patterns.md](dockerfile-patterns.md) — Read when: writing language-specific Dockerfiles or using build arguments
-- [dockerfile-deployment.md](dockerfile-deployment.md) — Read when: preparing for CI/CD, testing, or following best practices
 
 ## Docker Compose guidance
 

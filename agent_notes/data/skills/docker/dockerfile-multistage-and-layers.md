@@ -45,14 +45,14 @@ COPY --from=nginx:latest /etc/nginx/nginx.conf /nginx.conf
 ### Named Stages for Maintainability
 
 ```dockerfile
-FROM node:20-alpine AS dependencies
+FROM node:24-alpine AS dependencies
 RUN npm ci --only=production
 
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 COPY --from=dependencies /app/node_modules ./node_modules
 RUN npm run build
 
-FROM node:20-alpine AS production
+FROM node:24-alpine AS production
 COPY --from=builder /app/dist ./dist
 ```
 
@@ -105,7 +105,7 @@ RUN set -o pipefail && \
     curl -sL https://example.com/install.sh | bash
 ```
 
-Without pipefail, errors in piped commands may be silently ignored.
+Without pipefail, errors in piped commands may be silently ignored. Piping a script into a shell runs whatever the server returns: pin the version and verify a checksum or signature before executing, or install from a package instead.
 
 **Source**: [Docker Best Practices - RUN Instructions](https://docs.docker.com/build/building/best-practices/)
 

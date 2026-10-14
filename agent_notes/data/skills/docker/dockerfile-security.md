@@ -1,9 +1,12 @@
 # Security and Health Checks
 
+Version tags are examples as of 2026-10; use current releases.
+
 ## Contents
 
 - [Security Best Practices](#security-best-practices)
-- [Health Checks](#health-checks-production-necessary)
+- [Health Checks](#health-checks)
+- [Build, Rebuild and Test](#build-rebuild-and-test)
 
 ---
 
@@ -38,7 +41,7 @@ COPY --chown=appuser:appuser . .
 
 ```dockerfile
 # Use specific versions, never :latest
-FROM node:20.11.0-alpine
+FROM node:24-alpine
 
 # Keep base image updated
 RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
@@ -57,21 +60,26 @@ trivy image my-image:latest
 # ❌ BAD - Never hardcode secrets
 ENV API_KEY=secret123
 
-# ✅ GOOD - Use build args with cleanup
+# ❌ BAD - ARG values persist in image metadata and `docker history`,
+# even if a later layer deletes the file that used them
 ARG NPM_TOKEN
-RUN echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc && \
-    npm install && \
-    rm -f .npmrc
 
-# ✅ BETTER - Pass at runtime
+# ✅ GOOD - BuildKit secret mount: available only during this RUN, never stored in a layer
+RUN --mount=type=secret,id=npm_token,env=NPM_TOKEN npm ci
+
+# ✅ Runtime secrets - pass at runtime
 # docker run -e API_KEY=$API_KEY my-image
+```
+
+```bash
+docker build --secret id=npm_token,env=NPM_TOKEN .
 ```
 
 ---
 
-## Health Checks (Production-Necessary)
+## Health Checks
 
-According to Docker best practices, "adding a HEALTHCHECK to your Dockerfile is not a nice-to-have—**it's a production necessity**." Without health checks, Docker cannot detect if a containerized service is unhealthy, preventing automatic restarts or recovery.
+A HEALTHCHECK lets Docker detect an unhealthy container. Add one only when no orchestrator or proxy already checks health (Kubernetes probes, Kamal proxy, ECS, Compose healthcheck); a Rails app deployed with Kamal, for example, relies on the proxy hitting `/up` and needs none.
 
 ### HEALTHCHECK Syntax
 
@@ -114,3 +122,27 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
 4. **Lightweight checks** - Use `wget --spider` or native commands when possible
 
 **Source**: [Docker HEALTHCHECK Reference](https://docs.docker.com/reference/dockerfile/#healthcheck)
+
+---
+
+## Build, Rebuild and Test
+
+Rebuild images regularly with `--no-cache` so base-image security patches are picked up, and fail the pipeline on findings:
+
+```bash
+docker build --no-cache -t my-app:latest .
+docker scout cves my-app:latest --exit-code
+```
+
+Check the hardening claims instead of assuming them:
+
+```bash
+# Runs as an arbitrary non-root UID
+docker run --user 10001:10001 my-app:latest
+
+# Works with a read-only root filesystem
+docker run --read-only --tmpfs /tmp my-app:latest
+
+# Inspect layers for leaked secrets and bloat
+docker history my-app:latest
+```

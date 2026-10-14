@@ -1,5 +1,7 @@
 # Base Images and Structure
 
+Version tags are examples as of 2026-10; use current releases.
+
 ## Contents
 
 - [Dockerfile Structure Template](#dockerfile-structure-template)
@@ -13,7 +15,7 @@
 # syntax=docker/dockerfile:1
 
 # Build stage
-FROM node:20.11.0-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Metadata
 LABEL maintainer="team@example.com"
@@ -33,7 +35,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:20.11.0-alpine AS production
+FROM node:24-alpine AS production
 
 # Install security updates
 RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
@@ -55,7 +57,8 @@ USER nodejs
 # Expose port
 EXPOSE 3000
 
-# Health check (production-necessary, not optional)
+# Health check - only when no orchestrator or proxy already checks health
+# (Kubernetes probes, Kamal proxy, ECS, Compose healthcheck)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node healthcheck.js || exit 1
 
@@ -81,10 +84,9 @@ Docker recommends using images from:
 Alpine is recommended as a minimal starting point, currently **under 6 MB** while providing a full Linux distribution.
 
 ```dockerfile
-# Smallest size, minimal attack surface
-FROM node:20.11.0-alpine
+# Smallest size, minimal attack surface (musl libc: avoid for Ruby, native gems break)
+FROM node:24-alpine
 FROM python:3.12-alpine
-FROM ruby:3.3-alpine
 
 # Install common dependencies on Alpine
 RUN apk add --no-cache \
@@ -97,8 +99,8 @@ RUN apk add --no-cache \
 ### Pin to Specific Digests for Supply Chain Security
 
 ```dockerfile
-# Pin to specific digest for guaranteed immutability
-FROM node:20.11.0-alpine@sha256:c0a3badbd8a0a760de903e00cedbca94588e609299820557e72cba2a53dbaa2c
+# Pin to specific digest for guaranteed immutability (get the real digest from your registry)
+FROM node:24-alpine@sha256:<digest>
 
 # Note: Requires active maintenance for security updates
 # Use Docker Scout for automated remediation workflows
@@ -110,9 +112,9 @@ FROM node:20.11.0-alpine@sha256:c0a3badbd8a0a760de903e00cedbca94588e609299820557
 
 ```dockerfile
 # Good balance of size and compatibility
-FROM node:20-slim
+FROM node:24-slim
 FROM python:3.12-slim
-FROM ruby:3.3-slim
+FROM ruby:3.4-slim
 
 # CRITICAL: Always combine apt-get update with install
 # Prevents cache issues that could install outdated packages
@@ -128,7 +130,7 @@ RUN apt-get update && \
 
 ```dockerfile
 # Google's distroless images - no shell, minimal attack surface
-FROM gcr.io/distroless/nodejs20-debian12
+FROM gcr.io/distroless/nodejs24-debian12
 FROM gcr.io/distroless/python3-debian12
 FROM gcr.io/distroless/java17-debian12
 
