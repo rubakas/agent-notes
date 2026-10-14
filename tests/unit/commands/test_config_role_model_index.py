@@ -163,20 +163,30 @@ class TestRankedColumns:
         row = next(line for line in out.splitlines() if f" {rated.id} " in line)
         assert f"{rated.intelligence_index:.1f}" in row
 
-    def test_models_without_an_intelligence_score_render_a_dash(self, state_file, capsys):
+    def test_models_without_an_intelligence_score_render_a_dash(self, state_file, capsys, monkeypatch):
+        from dataclasses import replace
         from agent_notes.commands.config import model_columns
+        from agent_notes.registries import model_registry as mr
 
-        gap = [m for m in _claude_models()
-               if m.intelligence_index is None and m.coding_index is not None]
-        assert gap, "fixture assumption: some rated models have no intelligence index"
+        # A synthetic rated model with no intelligence index, so the assertion
+        # holds whatever the live catalog carries: a refresh can fill every gap in.
+        real = mr.load_model_registry().all()
+        template = next(m for m in real if "claude" in m.aliases or m.family == "claude")
+        gap = replace(template, id="synthetic-no-intelligence", coding_index=51.3,
+                      intelligence_index=None, provisional_coding_index=None,
+                      price_in=3.0)
+        patched = mr.ModelRegistry(real + [gap])
+        monkeypatch.setattr(mr, "load_model_registry", lambda: patched)
+        assert gap in _claude_models()
 
         with _patch_state_file(state_file), \
              patch("agent_notes.commands.config._apply_and_regenerate"):
             role_model("orchestrator", cli_filter="claude")
 
         out = capsys.readouterr().out
-        assert model_columns(gap[0]) in out
-        assert "0.0" not in model_columns(gap[0])
+        assert model_columns(gap) in out
+        assert "—" in model_columns(gap)
+        assert "0.0" not in model_columns(gap)
 
     def test_unrated_models_render_a_dash(self, state_file, capsys):
         from agent_notes.commands.config import model_columns
