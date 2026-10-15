@@ -414,4 +414,16 @@ Detailed task breakdown in `tasks.md`. Security tickets come first (T01–T05), 
 
 ## Verification
 
-To be measured after implementation against the success criteria above. Blocking gate: `agent-notes validate` must pass and all existing tests must remain green before declaring done.
+Measured 2026-10-15 on branch feat/skill-quality-and-safety, HEAD d73ea23.
+
+- **Tests:** `uv run pytest -q` 3033 passed, 1 skipped, 15 deselected on Python 3.14 and 3.11 (CI matrix legs). `agent-notes build` succeeds.
+- **Validate:** 0 errors; exactly 3 "Use when" warnings (grill-me, grill-with-docs, migrate-memory) plus unrelated `dist/opencode/agents/lead.md` length warning.
+- **Grep gates (T01–T14):** 24 gates all at expected values. Untrusted-content phrase in 11 files: 10 in SC-001 plus to-spec (also reads issue/PR references).
+- **Rails (SC-006):** Block-vs-file checker against Fizzy at 6aebc0c: 281 path-headed blocks, 0 mismatches, 0 missing. Duplicated lines: 483 before, 21 after. Total skill lines: 6,856 → 6,353. "Why:" tails removed from SKILL.md Rules; per-section "Why" in 28 reference files kept. Only models-migrations.md holds Migration[8.2] blocks and carries the Rails-main note.
+- **Docker (SC-007):** Rails Dockerfile and bin/docker-entrypoint byte-identical to fresh `rails _8.1.3.1_ new` (Ruby 3.4.4). Source named on prose `Source:` line outside fence to preserve byte identity.
+- **chrome-test bus key (SC-012/M7):** `<repo-name>-<12-char sha256 of absolute repo path>` for uniqueness; basename kept for readability.
+- **SRI hashes:** @tailwindcss/browser@4.3.3 and mermaid@11.17.2 recomputed independently and match.
+- **Evals:** 140 prompts (≥3 should_trigger, ≥2 near_miss per skill). One live runner call (git, claude-haiku-4-5) PASS at $0.029.
+- **improve-codebase-architecture:** No handoff template to move (already split in spec 008).
+- **Review:** AF review (correctness, security, test falsifiability, blast radius): 0 critical / 0 major / 7 minor. Delivery dimension failed with API error; separate success-criteria review: 15 of 16 SC met, SC-006 partial for reference-file "Why" lines only; 0 critical / 0 major.
+- **Minor follow-ups (not done):** `stability` missing from validator's frontmatter keys; README and `extra` help omit `--body-file`; multi-line note titles written raw; empty bodies accepted; one-word bodies equal to note types misread as types; class-tier test cannot catch haiku-5-5 reclass; single-quoted fan-out bodies lack `'` escape; `.claude-plugin/` stale until next rebuild. Open: should migrate-memory get `disable-model-invocation: true` while M5 stays deferred?

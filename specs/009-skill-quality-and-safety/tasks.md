@@ -348,7 +348,7 @@ Ticket index for `spec.md`, which holds the requirements, success criteria and a
   - The manifest lists every edited upstream skill.
   - The CHANGELOG entry links spec 009.
 
-- [ ] **T17 Verification**
+- [x] **T17 Verification**
 
   **Checks:**
   - `agent-notes validate`: 0 errors, exactly 3 "Use when" warnings.
