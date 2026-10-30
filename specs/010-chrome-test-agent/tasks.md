@@ -114,7 +114,9 @@ Ticket index for `spec.md`. Paths relative to `agent_notes/` unless start with `
   - `grep -i "browser-tester" README.md` shows presence.
   - `uv run pytest tests/unit/commands/test_count_agents.py -v` passes.
 
-- [ ] **T05 Final validation** (All, after T07)
+- [x] **T05 Final validation** (All, after T07)
+
+  Done 2026-10-30 by the lead at `469f616`: `uv run pytest` 3061 passed, 1 skipped, 15 deselected on Python 3.14 and 3.11; `agent-notes build` generated 91 files; `agent-notes validate` 0 errors, 4 pre-existing warnings.
 
   **Scope**: Full validation and test suite.
 
