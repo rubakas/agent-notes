@@ -1,6 +1,6 @@
 # agent-notes
 
-AI agent configuration manager for Claude Code and OpenCode — orchestrates a team of 19 specialized subagents across three model tiers.
+AI agent configuration manager for Claude Code and OpenCode — orchestrates a team of 20 specialized subagents across three model tiers (browser-tester is Claude Code only; OpenCode and Codex use the manual `claude --chrome` fallback).
 
 ## Quick Start
 
@@ -17,7 +17,7 @@ agent-notes doctor
 > No `pipx`? Use `uv tool install agent-notes` instead, or see **Troubleshooting: externally-managed-environment** below.
 
 **What's Included**
-- 19 specialized AI subagents (Opus reasons, Sonnet executes, Haiku explores)
+- 20 specialized AI subagents (Opus reasons, Sonnet executes, Haiku explores); browser-tester is Claude Code only, OpenCode and Codex use the manual fallback
 - 25 on-demand skills (Rails, Docker, Git, Kamal, Process)
 - Global rules and guardrails (including a ban on AI self-attribution in commits/PRs)
 - Agent memory with 3 storage options (Local, Obsidian, Wiki)
