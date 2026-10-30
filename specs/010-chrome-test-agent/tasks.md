@@ -4,37 +4,38 @@ Ticket index for `spec.md`. Paths relative to `agent_notes/` unless start with `
 
 ## Implementation Phase (T01–T04)
 
-- [ ] **T01 browser-tester agent definition** (Req 1)
+- [x] **T01 browser-tester agent definition** (Req 1)
 
   **Files**: data/agents/agents.yaml, data/agents/browser-tester.md (new)
 
   **Changes**:
-  - **agents.yaml**: Add entry (agents.yaml has no alphabetical order; the entry is at the END of the file, added in commit 7f935ba):
+  - **agents.yaml**: Add entry (agents.yaml has no alphabetical order; the entry is at the END of the file, added in commit 7f935ba, tools and description amended later):
     ```yaml
     browser-tester:
-      description: "Automates browser testing by reading scenarios from a request file, driving Chrome through MCP tools, and writing progress and reports back to the bus. Use when chrome-test skill dispatches it; runs in background (or foreground if site-permission blocks background)."
+      description: "Runs a browser-test request file in the user's Chrome and returns the report to the main session as its final message, writing only a progress file. Dispatched by the chrome-test skill. Use when a chrome-test request-<uuid>.md is ready to execute. Triggers: browser test, chrome-test, run request."
       role: worker
       mode: subagent
       color: cyan
       effort: medium
+      claude:
+        tools: "ToolSearch, Read, Write, mcp__claude-in-chrome__list_connected_browsers, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__tabs_close_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__find, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__javascript_tool, mcp__claude-in-chrome__read_console_messages, mcp__claude-in-chrome__read_network_requests, mcp__claude-in-chrome__resize_window"
       opencode:
         exclude: true
       codex:
         exclude: true
-      claude:
-        tools: "ToolSearch, Read, Write, Grep, Glob, mcp__claude-in-chrome__*"
-        memory: user
     ```
-  - **browser-tester.md** (new): Prompt covering precondition (list_connected_browsers, BLOCKED), tab lifecycle (tabs_create_mcp, tabs_context_mcp, tabs_close_mcp), loop (navigate, form_input, javascript_tool, computer, read_page, get_page_text, find, read_console_messages, read_network_requests), progress writes, report write (no screenshot paths), verdict, untrusted clause, error handling, cleanup.
+    No wildcard and no `memory:`; see Req 1.
+  - **browser-tester.md** (new, no memory section): Prompt covering tool loading, precondition (list_connected_browsers, BLOCKED), tab lifecycle (`tabs_context_mcp` with `createIfEmpty: true`, then `tabs_create_mcp`, then `tabs_close_mcp`), loop (navigate, form_input, javascript_tool read-only, computer, read_page, get_page_text, find, read_console_messages, read_network_requests, resize_window), progress overwrites, the report returned as the final message (Claude Code refuses subagent report files: "Subagents should return findings as text, not write report files. Include this content in your final response instead."), the verdict line `browser-test <uuid>: <passed>/<total> passed, <failed> failed, <blocked> blocked`, untrusted clause, FAIL vs BLOCKED rules, error handling, cleanup.
 
   **Acceptance**:
-  - agents.yaml entry has worker role, opencode/codex backend blocks (exclude: true), tools include ToolSearch + mcp wildcard.
+  - agents.yaml entry has worker role, opencode/codex backend blocks (exclude: true), the exact explicit tool list, no wildcard, no memory.
   - browser-tester.md covers all required steps with correct tool names. No screenshot paths in report description.
   - `agent-notes validate` 0 errors.
+  - `tests/unit/services/test_browser_tester_agent.py` asserts the exact tools list.
 
   **Verification**: `grep -A 20 "browser-tester:" data/agents/agents.yaml` confirms backend blocks. `test -f data/agents/browser-tester.md && wc -l data/agents/browser-tester.md` confirms file exists and has content.
 
-- [ ] **T02 chrome-test skill integration** (Req 2)
+- [x] **T02 chrome-test skill integration** (Req 2)
 
   **Files**: data/skills/chrome-test/SKILL.md
 
@@ -50,7 +51,7 @@ Ticket index for `spec.md`. Paths relative to `agent_notes/` unless start with `
   - `agent-notes validate` 0 errors.
   - `grep "polling\|timeout\|wait for report" data/skills/chrome-test/SKILL.md | grep -v fallback | grep -v operator` returns 0 hits (no polling in agent path).
 
-- [ ] **T03 lead templates update** (Req 3)
+- [x] **T03 lead templates update** (Req 3)
 
   **Files**: data/agents/shared/pipelines.md (line 6), data/agents/shared/verification.md (lines 39-41)
 
@@ -114,7 +115,7 @@ Ticket index for `spec.md`. Paths relative to `agent_notes/` unless start with `
   - `test -f /private/tmp/[session]/test-bus/report-test0001.md && grep "PASS\|FAIL" /private/tmp/[session]/test-bus/report-test0001.md` confirms report format.
   - `test -f /private/tmp/[session]/test-bus/report-test0002.md` confirms parallel completion.
 
-- [ ] **T07 Eval prompts, CHANGELOG, docs, agent tests** (All)
+- [x] **T07 Eval prompts, CHANGELOG, docs, agent tests** (All)
 
   **Files**: tests/skill_evals/prompts.yaml, CHANGELOG.md, README.md, tests/unit/commands/test_count_agents.py
 
