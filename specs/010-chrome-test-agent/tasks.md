@@ -41,7 +41,7 @@ Ticket index for `spec.md`. Paths relative to `agent_notes/` unless start with `
 
   **Changes**: After the end of Leg A (SKILL.md ~line 243, just before "## Leg B" at line 245), add:
   - "Precondition: MCP Tools and Browser Check" section describing ToolSearch + list_connected_browsers call.
-  - "Dispatch browser-tester" section with conditional background/foreground (T06-determined), Modes 1 & 2, completion notification (no polling or timeouts).
+  - Agent path section with background dispatch (decided by T06), Modes 1 & 2, completion notification (no polling or timeouts).
   - "Operator handoff (fallback)" section (preserved, shortened).
   - Leg B unchanged.
   - Preserve objective-trigger gate wording (decision_chrome_test_objective_gate).
@@ -56,7 +56,7 @@ Ticket index for `spec.md`. Paths relative to `agent_notes/` unless start with `
   **Files**: data/agents/shared/pipelines.md (line 6), data/agents/shared/verification.md (lines 39-41)
 
   **Changes**:
-  - **pipelines.md**: Preserve objective-trigger wording. Replace operator relay section with agent dispatch as primary, operator as fallback. No polling/timeout language. Conditional background/foreground on T06.
+  - **pipelines.md**: Preserve objective-trigger wording. Replace operator relay section with agent dispatch as primary, operator as fallback. No polling/timeout language. Background dispatch (decided by T06).
   - **verification.md**: Same changes.
 
   **Acceptance**:
@@ -64,56 +64,31 @@ Ticket index for `spec.md`. Paths relative to `agent_notes/` unless start with `
   - `agent-notes build` succeeds.
   - `grep -i "polling\|timeout\|wait" data/agents/shared/pipelines.md data/agents/shared/verification.md | grep -v operator | grep -v fallback` returns 0 hits.
 
-- [ ] **T04 Parallel execution and untrusted content** (Req 4, 5)
+- [x] **T04 Parallel execution and untrusted content** (Req 4, 5)
 
   **Scope**: Finalize parallel execution requirement and confirm untrusted-content handling.
 
   **Changes**:
-  - **Parallel execution**: spec.md Requirement 4 currently has two conditional branches (if safe / if collision). T06 determines which. Rewrite with chosen branch (single path, not conditional).
+  - **Parallel execution**: spec.md Requirement 4 now holds the single decided path (T06c: parallel allowed, one agent per request, each in its own tab).
   - **Untrusted content**: Verify browser-tester.md prompt includes untrusted-content clause. Clause already stated in Req 5.
 
   **Acceptance**:
-  - Spec Requirement 4 rewritten with chosen branch (A or B) based on T06 results. Untrusted-content clause confirmed in agent prompt.
+  - Spec Requirement 4 rewritten with the chosen branch (A, parallel allowed) based on T06 results. Untrusted-content clause confirmed in agent prompt.
   - No conditional wording remains in Requirement 4 section after T06.
 
   **Verification**: `grep -A 10 "Requirement 4" spec.md | head -15` shows single path (no "if safe" / "if collision" alternatives).
 
 ## Verification Phase (T06–T05)
 
-- [ ] **T06 Live verification** (Req 6)
+- [x] **T06 Live verification** (Req 6)
 
-  **Setup** (scratchpad, never touch HOME or ~/.claude):
-  - HTML page at /private/tmp/[session]/test-server/index.html: button "Change Text" → "Changed" (pass), button "No Change" → no change (fail).
-  - Serve: `cd /private/tmp/[session]/test-server && python3 -m http.server 8080`.
+  Done 2026-10-30 by the lead; facts and exact error strings are in spec.md "T06 results (2026-10-30)".
 
-  **T06 (a) Prompt test (this session)**:
-  - Dispatch general-purpose subagent with browser-tester.md prompt against http://127.0.0.1:8080.
-  - Check report-test0001.md: Scenario 1 PASS, Scenario 2 FAIL.
-
-  **T06 (b) Allowlist test** (scratch project, `chmod -R u+w` before cleanup):
-  - `claude -p --chrome --agents '<json for browser-tester with exact rendered tools allowlist>'` with prompt dispatching browser-tester.
-  - If `claude -p --chrome` fails, record "owner-verify after reinstall".
-
-  **T06 (c) Parallel** (concurrent agents):
-  - Two requests on two UUIDs (request-test0001.md, request-test0002.md) dispatched at same time.
-  - Verify both reports complete, neither touched other's tab or bus files.
-
-  **Permission determination**:
-  - Observe whether background dispatch is blocked by Chrome extension's site-permission prompt.
-  - If blocked → write conditional into T02 & T03: dispatch foreground always.
-  - If not blocked → write conditional: dispatch background always.
-
-  **Acceptance**:
-  - Test page serves on 127.0.0.1:8080 without error.
-  - (a) Prompt test: report-test0001.md has PASS for scenario 1, FAIL for scenario 2. Observations match expected.
-  - (b) Allowlist test: allowlist allows ToolSearch or agent loads mcp tools without it. If -p --chrome doesn't work, marked for owner.
-  - (c) Parallel: both reports complete, no file corruption, neither agent touched other's files.
-  - Permission behavior determined; conditional written into spec.md Req 2 & 3.
-
-  **Verification**:
-  - `test -f /private/tmp/[session]/test-server/index.html` confirms page exists.
-  - `test -f /private/tmp/[session]/test-bus/report-test0001.md && grep "PASS\|FAIL" /private/tmp/[session]/test-bus/report-test0001.md` confirms report format.
-  - `test -f /private/tmp/[session]/test-bus/report-test0002.md` confirms parallel completion.
+  - **(a) Prompt test:** one background agent on https://example.com/ with two scenarios. It loaded the tools, created and closed its own tab, wrote progress, returned the report as text, no permission prompt. Both scenarios were correctly FAIL (the fixture was wrong: example.com has no `<h1>`).
+  - **(b) Allowlist test:** `claude -p --chrome --no-session-persistence --agents <file> --permission-prompts none --allowedTools …` with the exact 17-tool allowlist. PASS on https://the-internet.herokuapp.com/add_remove_elements/, $0.64. Side effect: an empty `~/.claude/projects/<slug>/` memory dir and a subagent meta file, removed afterwards.
+  - **(c) Parallel:** two simultaneous background agents, both PASS, tabs 188767718 and 188767721, no cross-touching. Branch A: parallel allowed.
+  - **Permission determination:** no site prompt blocked a background agent on a public site. Dispatch stays in the background.
+  - **Findings:** local hosts need the extension's site permission (every read fails with "Page still loading (executeScript waited 45000ms for document_idle)"); `javascript_tool` can be refused with "[BLOCKED: Cookie/query string data]".
 
 - [x] **T07 Eval prompts, CHANGELOG, docs, agent tests** (All)
 

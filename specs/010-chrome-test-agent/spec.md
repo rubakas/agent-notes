@@ -58,8 +58,7 @@
 
 **Permission Prompt Behavior**:
 - Site-permission prompt cannot be surfaced by background subagent; cannot be detected at runtime.
-- T06 determines once: if background dispatch blocked by extension's site prompt, skill ALWAYS dispatches foreground going forward. Otherwise always background.
-- Write both branches in spec and skill; implement based on T06 result.
+- Resolved by T06 (2026-10-30): no site prompt blocked a background agent on a public site, so the skill always dispatches in the background. Local hosts are a separate permission issue (see Risks).
 
 **MCP Tool Loading**:
 - Subagent inherits MCP tools when `tools:` omitted from agent config.
@@ -111,19 +110,19 @@ Create agent `browser-tester` in agents.yaml and prompt in agent_notes/data/agen
 
 ### Requirement 2: Chrome-Test Skill Integration
 
-Update agent_notes/data/skills/chrome-test/SKILL.md to add MPC precondition check and dispatch logic.
+Update agent_notes/data/skills/chrome-test/SKILL.md to add the MCP precondition check and dispatch logic.
 
 **Changes**:
 - After the end of Leg A (SKILL.md ~line 243, just before "## Leg B" at line 245; after writing request-<uuid>.md): add "Precondition: MCP Tools and Browser Check" section.
 - Precondition: main session uses ToolSearch to check for `mcp__claude-in-chrome__list_connected_browsers`. If available, calls it. If tools present AND browser connected → "Dispatch browser-tester"; if tools absent OR no browser → "Operator handoff (fallback)".
-- **Dispatch browser-tester** (~15 lines): "If MCP tools and browser available, dispatch the browser-tester agent with the request file path. [Conditional on T06 result: if site-permission prompt blocked background, dispatch foreground; otherwise background]. Agent writes progress and report to bus. Skill reads report when agent completes (completion notification). Mode 1 (live): main session continues, user may ask for status (read progress-<uuid>.md). Mode 2 (end-state): skill waits for report, then proceeds to Leg B."
+- **Dispatch browser-tester** (~15 lines): "If MCP tools and browser available, dispatch the browser-tester agent with the request file path. Dispatch is always in the background (T06: no site prompt blocked a background agent). The agent overwrites progress on the bus and returns the report as its final message; the skill saves it to `report-<uuid>.md` when the completion notification arrives. Mode 1 (live): main session continues, user may ask for status (read progress-<uuid>.md). Mode 2 (end-state): skill waits for report, then proceeds to Leg B."
 - **Operator handoff (fallback)** (~15 lines): "If MCP tools unavailable or no browser connected, use manual operator fallback [original steps]. If no operator available, mark DEFERRED."
 - Leg B unchanged.
 - Preserve objective-trigger gate wording (decision_chrome_test_objective_gate).
 
 **Acceptance**:
 - Precondition check section present (ToolSearch, list_connected_browsers).
-- "Dispatch browser-tester" section with conditional background/foreground (T06-determined), Modes 1 & 2, completion notification (no polling).
+- "Agent path" section with background dispatch, Modes 1 & 2, completion notification (no polling).
 - "Operator handoff" section preserved.
 - Objective-trigger wording intact.
 - No changes to Leg B, request/report formats, bus logic.
@@ -135,11 +134,11 @@ Update agent_notes/data/agents/shared/pipelines.md and verification.md.
 
 **pipelines.md** (line 6, "Frontend addendum"):
 - Preserve: "Chrome-test is a gate with an objective trigger… When it fires…"
-- Replace operator relay section with: "Check if MCP tools available and browser connected (main session uses ToolSearch for mcp__claude-in-chrome__list_connected_browsers). If yes, dispatch browser-tester [conditional on T06: foreground or background]. If no, use manual operator fallback. User may ask for status to check progress-<uuid>.md for long runs. Run multiple uuid-d requests in parallel (each with own tab). Two modes: Mode 1 (live/parallel) during iterative work, or Mode 2 (end-state QC) once after linters/tests pass, before commit. If neither agent nor operator available, write request-<uuid>.md, mark DEFERRED — pending operator or tools, do not claim gate fully closed."
+- Replace operator relay section with: "Check if MCP tools available and browser connected (main session uses ToolSearch for mcp__claude-in-chrome__list_connected_browsers). If yes, dispatch browser-tester in the background. If no, use manual operator fallback. User may ask for status to check progress-<uuid>.md for long runs. Run multiple uuid-d requests in parallel (each with own tab). Two modes: Mode 1 (live/parallel) during iterative work, or Mode 2 (end-state QC) once after linters/tests pass, before commit. If neither agent nor operator available, write request-<uuid>.md, mark DEFERRED — pending operator or tools, do not claim gate fully closed."
 
 **verification.md** (lines 39-41, "4.5 Browser test"):
 - Preserve objective-trigger wording.
-- Replace "load the chrome-test skill… give the operator… fetch results…" with: "Check if MCP tools available and browser connected (ToolSearch mcp__claude-in-chrome__list_connected_browsers). If yes, dispatch browser-tester [conditional on T06: foreground or background]. If tools absent or no browser, use manual operator fallback. Act on every FAIL before gate closes. If neither agent nor operator available, write request-<uuid>.md, mark DEFERRED — pending operator or tools, report Done Gate as partial."
+- Replace "load the chrome-test skill… give the operator… fetch results…" with: "Check if MCP tools available and browser connected (ToolSearch mcp__claude-in-chrome__list_connected_browsers). If yes, dispatch browser-tester in the background. If tools absent or no browser, use manual operator fallback. Act on every FAIL before gate closes. If neither agent nor operator available, write request-<uuid>.md, mark DEFERRED — pending operator or tools, report Done Gate as partial."
 
 **Acceptance**:
 - Both files reference agent dispatch as primary, operator as fallback.
@@ -154,11 +153,9 @@ Verify parallel browser-tester runs do not collide.
 
 **Design**: Each run uses unique UUID, creates own tab, touches only UUID files.
 
-**Conditional (T06-determined)**:
-- **If no collision**: "Parallel runs allowed; each creates own tab, touches own UUID files."
-- **If collision detected**: "Serial runs only; spec 011 will add queue."
+**Decision (T06c, 2026-10-30): parallel runs are allowed.** One browser-tester agent per request, each in its own tab (`tabs_create_mcp`) and touching only its own `<uuid>` files. Two background agents ran at the same time and both PASSed; each used only its own tab, saw the other's tab without touching it, and saw no change to its own.
 
-**Acceptance**: Spec explicitly names conditional choice based on T06 results.
+**Acceptance**: Req 4 states the single decided path above, with no conditional wording.
 
 ### Requirement 5: Untrusted Content
 
@@ -173,54 +170,58 @@ Browser-tester treats all external content as data (spec 009 M7).
 
 ### Requirement 6: Live Verification
 
-Run full path with local test page and concurrent agents.
+Run the full path with real agents against a real Chrome. Results are in "T06 results (2026-10-30)" below.
 
-**Setup** (scratchpad):
-- HTML page: button "Change Text" → text becomes "Changed" (pass scenario), button "No Change" → does NOT change (fail scenario).
-- Serve: `python3 -m http.server 8080` on http://127.0.0.1:8080.
+**Acceptance**: reports are accurate (PASS/FAIL correct), parallel safety confirmed, permission behavior determined, allowlist works headless.
 
-**(a) Prompt test (in this session)**:
-- Dispatch a general-purpose subagent with browser-tester prompt body against test page.
-- Verify report-test0001.md has correct PASS/FAIL verdicts.
+## T06 results (2026-10-30)
 
-**(b) Allowlist test** (scratch project):
-- Run `claude -p --chrome --agents '<json for browser-tester with exact tools allowlist>'` with dispatch prompt.
-- If `claude -p --chrome` doesn't work, record "owner-verify after reinstall".
+Claude Code 2.1.312, one connected Chrome. Run by the lead.
 
-**(c) Parallel**:
-- Two agents on two request files (request-test0001.md, request-test0002.md) at same time.
-- Verify neither touched other's tab or bus files.
+**T06a, one background agent, https://example.com/, two scenarios.**
+- It loaded the tools through ToolSearch, created its own tab, wrote progress, closed its tab, and returned the report as text. No permission prompt appeared.
+- Both scenarios were correctly FAIL: the live example.com has no `<h1>`, so the fixture was wrong, and the agent did not invent a PASS.
+- Earlier runs established two facts that changed the design: a subagent's Write of a report file is refused ("Subagents should return findings as text, not write report files. Include this content in your final response instead."), and `tabs_create_mcp` fails with "This session has no tab group of its own... Call tabs_context_mcp with createIfEmpty: true first". Writing `progress-<uuid>.md` works.
 
-**Permission behavior**:
-- Determine whether background dispatch is blocked by site-permission prompt. Result determines which conditional (foreground always / background always) is written into Req 2 and Req 3.
+**T06c, two background agents at the same time, separate requests.** Both PASSed. Each used only its own tab (188767718 and 188767721), saw the other's tab without touching it, and saw no change to its own. Parallel is safe: Req 4 takes the allowed branch.
 
-**Acceptance**: Test page serves, reports are accurate (PASS/FAIL correct), parallel safety confirmed/collision detected, permission behavior determined, allowlist works (or deferred to owner).
+**T06b, headless.** `claude -p --chrome --no-session-persistence --agents <file> --permission-prompts none --allowedTools …` dispatched browser-tester with the exact 17-tool allowlist from agents.yaml (ToolSearch, Read, Write and 14 chrome tools). It clicked "Add Element" on https://the-internet.herokuapp.com/add_remove_elements/ and confirmed that one "Delete" button appeared: PASS, cost $0.64. The allowlist works, including the chrome tools loaded through ToolSearch.
+
+**Permission prompt.** No site prompt blocked a background agent on a public site. Dispatch stays in the background.
+
+**Local hosts.** On http://127.0.0.1:8765 and http://localhost:8765 Chrome loaded the page (the server logged 200 and 304), but every extension read failed with "Page still loading (executeScript waited 45000ms for document_idle)", from the main session and from agents alike, while example.com worked in the same tab. The extension does not act on local hosts until the user allows them in its site permissions.
+
+**Script output filter.** `javascript_tool` twice refused read-only DOM queries with "[BLOCKED: Cookie/query string data]", the extension's output filter. The prompt tells the agent not to retry it and to use `read_page`, `find` or `get_page_text`.
 
 ## Success Criteria
 
 - **SC-001**: Agent in agents.yaml with worker role, opencode + codex backend blocks (exclude: true), the exact explicit tool list (ToolSearch, Read, Write and 14 `mcp__claude-in-chrome__*` tools, no wildcard), no memory.
 - **SC-002**: browser-tester.md covers precondition, tab lifecycle (`tabs_context_mcp` with `createIfEmpty: true` before `tabs_create_mcp`), loop (navigate, form_input, javascript_tool, computer, read_page, get_page_text, find, read_console_messages, read_network_requests, resize_window), progress overwrite, report returned as the final message (subagents cannot write report files; the lead saves it), verdict line `browser-test <uuid>: <passed>/<total> passed, <failed> failed, <blocked> blocked`, untrusted clause, cleanup.
-- **SC-003**: chrome-test SKILL.md has precondition check, dispatch section (conditional background/foreground from T06), fallback section, completion notification (no polling). Objective-trigger wording intact.
+- **SC-003** (met): chrome-test SKILL.md has the precondition check, the Agent path (background dispatch, completion notification, no polling), the fallback section and the stuck-run rule. Objective-trigger wording intact. Evidence: commits 2828d3d, 2ec7f6e, 4b9c599; T06a ran the path end to end.
 - **SC-004**: Lead templates reference agent dispatch as primary, operator as fallback. Objective-trigger preserved. DEFERRED covers both missing agent and missing operator.
-- **SC-005**: Parallel behavior specified (if safe / if collision, T06-determined).
+- **SC-005** (met): Parallel behavior specified: allowed, one agent per request, each in its own tab. Evidence: T06c, two simultaneous background agents, both PASS, tabs 188767718 and 188767721, no cross-touching.
 - **SC-006**: Untrusted-content clause in prompt; no directives followed.
-- **SC-007**: Live test (a, b, c): report accuracy verified, permission behavior determined (conditional written), parallel safety confirmed/collision found, allowlist works.
+- **SC-007** (met): Live test: report accuracy verified (T06a, both scenarios correctly FAIL on a wrong fixture), permission behavior determined (no site prompt; background dispatch), parallel safety confirmed (T06c), allowlist works headless (T06b, PASS, $0.64).
 - **SC-008**: All tests pass; `agent-notes validate` 0 errors; no regression.
 
 ## Risks
 
 - MCP tool availability. Extension disabled/not installed. Fallback built in; DEFERRED more common.
-- Site-permission prompt blocks background agent (determined once by T06). Foreground dispatch required; user interaction needed (clicking prompt).
-- Parallel collisions. T06 with 2 agents confirms safety or detects collision.
-- Allowlist excludes ToolSearch. T06 (b) verifies rendered allowlist includes ToolSearch or proves mcp tools load without it.
+- Local dev servers (`localhost`, `127.0.0.1`): until the host is allowed in the Claude in Chrome extension's site permissions, every extension read fails with "Page still loading (executeScript waited 45000ms for document_idle)" and the agent returns all-BLOCKED. The skill tells the user to allow the host or use the fallback. Found in T06.
+- The extension's output filter can refuse `javascript_tool` reads ("[BLOCKED: Cookie/query string data]"). The agent falls back to `read_page`, `find` and `get_page_text`.
+- A JS dialog or extension hang freezes an agent run. The skill's stuck-run rule stops it after 5 minutes without progress.
+- Headless side effect: `claude -p --chrome --no-session-persistence` still creates `~/.claude/projects/<slug>/` with an empty memory dir and a subagent meta file. T06b's cleanup removed them; anyone repeating the test should expect them.
+- Site-permission prompt blocking a background agent: not observed on a public site (T06), so dispatch stays in the background.
+- Parallel collisions: not observed (T06c).
+- Allowlist excludes ToolSearch: resolved, the rendered allowlist includes it and the headless run loaded the chrome tools through it (T06b).
 
 ## Out of Scope
 
-- Headless Chrome (undocumented).
+- Headless Chrome as a supported path (undocumented; tried once in T06b to check the allowlist).
 - Multi-user sessions.
 - Interactive debugging.
 - Full eval suite on Haiku/Sonnet/Opus.
-- Queue mechanism (spec 011 if parallel unsafe).
+- Queue mechanism (not needed: parallel runs are safe, T06c).
 - MCP servers other than Claude in Chrome.
 
 ## Tickets
