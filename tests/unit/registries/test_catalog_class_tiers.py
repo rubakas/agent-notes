@@ -47,9 +47,7 @@ SONNET_MAX_CODING_INDEX = max(m.coding_index for m in _claude("sonnet"))
 
 # The weakest NON-DEPRECATED Claude model named sonnet: the small tier must not
 # out-rank the weakest middle-tier model a user can actually select. Deprecated
-# sonnets have to be excluded — claude-sonnet-4 is 37.6, below Anthropic's own
-# claude-haiku-4-5 at 43.9, so including them would make the ceiling
-# self-contradictory rather than merely loose.
+# sonnets are excluded so the ceiling follows models still on offer.
 HAIKU_MAX_CODING_INDEX = min(
     m.coding_index for m in _claude("sonnet") if not m.deprecated
 )
@@ -68,7 +66,6 @@ PREMIUM_MIN_PRICE_IN = max(
 # someone makes that call — unrated models are the most likely to be
 # misclassified, so they must not be skipped silently.
 UNRATED_BY_DECISION = {
-    "claude-opus-4-1": "deprecated legacy Opus; its tier comes from Anthropic's own name",
     "claude-opus-4-5": "deprecated legacy Opus; its tier comes from Anthropic's own name",
     "claude-opus-4-6": "deprecated legacy Opus; its tier comes from Anthropic's own name",
     "gpt-5-nano": "size suffix puts it in the small tier, the cheapest option available",
@@ -82,6 +79,8 @@ UNRATED_BY_DECISION = {
                  "unrated models are never chosen as a role default, so the class cannot move one",
     "gpt-6-1-sol": "unrated GPT-6 generation member classed opus by the gpt-6* rule; "
                    "unrated models are never chosen as a role default, so the class cannot move one",
+    "gpt-6-1-terra": "new GPT-6.1 member, not yet rated upstream (checked 2026-10-30); $1.00/M in is "
+                     "small-tier money, so rules.yaml pins it to the middle tier as gpt-6-luna is",
     "gpt-6-luna": "cheap member of the GPT-6 generation, pinned to the middle tier as gpt-5-6-luna is",
 }
 

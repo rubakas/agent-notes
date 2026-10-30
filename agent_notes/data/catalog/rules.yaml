@@ -16,6 +16,11 @@ classes:
   # Luna is the cheap member of the GPT-6 generation too ($0.10/M, unrated):
   # the middle tier, the same call as gpt-5-6-luna below.
   - {match: "gpt-6-luna", class: sonnet}
+  # Terra is the middle member of the GPT-6.1 generation at $1.00/M in, no more
+  # than claude-haiku-4-5. The gpt-6* rule would class a small-tier price as the
+  # most expensive tier; unrated at the 2026-10-30 refresh, so the middle tier,
+  # the same call as gpt-6-luna.
+  - {match: "gpt-6-1-terra", class: sonnet}
   - {match: "gpt-6*",     class: opus}
   # Luna is the cheap member of the 5.6 generation, not a frontier model: at
   # coding_index 71.4 and $0.20/M it sits below every Claude model named opus
@@ -33,12 +38,6 @@ classes:
 alias_transforms:
   anthropic: "{id}"
   openai: "{seed_id}"
-
-# Per-model alias overrides. Indexed by normalized registry id.
-# claude-sonnet-4's anthropic alias is a dated form, not the bare id.
-alias_overrides:
-  anthropic:
-    claude-sonnet-4: claude-sonnet-4-20250514
 
 # Per-model price pins, indexed by normalized registry id. Applied on top of the
 # seed, which is machine-refreshed from OpenRouter — an entry here survives a
@@ -78,22 +77,26 @@ provisional_coding_index:
   # coding_index null (checked 2026-10-15). 44.0 ranks it directly above Haiku 4.5.
   claude-haiku-5-5: 44.0
 
+# Deprecated models are skipped by role selection. Vendor lifecycle status,
+# checked 2026-10-30:
+#   Anthropic, https://platform.claude.com/docs/en/about-claude/model-deprecations
+#     claude-sonnet-4-5 is Deprecated (retires 2026-11-30); claude-opus-4-5,
+#     claude-opus-4-6 and claude-opus-4-7 are Active, so they are not listed.
+#     Retired models (claude-sonnet-4, claude-opus-4-1) are dropped from the
+#     seed by the filter below instead.
+#   OpenAI, https://developers.openai.com/api/docs/deprecations
+#     shutdown 2026-12-11 for gpt-5, gpt-5-mini and gpt-5-nano; shutdown
+#     2027-04-01 for gpt-5.1 and gpt-5.4-nano.
+#   gpt-5.2 is a vendor SUPERSESSION notice, not an announced shutdown: its model
+#     page reads "We recommend using the latest [GPT-6 Astra]" (checked 2026-09-19).
 deprecated:
-  - claude-opus-4-1
-  - claude-opus-4-5
-  - claude-opus-4-6
-  - claude-opus-4-7
-  - claude-sonnet-4
   - claude-sonnet-4-5
-  # Vendor SUPERSESSION guidance, not an announced shutdown: the model pages for
-  # both gpt-5 and gpt-5.2 read "We recommend using the latest [GPT-6 Astra]"
-  # (checked 2026-09-19). OpenAI's formal deprecations page lists dated shutdowns
-  # only for id variants this catalog does not carry (gpt-5.2-chat-latest,
-  # gpt-5.1-chat-latest, and the August-2025 gpt-5 / gpt-5-mini snapshots), so
-  # those are deliberately absent here. gpt-5.1 is ALSO deliberately absent: it
-  # carries no supersession notice at all, despite being older than gpt-5.2.
   - gpt-5
+  - gpt-5-mini
+  - gpt-5-nano
+  - gpt-5-1
   - gpt-5-2
+  - gpt-5-4-nano
 
 capabilities:
   default:
@@ -116,8 +119,6 @@ capabilities:
       # (checked 2026-09-19). Whether the API errors or silently ignores the
       # field is undocumented, so it is treated as unsupported either way.
       effort_support: false
-    claude-opus-4-1:
-      long_context: false
     claude-opus-4-5:
       long_context: false
     claude-sonnet-4-5:

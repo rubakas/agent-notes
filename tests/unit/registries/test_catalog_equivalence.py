@@ -40,22 +40,13 @@ EXPECTED = [
         "deprecated": False,
     },
     {
-        "id": "claude-opus-4-1",
-        "label": "Claude Opus 4.1",
-        "family": "claude",
-        "model_class": "opus",
-        "aliases": {"anthropic": "claude-opus-4-1"},
-        "capabilities": {"vision": True, "long_context": False, "tool_use": True, "effort_support": True},
-        "deprecated": True,
-    },
-    {
         "id": "claude-opus-4-5",
         "label": "Claude Opus 4.5",
         "family": "claude",
         "model_class": "opus",
         "aliases": {"anthropic": "claude-opus-4-5"},
         "capabilities": {"vision": True, "long_context": False, "tool_use": True, "effort_support": True},
-        "deprecated": True,
+        "deprecated": False,
     },
     {
         "id": "claude-opus-4-6",
@@ -64,7 +55,7 @@ EXPECTED = [
         "model_class": "opus",
         "aliases": {"anthropic": "claude-opus-4-6"},
         "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
-        "deprecated": True,
+        "deprecated": False,
     },
     {
         "id": "claude-opus-4-7",
@@ -73,7 +64,7 @@ EXPECTED = [
         "model_class": "opus",
         "aliases": {"anthropic": "claude-opus-4-7"},
         "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
-        "deprecated": True,
+        "deprecated": False,
     },
     {
         "id": "claude-opus-4-8",
@@ -83,15 +74,6 @@ EXPECTED = [
         "aliases": {"anthropic": "claude-opus-4-8"},
         "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
         "deprecated": False,
-    },
-    {
-        "id": "claude-sonnet-4",
-        "label": "Claude Sonnet 4",
-        "family": "claude",
-        "model_class": "sonnet",
-        "aliases": {"anthropic": "claude-sonnet-4-20250514"},
-        "capabilities": {"vision": True, "long_context": True, "tool_use": True, "effort_support": True},
-        "deprecated": True,
     },
     {
         "id": "claude-sonnet-4-5",

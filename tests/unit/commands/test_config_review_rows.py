@@ -18,7 +18,7 @@ def catalog():
 
 
 def _ctx(catalog, tmp_path, *keys, pins=None, efforts=None):
-    pins = pins or {"reasoner": "claude-opus-4-6", "worker": "claude-sonnet-5-5",
+    pins = pins or {"reasoner": "claude-sonnet-4-5", "worker": "claude-sonnet-5-5",
                     "scout": "claude-gone-1"}
     backend = BackendState(role_models=dict(pins), role_efforts=dict(efforts or {"reasoner": "high"}))
     state = State(local_installs={str(tmp_path): ScopeState(clis={"claude": backend})})
@@ -142,7 +142,7 @@ def test_show_prints_shared_settings_once_then_each_install(catalog, tmp_path, m
     a, b = tmp_path / "a", tmp_path / "b"
     a.mkdir()
     b.mkdir()
-    pins = BackendState(role_models={"reasoner": "claude-opus-4-6"})
+    pins = BackendState(role_models={"reasoner": "claude-sonnet-4-5"})
     state = State(local_installs={str(a): ScopeState(clis={"claude": pins}),
                                   str(b): ScopeState(clis={"claude": BackendState()})})
     lines = render_show(state, 120)

@@ -111,7 +111,7 @@ def test_the_model_list_marks_star_budget_and_deprecation(catalog):
     assert "★" in items["claude-opus-5-5"].text
     assert "★" not in items["claude-opus-5"].text
     assert items["claude-fable-5-1"].tag == "over budget"
-    assert items["claude-opus-4-6"].tag.startswith("deprecated") and items["claude-opus-4-6"].dim
+    assert items["claude-sonnet-4-5"].tag.startswith("deprecated") and items["claude-sonnet-4-5"].dim
 
 
 def test_set_model_clears_effort_for_a_model_without_effort_support(catalog):
