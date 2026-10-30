@@ -139,6 +139,8 @@ filter:
       - "*-fast"
       - "claude-3-*"
       - "claude-opus-4"
+      # Retired 2026-08-05; OpenRouter still lists it. https://platform.claude.com/docs/en/about-claude/model-deprecations
+      - "claude-opus-4-1"
   openai:
     allow:
       - "gpt-*"
@@ -154,3 +156,5 @@ filter:
       - "*oss*"
       - "*-instruct"
       - "*-preview"
+      # Restricted: requires separate approval and provisioning. https://developers.openai.com/api/docs/models/gpt-5.6-cyber
+      - "gpt-5.6-cyber"
