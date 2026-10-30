@@ -30,8 +30,18 @@ class TestBrowserTesterRegistry:
         assert agent.excluded_from("claude") is False
 
 
+_CHROME_TOOLS = [
+    "mcp__claude-in-chrome__" + name
+    for name in (
+        "list_connected_browsers", "tabs_context_mcp", "tabs_create_mcp", "tabs_close_mcp",
+        "navigate", "computer", "read_page", "find", "get_page_text", "form_input",
+        "javascript_tool", "read_console_messages", "read_network_requests", "resize_window",
+    )
+]
+
+
 class TestBrowserTesterRendering:
-    def test_renders_for_claude_with_chrome_tools(self, tmp_path, monkeypatch):
+    def test_claude_tools_are_the_exact_least_privilege_list(self, tmp_path, monkeypatch):
         dist = _render_all(tmp_path, monkeypatch)
 
         path = dist / "claude" / "agents" / "browser-tester.md"
@@ -39,8 +49,24 @@ class TestBrowserTesterRendering:
         tools_line = next(
             line for line in _frontmatter(path).splitlines() if line.startswith("tools:")
         )
-        assert "mcp__claude-in-chrome__*" in tools_line
-        assert "ToolSearch" in tools_line
+        tools = [t.strip() for t in tools_line.split(":", 1)[1].split(",")]
+        assert tools == ["ToolSearch", "Read", "Write"] + _CHROME_TOOLS
+
+    def test_has_no_persistent_memory(self, tmp_path, monkeypatch):
+        dist = _render_all(tmp_path, monkeypatch)
+
+        path = dist / "claude" / "agents" / "browser-tester.md"
+        assert not any(
+            line.startswith("memory:") for line in _frontmatter(path).splitlines()
+        )
+
+    def test_prompt_loads_exactly_the_granted_chrome_tools(self, tmp_path, monkeypatch):
+        dist = _render_all(tmp_path, monkeypatch)
+
+        body = (dist / "claude" / "agents" / "browser-tester.md").read_text()
+        select = next(line for line in body.splitlines() if "`select:" in line)
+        loaded = select.split("`select:", 1)[1].split("`", 1)[0].split(",")
+        assert sorted(loaded) == sorted(_CHROME_TOOLS)
 
     def test_not_rendered_for_opencode_or_codex(self, tmp_path, monkeypatch):
         dist = _render_all(tmp_path, monkeypatch)
