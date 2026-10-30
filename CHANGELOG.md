@@ -40,6 +40,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **`browser-tester` agent (Claude Code only).** It runs a `chrome-test` request in the user's Chrome through the Claude-in-Chrome tools, overwrites `progress-<uuid>.md` after each step, and returns the report as its final message, because Claude Code refuses report files written by subagents. It is excluded from OpenCode and Codex.
+
 - **Claude Haiku 5.5 added to the model catalog and priced at its own rate;** it becomes the default scout model via a provisional coding score.
 
 - **Model catalog refreshed against the vendor docs.** The retired `claude-sonnet-4` and `claude-opus-4-1` are removed, and `gpt-6.1-terra` is added (priced at its own rate, classed as the middle tier). Deprecations now follow Anthropic's and OpenAI's pages: `claude-opus-4-5`, `claude-opus-4-6` and `claude-opus-4-7` are active again, while `gpt-5-mini`, `gpt-5-nano`, `gpt-5.1` and `gpt-5.4-nano` are deprecated. Claude Sonnet 5.5 is priced at its own rate, with cache reads at $0.10 per million tokens instead of Sonnet 5's $0.20. The restricted `gpt-5.6-cyber` stays out of the catalog.
@@ -65,6 +67,8 @@ All notable changes to this project will be documented in this file.
   - A skill evaluation prompt set (`tests/skill_evals/prompts.yaml`, 140 prompts covering all 25 skills, each with should-trigger and near-miss cases), a schema test for it, and a one-prompt runner (`tests/skill_evals/runner.py`) that sends one prompt through `claude -p` and reports which skill loaded. Running the full set is not automated.
 
 ### Changed
+
+- **`chrome-test` runs the browser test through the `browser-tester` agent.** The main session checks that the Chrome tools and a connected browser exist, dispatches the agent in the background with the request path, and saves the returned report to `report-<uuid>.md`. There is no polling and no "report ready" relay. The manual `claude --chrome` session is now the fallback, used when the tools are missing, no browser is connected, or the extension fails. The lead's pipeline and verification text follow the same flow, and a report can now mark a scenario BLOCKED, which keeps the gate open.
 
 - **The install wizard and the interactive `config` menu are replaced by one review screen.** `agent-notes install` opens it with every setting pre-filled: ↑↓ move, ⏎ edits a row, ←→ changes simple values, `i` installs (quiet build, then "Install N files (M backed up)?"), `q` quits. `agent-notes config` opens the same screen on an existing install (the current folder's, else global, else a picker): `tab` switches installs, `u` moves deprecated or unknown pins to the recommended model, `s` shows the diff and saves everything with one state write and one regenerate; API keys save as soon as entered. Terminals under 60×16 (or without `termios`) get numbered prompts. With no terminal, `install` installs the recommended setup without prompts — piped answers are no longer read. Scriptable `config` subcommands and `install --local/--copy/--profile/--folder/--global-home` are unchanged. `config show` uses the same layout and flags outdated pins.
 
