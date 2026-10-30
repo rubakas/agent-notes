@@ -88,6 +88,7 @@ Ticket index for `spec.md`. Paths relative to `agent_notes/` unless start with `
   - **(b) Allowlist test:** `claude -p --chrome --no-session-persistence --agents <file> --permission-prompts none --allowedTools …` with the exact 17-tool allowlist. PASS on https://the-internet.herokuapp.com/add_remove_elements/, $0.64. Side effect: an empty `~/.claude/projects/<slug>/` memory dir and a subagent meta file, removed afterwards.
   - **(c) Parallel:** two simultaneous background agents, both PASS, tabs 188767718 and 188767721, no cross-touching. Branch A: parallel allowed.
   - **Permission determination:** no site prompt blocked a background agent on a public site. Dispatch stays in the background.
+  - **Leaked tabs:** the first `tabs_context_mcp(createIfEmpty: true)` creates a window with a blank tab that agents never closed; the skill now creates the group before dispatch, cleans up after the last agent, and caps concurrent agents at 3.
   - **Findings:** local hosts need the extension's site permission (every read fails with "Page still loading (executeScript waited 45000ms for document_idle)"); `javascript_tool` can be refused with "[BLOCKED: Cookie/query string data]".
 
 - [x] **T07 Eval prompts, CHANGELOG, docs, agent tests** (All)
