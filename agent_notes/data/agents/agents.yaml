@@ -353,7 +353,7 @@ agents:
         bash: allow
 
   browser-tester:
-    description: "Runs a browser-test request file in the user's Chrome and writes progress and report files back to the same directory. Dispatched by the chrome-test skill. Use when a chrome-test request-<uuid>.md is ready to execute. Triggers: browser test, chrome-test, run request."
+    description: "Runs a browser-test request file in the user's Chrome and returns the report to the main session as its final message, writing only a progress file. Dispatched by the chrome-test skill. Use when a chrome-test request-<uuid>.md is ready to execute. Triggers: browser test, chrome-test, run request."
     role: worker
     mode: subagent
     color: cyan
