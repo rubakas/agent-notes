@@ -253,13 +253,14 @@ Specialized subagents with hierarchical model strategy: **Opus 4.8 reasons (high
 | api-reviewer | worker | sonnet | REST conventions, versioning, backward compatibility |
 | devops | worker | sonnet | Docker, CI/CD, deployment, infrastructure |
 | devil | worker | sonnet | Devil's advocate — challenges plans and assumptions |
+| browser-tester | worker | sonnet | Runs chrome-test browser tests in Chrome (Claude Code only) |
 | integrations | worker | sonnet | OAuth, webhooks, API clients, SSO |
 | refactorer | worker | sonnet | Extracts methods, reduces duplication, improves naming |
 | explorer | scout | haiku | Fast file discovery, pattern search |
 | analyst | scout | haiku | Requirements translation, acceptance criteria |
 | tech-writer | scout | haiku | READMEs, API docs, changelogs |
 
-**4 roles, 19 agents, 3 model tiers.** The tiered model strategy optimizes cost: Opus reasons ($5/$25 per 1M tokens in/out), Sonnet executes ($3/$15), Haiku scouts ($1/$5). A premium `fable` tier ($10/$50) is available for explicit pinning, but no role defaults to it.
+**4 roles, 20 agents, 3 model tiers.** The tiered model strategy optimizes cost: Opus reasons ($5/$25 per 1M tokens in/out), Sonnet executes ($3/$15), Haiku scouts ($1/$5). A premium `fable` tier ($10/$50) is available for explicit pinning, but no role defaults to it.
 
 ### Delegation rules
 
@@ -280,6 +281,7 @@ Specialized subagents with hierarchical model strategy: **Opus 4.8 reasons (high
 - **analyst** — Requirements and acceptance criteria
 - **tech-writer** — Documentation, READMEs, API docs
 - **devil** — Challenges assumptions and plans
+- **browser-tester** — Runs browser tests in Chrome for the `chrome-test` skill (Claude Code only; OpenCode and Codex fall back to a manual `claude --chrome` session)
 
 ### Reconfiguring roles, models, and effort
 
