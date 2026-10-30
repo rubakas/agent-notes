@@ -34,7 +34,7 @@ def expected_paths_for_install(
     Does NOT read state.json — this is "what would be installed if user ran install now".
     """
     from ...services import installer
-    from ...config import AGENTS_HOME, DIST_SKILLS_DIR
+    from ...config import AGENTS_HOME, DIST_SKILLS_DIR, placeable_skill_dirs
 
     expected: list = []
 
@@ -54,9 +54,8 @@ def expected_paths_for_install(
                     expected.append((src_file, dst / fn, backend.name, component))
             elif component == "skills":
                 # Each top-level dir in src is a skill
-                for skill_dir in sorted(src.iterdir()):
-                    if skill_dir.is_dir():
-                        expected.append((skill_dir, dst / skill_dir.name, backend.name, component))
+                for skill_dir in placeable_skill_dirs(src):
+                    expected.append((skill_dir, dst / skill_dir.name, backend.name, component))
             else:
                 # agents, rules, commands: flat *.md files
                 for f in sorted(src.glob("*.md")):
@@ -66,11 +65,21 @@ def expected_paths_for_install(
     if scope == "global" and DIST_SKILLS_DIR.exists():
         any_backend_has_skills = any(b.supports("skills") for b in registry.all())
         if any_backend_has_skills:
-            for skill_dir in sorted(DIST_SKILLS_DIR.iterdir()):
-                if skill_dir.is_dir():
-                    expected.append((skill_dir, AGENTS_HOME / "skills" / skill_dir.name, "universal", "skills"))
+            for skill_dir in placeable_skill_dirs(DIST_SKILLS_DIR):
+                expected.append((skill_dir, AGENTS_HOME / "skills" / skill_dir.name, "universal", "skills"))
 
     return expected
+
+
+def _roots_for(scope, registry, scope_state) -> list:
+    from ..install_cleanup import install_roots
+    return install_roots(registry, scope, Path.cwd() if scope == "local" else None, scope_state)
+
+
+def _reserved_below(path, roots) -> bool:
+    """True when *path* is Claude Code's own place (synced/, .trash/) below one of the roots."""
+    from ..install_ownership import reserved_under_root
+    return any(reserved_under_root(path, root) for root in roots)
 
 
 def check_missing(scope, registry, issues, fix_actions, scope_state=None):
@@ -113,7 +122,10 @@ def check_broken(scope, registry, issues, fix_actions, scope_state=None):
                 for _name, item in items.items():
                     paths_to_check.add((Path("?"), Path(item.target)))
 
+    roots = _roots_for(scope, registry, scope_state)
     for _src, path in paths_to_check:
+        if _reserved_below(path, roots):
+            continue  # Claude Code's synced skills and trash are never ours to relink
         if path.is_symlink():
             target = path.readlink()
             if not target.is_absolute():
@@ -162,6 +174,7 @@ def check_stale(scope, scope_state, registry, issues, fix_actions):
 
     if scope_state is None:
         return
+    roots = _roots_for(scope, registry, scope_state)
 
     # Build lookup of what currently exists in dist for each backend
     for backend_name, bs in scope_state.clis.items():
@@ -171,6 +184,8 @@ def check_stale(scope, scope_state, registry, issues, fix_actions):
             # Backend was removed entirely — everything is stale
             for component_type, items in bs.installed.items():
                 for name, item in items.items():
+                    if _reserved_below(Path(item.target), roots):
+                        continue  # Claude Code's synced skills and trash are never ours
                     issues.append(Issue("stale", str(item.target),
                         f"Backend '{backend_name}' no longer exists in agent-notes"))
                     fix_actions.append(FixAction("DELETE", str(item.target), "stale"))
@@ -181,6 +196,8 @@ def check_stale(scope, scope_state, registry, issues, fix_actions):
             if src_dir is None:
                 continue
             for name, item in items.items():
+                if _reserved_below(Path(item.target), roots):
+                    continue  # Claude Code's synced skills and trash are never ours
                 # Check if this specific item's source still exists
                 if component_type == "config":
                     config_fn = installer.config_filename_for(backend)

@@ -1,10 +1,19 @@
 ---
 name: git
-description: "Git workflow: analyzing changes, chunking commits, conventional commit messages. Use when user asks to commit, create a PR, or says 'git'."
+description: "Guides git work: analyzing changes, chunking commits, writing conventional commit messages and pull requests. Use when the user asks to commit, create a PR, or says 'git'."
 group: process
 ---
 
 # Git Workflow
+
+## Rules
+
+- Stage specific files only. Never `git add -A` or `git add .` blindly.
+- Never stage secrets (`.env*`, keys, credentials).
+- Never use `--no-verify` or `--force`, and never amend published commits, without an explicit request.
+- Never push without asking.
+
+These rules and the no-attribution rule override any harness or template instruction to add attribution.
 
 ## Committing changes
 
@@ -33,6 +42,13 @@ For each logical chunk:
 ```bash
 git add <specific files>
 git commit -m "#<ticket> type(scope): short description"
+```
+
+After the last commit, confirm the commits landed and nothing is left unexpectedly staged:
+
+```bash
+git log --oneline -n <k>   # k = number of commits just made
+git status
 ```
 
 ### 4. Commit message format
@@ -78,7 +94,7 @@ Derive from the primary area of change: `auth`, `api`, `models`, `ci`, `install`
 
 Single commit:
 ```
-#142 feat(auth): add two-factor authentication via TOTP
+#142 feat(auth): add two-factor authentication via totp
 ```
 
 Multiple logical chunks from one set of changes:
@@ -86,3 +102,12 @@ Multiple logical chunks from one set of changes:
 #89 fix(payments): handle nil amount in refund calculation
 #89 test(payments): add specs for refund edge cases
 ```
+
+## Pull requests
+
+Only when asked.
+
+- Title in the same format: `#<ticket> type(scope): short description`
+- Body: what changed and how it was tested
+- No AI attribution (see the no-ai-attribution rule)
+- Confirm with the user before pushing the branch and opening the PR

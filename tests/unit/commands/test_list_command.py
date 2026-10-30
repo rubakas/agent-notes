@@ -89,18 +89,27 @@ class TestListModels:
         columns = [c.strip() for c in re.split(r"\s{2,}", header.strip())]
         assert columns == ["rank", "model", "int", "coding", "$/M in"]
 
-    def test_missing_metrics_render_an_em_dash(self, capsys):
-        models = load_model_registry().all()
+    def test_missing_metrics_render_an_em_dash(self, capsys, monkeypatch):
+        from dataclasses import replace
+        from agent_notes.registries import model_registry as mr
+
+        # Synthetic models, so the assertion holds whatever the live catalog
+        # carries: a refresh can legitimately fill every gap in.
+        real = mr.load_model_registry().all()
+        template = real[0]
+        no_score = replace(template, id="synthetic-no-score", coding_index=None,
+                           intelligence_index=None, provisional_coding_index=None)
+        no_intelligence = replace(template, id="synthetic-no-intelligence", coding_index=50.0,
+                                  intelligence_index=None, provisional_coding_index=None)
+        patched = mr.ModelRegistry(real + [no_score, no_intelligence])
+        monkeypatch.setattr(mr, "load_model_registry", lambda: patched)
         # No score at all — a provisional stand-in prints `78.1*`, not a dash.
-        unrated = [m for m in models if m.rank_score is None]
-        no_intelligence = [m for m in models if m.intelligence_index is None
-                           and m.coding_index is not None]
-        assert unrated and no_intelligence, "fixture assumption: catalog has gaps in both metrics"
+        assert no_score.rank_score is None
 
         list_models()
         out = capsys.readouterr().out
 
-        for model in unrated[:1] + no_intelligence[:1]:
+        for model in (no_score, no_intelligence):
             row = next(line for line in out.splitlines()
                        if re.match(rf"\s+\d+\s+{re.escape(model.id)}\s", line))
             assert "—" in row

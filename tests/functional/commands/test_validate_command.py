@@ -83,3 +83,56 @@ class TestValidateExitsNonzeroOnInvalid:
                 validate()
 
         assert exc_info.value.code != 0
+
+
+class TestValidateRejectsReservedSkillNames:
+    def _run(self, tmp_path, skill_dir):
+        fake_dist = tmp_path / "dist"
+        fake_dist.mkdir()
+        patches = _patch_validate_dirs(tmp_path, fake_dist)
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            with patch("agent_notes.config.find_skill_dirs", return_value=[skill_dir]):
+                with pytest.raises(SystemExit):
+                    from agent_notes.commands.validate import validate
+                    validate()
+
+    def test_a_skill_named_synced_fails(self, tmp_path, capsys):
+        skill = tmp_path / "skills-src" / "synced"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: synced\ndescription: x\n---\n")
+
+        self._run(tmp_path, skill)
+
+        out = capsys.readouterr().out
+        assert "synced" in out and "reserved" in out
+
+    def test_a_skill_named_synced_in_another_case_fails(self, tmp_path, capsys):
+        skill = tmp_path / "skills-src" / "Synced"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: Synced\ndescription: x\n---\n")
+
+        self._run(tmp_path, skill)
+
+        out = capsys.readouterr().out
+        assert "Synced" in out and "reserved" in out
+
+    def test_a_skill_named_dot_trash_fails(self, tmp_path, capsys):
+        skill = tmp_path / "skills-src" / ".trash"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: .trash\ndescription: x\n---\n")
+
+        self._run(tmp_path, skill)
+
+        out = capsys.readouterr().out
+        assert ".trash" in out and "reserved" in out
+
+    def test_a_normal_skill_is_not_flagged_as_reserved(self, tmp_path, capsys):
+        skill = tmp_path / "skills-src" / "my-skill"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: my-skill\ndescription: x\n---\n")
+
+        self._run(tmp_path, skill)
+
+        out = capsys.readouterr().out
+        assert "reserved" not in out
+        assert "my-skill/SKILL.md" in out

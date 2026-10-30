@@ -14,11 +14,11 @@ jobs:
   update-models:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: develop
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
 
       - name: Sync deps
         run: uv sync
@@ -46,22 +46,50 @@ jobs:
             echo "Model set changed:"; diff <(printf '%s' "$old") <(printf '%s' "$new") || true
           fi
 
-      - name: Run test suite (guard before opening PR)
+      - name: Run test suite (recorded, not a gate on opening the PR)
+        id: tests
         if: steps.diff.outputs.changed == 'true'
-        run: uv run pytest tests/ -q
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          uv run pytest tests/ -q 2>&1 | tee "$RUNNER_TEMP/pytest.log"
 
       - name: Open / update PR (gh CLI — no third-party action)
         if: steps.diff.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
         run: |
+          body="$RUNNER_TEMP/pr-body.md"
+          draft=""
+          {
+            echo "Automated refresh from OpenRouter (keyless). Review the seed.json diff before merging; add pricing/rules for any new model."
+            if [ "$TESTS_OUTCOME" = "failure" ]; then
+              draft="--draft"
+              echo
+              echo "**Tests failed on this refresh, so curation is needed before merge:** add the pricing.yaml row, the rules.yaml class / provisional_coding_index, and any UNRATED_BY_DECISION entry for the new model."
+              echo
+              echo '```'
+              grep -E '^(FAILED|ERROR) ' "$RUNNER_TEMP/pytest.log" || tail -n 20 "$RUNNER_TEMP/pytest.log"
+              echo '```'
+            fi
+          } > "$body"
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B automation/model-catalog-update
           git add agent_notes/data/catalog/seed.json
           git commit -m "chore(catalog): refresh model catalog from OpenRouter"
           git push -f origin automation/model-catalog-update
-          gh pr create --base develop --head automation/model-catalog-update \
+          gh pr create --base develop --head automation/model-catalog-update $draft \
             --title "chore(catalog): model catalog update" \
-            --body "Automated refresh from OpenRouter (keyless). Review the seed.json diff before merging; add pricing/rules for any new model." \
-            || gh pr edit automation/model-catalog-update --base develop
+            --body-file "$body" \
+            || gh pr edit automation/model-catalog-update --base develop --body-file "$body"
+          if [ -z "$draft" ]; then
+            gh pr ready automation/model-catalog-update || true
+          else
+            gh pr ready --undo automation/model-catalog-update || true
+          fi
+
+      - name: Fail the run when the tests failed
+        if: steps.tests.outcome == 'failure'
+        run: exit 1

@@ -15,17 +15,17 @@ from ._common import _get_skill_groups, _count_rules
 
 def install_skills_filtered(skill_names: List[str], targets: List[Path], copy_mode: bool = False) -> None:
     """Install only specified skills to target directories."""
-    from ...config import DIST_SKILLS_DIR
-    if not skill_names or not DIST_SKILLS_DIR.exists():
+    from ...config import DIST_SKILLS_DIR, placeable_skill_dirs
+    wanted = set(skill_names)
+    skill_dirs = [d for d in placeable_skill_dirs(DIST_SKILLS_DIR) if d.name in wanted]
+    if not skill_dirs:
         return
 
     for target_dir in targets:
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        for skill_name in sorted(skill_names):
-            skill_dir = DIST_SKILLS_DIR / skill_name
-            if skill_dir.is_dir():
-                place_file(skill_dir, target_dir / skill_name, copy_mode)
+        for skill_dir in skill_dirs:
+            place_file(skill_dir, target_dir / skill_dir.name, copy_mode)
 
 
 def install_agents_filtered(clis: Set[str], scope: str, copy_mode: bool = False,

@@ -39,7 +39,7 @@ def test_newest_model_per_class_is_not_deprecated():
         by_class.setdefault(model.model_class, []).append(model)
 
     for cls, models in by_class.items():
-        newest = sorted(models, key=lambda m: _natural_key(m.id))[-1]
+        newest = sorted(models, key=lambda m: (m.created_at or "", _natural_key(m.id)))[-1]
         assert not newest.deprecated, (
             f"Newest model in class '{cls}' ({newest.id}) is deprecated — "
             f"the catalog must have at least one non-deprecated option per class"

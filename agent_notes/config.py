@@ -75,6 +75,32 @@ def find_skill_dirs() -> list[Path]:
     return []
 
 
+def is_reserved_skill_name(name: str) -> bool:
+    """Claude Code owns ~/.claude/skills/synced (its mirror of claude.ai skills) and
+    ~/.claude/skills/.trash (removed personal skills); a shipped skill must never
+    claim either name."""
+    return name.casefold() == "synced" or name.startswith(".")
+
+
+def is_reserved_skill_entry(path) -> bool:
+    """True when *path* is a reserved name (synced, .trash, a dot name) sitting directly in a
+    directory called `skills`: Claude Code's own place, never ours to place over or move.
+    Only the entry and its parent are looked at, so a project or home that merely has
+    `skills` or a dot-directory somewhere above the install is not caught."""
+    path = Path(path)
+    return path.parent.name.casefold() == "skills" and is_reserved_skill_name(path.name)
+
+
+def placeable_skill_dirs(dist_skills_dir) -> list[Path]:
+    """The skill directories of *dist_skills_dir* that may be placed, sorted: the reserved
+    names (see is_reserved_skill_name) never are."""
+    dist_skills_dir = Path(dist_skills_dir)
+    if not dist_skills_dir.is_dir():
+        return []
+    return sorted(d for d in dist_skills_dir.iterdir()
+                  if d.is_dir() and not is_reserved_skill_name(d.name))
+
+
 # === Registry-driven path helpers ===
 
 def dist_dir_for(backend) -> Path:

@@ -1,24 +1,25 @@
 ---
 name: docker
 group: domain
-description: "Docker reference: Dockerfiles, Compose, multi-stage builds, health checks, and service patterns. Use when writing or debugging a Dockerfile or docker-compose file, containerizing an app, or shaping container images and services. Loads only the relevant reference on demand."
-triggers:
-  - docker
-  - Dockerfile
-  - docker-compose
-  - container
-  - multi-stage build
-  - health check
-  - Docker Compose
+description: "Provides Dockerfile and Compose reference: multi-stage builds, health checks, services. Use when writing or debugging Dockerfiles and docker-compose files, or containerizing an app."
 ---
 
 # Docker Reference
 
-Based on the user's current task, use the Read tool to load the relevant reference file from this skill's directory. Only load the file(s) you need — do not load all of them.
+Based on the user's current task, read the relevant reference file(s) from this skill's directory. Only load what you need.
 
-| Topic | File | Use when |
-|---|---|---|
-| Dockerfile | dockerfile.md | Writing or editing Dockerfiles, multi-stage builds, layer optimization, language-specific patterns |
-| Compose | compose.md | Writing docker-compose.yml, service definitions, health checks, dev/prod configs |
+## Dockerfile guidance
 
-The reference files are in the same directory as this skill file. After reading, apply the patterns and conventions to the user's code.
+- [dockerfile-base-and-structure.md](dockerfile-base-and-structure.md) — Read when: choosing a base image or structuring a Dockerfile
+- [dockerfile-multistage-and-layers.md](dockerfile-multistage-and-layers.md) — Read when: using multi-stage builds or optimizing layers
+- [dockerfile-security.md](dockerfile-security.md) — Read when: securing a Dockerfile or adding health checks, or rebuilding and testing images
+- [dockerfile-patterns.md](dockerfile-patterns.md) — Read when: writing language-specific Dockerfiles or using build arguments
+
+## Docker Compose guidance
+
+- [compose-configuration.md](compose-configuration.md) — Read when: configuring basic Compose files, health checks, or environment variables
+- [compose-services.md](compose-services.md) — Read when: setting up Node.js, Rails, or Python/Django services
+- [compose-infrastructure.md](compose-infrastructure.md) — Read when: configuring databases, caches, reverse proxies, or message queues
+- [compose-examples.md](compose-examples.md) — Read when: seeing complete examples, dev/prod configs, or best practices
+
+After reading, apply the patterns and conventions to your code.

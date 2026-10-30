@@ -25,10 +25,6 @@ class TestMemoryPackageExports:
         assert callable(do_export)
         assert callable(do_import)
 
-    def test_migrate_function_importable(self):
-        from agent_notes.memory.commands.migrate import do_migrate
-        assert callable(do_migrate)
-
     def test_reset_function_importable(self):
         from agent_notes.commands.memory import do_reset
         assert callable(do_reset)
@@ -55,7 +51,6 @@ class TestMemorySubmodulesImportable:
         "agent_notes.memory.commands.vault",
         "agent_notes.memory.commands.notes",
         "agent_notes.memory.commands.transfer",
-        "agent_notes.memory.commands.migrate",
         "agent_notes.memory.commands.reset",
     ])
     def test_submodule_importable(self, submodule):
@@ -94,10 +89,22 @@ class TestMemoryNoCircularImports:
             "agent_notes.memory.commands.vault",
             "agent_notes.memory.commands.notes",
             "agent_notes.memory.commands.transfer",
-            "agent_notes.memory.commands.migrate",
-            "agent_notes.memory.commands.reset",
+                "agent_notes.memory.commands.reset",
         ]
         for mod_name in modules:
             # importlib.import_module is idempotent — repeated calls reuse sys.modules
             mod = importlib.import_module(mod_name)
             assert mod is not None, f"{mod_name} returned None"
+
+
+class TestMemoryMigrateRemoved:
+    """`memory migrate` was dead code; neither help nor module may bring it back."""
+
+    def test_help_does_not_advertise_migrate(self, capsys):
+        from agent_notes.memory.commands import show_help
+        show_help()
+        assert "migrate" not in capsys.readouterr().out.lower()
+
+    def test_migrate_module_not_importable(self):
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module("agent_notes.memory.commands.migrate")

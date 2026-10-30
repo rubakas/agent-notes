@@ -1,0 +1,630 @@
+# Skill trigger-eval prompt set (spec 009, Req 11, SC-013).
+#
+# Each entry has exactly four keys:
+#   skill              a directory name under agent_notes/data/skills
+#   category           should_trigger | near_miss
+#   prompt             what a real user would type
+#   expected_behaviour what the model must do (and, for near_miss, where it routes instead)
+#
+# Coverage rule (enforced by test_evals.py): every skill directory has at least
+# 3 should_trigger and 1 near_miss entry, and the file has at least 100 entries.
+#
+# USER-ONLY SKILLS. Nine skills set `disable-model-invocation: true`:
+# grill-me, grill-with-docs, handoff, improve-codebase-architecture,
+# setup-agent-tracker, to-spec, to-tickets, triage, wayfinder.
+# The model cannot auto-trigger them, so for these skills:
+#   - should_trigger prompts are SLASH INVOCATIONS (the user types /<skill> ...),
+#     and expected_behaviour describes what the skill must do once invoked.
+#   - near_miss prompts are NATURAL requests where the model must NOT run the
+#     skill itself. It may suggest that the user run the slash command.
+# Model-invocable skills use natural-language prompts for both categories.
+
+# ---------------------------------------------------------------- chrome-test
+- skill: chrome-test
+  category: should_trigger
+  prompt: "I just finished the new checkout form and it runs locally. Can you get it browser tested?"
+  expected_behaviour: "Loads chrome-test, mints a uuid, writes request-<uuid>.md to the file bus and hands the operator only the request path."
+- skill: chrome-test
+  category: should_trigger
+  prompt: "chrome-test the signup flow, the layout broke on mobile widths last time"
+  expected_behaviour: "Loads chrome-test and writes a request file with signup and mobile-width scenarios, then waits for report-<uuid>.md."
+- skill: chrome-test
+  category: should_trigger
+  prompt: "run a browser test on the dashboard before I commit"
+  expected_behaviour: "Loads chrome-test in end-state mode, writes the request file, and prints operator instructions for starting a claude --chrome session."
+- skill: chrome-test
+  category: should_trigger
+  prompt: "there's a report-3f9a.md in the bus folder from the chrome session, go through the failures"
+  expected_behaviour: "Loads chrome-test and runs the Ingest leg: reads the report, triages each FAIL and proposes fixes."
+- skill: chrome-test
+  category: near_miss
+  prompt: "write a Playwright spec that clicks through the login page and asserts the redirect"
+  expected_behaviour: "Does not load chrome-test. This is writing an automated test file, handled by the test-writer agent, not a chrome-session handoff."
+- skill: chrome-test
+  category: near_miss
+  prompt: "why does the login page throw a 500 when the session cookie is missing?"
+  expected_behaviour: "Does not load chrome-test. Routes to diagnosing-bugs, since it is a server-side failure to reproduce and diagnose."
+
+# ---------------------------------------------------------------- code-review
+- skill: code-review
+  category: should_trigger
+  prompt: "can you review everything on this branch since main?"
+  expected_behaviour: "Loads code-review, pins main as the fixed point, finds the spec source and runs the Standards and Spec axes."
+- skill: code-review
+  category: should_trigger
+  prompt: "review since HEAD~5 against issue 142 please"
+  expected_behaviour: "Loads code-review with HEAD~5 as the fixed point and issue 142 as the spec source; reports both axes."
+- skill: code-review
+  category: should_trigger
+  prompt: "I'm about to open the PR. Does this branch actually match what the spec asked for and follow our conventions?"
+  expected_behaviour: "Loads code-review: a Spec axis check against the requirements and a Standards axis check against repo conventions."
+- skill: code-review
+  category: should_trigger
+  prompt: "do a proper review of my changes since the v2.3 tag, standards and spec"
+  expected_behaviour: "Loads code-review with the v2.3 tag as the fixed point and spawns both axis sub-agents."
+- skill: code-review
+  category: near_miss
+  prompt: "quick sanity check on this one function, does it look okay?"
+  expected_behaviour: "Does not load code-review. Handled by the reviewer agent (quick quality pass), not a two-axis review since a fixed point."
+- skill: code-review
+  category: near_miss
+  prompt: "write the PR description for this branch"
+  expected_behaviour: "Does not load code-review. Routes to the git skill (pull requests section)."
+
+# ------------------------------------------------------------ codebase-design
+- skill: codebase-design
+  category: should_trigger
+  prompt: "I'm designing the interface for a new payments module. How do I keep it deep instead of a thin wrapper?"
+  expected_behaviour: "Loads codebase-design and applies deep-module vocabulary: small interface, leverage, locality, the deletion test."
+- skill: codebase-design
+  category: should_trigger
+  prompt: "where should the seam go between the order service and the payment gateway so I can test it?"
+  expected_behaviour: "Loads codebase-design and reasons about seams, adapters (one adapter means hypothetical seam) and the interface as the test surface."
+- skill: codebase-design
+  category: should_trigger
+  prompt: "this class is really hard to unit test, how should I restructure it so dependencies are injectable?"
+  expected_behaviour: "Loads codebase-design and applies designing-for-testability: accept dependencies, return results, small surface area."
+- skill: codebase-design
+  category: should_trigger
+  prompt: "is this a shallow module? Explain in terms of interface vs implementation."
+  expected_behaviour: "Loads codebase-design and uses the glossary (module, interface, depth, seam) to assess the module."
+- skill: codebase-design
+  category: near_miss
+  prompt: "scan the whole repo and tell me where the architecture could be deepened"
+  expected_behaviour: "Does not run improve-codebase-architecture itself (user-only). May suggest the user run /improve-codebase-architecture."
+- skill: codebase-design
+  category: near_miss
+  prompt: "extract this 200-line function into smaller functions without changing behaviour"
+  expected_behaviour: "Does not load codebase-design. Routes to refactoring-protocol."
+
+# ------------------------------------------------------------ diagnosing-bugs
+- skill: diagnosing-bugs
+  category: should_trigger
+  prompt: "debug this: the nightly export job randomly fails with a timeout and I can't reproduce it"
+  expected_behaviour: "Loads diagnosing-bugs and starts with Phase 1, building a feedback loop to reproduce the non-deterministic failure."
+- skill: diagnosing-bugs
+  category: should_trigger
+  prompt: "the checkout page got way slower after Tuesday's deploy, can you diagnose it?"
+  expected_behaviour: "Loads diagnosing-bugs, treats it as a performance regression and builds a measurable loop (bisection or differential) before hypothesising."
+- skill: diagnosing-bugs
+  category: should_trigger
+  prompt: "users are getting a NoMethodError on the invoices page and tests are failing since the last merge"
+  expected_behaviour: "Loads diagnosing-bugs: reproduce, minimise, hypothesise, instrument, fix with a regression test."
+- skill: diagnosing-bugs
+  category: should_trigger
+  prompt: "something is broken in the websocket reconnect logic, it throws sometimes. help me track it down"
+  expected_behaviour: "Loads diagnosing-bugs and follows the reproduce-hypothesise-instrument-fix loop rather than guessing at a patch."
+- skill: diagnosing-bugs
+  category: near_miss
+  prompt: "have the debugger agent look at this single failing test"
+  expected_behaviour: "Does not load diagnosing-bugs. Dispatches the debugger agent, which investigates one failure."
+- skill: diagnosing-bugs
+  category: near_miss
+  prompt: "rename the variable tmp to pending_orders everywhere in this file"
+  expected_behaviour: "Does not load diagnosing-bugs. A mechanical rename needs no bug diagnosis; at most refactoring-protocol."
+
+# --------------------------------------------------------------------- docker
+- skill: docker
+  category: should_trigger
+  prompt: "write me a multi-stage Dockerfile for this Node app, the image is 1.4 GB right now"
+  expected_behaviour: "Loads docker and reads the Dockerfile reference; produces a multi-stage build that shrinks the image."
+- skill: docker
+  category: should_trigger
+  prompt: "add a healthcheck to the api service in docker-compose.yml and make worker wait for it"
+  expected_behaviour: "Loads docker and reads the Compose reference; adds a healthcheck and depends_on with condition service_healthy."
+- skill: docker
+  category: should_trigger
+  prompt: "my compose stack starts the web container before postgres is ready. how do I fix the ordering?"
+  expected_behaviour: "Loads docker and uses the Compose guidance for health checks and dependency ordering."
+- skill: docker
+  category: should_trigger
+  prompt: "containerize this Flask app so we can run it in staging"
+  expected_behaviour: "Loads docker and reads the relevant reference files; writes a Dockerfile and a Compose file."
+- skill: docker
+  category: near_miss
+  prompt: "set up the Kubernetes deployment manifests and a Helm chart for the api"
+  expected_behaviour: "Does not load docker. Kubernetes and Helm are out of scope for the docker skill; handled by the devops agent."
+- skill: docker
+  category: near_miss
+  prompt: "ship this Rails app with Kamal to our server"
+  expected_behaviour: "Does not load docker. Routes to the rails skill (infrastructure and deploy)."
+
+# ------------------------------------------------------------ domain-modeling
+- skill: domain-modeling
+  category: should_trigger
+  prompt: "we keep using 'customer', 'client' and 'account' for the same thing. Can we pin down the terms?"
+  expected_behaviour: "Loads domain-modeling, challenges the terms against the glossary and records the agreed language in CONTEXT.md."
+- skill: domain-modeling
+  category: should_trigger
+  prompt: "we just decided to use soft deletes for invoices. Record that as an architectural decision."
+  expected_behaviour: "Loads domain-modeling and writes an ADR (offered sparingly) capturing the decision and its reasons."
+- skill: domain-modeling
+  category: should_trigger
+  prompt: "help me build the ubiquitous language for our shipping domain"
+  expected_behaviour: "Loads domain-modeling, sharpens fuzzy terms with concrete scenarios and writes the glossary down as it crystallises."
+- skill: domain-modeling
+  category: should_trigger
+  prompt: "update CONTEXT.md, 'subscription' now means a billing agreement, not a plan"
+  expected_behaviour: "Loads domain-modeling and updates the glossary entry inline, cross-referencing the code for stale uses."
+- skill: domain-modeling
+  category: near_miss
+  prompt: "interview me about this migration plan until every branch is resolved"
+  expected_behaviour: "Does not load domain-modeling. Routes to grilling (the interview), which may use domain-modeling only if docs are wanted."
+- skill: domain-modeling
+  category: near_miss
+  prompt: "design the Order aggregate's public methods so it's easy to mock"
+  expected_behaviour: "Does not load domain-modeling. Routes to codebase-design (interfaces, seams, testability)."
+
+# ------------------------------------------------------------------------ git
+- skill: git
+  category: should_trigger
+  prompt: "commit my changes"
+  expected_behaviour: "Loads git, analyses the diff, chunks it into logical commits and writes title-only conventional messages with the ticket from the branch."
+- skill: git
+  category: should_trigger
+  prompt: "make a PR for this branch"
+  expected_behaviour: "Loads git and follows the pull-request section; no AI attribution lines in the description."
+- skill: git
+  category: should_trigger
+  prompt: "split these changes into a few clean commits, I touched auth and the billing page"
+  expected_behaviour: "Loads git, stages specific files per chunk (never git add -A) and commits auth and billing separately."
+- skill: git
+  category: should_trigger
+  prompt: "what should the commit message be for this diff? We use ticket numbers from the branch name"
+  expected_behaviour: "Loads git and produces '#<ticket> type(scope): short description' under 72 chars, lowercase, no body."
+- skill: git
+  category: near_miss
+  prompt: "review everything on the branch since main before I merge"
+  expected_behaviour: "Does not load git. Routes to code-review."
+- skill: git
+  category: near_miss
+  prompt: "what does git rebase --onto do?"
+  expected_behaviour: "Does not load git. A plain knowledge question answered directly; the skill is for committing and PR workflow."
+
+# -------------------------------------------------------------------- grilling
+- skill: grilling
+  category: should_trigger
+  prompt: "grill me on this plan before I start building it: move sessions from Redis to the database"
+  expected_behaviour: "Loads grilling and asks one question at a time with a recommended answer, looking up facts in the codebase instead of asking."
+- skill: grilling
+  category: should_trigger
+  prompt: "stress-test my design for the notification system, be relentless"
+  expected_behaviour: "Loads grilling: walks each branch of the design tree and resolves dependencies between decisions one by one."
+- skill: grilling
+  category: should_trigger
+  prompt: "poke holes in this rollout plan. Interview me until we agree on everything."
+  expected_behaviour: "Loads grilling, asks one question at a time and waits for each answer."
+- skill: grilling
+  category: near_miss
+  prompt: "grill me on this plan and write ADRs and a glossary as we go"
+  expected_behaviour: "Does not run grill-with-docs itself (user-only). May suggest /grill-with-docs, or runs grilling with domain-modeling."
+- skill: grilling
+  category: near_miss
+  prompt: "just tell me whether this plan is good, no questions"
+  expected_behaviour: "Does not load grilling. The user wants a direct opinion, not an interview."
+
+# ------------------------------------------------------------------- grill-me
+- skill: grill-me
+  category: should_trigger
+  prompt: "/grill-me our plan to split the monolith into three services"
+  expected_behaviour: "Runs a /grilling session: one question at a time, a recommended answer for each, facts looked up in the codebase."
+- skill: grill-me
+  category: should_trigger
+  prompt: "/grill-me"
+  expected_behaviour: "Starts a grilling session about the plan under discussion, asking for the plan first if none exists in context."
+- skill: grill-me
+  category: should_trigger
+  prompt: "/grill-me the caching design in specs/014/spec.md"
+  expected_behaviour: "Reads the spec, then interviews the user branch by branch via the grilling workflow."
+- skill: grill-me
+  category: near_miss
+  prompt: "please grill me about my database schema design"
+  expected_behaviour: "Does not run grill-me itself (user-only). May run the model-invocable grilling skill or suggest the user type /grill-me."
+- skill: grill-me
+  category: near_miss
+  prompt: "list the open questions in this plan, I'll answer them all at once"
+  expected_behaviour: "Does not run grill-me; this asks for a batch of questions, the opposite of one-at-a-time grilling."
+
+# ------------------------------------------------------------ grill-with-docs
+- skill: grill-with-docs
+  category: should_trigger
+  prompt: "/grill-with-docs the new billing model"
+  expected_behaviour: "Runs a grilling session using domain-modeling: updates CONTEXT.md and offers ADRs as decisions crystallise."
+- skill: grill-with-docs
+  category: should_trigger
+  prompt: "/grill-with-docs"
+  expected_behaviour: "Starts the interview, asking one question at a time, and writes glossary and ADR docs as terms and decisions settle."
+- skill: grill-with-docs
+  category: should_trigger
+  prompt: "/grill-with-docs specs/021/spec.md"
+  expected_behaviour: "Reads the spec, grills the user on it and records agreed terminology and decisions in CONTEXT.md and docs/adr."
+- skill: grill-with-docs
+  category: near_miss
+  prompt: "interview me about this design and update the glossary while you're at it"
+  expected_behaviour: "Does not run grill-with-docs itself (user-only). May suggest /grill-with-docs, or use grilling plus domain-modeling."
+- skill: grill-with-docs
+  category: near_miss
+  prompt: "add an ADR for choosing Postgres over MySQL"
+  expected_behaviour: "Does not run grill-with-docs. Routes to domain-modeling (record an architectural decision) with no interview."
+
+# -------------------------------------------------------------------- handoff
+- skill: handoff
+  category: should_trigger
+  prompt: "/handoff continue the auth refactor in a fresh session"
+  expected_behaviour: "Writes a handoff document (goal, state, next steps, references) into a fresh mktemp -d directory and prints its absolute path."
+- skill: handoff
+  category: should_trigger
+  prompt: "/handoff"
+  expected_behaviour: "Summarises the current conversation into a short handoff document outside the workspace and prints the file path."
+- skill: handoff
+  category: should_trigger
+  prompt: "/handoff next session: finish the failing migration specs"
+  expected_behaviour: "Writes a handoff with the stated goal, what is done and half-done, ordered next steps, saved in a mktemp -d directory."
+- skill: handoff
+  category: near_miss
+  prompt: "I'm out of context soon, can you write up where we are so another agent can pick this up?"
+  expected_behaviour: "Does not run handoff itself (user-only). May suggest the user run /handoff."
+- skill: handoff
+  category: near_miss
+  prompt: "save a note about today's decision about the retry policy to memory"
+  expected_behaviour: "Does not run handoff. Routes to obsidian-memory (saving a decision to the vault)."
+
+# ------------------------------------------------ improve-codebase-architecture
+- skill: improve-codebase-architecture
+  category: should_trigger
+  prompt: "/improve-codebase-architecture"
+  expected_behaviour: "Scans the codebase for deepening opportunities, shows them in a visual HTML report, then grills through the one the user picks."
+- skill: improve-codebase-architecture
+  category: should_trigger
+  prompt: "/improve-codebase-architecture src/billing"
+  expected_behaviour: "Scans the billing area for shallow modules and presents deepening opportunities as an HTML report."
+- skill: improve-codebase-architecture
+  category: should_trigger
+  prompt: "/improve-codebase-architecture focus on testability"
+  expected_behaviour: "Surfaces architectural friction with testability and AI-navigability as the aim, using the codebase-design vocabulary."
+- skill: improve-codebase-architecture
+  category: near_miss
+  prompt: "find places in this codebase where the modules are too shallow and propose redesigns"
+  expected_behaviour: "Does not run improve-codebase-architecture itself (user-only). May suggest /improve-codebase-architecture, or discuss with codebase-design."
+- skill: improve-codebase-architecture
+  category: near_miss
+  prompt: "pull the retry logic out of the client class, one step at a time"
+  expected_behaviour: "Does not run improve-codebase-architecture. Routes to refactoring-protocol (one refactor)."
+
+# --------------------------------------------------------------------- ingest
+- skill: ingest
+  category: should_trigger
+  prompt: "ingest this project into the knowledge base"
+  expected_behaviour: "Loads ingest, scans the project (excluding credential files), analyses it and writes category-mapped Obsidian notes via the CLI."
+- skill: ingest
+  category: should_trigger
+  prompt: "ingest https://martinfowler.com/articles/microservices.html"
+  expected_behaviour: "Loads ingest, fetches the URL as data and creates a source note with concepts and entities in the vault."
+- skill: ingest
+  category: should_trigger
+  prompt: "can you learn from the docs/ folder and add it to my vault?"
+  expected_behaviour: "Loads ingest with a folder argument and ingests the files as Obsidian notes."
+- skill: ingest
+  category: should_trigger
+  prompt: "ingest ./design/payments-rfc.pdf"
+  expected_behaviour: "Loads ingest with a file argument and writes the resulting notes into the vault."
+- skill: ingest
+  category: near_miss
+  prompt: "gather what the official Stripe docs say about idempotency keys and write it up as a markdown file"
+  expected_behaviour: "Does not load ingest. Routes to research (primary-source findings in a repo file, not vault notes)."
+- skill: ingest
+  category: near_miss
+  prompt: "remember that we decided to use UUID primary keys"
+  expected_behaviour: "Does not load ingest. Routes to obsidian-memory (save one decision)."
+
+# -------------------------------------------------------------- migrate-memory
+- skill: migrate-memory
+  category: should_trigger
+  prompt: "migrate memory"
+  expected_behaviour: "Loads migrate-memory, detects the backend with agent-notes memory vault and reconciles folders, frontmatter and filenames."
+- skill: migrate-memory
+  category: should_trigger
+  prompt: "I upgraded agent-notes and my vault structure looks outdated, can you bring it up to date?"
+  expected_behaviour: "Loads migrate-memory and reconciles the Obsidian vault to the canonical layout, then regenerates Index.md."
+- skill: migrate-memory
+  category: should_trigger
+  prompt: "/migrate-memory"
+  expected_behaviour: "Loads migrate-memory and reports the changes it made to the vault."
+- skill: migrate-memory
+  category: should_trigger
+  prompt: "some of my vault notes have missing frontmatter and the filenames don't have dates. fix the memory store"
+  expected_behaviour: "Loads migrate-memory: reconciles note frontmatter and filenames to YYYY-MM-DD_<slug>.md."
+- skill: migrate-memory
+  category: near_miss
+  prompt: "save this pattern to my vault: always wrap external calls in a timeout"
+  expected_behaviour: "Does not load migrate-memory. Routes to obsidian-memory (saving a pattern)."
+- skill: migrate-memory
+  category: near_miss
+  prompt: "run the Rails database migration for adding the status column"
+  expected_behaviour: "Does not load migrate-memory. Routes to rails (migrations); this is a schema migration, not a vault migration."
+
+# ------------------------------------------------------------- obsidian-memory
+- skill: obsidian-memory
+  category: should_trigger
+  prompt: "save this decision to the vault: we use UUIDs for primary keys because of sharding"
+  expected_behaviour: "Loads obsidian-memory and runs agent-notes memory add with the decision type, a slugified title and the reasons."
+- skill: obsidian-memory
+  category: should_trigger
+  prompt: "what do we already know in memory about our retry policy?"
+  expected_behaviour: "Loads obsidian-memory and retrieves existing notes with the memory CLI before answering."
+- skill: obsidian-memory
+  category: should_trigger
+  prompt: "record a mistake note: I forgot to run migrations before the seed script"
+  expected_behaviour: "Loads obsidian-memory and saves a mistake-type note following the single record format (filename and frontmatter rules)."
+- skill: obsidian-memory
+  category: should_trigger
+  prompt: "write the session state to the vault so the next session knows where we stopped"
+  expected_behaviour: "Loads obsidian-memory and saves a type=session note named YYYY-MM-DD_<session-id>.md."
+- skill: obsidian-memory
+  category: near_miss
+  prompt: "write up a handoff doc for the next agent in a temp folder"
+  expected_behaviour: "Does not load obsidian-memory. Handoff documents are the user-only /handoff skill; may suggest it."
+- skill: obsidian-memory
+  category: near_miss
+  prompt: "bring my old vault layout up to the latest format"
+  expected_behaviour: "Does not load obsidian-memory. Routes to migrate-memory."
+
+# ------------------------------------------------------------------ prototype
+- skill: prototype
+  category: should_trigger
+  prompt: "I want to sanity-check whether this order state machine feels right before building it. Can you prototype it?"
+  expected_behaviour: "Loads prototype, picks the logic branch and builds a tiny throwaway terminal app that pushes the state model through cases."
+- skill: prototype
+  category: should_trigger
+  prompt: "prototype a few different layouts for the settings page so I can see what it should look like"
+  expected_behaviour: "Loads prototype, picks the UI branch and generates several radically different variations on one route, switchable by a URL param."
+- skill: prototype
+  category: should_trigger
+  prompt: "build me a throwaway demo to test if the undo/redo logic is workable"
+  expected_behaviour: "Loads prototype and builds throwaway code with one command to run, no persistence and the state printed after each action."
+- skill: prototype
+  category: should_trigger
+  prompt: "can we quickly mock up the onboarding flow in the browser to explore options?"
+  expected_behaviour: "Loads prototype (UI branch) and produces switchable UI variants, clearly marked throwaway."
+- skill: prototype
+  category: near_miss
+  prompt: "implement the onboarding flow properly with tests, the design is settled"
+  expected_behaviour: "Does not load prototype. The design is settled; this is regular feature implementation by the coder agent."
+- skill: prototype
+  category: near_miss
+  prompt: "design the module boundary for the pricing engine"
+  expected_behaviour: "Does not load prototype. Routes to codebase-design."
+
+# ---------------------------------------------------------------------- rails
+- skill: rails
+  category: should_trigger
+  prompt: "add a Closeable concern to the Card model in our Rails app"
+  expected_behaviour: "Loads rails and reads the models reference; builds the concern named for its capability, following the project's RuboCop config."
+- skill: rails
+  category: should_trigger
+  prompt: "how should I structure the controller for closing a card? It feels like a custom action"
+  expected_behaviour: "Loads rails and recommends a new resource (resource :closure) over a custom action, with a thin controller."
+- skill: rails
+  category: should_trigger
+  prompt: "set up background jobs in my Rails 8 app, should I use Sidekiq?"
+  expected_behaviour: "Loads rails and recommends Solid Queue with the _later naming and shallow jobs, noting the project's existing choices win."
+- skill: rails
+  category: should_trigger
+  prompt: "write the Minitest fixtures and a system test for the comments feature in this Rails codebase"
+  expected_behaviour: "Loads rails and reads the testing reference: Minitest and fixtures, no factories unless the project already uses them."
+- skill: rails
+  category: near_miss
+  prompt: "write the Dockerfile for deploying this app"
+  expected_behaviour: "Does not load rails. Routes to docker (Dockerfile and Compose reference)."
+- skill: rails
+  category: near_miss
+  prompt: "build a Django model for blog posts with comments"
+  expected_behaviour: "Does not load rails. Not a Rails codebase; no skill applies."
+
+# --------------------------------------------------------- refactoring-protocol
+- skill: refactoring-protocol
+  category: should_trigger
+  prompt: "refactor this 300-line OrderProcessor class, no behaviour changes"
+  expected_behaviour: "Loads refactoring-protocol: confirm tests are green first, make one extraction at a time, run tests after each, commit separately."
+- skill: refactoring-protocol
+  category: should_trigger
+  prompt: "clean this up, there's so much duplication between these two controllers"
+  expected_behaviour: "Loads refactoring-protocol, names the smell, extracts one thing at a time and keeps structure and behaviour out of the same commit."
+- skill: refactoring-protocol
+  category: should_trigger
+  prompt: "reduce the duplication in the three report builders without breaking anything"
+  expected_behaviour: "Loads refactoring-protocol and writes characterization tests first if there is no coverage."
+- skill: refactoring-protocol
+  category: should_trigger
+  prompt: "extract the pricing logic out of the checkout controller into its own object"
+  expected_behaviour: "Loads refactoring-protocol and performs the extraction as a single concern with green tests before and after."
+- skill: refactoring-protocol
+  category: near_miss
+  prompt: "keep improving this module in multiple passes until nothing is left to harden: bugs, perf, tests, DRY"
+  expected_behaviour: "Does not load refactoring-protocol. Routes to rsi (iterative multi-pass quality loop)."
+- skill: refactoring-protocol
+  category: near_miss
+  prompt: "add a CSV export button to the reports page"
+  expected_behaviour: "Does not load refactoring-protocol. This adds a feature, handled by the coder agent."
+
+# ------------------------------------------------------------------- research
+- skill: research
+  category: should_trigger
+  prompt: "research how Stripe handles idempotency keys and write up what you find"
+  expected_behaviour: "Loads research, spawns a background agent with a four-part brief and asks for a cited Markdown file saved in the repo."
+- skill: research
+  category: should_trigger
+  prompt: "can you dig into the SQLite WAL mode docs and tell me what's safe for concurrent writers? I need it for a design decision"
+  expected_behaviour: "Loads research with the question verbatim, the decision it informs, an output path and the cite-primary-sources standard."
+- skill: research
+  category: should_trigger
+  prompt: "go read the Anthropic prompt caching docs in the background while I keep working"
+  expected_behaviour: "Loads research and delegates the reading to a background agent, then reports the file path and a 2-3 line summary."
+- skill: research
+  category: should_trigger
+  prompt: "gather the API facts for the GitHub GraphQL rate limits, with sources"
+  expected_behaviour: "Loads research; claims cite a URL and date, and anything unconfirmed from a primary source is labelled unverified."
+- skill: research
+  category: near_miss
+  prompt: "ingest this article into my knowledge base: https://example.com/post"
+  expected_behaviour: "Does not load research. Routes to ingest (vault notes from an external source)."
+- skill: research
+  category: near_miss
+  prompt: "what's the difference between a mutex and a semaphore?"
+  expected_behaviour: "Does not load research. A general knowledge question answered directly."
+
+# ------------------------------------------------------------------------ rsi
+- skill: rsi
+  category: should_trigger
+  prompt: "rsi src/billing"
+  expected_behaviour: "Loads rsi and runs the loop-until-dry on src/billing: confirm green tests, scan one dimension at a time, apply one atomic change, verify, repeat."
+- skill: rsi
+  category: should_trigger
+  prompt: "harden this codebase, but no new features. Find bugs, weak tests, duplication, and fix them in loops"
+  expected_behaviour: "Loads rsi with the prime invariant: behaviour-preserving except defect fixes, each with a regression test."
+- skill: rsi
+  category: should_trigger
+  prompt: "do a recursive self-improvement pass on the auth module, commit each fix separately"
+  expected_behaviour: "Loads rsi; the user said yes to commits, so each change is committed as one concern; stops after two dry passes or five total."
+- skill: rsi
+  category: should_trigger
+  prompt: "keep cleaning up the whole project until nothing is left to improve: consistency, performance, tests, dead code"
+  expected_behaviour: "Loads rsi and orchestrates read-only scan agents plus coder or refactorer for each atomic change."
+- skill: rsi
+  category: near_miss
+  prompt: "do one careful refactor: pull the validation out of this model"
+  expected_behaviour: "Does not load rsi. Routes to refactoring-protocol (one refactor)."
+- skill: rsi
+  category: near_miss
+  prompt: "the export endpoint returns a 500 intermittently, find out why"
+  expected_behaviour: "Does not load rsi. Routes to diagnosing-bugs (a specific failing behaviour to diagnose)."
+
+# ---------------------------------------------------------- setup-agent-tracker
+- skill: setup-agent-tracker
+  category: should_trigger
+  prompt: "/setup-agent-tracker"
+  expected_behaviour: "Explores the repo (remote, gh auth, AGENTS.md, CONTEXT.md, docs/agents), shows what it found, confirms with the user, then writes the config."
+- skill: setup-agent-tracker
+  category: should_trigger
+  prompt: "/setup-agent-tracker use local markdown, no GitHub for this one"
+  expected_behaviour: "Configures the local-markdown issue tracker, the triage label vocabulary and the domain doc layout after confirming with the user."
+- skill: setup-agent-tracker
+  category: should_trigger
+  prompt: "/setup-agent-tracker"
+  expected_behaviour: "Runs the tracker preflight (gh --version, gh auth status) and offers the local-markdown tracker if the CLI is missing or unauthenticated."
+- skill: setup-agent-tracker
+  category: near_miss
+  prompt: "this is a fresh repo, set up the issue tracker config and triage labels for the agent skills"
+  expected_behaviour: "Does not run setup-agent-tracker itself (user-only). May suggest the user run /setup-agent-tracker."
+- skill: setup-agent-tracker
+  category: near_miss
+  prompt: "create a GitHub issue for the flaky login test"
+  expected_behaviour: "Does not run setup-agent-tracker. A one-off issue creation; may use gh directly."
+
+# -------------------------------------------------------------------- to-spec
+- skill: to-spec
+  category: should_trigger
+  prompt: "/to-spec"
+  expected_behaviour: "Synthesises the current conversation into a spec with no interview, reads docs/agents/issue-tracker.md and publishes it to the tracker."
+- skill: to-spec
+  category: should_trigger
+  prompt: "/to-spec offline sync for the mobile app"
+  expected_behaviour: "Writes the discussed offline-sync work up as a spec titled for the topic and publishes it to the configured tracker."
+- skill: to-spec
+  category: should_trigger
+  prompt: "/to-spec specs/012"
+  expected_behaviour: "Produces the spec at the given path from the conversation and codebase understanding, asking no interview questions."
+- skill: to-spec
+  category: near_miss
+  prompt: "we've talked it through, write this up as a spec and put it in the tracker"
+  expected_behaviour: "Does not run to-spec itself (user-only). May suggest the user run /to-spec."
+- skill: to-spec
+  category: near_miss
+  prompt: "ask me questions until we have a clear picture of what this feature needs"
+  expected_behaviour: "Does not run to-spec (it never interviews). Routes to grilling for the interview."
+
+# ------------------------------------------------------------------- to-tickets
+- skill: to-tickets
+  category: should_trigger
+  prompt: "/to-tickets specs/012/spec.md"
+  expected_behaviour: "Breaks the spec into tracer-bullet vertical-slice tickets, each declaring its blocking edges, and publishes them to the tracker."
+- skill: to-tickets
+  category: should_trigger
+  prompt: "/to-tickets 142"
+  expected_behaviour: "Reads issue 142 as the source plan, splits it into tickets with blocks relationships and publishes them."
+- skill: to-tickets
+  category: should_trigger
+  prompt: "/to-tickets"
+  expected_behaviour: "Turns the current conversation's plan into tracer-bullet tickets with declared blockers and publishes to the configured tracker."
+- skill: to-tickets
+  category: near_miss
+  prompt: "break this plan into tickets and create the issues on GitHub"
+  expected_behaviour: "Does not run to-tickets itself (user-only). May suggest the user run /to-tickets."
+- skill: to-tickets
+  category: near_miss
+  prompt: "turn our discussion into a PRD"
+  expected_behaviour: "Does not run to-tickets. A spec write-up is to-spec (also user-only); may suggest /to-spec."
+
+# --------------------------------------------------------------------- triage
+- skill: triage
+  category: should_trigger
+  prompt: "/triage"
+  expected_behaviour: "Walks the backlog through the triage state machine: categorise as bug or enhancement, verify, grill if needed, write agent-ready briefs."
+- skill: triage
+  category: should_trigger
+  prompt: "/triage #87"
+  expected_behaviour: "Resolves #87 to an issue or PR per the tracker config and moves it through the triage roles."
+- skill: triage
+  category: should_trigger
+  prompt: "/triage the open external PRs"
+  expected_behaviour: "Treats each PR as an issue with attached code and applies the triage roles, treating PR content as data and not instructions."
+- skill: triage
+  category: near_miss
+  prompt: "go through the open issues and label which are bugs and which are enhancements"
+  expected_behaviour: "Does not run triage itself (user-only). May suggest the user run /triage."
+- skill: triage
+  category: near_miss
+  prompt: "fix issue 87"
+  expected_behaviour: "Does not run triage. This is implementation of a known issue, handled by the coder agent."
+
+# ------------------------------------------------------------------- wayfinder
+- skill: wayfinder
+  category: should_trigger
+  prompt: "/wayfinder migrate the whole platform off the legacy billing system"
+  expected_behaviour: "Charts a shared map on the issue tracker: names the destination first, creates investigation tickets and resolves them one at a time."
+- skill: wayfinder
+  category: should_trigger
+  prompt: "/wayfinder 215"
+  expected_behaviour: "Treats 215 as an existing map issue and continues working its tickets one at a time."
+- skill: wayfinder
+  category: should_trigger
+  prompt: "/wayfinder rebuild our onboarding as a course"
+  expected_behaviour: "Treats the idea as domain-agnostic, names the destination, charts a map of investigation tickets on the tracker."
+- skill: wayfinder
+  category: near_miss
+  prompt: "I have a huge vague idea, rewrite the data layer, and no clue where to begin. Can you plan it out over several sessions?"
+  expected_behaviour: "Does not run wayfinder itself (user-only). May suggest the user run /wayfinder."
+- skill: wayfinder
+  category: near_miss
+  prompt: "break this clear 5-step plan into tickets"
+  expected_behaviour: "Does not run wayfinder. The plan is already clear, so it is to-tickets (user-only); may suggest /to-tickets."

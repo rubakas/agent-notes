@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from .. import config as _config
 from . import install_ownership as _ownership
 from .ui import Color as _Color, printable as _printable
 
@@ -88,7 +89,10 @@ def _timestamped_backup_path(dst: Path) -> Path:
 def _move_aside(dst: Path) -> Path:
     """Move *dst* to a fresh timestamped backup name and return it. A directory is copied
     with its symlinks kept as symlinks; the name is claimed exclusively, so an existing
-    backup is never overwritten (a numeric suffix is added on a collision)."""
+    backup is never overwritten (a numeric suffix is added on a collision). Claude Code's
+    synced/ and .trash/ are never moved: reaching here with one is a bug in the caller."""
+    if _config.is_reserved_skill_entry(dst):
+        raise ValueError(f"refusing to move {_printable(dst)}: reserved by Claude Code")
     base = _timestamped_backup_path(dst)
     for attempt in range(1000):
         candidate = base if attempt == 0 else Path(f"{base}.{attempt}")
@@ -158,7 +162,11 @@ def _clear_symlink(src: Path, dst: Path) -> None:
 
 
 def place_file(src: Path, dst: Path, copy_mode: bool = False) -> None:
-    """Place file as symlink or copy, handling existing files."""
+    """Place file as symlink or copy, handling existing files. Refuses a destination that is
+    one of Claude Code's own places (synced/, .trash/): nothing of ours goes there."""
+    if _config.is_reserved_skill_entry(dst):
+        print(f"Refusing to place {_printable(dst)}: reserved by Claude Code.")
+        return
     dst.parent.mkdir(parents=True, exist_ok=True)
 
     if dst.exists() and not dst.is_symlink():

@@ -18,7 +18,7 @@ from .. import config
 from ..domain.state import InstalledItem, ScopeState, State
 from . import fs as _fs
 from .ui import printable
-from .install_ownership import confined, home_is_valid, is_ours, path_key as _key
+from .install_ownership import confined, home_is_valid, is_ours, path_key as _key, reserved_under_root
 from .install_plan import _apply_overrides
 
 COMPONENT_DIRS = ("agents", "skills", "rules", "commands")
@@ -148,7 +148,7 @@ def _scan_links(directory: Path) -> Iterator[Path]:
     except OSError:
         return
     for entry in entries:
-        if entry.is_symlink() and is_ours(entry):
+        if entry.is_symlink() and not reserved_under_root(entry, directory) and is_ours(entry):
             yield entry
 
 
@@ -171,6 +171,24 @@ def _root_for(path: Path, backend, scope: str, project_path: Optional[Path]) -> 
     return next((root for root in _roots(backend, scope, project_path) if confined(path, root)), None)
 
 
+def install_roots(registry, scope: str, project_path: Optional[Path],
+                  scope_state: Optional[ScopeState] = None) -> list[Path]:
+    """Every root an install of *scope* may use: each registered CLI's default dirs, and the
+    dirs the recorded install used (its overrides applied). For tools that judge paths on
+    their own findings, like doctor."""
+    roots: list[Path] = []
+    for backend in registry.all():
+        roots += _roots(backend, scope, project_path)
+    for cli, bs in (scope_state.clis.items() if scope_state is not None else ()):
+        try:
+            backend = _effective(registry.get(cli), bs, scope, project_path)
+        except KeyError:
+            continue
+        if backend is not None:
+            roots += _roots(backend, scope, project_path)
+    return roots
+
+
 def _owned(old: ScopeState, scope: str, project_path: Optional[Path], registry) -> dict[str, tuple[str, Stale]]:
     """key -> (cli, Stale): the old manifest's paths that are ours and inside the install's roots,
     plus our links found in the old install's component dirs and config files, so a manifest
@@ -190,7 +208,7 @@ def _owned(old: ScopeState, scope: str, project_path: Optional[Path], registry) 
                 try:
                     path = Path(item.target)
                     root = _root_for(path, backend, scope, project_path)
-                    if root is not None and is_ours(path, item):
+                    if root is not None and is_ours(path, item):  # confined: never synced/.trash
                         owned.setdefault(_key(path), (cli, Stale(path, item, root)))
                 except (TypeError, ValueError, OSError, AttributeError):
                     continue  # a malformed record names nothing

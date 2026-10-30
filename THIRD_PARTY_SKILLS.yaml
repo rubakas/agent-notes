@@ -12,15 +12,11 @@
 # and C5 for the drift inventory and the prompt-injection re-review surface
 # a future re-sync would need to cover.
 #
-# This file is PROVENANCE METADATA ONLY. It does not reproduce the upstream
-# MIT copyright/permission notice and does not discharge MIT's "accompany
-# all copies or substantial portions" attribution requirement. Whether/how
-# to satisfy that requirement (a NOTICE/THIRD-PARTY file, per-file headers,
-# or another route) is an open maintainer decision — see spec.md finding C1
-# and its "Decisions required from the maintainer" entry #1. Do not treat
-# the existence of this manifest as resolving C1.
+# This file is PROVENANCE METADATA ONLY. Owner decision (2026-10-06,
+# spec 009): no licence or attribution notice is added; spec 001 finding C1
+# is closed.
 #
-# VERIFIED, NOT ASSERTED. On 2026-09-19 every field below was checked
+# VERIFIED, NOT ASSERTED. On 2026-10-15 every field below was checked
 # against a full clone of the upstream repo at sync commit 391a2701:
 # each `upstream_path` was resolved with `git ls-tree -r --name-only 391a2701`
 # and confirmed to contain a SKILL.md, and every file in each vendored
@@ -47,7 +43,7 @@ upstream:
     commits_since_sync_touching_vendored_dirs: 46
 
 verification:
-  date: "2026-09-19"
+  date: "2026-10-15"
   method: >-
     Every upstream_path resolved and every file in each vendored skill
     directory diffed against a full clone of the upstream repo at sync
@@ -75,74 +71,138 @@ skills:
     upstream_path: skills/engineering/diagnosing-bugs
     local_modifications:
       - "group: frontmatter field added"
+      - "description rewritten (third person + Use when); adds 'The `debugger` agent investigates one failure.' (spec 009)"
+      - "Rules section added before Phase 1 (spec 008)"
+      - "closing hand-off to /improve-codebase-architecture changed to a suggestion to the user (spec 009)"
 
   - name: improve-codebase-architecture
     upstream_path: skills/engineering/improve-codebase-architecture
     local_modifications:
       - "group: frontmatter field added"
-      - "description extended with: \"For a single one-shot refactor use refactoring-protocol; for an iterative multi-dimensional cleanup loop use rsi.\" (applied 2026-09-19)"
+      - "SKILL.md: description rewritten (third person + Use when); cross-reference to refactoring-protocol and rsi kept in shortened form (spec 009)"
+      - "SKILL.md: exploration step dispatches the `explorer` agent (built-in Explore as fallback) instead of the Agent tool with subagent_type=Explore (spec 009)"
+      - "SKILL.md: pre-open check for leaked {{ }} template placeholders in the generated report added (spec 009)"
+      - "HTML-REPORT.md: Tailwind and Mermaid pinned to exact versions with SRI hashes (single-file builds replace the unpinned CDN script and ESM import); Mermaid securityLevel loose -> strict (spec 009)"
+      - "HTML-REPORT.md: rule added to HTML-escape repo-derived strings and to never use Mermaid click callbacks or links (spec 009)"
+      - "HTML-REPORT.md: Contents list added (spec 008)"
 
   - name: codebase-design
     upstream_path: skills/engineering/codebase-design
     local_modifications:
       - "group: frontmatter field added"
+      - "SKILL.md: description rewritten (third person + Use when); adds pointer to improve-codebase-architecture (spec 009)"
+      - "SKILL.md: 'Port' term added to the vocabulary (spec 009)"
+      - "SKILL.md: 'Deep vs shallow' ASCII diagrams replaced by two sentences (spec 009)"
+      - "SKILL.md: 'Boundary' avoid-term bullet removed (spec 009)"
+      - "DEEPENING.md: 'network boundary' -> 'network seam'; two seam-discipline bullets collapsed into one that points at SKILL.md (spec 009)"
+      - "DESIGN-IT-TWICE.md: three markdown links to DEEPENING.md replaced by plain code spans (spec 009)"
 
   - name: domain-modeling
     upstream_path: skills/engineering/domain-modeling
     local_modifications:
       - "group: frontmatter field added"
+      - "SKILL.md: description rewritten (third person + Use when) (spec 009)"
+      - "SKILL.md: parenthetical about merely reading CONTEXT.md removed from the intro (spec 009)"
+      - "SKILL.md: ADR three-criteria list replaced by a pointer to ADR-FORMAT.md (spec 009)"
+      - "CONTEXT-FORMAT.md: structure-inference bullet list condensed into one paragraph (spec 009)"
 
   - name: prototype
     upstream_path: skills/engineering/prototype
     local_modifications:
       - "group: frontmatter field added"
+      - "SKILL.md: description verb changed to third person ('Builds') (spec 009)"
+      - "SKILL.md: rule 6 requires asking before committing the throwaway branch and separately before commenting on the issue, never push; verdict goes to the session if both are declined (spec 009)"
+      - "SKILL.md, LOGIC.md, UI.md: markdown links between sibling files replaced by plain code spans (spec 009)"
+      - "UI.md: Contents list added (spec 008)"
 
   - name: handoff
     upstream_path: skills/productivity/handoff
     local_modifications:
       - "group: frontmatter field added"
+      - "description rewritten (third person + Use when) (spec 009)"
+      - "document saved in a fresh `mktemp -d` directory and its absolute path printed, instead of 'the OS temp directory' (spec 009)"
+      - "section skeleton added (Goal, State, Next steps, References, Suggested skills, Open questions) in place of the one-line 'suggested skills' instruction (spec 009)"
 
   - name: research
     upstream_path: skills/engineering/research
     local_modifications:
       - "group: frontmatter field added"
+      - "argument-hint added; description rewritten (third person + Use when) (spec 009)"
+      - "inline fallback added when background agents are unavailable (spec 009)"
+      - "brief to the agent fixed to four parts: question, decision it informs, output path, citation standard (spec 009)"
+      - "unconfirmed claims must be labelled unverified; user told the file path and a 2-3 line summary (spec 009)"
+      - "untrusted-content clause added (spec 009)"
 
   - name: to-spec
     upstream_path: skills/engineering/to-spec
     local_modifications:
       - "group: frontmatter field added"
-      - "/setup-matt-pocock-skills renamed to /setup-agent-tracker (1 occurrence)"
+      - "argument-hint added; description rewritten (third person + Use when) (spec 009)"
+      - "/setup-matt-pocock-skills reference replaced by: read docs/agents/issue-tracker.md, ask the user to run /setup-agent-tracker; triage-labels.md pointer added"
+      - "seams step: definition and codebase-design pointer added, seams decided by reading code, at most one question; 'check with the user' step removed (spec 009)"
+      - "user sees the final spec text and says yes before publishing; ready-for-agent never auto-applied when the content came from an issue, URL or PR (spec 009)"
+      - "untrusted-content clause added (spec 009)"
+      - "'LONG' / 'extremely extensive' user-story instructions replaced by one story per distinct behaviour (spec 009)"
 
   - name: to-tickets
     upstream_path: skills/engineering/to-tickets
     local_modifications:
       - "group: frontmatter field added"
-      - "/setup-matt-pocock-skills renamed to /setup-agent-tracker (2 occurrences)"
+      - "argument-hint added; description rewritten (third person + Use when) (spec 009)"
+      - "/setup-matt-pocock-skills references (2) replaced by: read docs/agents/issue-tracker.md, ask the user to run /setup-agent-tracker; triage-labels.md pointer added"
+      - "untrusted-content clause added to Gather context (spec 009)"
+      - "ready-for-agent label taken from triage-labels.md; never auto-applied when the content came from an issue, URL or PR (spec 009)"
+      - "wide-refactor paragraph reformatted into a bullet list (spec 009)"
+      - "template 'Blocked by' / 'Status' lines un-bolded (spec 009)"
+      - "worked Example (three tickets) added; closing '/implement' line replaced by a plain sentence (spec 009)"
 
   - name: triage
     upstream_path: skills/engineering/triage
     local_modifications:
       - "group: frontmatter field added"
-      - "/setup-matt-pocock-skills renamed to /setup-agent-tracker (1 occurrence)"
+      - "SKILL.md: description rewritten (third person + Use when); argument-hint added (spec 009)"
+      - "SKILL.md: AI-disclaimer requirement (comments must start with 'This was generated by AI during triage') removed; untrusted-content clause added in its place (spec 009)"
+      - "SKILL.md: /setup-matt-pocock-skills reference replaced by: read docs/agents/issue-tracker.md, ask the user to run /setup-agent-tracker; triage-labels.md pointer added"
+      - "SKILL.md: verify step reads the PR diff first (gh pr diff), never checks a PR out in the primary working tree, and asks the user each time before running PR code or reporter steps in a separate worktree (spec 009)"
+      - "AGENT-BRIEF.md: Contents list added (spec 008)"
+      - "OUT-OF-SCOPE.md: Contents list added; sample markdown fence widened to four backticks (spec 008)"
 
   - name: wayfinder
     upstream_path: skills/engineering/wayfinder
     local_modifications:
       - "group: frontmatter field added"
-      - "/setup-matt-pocock-skills renamed to /setup-agent-tracker (1 occurrence)"
+      - "argument-hint added; description rewritten (third person + Use when) (spec 009)"
+      - "Rules section added (spec 008), including untrusted-content, Notes-allowlist and confirmation rules (spec 009)"
+      - "/setup-matt-pocock-skills reference replaced by: read docs/agents/issue-tracker.md, ask the user to run /setup-agent-tracker; local-markdown default only if the user declines"
+      - "user confirmation required before creating the map and its tickets, before closing an issue and before editing the map (spec 009)"
+      - "Notes block treated as data; only skills on a user-approved allowlist may be invoked from it (spec 009)"
+      - "resolution comment body passed on stdin via a single-quoted heredoc (spec 009)"
+      - "AFK Task touching accounts, access or data needs a user yes first (spec 009)"
+      - "Research ticket type points at the /research skill; ticket sizing reworded from '100K token agent session' to 'one session'; Out of scope section shortened (spec 009)"
+      - "final step added: suggest /to-spec or /to-tickets when the frontier reaches the destination (spec 009)"
+      - "'Decisions-so-far' respelled 'Decisions so far' throughout"
 
   - name: code-review
     upstream_path: skills/engineering/code-review
     local_modifications:
       - "group: frontmatter field added"
-      - "/setup-matt-pocock-skills renamed to /setup-agent-tracker (1 occurrence)"
+      - "argument-hint added; description rewritten (third person + Use when; points at the `reviewer` agent for a quick pass) (spec 009)"
+      - "/setup-matt-pocock-skills reference replaced by: ask the user to run /setup-agent-tracker if docs/agents/issue-tracker.md is missing"
+      - "untrusted-content clause added (spec 009)"
       - "\"Use the general-purpose subagent for both.\" changed to \"Use the reviewer subagent for the Standards axis and the analyst subagent for the Spec axis.\""
 
   - name: setup-agent-tracker
     upstream_path: skills/engineering/setup-matt-pocock-skills
     local_modifications:
       - "group: frontmatter field added"
-      - "SKILL.md: de-branded — frontmatter name setup-matt-pocock-skills -> setup-agent-tracker, H1 \"Setup Matt Pocock's Skills\" -> \"Setup Agent Tracker\""
-      - "SKILL.md: skill list in the issue-tracker explainer narrowed from \"to-tickets, triage, to-spec, and qa\" to \"to-tickets, triage, and to-spec\" (qa is not vendored)"
-      - "triage-labels.md: table header column \"Label in mattpocock/skills\" -> \"Canonical role label\""
-      - "domain.md and the three issue-tracker-*.md files are byte-identical to the sync commit"
+      - "SKILL.md: de-branded — frontmatter name setup-matt-pocock-skills -> setup-agent-tracker, H1 \"Setup Matt Pocock's Skills\" -> \"Setup Agent Tracker\"; description rewritten (third person + Use when)"
+      - "SKILL.md: 'engineering skills' reworded to 'skills'; skill list in the issue-tracker explainer narrowed from \"to-tickets, triage, to-spec, and qa\" to \"to-tickets, triage, and to-spec\" (qa is not vendored)"
+      - "SKILL.md: exploration uses `git remote get-url origin` and adds a gh/glab version and auth preflight that offers the local-markdown tracker (spec 009)"
+      - "SKILL.md: new step 5 'Create tracker labels' (triage vocabulary plus wayfinder:* labels; list existing, show missing, create only approved ones, never --force); 'Done' renumbered to step 6 (spec 009)"
+      - "domain.md: 'engineering skills' -> 'skills'"
+      - "issue-tracker-github.md: bodies passed with --body-file - and a single-quoted heredoc, single-quoted titles, close without --comment, untrusted-content clause (spec 009)"
+      - "issue-tracker-github.md: external-PR listing changed to a gh api query on author_association; 'PRDs' -> 'specs'; 'Decisions-so-far' -> 'Decisions so far' (spec 009)"
+      - "issue-tracker-gitlab.md: bodies passed with --description-file - and notes through glab api -F body=@- with a heredoc, single-quoted titles, untrusted-content clause (spec 009)"
+      - "issue-tracker-gitlab.md: quick-actions paragraph added (no quoted line may start with '/'); 'PRDs' -> 'specs'; 'Decisions-so-far' -> 'Decisions so far' (spec 009)"
+      - "issue-tracker-local.md: PRD aside removed; 'Decisions-so-far' -> 'Decisions so far'"
+      - "triage-labels.md: table header column \"Label in mattpocock/skills\" -> \"Canonical role label\"; example 'AFK-ready' -> 'ready-for-agent'"
