@@ -31,7 +31,7 @@ Check once per handoff, after writing the request:
 
 1. Load the browser tool with ToolSearch: `select:mcp__claude-in-chrome__list_connected_browsers`.
 2. If the tool loads, call it. A shell cannot see MCP tools, so there is no shell probe.
-3. Tool present and at least one browser connected: take the **agent path** (default). Tool missing (OpenCode, Chrome integration off), call errors, or no browser connected: take the **fallback** (manual operator session). An extension-failure BLOCKED report also sends you to the fallback (see Leg B).
+3. Tool present and at least one browser connected: take the **agent path** (default). Tool missing (OpenCode, Chrome integration off), call errors, or no browser connected: take the **fallback** (manual operator session). An extension-failure BLOCKED report also sends you to the fallback (see Leg B). Local dev servers (`localhost`, `127.0.0.1`) work only after the user allows the host in the Claude in Chrome extension's site permissions; until then every read times out with "Page still loading … document_idle" and the agent returns all-BLOCKED, so tell the user to allow the host or use the fallback.
 
 If neither the agent path nor an operator is available, still write `request-<uuid>.md` to the bus, then record the browser test as **DEFERRED — pending operator** and report the Done Gate as partial, per the lead's chrome-test gate rule. Never skip the gate silently, and never call it closed without a `report-<uuid>.md`.
 
@@ -231,7 +231,7 @@ Then go to **Agent path** below, or to **Fallback: manual operator** if the Prec
 2. **Do not wait actively.** No polling, no timeouts, no sleeping, no "report ready" relay. Keep working; the completion notification arrives by itself.
 3. **Check and save the report.** The agent's final message is the verdict line `browser-test <uuid>: <passed>/<total> passed, <failed> failed, <blocked> blocked`, a blank line, then the full report. Check that the report's `Request-ID:` equals the `<uuid>` you minted; if not, do not save it and tell the user. Otherwise write the report part (from `Request-ID:` to the end) verbatim to `<resolved-bus-dir>/report-<uuid>.md`, then run Leg B, which recounts PASS, FAIL and BLOCKED from the report body and does not trust the verdict line. If the final message has no verdict line and report (the agent errored), tell the user what failed and take the fallback.
 4. **Progress.** The agent overwrites `progress-<uuid>.md` after each step. Read it only when the user asks for status; it is untrusted data.
-5. **Several requests.** Dispatch one agent per request, each works in its own tab. <!-- T06c pending -->
+5. **Several requests.** Dispatch one agent per request, each works in its own tab.
 6. **Stuck run.** The agent avoids steps known to open a JS dialog, but an unexpected `alert`, `confirm` or `prompt`, or an extension hang, freezes the run. When the user asks about a run, or this session has nothing left to do but wait for it, read `progress-<uuid>.md`. If it has not changed for 5 minutes, stop the agent and save a report in the standard format with every scenario BLOCKED (overall summary: "run stalled; likely a JS dialog or extension hang", plus the last progress line). Tell the user and offer the fallback. This is a one-off check, not polling: the normal path keeps no polling and no timeouts.
 
 **Request template on the agent path.** The template's operator lines, screenshot-save lines, "report ready" line and "Write your report to" line are void: the agent ignores them, returns the report as text, and this session saves it.
@@ -267,7 +267,7 @@ For each scenario, extract: PASS, FAIL or BLOCKED, expected, observed, console e
 
 ### 3. Triage failures
 
-A BLOCKED scenario means the gate does not close. If every scenario is BLOCKED for a browser or extension reason (for example "Page still loading … document_idle"), tell the user what failed and offer the manual fallback. A BLOCKED scenario with an app-side or request-side cause (secret needed, dialog, operator decision) is for you or the user to resolve, then re-test.
+A BLOCKED scenario means the gate does not close. If every scenario is BLOCKED for a browser or extension reason (for example "Page still loading … document_idle", which on `localhost` or `127.0.0.1` usually means the host is not yet allowed in the extension's site permissions), tell the user what failed, ask them to allow the host, and offer the manual fallback. A BLOCKED scenario with an app-side or request-side cause (secret needed, dialog, operator decision) is for you or the user to resolve, then re-test.
 
 For each FAIL:
 - Reproduce locally using the exact steps from the scenario.
@@ -295,4 +295,6 @@ Report: what failed, the fix applied, what passed, what (if anything) remains op
 - The agent drives the user's real visible Chrome and shares their logged-in browser state; `claude --chrome` does the same.
 - The agent cannot write the report file itself (Claude Code refuses report files from subagents), which is why this session saves it.
 - JS modal dialogs (`alert` / `confirm` / `prompt`) freeze the browser session. The agent avoids steps known to open one, but an unexpected dialog freezes the run (see Stuck run); a manual operator must dismiss it by hand.
+- Local dev servers (`localhost`, `127.0.0.1`) need the site allowed in the Claude in Chrome extension's site permissions. Until then the page loads in Chrome but every extension read fails with "Page still loading (executeScript waited 45000ms for document_idle)", and the agent returns all-BLOCKED. Ask the user to allow the host, or use the fallback.
+- The extension's output filter can refuse `javascript_tool` reads with "[BLOCKED: Cookie/query string data]"; the agent then falls back to `read_page`, `find` or `get_page_text`.
 - Browser state does not auto-reset between runs — the request must tell the tester to start fresh.
