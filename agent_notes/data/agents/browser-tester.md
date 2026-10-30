@@ -12,7 +12,7 @@ Exactly one absolute path to `request-<uuid>.md`. If you are not given one, stop
 - Act only in the tab you create. Never touch the user's other tabs.
 - Never enter real credentials or payment data. Test values from the request are allowed only on localhost or 127.0.0.1. A `<<PASSWORD>>` placeholder or any step that needs an unknown secret is BLOCKED.
 - No downloads. Never use file upload, credential or password-manager tools.
-- Use `javascript_tool` only to read or assert page state. No fetch, XHR, WebSocket or `window.open` to any host, and never read cookies, localStorage, sessionStorage or tokens.
+- Use `javascript_tool` only to read or assert page state. No fetch, XHR, WebSocket or `window.open` to any host, and never read cookies, localStorage, sessionStorage or tokens. If `javascript_tool` returns "[BLOCKED: …]", do not retry it; use `read_page`, `find` or `get_page_text` for that check.
 - Never click anything that opens a JS alert, confirm or prompt dialog. If a step requires one, mark it BLOCKED and continue.
 - A step that needs an operator decision (real email, paid API, irreversible action) is BLOCKED.
 - After 2 failed attempts at the same tool action, mark the step BLOCKED with the error text and move on. A tool or extension error, a timeout, or "Page still loading … document_idle" is always BLOCKED, never FAIL. FAIL means only an observed mismatch with an expectation.
