@@ -22,7 +22,7 @@ from .. import config
 from . import fs as _fs
 from .ui import printable
 from .install_cleanup import claims_of_others, home_claimed, is_claimed
-from .install_ownership import home_is_valid, recorded_env, replacing
+from .install_ownership import home_is_valid, replacing
 from .state_store import load_state, get_scope
 
 # ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ def uninstall_all(scope: str, registry: Optional[CLIRegistry] = None,
             with _fs.quiet_output():   # never installed by this install: nothing to announce
                 _uninstall_session_hook(_hook_backend, scope)
         else:
-            _uninstall_session_hook(_hook_backend, scope)
+            _uninstall_session_hook(_hook_backend, scope, env=_recorded_env(scope_state, _hook_backend.name))
         _fs.remove_dir_if_empty(
             _hook_backend.global_home if scope == "global" else Path(project_path) / _hook_backend.local_dir)
 
@@ -306,9 +306,19 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
     _apply_plugin_settings(settings_path, backend, user_config)
 
 
+def _recorded_env(scope_state, cli: str) -> dict:
+    """The settings.json env keys (and values) *scope_state* recorded for *cli*."""
+    backend_state = scope_state.clis.get(cli) if scope_state is not None else None
+    return dict(backend_state.settings_env) if backend_state else {}
+
+
 @_one_settings_write(drop_empty=True)
-def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "") -> None:
+def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memory_path: str = "",
+                            env: Optional[dict] = None) -> None:
     """Remove the SessionStart hook and context file.
+
+    env: the settings.json env keys (and values) the install recorded; only those that are
+    still one of our subagent caps at the value we ship are removed.
 
     Behaviour is driven by the backend's feature flags:
       stop_hook        — memory-bridge and Stop/cost-report hook (claude: true, codex: false)
@@ -316,7 +326,7 @@ def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memor
       allow_entries    — Bash permission allow-list entries (claude: true, codex: false)
     """
     from .settings_writer import remove_hook, remove_allow_entry, remove_matching_allow_entries, remove_env_entries
-    from ..constants import Hooks
+    from ..constants import Hooks, SubagentCaps
     from ..memory.install import uninstall_memory_hooks
 
     settings_path, context_file, hook_command = _session_hook_paths(backend, scope)
@@ -339,7 +349,8 @@ def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memor
         # the user may still want Claude to access their vault without agent-notes.
 
     if backend.supports("subagent_caps"):
-        remove_env_entries(settings_path, recorded_env(backend.name))
+        remove_env_entries(settings_path, {k: v for k, v in (env or {}).items()
+                                           if SubagentCaps.ENV.get(k) == v})
 
     # Plugin-driven hooks and allow-entries — disable all so contributions are removed
     _all_disabled = {"enabled_plugins": {p.name: False for p in default_plugin_registry().all()}}

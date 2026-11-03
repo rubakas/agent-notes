@@ -84,7 +84,9 @@ def _write(path: Path, data: dict) -> None:
         _backed_up[str(real)] = backup_copy(real) if real.exists() else None
     tmp = real.with_name(f".{real.name}.tmp-{os.getpid()}")
     try:
-        tmp.write_text(json.dumps(data, indent=2) + "\n")
+        # private from the first byte: the source's mode is applied only once the content is written
+        with os.fdopen(os.open(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), "w") as f:
+            f.write(json.dumps(data, indent=2) + "\n")
         if real.exists():
             shutil.copymode(real, tmp)
         os.replace(tmp, real)
@@ -225,6 +227,7 @@ def remove_env_entries(settings_path: Path, written: dict[str, str]) -> None:
     if not ours:
         return
 
+    _env_written.get(os.path.realpath(settings_path), set()).difference_update(ours)
     kept = {k: v for k, v in env.items() if k not in ours}
     if kept:
         data["env"] = kept
@@ -275,13 +278,13 @@ def has_hook(settings_path: Path, hook_event: str, command: str) -> bool:
 
 def _holds_nothing(data: dict) -> bool:
     """{} or only the empty containers our own removals leave behind."""
-    return all(key in ("hooks", "permissions", "env") for key in data) \
-        and data.get("hooks", {}) == {} and data.get("env", {}) == {} and data.get("permissions", {}) in ({}, {"allow": []})
+    return all(key in ("hooks", "permissions") for key in data) \
+        and data.get("hooks", {}) == {} and data.get("permissions", {}) in ({}, {"allow": []})
 
 
 def drop_if_empty(settings_path: Path) -> bool:
     """Remove a settings/hooks file that this run edited and that now holds nothing ({} or only
-    empty "hooks" / "permissions" / "env" objects): it was created for our entries, and so was the
+    empty "hooks" / "permissions" objects): it was created for our entries, and so was the
     backup this run took of it, which goes too. A file that does not parse, that was not edited
     by us, or that is a symlink (its target is the user's dotfile) is never removed."""
     if settings_path.is_symlink():

@@ -480,6 +480,7 @@ The control agent's quotes match the real files word for word. So the control ag
 - **Rules still load on agents.** If `omitClaudeMd` also drops `~/.claude/rules/`, the agents lose the credential rule unless 1c restates it. T01 settles this before any code changes.
 - **Nesting off.** Depth 1 turns off nesting for every subagent, built-ins included. Any skill or workflow that relies on nested agents breaks. None is known in this repo, and the af review engine uses the Workflow tool, not nesting.
 - **The env write is persistent config** in the user's settings. Mitigations: only absent keys are written, the install state records them, and uninstall removes only unchanged values.
+- **Unclaimed caps.** Caps found already present at install are never claimed, even when equal to ours. A crash between the settings write and the state save leaves the keys unrecorded, so uninstall will not remove them. Remove them by hand if that happens.
 - **A conditional review can miss bugs** a reviewer would have caught. Mitigations: tests are still run, the lead reads the diff, and large or sensitive diffs still get review.
 - **Upstream hunks re-introducing unsafe patterns.** Mitigation: hand-apply only, then a grep gate for `--body "`, `cdn.tailwindcss.com` and `securityLevel: "loose"`.
 - **security-auditor's own report format competes with the hunter JSON contract.**
