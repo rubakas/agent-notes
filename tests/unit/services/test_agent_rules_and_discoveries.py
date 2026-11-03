@@ -43,8 +43,8 @@ def test_rule_block_is_at_most_25_lines():
 
 def test_claude_coder_restates_credentials_and_attribution(local_dist):
     text = (local_dist / "claude" / "agents" / "coder.md").read_text()
-    assert "Credentials" in text and "Never read, open, cat, grep" in text
-    assert "No AI attribution" in text and "Co-Authored-By" in text
+    assert "Credentials — absolute" in text and "Never read, open, cat, grep" in text
+    assert "No AI attribution — absolute" in text and "Co-Authored-By" in text
 
 
 def test_every_claude_agent_gets_the_block_exactly_once(local_dist):
