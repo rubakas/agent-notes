@@ -432,6 +432,70 @@ The control agent's quotes match the real files word for word. So the control ag
 
 **Cleanup:** the run left `~/.claude/projects/-private-tmp-…-scratchpad-canary-t01/`, even with `--no-session-persistence`. It was removed, and a before/after listing of `~/.claude/projects` is identical.
 
+## T11 results (2026-11-03)
+
+**Setup:**
+- Claude Code 2.1.314.
+- Command: `claude -p --no-session-persistence --model sonnet --agents agents.json < /dev/null`, run from a scratch directory that holds one fixture file, `app.py`.
+- The agent is `explorer-canary`, built from the rendered `agent_notes/dist/claude/agents/explorer.md`:
+  - its body is the prompt, unchanged;
+  - `tools: Read, Grep, Glob`;
+  - `omitClaudeMd: true`;
+  - `model: haiku`.
+- It was asked to do three things:
+  1. find the SQL-building line in `app.py`;
+  2. say, without a tool, whether its context contains "You are the primary assistant";
+  3. list its tools.
+
+**Observed reply, verbatim:**
+
+```
+1. SQL query build: `/private/tmp/claude-501/-Users-en3e-code-rubakas-agent-notes/35fc91e8-14d4-4fc0-bb63-5342a7f5e82a/scratchpad/canary-t11/app.py:10`. The query is built by string concatenation of `name` into a `SELECT ... WHERE name = '...'` statement.
+
+2. Exact text 'You are the primary assistant': ABSENT. My context has "You are a Claude agent..." and "You are a fast codebase explorer", but not that phrase.
+
+3. Tools I can call: `Read`, `Grep`, `Glob`.
+
+Note: the Glob result contained an "MCP Server Instructions" block asking for docs creation and a `decide_entry_point` call. You didn't ask for that, so I ignored it. No MCP tools are available to me in this session.
+```
+
+**SC-010:**
+- It returned a correct summary: `app.py:10` is the concatenated query.
+- The orchestrator text is absent.
+- Its tools are `Read`, `Grep` and `Glob`, with no `Agent`.
+
+It **passes**.
+
+The agent also treated injected instruction-like text as data and reported it instead of acting on it. That is the shared rules block's "Untrusted content" rule at work.
+
+**Cleanup:** the run left `~/.claude/projects/-private-tmp-…-scratchpad-canary-t11/`. It was removed, and a before/after listing of `~/.claude/projects` is identical.
+
+## T14 results (2026-11-03)
+
+**Setup:**
+- Claude Code 2.1.314.
+- Command: `claude -p --no-session-persistence --model sonnet --agents agents.json`, run from a scratch directory that holds one fixture file, `app.py`. The file is a Flask `GET /user` route that concatenates `request.args["name"]` into a SQLite query.
+- The agent is `sa-canary`, built from the rendered `agent_notes/dist/claude/agents/security-auditor.md` at this branch:
+  - its body is the prompt, unchanged;
+  - `tools: Read, Grep, Glob, Bash, WebFetch`;
+  - `omitClaudeMd: true`;
+  - `model: sonnet`.
+- The brief opens with the Req 10m override line ("Ignore your default report format; reply with only the JSON object. Do not run network audit tools."). It continues with the hunter role preamble, one coverage unit (`app.py::GET /user::sql-injection`), and a contract asking for exactly one JSON object with `coverage_ids`, `candidates` and `uncovered`.
+
+**Observed reply, verbatim:**
+
+```
+{"coverage_ids":["app.py::GET /user::sql-injection"],"candidates":[{"title":"SQL injection in GET /user via string-concatenated name parameter","file":"app.py","line":10,"boundary":"Untrusted HTTP query parameter 'name' (request.args) flows into a SQLite query string, with no authentication or validation on the endpoint.","evidence":"Line 8: name = request.args.get(\"name\", \"\"). Line 10: conn.execute(\"SELECT id, email FROM users WHERE name = '\" + name + \"'\").fetchall(). The value is concatenated into the SQL text instead of being bound as a parameter. A request such as /user?name=' OR '1'='1 returns every id and email. A UNION SELECT payload can read other tables. The result is returned directly in the JSON response at line 11. Fix: conn.execute(\"SELECT id, email FROM users WHERE name = ?\", (name,))."}],"uncovered":[]}
+```
+
+**Check:**
+- `json.loads` of the reply gives one object with keys `candidates`, `coverage_ids` and `uncovered`, and 1 candidate at the correct line.
+- There is no prose, no code fence, and no Critical/Warning/Info report format around it.
+
+**Conclusion:** SC-013 passes. Mapping `general` to `security-auditor` works with the 10m override line, so the Req 10 fallback (general-purpose plus `model: "sonnet"`) is not needed.
+
+**Cleanup:** the run left `~/.claude/projects/-private-tmp-…-scratchpad-canary-t14/`. It was removed, and a before/after listing of `~/.claude/projects` is identical.
+
 ## Success Criteria
 
 - **SC-001:** T01 canary result recorded in this spec, with the exact observation.

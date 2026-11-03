@@ -155,7 +155,7 @@ This is the ticket index for `spec.md`.
   - glab flags (checked 2026-11-03 against docs.gitlab.com/cli): `-O json` only on `glab issue list` (https://docs.gitlab.com/cli/issue/list/); `--output json` kept on `glab issue view` (https://docs.gitlab.com/cli/issue/view/), `glab mr list` (https://docs.gitlab.com/cli/mr/list/) and `glab label list` (https://docs.gitlab.com/cli/label/list/); `glab issue note` reads stdin (https://docs.gitlab.com/cli/issue/note/); `glab mr note create` takes `-m` (https://docs.gitlab.com/cli/mr/note/); `glab issue update --assignee` takes a username, `@me` undocumented (https://docs.gitlab.com/cli/issue/update/).
   - Gates: validate shows no FAIL or WARN for these 11 skills; its 18 errors are all `security-audit/` (T13). pytest has 5 failures, all `security-audit` (T13: no `group`, no provenance row, no eval prompts).
 
-- [ ] **T08b Skill fixes: design, tooling and the grill descriptions** (Req 7)
+- [x] **T08b Skill fixes: design, tooling and the grill descriptions** (Req 7)
 
   **Skills**:
   - codebase-design, domain-modeling, prototype, research, git, docker;
@@ -171,6 +171,15 @@ This is the ticket index for `spec.md`.
   - SC-008 and SC-014 pass.
   - chrome-test SKILL.md is at most 14,000 bytes.
   - `agent-notes validate` reports 0 errors and 0 warnings once both T08 tickets are done.
+
+  **Note** (2026-11-03):
+  - Commits `bb4503d`..`ca2b6e7`.
+  - Every finding applied except:
+    - DM-4: its premise is gone after T09;
+    - part of PR-2: LOGIC Step 5 is kept because PR-5 needs it;
+    - GT-4, GR-2 to GR-4, MM-1 to MM-5 and MM-7 to MM-10: decisions 10 and 11.
+  - DK-5 is rewritten as a three-stage build, because the review's fix would not build.
+  - chrome-test SKILL.md went from 17,441 to 13,482 bytes.
 
 - [x] **T09 Upstream partial pulls** (Req 8)
 
@@ -191,7 +200,7 @@ This is the ticket index for `spec.md`.
   - The grep gates for `--body "`, `cdn.tailwindcss.com` and `securityLevel: "loose"` return 0 hits in `skills/`.
   - `THIRD_PARTY_SKILLS.yaml` lists the applied SHAs per skill.
 
-- [ ] **T13 Import `security-audit`** (Req 10a–10j)
+- [x] **T13 Import `security-audit`** (Req 10a–10j)
 
   **Files**:
   - `skills/security-audit/`: 18 vendored files (SKILL.md, 14 reference `.md` files, `report-schema.json` and 2 validator `.cjs` files), plus the new `PLANNING.md` (and `WRITE-ISOLATION.md` only if 10c needs it);
@@ -206,7 +215,13 @@ This is the ticket index for `spec.md`.
 
   **Acceptance**: SC-012 and SC-015, plus `agent-notes validate` with 0 errors and no new warnings.
 
-- [ ] **T14 Canary: security-auditor as hunter** (Req 10f, SC-013; done by the lead; after T03, T04 and T13)
+  **Note** (2026-11-03):
+  - Commits `804d9e1` (pristine copy), `83b165b` (adaptations) and `22f8806` (worker safety block after the security review).
+  - `check_skill_dir` reports 0 errors and 0 warnings.
+  - SKILL.md is 16,672 bytes (about 4,763 tokens).
+  - The diff-vs-pin list: 7 changed, 2 new, 11 identical.
+
+- [x] **T14 Canary: security-auditor as hunter** (Req 10f, SC-013; done by the lead; after T03, T04 and T13)
 
   - Run a headless `claude -p --no-session-persistence --agents '<rendered security-auditor json>'`. The prompt carries a minimal hunter brief:
     - the 10m override line;
@@ -217,6 +232,8 @@ This is the ticket index for `spec.md`.
   - Record the verbatim reply in spec.md under "T14 results", and clean up the leftovers.
   - If it fails, stop and report to the owner with the Req 10 fallback. Do not apply the fallback unasked.
 
+  **Note** (2026-11-03): passed; see spec T14 results.
+
 ## Phase D — Docs, live check, validation (T10–T12)
 
 - [ ] **T10 Docs and evals** (Req 9)
@@ -225,11 +242,13 @@ This is the ticket index for `spec.md`.
 
   **Acceptance**: `uv run pytest tests/skill_evals -q` passes.
 
-- [ ] **T11 Live dispatch check** (SC-010; done by the lead, after `agent-notes build` into a sandbox HOME or a headless run with the rendered agent file)
+- [x] **T11 Live dispatch check** (SC-010; done by the lead, after `agent-notes build` into a sandbox HOME or a headless run with the rendered agent file)
 
   - Dispatch one rendered agent, for example `explorer`.
   - Confirm it returns a summary, that its context lacks "You are the primary assistant", and that `Agent` is not in its tools.
   - Clean up the leftovers.
+
+  **Note** (2026-11-03): passed; see spec T11 results.
 
 - [ ] **T12 Final validation** (all)
 

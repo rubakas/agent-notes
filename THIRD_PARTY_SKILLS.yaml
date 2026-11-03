@@ -121,7 +121,7 @@ skills:
       - "SKILL.md: 'Boundary' avoid-term bullet removed (spec 009)"
       - "DEEPENING.md: 'network boundary' -> 'network seam'; two seam-discipline bullets collapsed into one that points at SKILL.md (spec 009)"
       - "DESIGN-IT-TWICE.md: three markdown links to DEEPENING.md replaced by plain code spans (spec 009)"
-      - "SKILL.md: description names the user as the one who runs /improve-codebase-architecture; user-invocable: false added; Deep-vs-shallow, Designing-for-testability and Relationships sections condensed into the vocabulary (spec 011 Req 7: CD-8 and related)"
+      - "SKILL.md: description names the user as the one who runs /improve-codebase-architecture; user-invocable: false added; Deep-vs-shallow, Designing-for-testability and Relationships sections condensed into the vocabulary (spec 011 Req 7: CD-8 for the description, CD-11 for user-invocable: false, and related)"
       - "DEEPENING.md: the old-tests deletion rule requires interface-level tests that cover the same behaviour and pass; the Seam discipline section removed; dependency categories spelled out instead of pointing at DEEPENING.md (spec 011 Req 7: CD-7)"
       - "DESIGN-IT-TWICE.md: spawns 3 `architect` sub-agents, with the Claude Code and OpenCode tool names; the optional fourth agent replaced by a ports-and-adapters instruction to all three (spec 011 Req 7: CD-6)"
 
