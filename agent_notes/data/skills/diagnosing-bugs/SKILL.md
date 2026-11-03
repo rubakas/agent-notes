@@ -1,6 +1,6 @@
 ---
 name: diagnosing-bugs
-description: Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow.
+description: Drives a reproduce, hypothesise, instrument, fix loop for hard bugs and performance regressions. Use when the user says 'diagnose' or 'debug this', or reports something broken, throwing, failing or slow. The `debugger` agent investigates one failure.
 group: process
 ---
 
@@ -9,6 +9,20 @@ group: process
 A discipline for hard bugs. Skip phases only when explicitly justified.
 
 When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
+
+## Rules
+
+- Build a tight feedback loop first (red-capable, deterministic, fast, agent-runnable)
+- Never jump to hypothesis or code without a red-capable feedback loop
+- Always reproduce the user's exact symptom (not a nearby bug)
+- Minimize to smallest scenario that still fails (every element must be load-bearing)
+- Generate and rank 3-5 hypotheses before testing any one
+- Change one variable at a time during instrumentation
+- Tag every debug log with a unique prefix for cleanup (e.g., `[DEBUG-a4f2]`)
+- Write regression test before the fix (only if a correct seam exists)
+- Re-run Phase 1 loop against the original scenario after the fix
+
+---
 
 ## Phase 1 — Build a feedback loop
 
@@ -132,4 +146,4 @@ Required before declaring done:
 - [ ] Throwaway prototypes deleted (or moved to a clearly-marked debug location)
 - [ ] The hypothesis that turned out correct is stated in the commit / PR message — so the next debugger learns
 
-**Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) hand off to the `/improve-codebase-architecture` skill with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
+**Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) suggest the user run `/improve-codebase-architecture`, with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.

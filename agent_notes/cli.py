@@ -302,6 +302,8 @@ def _main():
     p_memory.add_argument("name", nargs="?", help="Agent name / note title (for show/reset/add)")
     p_memory.add_argument("extra", nargs="*", help="Additional args (for add: body [type] [agent] [project])")
     p_memory.add_argument("--description", default="", help="One-liner description for index display")
+    p_memory.add_argument("--body-file", metavar="PATH", default=None,
+        help="add: read the note body from PATH; '-' reads stdin")
 
     # hook
     p_hook = subparsers.add_parser("hook", help="Claude Code hook integrations")
@@ -408,7 +410,9 @@ def _main():
                    profile_label=getattr(args, 'profile', '') or "")
     elif args.command == "memory":
         from .commands.memory import memory
-        memory(args.action, args.name, getattr(args, "extra", None), description=getattr(args, "description", ""))
+        memory(args.action, args.name, getattr(args, "extra", None),
+               description=getattr(args, "description", ""),
+               body_file=getattr(args, "body_file", None))
     elif args.command == "models":
         subaction = getattr(args, "subaction", None)
         if subaction == "refresh":

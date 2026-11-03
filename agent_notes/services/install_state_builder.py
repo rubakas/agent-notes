@@ -78,7 +78,7 @@ def build_install_state(
     
     # Import here to avoid circular import
     from ..registries.cli_registry import load_registry
-    from ..config import PKG_DIR, DIST_DIR, DIST_SKILLS_DIR, DIST_RULES_DIR, AGENTS_HOME
+    from ..config import PKG_DIR, DIST_DIR, DIST_SKILLS_DIR, DIST_RULES_DIR, AGENTS_HOME, placeable_skill_dirs
 
     # Build scope-specific install
     try:
@@ -93,10 +93,8 @@ def build_install_state(
     timestamp = now_iso()
 
     wanted = None if selected_skills is None else set(selected_skills)
-    placed_skills = sorted(
-        d for d in (DIST_SKILLS_DIR.iterdir() if DIST_SKILLS_DIR.exists() else ())
-        if d.is_dir() and (wanted is None or d.name in wanted)
-    )
+    placed_skills = [d for d in placeable_skill_dirs(DIST_SKILLS_DIR)
+                     if wanted is None or d.name in wanted]
     
     # Build CLIs dict for this scope
     clis = {}

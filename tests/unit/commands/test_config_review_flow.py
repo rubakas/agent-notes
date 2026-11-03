@@ -24,7 +24,7 @@ def env(tmp_path, monkeypatch):
     project = tmp_path / "project"
     project.mkdir()
     state = State(local_installs={str(project.resolve()): ScopeState(clis={"claude": BackendState(
-        role_models={"reasoner": "claude-opus-4-6", "worker": "claude-sonnet-5-5",
+        role_models={"reasoner": "claude-sonnet-4-5", "worker": "claude-sonnet-5-5",
                      "scout": "claude-haiku-4-5"},
         role_efforts={"reasoner": "high", "worker": "medium"})})})
     monkeypatch.setattr(state_store, "load_state", lambda: state)
@@ -65,7 +65,7 @@ def test_three_edits_save_with_one_write_and_one_regenerate(env):
                                               profile_label="")
     env["enable"].assert_called_once_with("cost-report")
     shown = "\n".join("\n".join(frame) for frame in ui.term.frames)
-    assert f"claude reasoner: claude-opus-4-6 → {star}" in shown
+    assert f"claude reasoner: claude-sonnet-4-5 → {star}" in shown
     assert "cost-report: off → on" in shown
     assert env["state"].memory.backend == "local"  # the loaded state itself is untouched
 

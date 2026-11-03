@@ -149,6 +149,11 @@ class TestOpus5Pricing:
             "claude-haiku-4-5-20251001 priced incorrectly (expected 1.0/M in)"
         )
 
+        # haiku-5-5 dated — own entry, must not fall through to *haiku* ($1.0)
+        assert get_price("claude-haiku-5-5-20261007")["in"] == 0.10, (
+            "claude-haiku-5-5-20261007 priced incorrectly (expected 0.10/M in, not 1.0)"
+        )
+
         # opus-4-5 dated — matches *opus-4-5-*
         assert get_price("claude-opus-4-5-20251101")["in"] == 5.0, (
             "claude-opus-4-5-20251101 priced incorrectly (expected 5.0/M in, not 15.0 legacy)"
@@ -244,6 +249,9 @@ class TestGithubCopilotAliasPricing:
         ("github-copilot/claude-sonnet-4.5", 3.0),
         ("github-copilot/claude-sonnet-4", 3.0),
         ("github-copilot/claude-haiku-4.5", 1.0),
+        ("github-copilot/claude-haiku-5.5", 0.10),
+        ("github-copilot/claude-sonnet-5.5", 2.0),
+        ("github-copilot/gpt-6.1-terra", 1.0),
         ("github-copilot/claude-fable-5", 10.0),
     ])
     def test_copilot_alias_prices_correctly(self, model_id, expected_in):
@@ -299,6 +307,10 @@ class TestRawDashedIdsNoNormalization:
         ("claude-opus-4-8", 5.0),
         ("claude-opus-4-5-20251101", 5.0),
         ("claude-haiku-4-5-20251001", 1.0),
+        ("claude-haiku-5-5", 0.10),
+        ("claude-haiku-5-5-20261007", 0.10),
+        ("claude-sonnet-5-5", 2.0),
+        ("claude-sonnet-5-5-20261007", 2.0),
         ("claude-sonnet-5", 2.0),
         ("claude-sonnet-4-5-20250929", 3.0),
         ("claude-fable-5", 10.0),
@@ -354,6 +366,24 @@ class TestUnknownIdsAreNotBilledAtAnotherVendorsRates:
         assert price["in"] == 3.00 and price["out"] == 15.00
 
 
+class TestSonnet55AndTerraCacheReadRates:
+    """Sonnet 5.5 and GPT-6.1 Terra cache reads are 0.05x input, not Sonnet 5's
+    0.1x. A row placed after `*sonnet-5*` would silently bill $0.20/M."""
+
+    @pytest.mark.parametrize("model_id,expected_read", [
+        ("claude-sonnet-5-5", 0.10),
+        ("claude-sonnet-5", 0.20),
+        ("gpt-6.1-terra", 0.05),
+        ("gpt-6-1-terra", 0.05),
+    ])
+    def test_cache_read_rate(self, model_id, expected_read):
+        assert _pricing.get_price(model_id)["cache_read"] == expected_read
+
+    def test_sonnet_55_cache_writes_follow_anthropic_ratios(self):
+        price = _pricing.get_price("claude-sonnet-5-5")
+        assert (price["cache_write_5m"], price["cache_write_1h"]) == (2.50, 4.00)
+
+
 class TestOpenAIDatedSnapshotPricing:
     """Session logs carry dated snapshot ids (gpt-5.1-2025-11-13), same as the
     Anthropic side. Without a `-202*` glob per model they reached the fallback."""
@@ -370,6 +400,9 @@ class TestOpenAIDatedSnapshotPricing:
         ("gpt-5.6-sol-2026-09-01", 4.00),
         ("gpt-5-6-sol-2026-09-01", 4.00),
         ("github-copilot/gpt-5.6-sol-2026-09-01", 4.00),
+        ("gpt-6.1-terra", 1.00),
+        ("gpt-6-1-terra", 1.00),
+        ("gpt-6.1-terra-2026-10-26", 1.00),
     ])
     def test_dated_openai_id_prices_like_its_base_model(self, model_id, expected_in, capsys):
         price = _pricing.get_price(model_id)

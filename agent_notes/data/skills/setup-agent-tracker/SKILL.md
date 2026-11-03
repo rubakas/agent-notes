@@ -1,13 +1,13 @@
 ---
 name: setup-agent-tracker
-description: Configure this repo for the engineering skills — set up its issue tracker, triage label vocabulary, and domain doc layout. Run once before first use of the other engineering skills.
+description: Configures a repo's issue tracker, triage label vocabulary and domain doc layout for the agent-notes workflow skills. Use when starting in a new repo, once, before triage, to-spec, to-tickets or wayfinder.
 disable-model-invocation: true
 group: process
 ---
 
 # Setup Agent Tracker
 
-Scaffold the per-repo configuration that the engineering skills assume:
+Scaffold the per-repo configuration that the skills assume:
 
 - **Issue tracker** — where issues live (GitHub by default; local markdown is also supported out of the box)
 - **Triage labels** — the strings used for the five canonical triage roles
@@ -21,7 +21,8 @@ This is a prompt-driven skill, not a deterministic script. Explore, present what
 
 Look at the current repo to understand its starting state. Read whatever exists; don't assume:
 
-- `git remote -v` and `.git/config` — is this a GitHub repo? Which one?
+- `git remote get-url origin` (and `git remote -v`) — is this a GitHub or GitLab repo? Which one?
+- Tracker preflight — for GitHub run `gh --version` and `gh auth status`; for GitLab run `glab --version` and `glab auth status`. If the CLI is missing or unauthenticated, tell the user and offer the local-markdown tracker.
 - `AGENTS.md` and `CLAUDE.md` at the repo root — does either exist? Is there already an `## Agent skills` section in either?
 - `CONTEXT.md` and `CONTEXT-MAP.md` at the repo root
 - `docs/adr/` and any `src/*/docs/adr/` directories
@@ -112,6 +113,17 @@ Then write the docs files using the seed templates in this skill folder as a sta
 
 For "other" issue trackers, write `docs/agents/issue-tracker.md` from scratch using the user's description.
 
-### 5. Done
+### 5. Create tracker labels
 
-Tell the user the setup is complete and which engineering skills will now read from these files. Mention they can edit `docs/agents/*.md` directly later — re-running this skill is only necessary if they want to switch issue trackers or restart from scratch.
+GitHub and GitLab trackers only — skip this step for local markdown and "other" trackers.
+
+The labels the skills apply are:
+
+- the triage vocabulary from the "Label in our tracker" column of the written `docs/agents/triage-labels.md` (defaults `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` — the user may have renamed them in step 3); omit when `triage` isn't installed
+- `wayfinder:map`, `wayfinder:research`, `wayfinder:prototype`, `wayfinder:grilling`, `wayfinder:task`
+
+List the labels that already exist (GitHub `gh label list --limit 200 --json name --jq '.[].name'`; GitLab `glab label list --output json`), show the user which of the above are missing, and ask which to create. Create only the approved ones (GitHub `gh label create '<name>' --description '<meaning>'`; GitLab `glab label create --name '<name>' --description '<meaning>'`). Never recreate or modify an existing label, and never pass `--force` (it overwrites).
+
+### 6. Done
+
+Tell the user the setup is complete and which skills will now read from these files. Mention they can edit `docs/agents/*.md` directly later — re-running this skill is only necessary if they want to switch issue trackers or restart from scratch.

@@ -630,7 +630,7 @@ class TestRealRegistryResolution:
         "orchestrator": ("claude-fable-5-1", "fable"),
         "reasoner": ("claude-opus-5-5", "opus"),
         "worker": ("claude-sonnet-5-5", "sonnet"),
-        "scout": ("claude-haiku-4-5", "haiku"),
+        "scout": ("claude-haiku-5-5", "haiku"),
     }
 
     # Multi-provider (anthropic + openai) with preferred_family claude: the
@@ -639,7 +639,7 @@ class TestRealRegistryResolution:
         "orchestrator": ("claude-fable-5-1", "claude-fable-5-1"),
         "reasoner": ("claude-opus-5-5", "claude-opus-5-5"),
         "worker": ("claude-sonnet-5-5", "claude-sonnet-5-5"),
-        "scout": ("claude-haiku-4-5", "claude-haiku-4-5"),
+        "scout": ("claude-haiku-5-5", "claude-haiku-5-5"),
     }
 
     CODEX_DEFAULTS = {

@@ -10,6 +10,8 @@ from ..domain.diagnostics import ValidationError, ValidationWarning  # noqa: F40
 from ..services.validation import (
     has_field, get_field, line_count, has_frontmatter, check_unclosed_code_blocks
 )
+from ..services.skill_validation import check_skill_dir, count_lines, read_markdown
+from ..services.ui import printable
 
 
 def _agent_line_limit(local_name: str) -> int:
@@ -23,7 +25,7 @@ def validate() -> None:
     """Lint all agent-notes configs."""
     from ..config import (
         Color, ROOT, DIST_CLAUDE_DIR, DIST_OPENCODE_DIR, DIST_GITHUB_DIR,
-        DIST_RULES_DIR, find_skill_dirs
+        DIST_RULES_DIR, find_skill_dirs, is_reserved_skill_name
     )
 
     errors: List[ValidationError] = []
@@ -103,12 +105,26 @@ def validate() -> None:
 
     for skill_path in find_skill_dirs():
         skill_name = skill_path.name
+
+        if is_reserved_skill_name(skill_name):
+            errors.append(ValidationError(
+                f"{skill_name}/", "name is reserved by Claude Code (synced skills or its trash) "
+                "and must not be shipped"))
+            continue
+
         f = skill_path / "SKILL.md"
         if not f.exists():
             continue
 
-        lines = line_count(f)
-        label = f"{skill_name}/SKILL.md ({lines} lines)"
+        text, _ = read_markdown(f)
+        if text is None:  # check_skill_dir reports why as file-unreadable
+            unreadable_errors, unreadable_warnings = check_skill_dir(skill_path)
+            errors.extend(unreadable_errors)
+            warnings.extend(unreadable_warnings)
+            continue
+
+        errors_before = len(errors)
+        label = f"{skill_name}/SKILL.md ({count_lines(text)} lines)"
 
         if not has_frontmatter(f):
             errors.append(ValidationError(label, "missing frontmatter"))
@@ -127,7 +143,12 @@ def validate() -> None:
         if fm_name and not skill_name_regex.match(fm_name):
             errors.append(ValidationError(label, f"name '{fm_name}' does not match required pattern (lowercase alphanumeric + hyphens)"))
 
-        print(f"  {Color.GREEN}OK{Color.NC}    {label}")
+        rule_errors, rule_warnings = check_skill_dir(skill_path)
+        errors.extend(rule_errors)
+        warnings.extend(rule_warnings)
+
+        if len(errors) == errors_before:
+            print(f"  {Color.GREEN}OK{Color.NC}    {printable(label)}")
 
         if fm_name:
             skill_names.add(f"skill:{fm_name}")
@@ -175,7 +196,12 @@ def validate() -> None:
         if any(part in {".git", "node_modules"} for part in md_file.parts):
             continue
 
-        if not check_unclosed_code_blocks(md_file):
+        try:
+            closed = check_unclosed_code_blocks(md_file)
+        except UnicodeDecodeError:
+            continue  # skill files report this as file-unreadable; other docs are not validated further
+
+        if not closed:
             rel_path = md_file.relative_to(ROOT)
             try:
                 fence_count = md_file.read_text().count('```')
@@ -189,10 +215,10 @@ def validate() -> None:
 
     # Print all errors and warnings
     for error in errors:
-        print(f"  {Color.RED}FAIL{Color.NC}  {error.file_path} — {error.message}")
+        print(f"  {Color.RED}FAIL{Color.NC}  {printable(error.file_path)} — {printable(error.message)}")
 
     for warning in warnings:
-        print(f"  {Color.YELLOW}WARN{Color.NC}  {warning.file_path} — {warning.message}")
+        print(f"  {Color.YELLOW}WARN{Color.NC}  {printable(warning.file_path)} — {printable(warning.message)}")
 
     # Summary
     print("")

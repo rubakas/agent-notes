@@ -45,11 +45,26 @@ def under(path: Path, root: Path) -> bool:
         and real.is_relative_to(real_root)
 
 
+def reserved_under_root(path: Path, root: Path) -> bool:
+    """True when the first component of *path* below *root* is a reserved name (synced, .trash,
+    a dot name): Claude Code's places in a skills directory. Judged against *root* as written
+    and as resolved, so a root that is a symlink to a differently named store is covered;
+    *root* itself and paths outside it are not reserved."""
+    absolute = Path(os.path.abspath(path))
+    for base in (Path(os.path.abspath(root)), Path(os.path.realpath(root))):
+        if absolute != base and absolute.is_relative_to(base):
+            if config.is_reserved_skill_name(absolute.relative_to(base).parts[0]):
+                return True
+    return False
+
+
 def confined(path: Path, root: Path) -> bool:
     """under() but strictly below a directory root, and no symlink anywhere between *root* and *path*'s parent: a manifest path
     that crosses a link is not where the install put it. A raw ".." is refused too: the checks
-    here collapse it lexically, but the OS resolves it through a symlinked directory."""
-    if ".." in Path(path).parts or not under(path, root):
+    here collapse it lexically, but the OS resolves it through a symlinked directory. Claude
+    Code's own places below the root (synced/, .trash/) are never confined: nothing of ours
+    lives there, whatever a manifest says."""
+    if ".." in Path(path).parts or reserved_under_root(path, root) or not under(path, root):
         return False
     if os.path.abspath(path) == os.path.abspath(root) and os.path.isdir(root):
         return False  # a directory root is never itself the thing to delete (a file root, the config file, is)

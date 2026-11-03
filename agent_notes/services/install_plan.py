@@ -241,7 +241,7 @@ def _plan_component(
     elif component == "skills":
         if not src.exists():
             return []
-        for skill_dir in sorted(d for d in src.iterdir() if d.is_dir()):
+        for skill_dir in config.placeable_skill_dirs(src):
             actions.append(_plan_file(skill_dir, dst / skill_dir.name, copy_mode))
 
     return actions
@@ -330,7 +330,7 @@ def plan_install(
     if scope == "global" or selected_skills is not None:
         dist_skills_dir = config.DIST_SKILLS_DIR
         if dist_skills_dir.exists():
-            skill_dirs = {d.name: d for d in dist_skills_dir.iterdir() if d.is_dir()}
+            skill_dirs = {d.name: d for d in config.placeable_skill_dirs(dist_skills_dir)}
             names_to_plan = selected_skills if selected_skills is not None else list(skill_dirs.keys())
 
             # Per-backend skill targets

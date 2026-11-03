@@ -1,6 +1,6 @@
 ---
 name: improve-codebase-architecture
-description: Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick. For a single one-shot refactor use refactoring-protocol; for an iterative multi-dimensional cleanup loop use rsi.
+description: Scans a codebase for deepening opportunities, shows them as a visual HTML report, then grills through the one picked. Use when the user wants module or interface redesign. For one refactor use refactoring-protocol; for a cleanup loop use rsi.
 disable-model-invocation: true
 group: process
 ---
@@ -20,7 +20,7 @@ This command is _informed_ by the project's domain model and built on a shared d
 
 Read the project's domain glossary (`CONTEXT.md`) and any ADRs in the area you're touching first.
 
-Then use the Agent tool with `subagent_type=Explore` to walk the codebase. Don't follow rigid heuristics — explore organically and note where you experience friction:
+Then dispatch the `explorer` agent to walk the codebase; if it isn't installed, fall back to the built-in Explore agent. Don't follow rigid heuristics — explore organically and note where you experience friction:
 
 - Where does understanding one concept require bouncing between many small modules?
 - Where are modules **shallow** — interface nearly as complex as the implementation?
@@ -52,6 +52,8 @@ End the report with a **Top recommendation** section: which candidate you'd tack
 **ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _"contradicts ADR-0007 — but worth reopening because…"_). Don't list every theoretical refactor an ADR forbids.
 
 See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.
+
+Before opening the report, check it for leaked template tokens: `grep -nE '\{\{|\}\}' <path>` over the generated HTML. Fix every hit, then open the report.
 
 Do NOT propose interfaces yet. After the file is written, ask the user: "Which of these would you like to explore?"
 
