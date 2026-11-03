@@ -25,6 +25,12 @@ def _agent_line_limit(local_name: str) -> int:
     return 500 if local_name == "lead" else 300
 
 
+def _agent_trim_lines(local_name: str) -> int:
+    """Line count above which an agent gets a "consider trimming" warning.
+    The lead is exempt: it is only held to its own ceiling in _agent_line_limit."""
+    return _agent_line_limit(local_name) if local_name == "lead" else AGENT_TRIM_LINES
+
+
 def validate() -> None:
     """Lint all agent-notes configs."""
     from ..config import (
@@ -66,7 +72,7 @@ def validate() -> None:
             limit = _agent_line_limit(local_name)
             if lines > limit:
                 errors.append(ValidationError(label, f"exceeds {limit} line limit"))
-            elif lines > AGENT_TRIM_LINES:
+            elif lines > _agent_trim_lines(local_name):
                 warnings.append(ValidationWarning(label, f"over {AGENT_TRIM_LINES} lines (consider trimming)"))
             else:
                 print(f"  {Color.GREEN}OK{Color.NC}    {label}")
@@ -96,7 +102,7 @@ def validate() -> None:
             limit = _agent_line_limit(local_name)
             if lines > limit:
                 errors.append(ValidationError(label, f"exceeds {limit} line limit"))
-            elif lines > AGENT_TRIM_LINES:
+            elif lines > _agent_trim_lines(local_name):
                 warnings.append(ValidationWarning(label, f"over {AGENT_TRIM_LINES} lines (consider trimming)"))
             else:
                 print(f"  {Color.GREEN}OK{Color.NC}    {label}")
