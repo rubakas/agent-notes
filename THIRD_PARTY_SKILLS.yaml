@@ -1,4 +1,9 @@
-# Provenance manifest for skills vendored from mattpocock/skills.
+# Provenance manifest for vendored skills.
+#
+# The top-level `upstream:` block below describes mattpocock/skills; every entry
+# without its own `upstream:` block comes from it. An entry with its own
+# `upstream:` block (security-audit, from cloudflare/security-audit-skill) comes
+# from that repo instead.
 #
 # Upstream:      https://github.com/mattpocock/skills
 # License:       MIT
@@ -237,3 +242,29 @@ skills:
       - "issue-tracker-gitlab.md: quick-actions paragraph added (no quoted line may start with '/'); 'PRDs' -> 'specs'; 'Decisions-so-far' -> 'Decisions so far' (spec 009)"
       - "issue-tracker-local.md: PRD aside removed; 'Decisions-so-far' -> 'Decisions so far'"
       - "triage-labels.md: table header column \"Label in mattpocock/skills\" -> \"Canonical role label\"; example 'AFK-ready' -> 'ready-for-agent'"
+
+  - name: security-audit
+    upstream_path: skills/security-audit
+    upstream:
+      repo: https://github.com/cloudflare/security-audit-skill
+      license: MIT
+      copyright: "Copyright (c) 2025-2026 Cloudflare, Inc."
+      sync_commit: c1c8a8c1471069fb0e188eeaff69b8e8db6564a8
+      sync_date: "2026-09-14"
+    local_modifications:
+      - "files not copied: validate-findings.test.cjs and validate-coverage-ledger.test.cjs (not needed at runtime, never referenced by the skill); the 18 runtime files were copied with cp (spec 011)"
+      - "SKILL.md frontmatter: group, argument-hint and disable-model-invocation added; description rewritten (third person, 250 characters or fewer, Use when naming a full multi-phase audit or pen test) (spec 011)"
+      - "SKILL.md: '## Full audit planning' (upstream lines 88-135) moved to the new PLANNING.md and replaced by a pointer; the two links inside it to RECONNAISSANCE.md and HUNTING.md became code spans (spec 011)"
+      - "SKILL.md: the artifact promotion procedure (upstream lines 68-82) moved to the new WRITE-ISOLATION.md and replaced by a pointer; adds 'On Claude Code with execution disabled there is nothing to promote; skip this section', and the sentence that the procedure is carried as a fenced block in HUNTING.md and VALIDATION-AND-REPORTING.md is replaced by one saying the parent performs it and never pastes it into a prompt (spec 011)"
+      - "SKILL.md: new '## Companion files' list linking the 10 companion files, scopes taken from the upstream README Files table (spec 011)"
+      - "SKILL.md: 'Platform terminology' gains the Claude Code mapping (Task tool is Agent, task on OpenCode; research is explorer for recon 1a, 1c and 1d only; general, the coverage critics, recon 1b and every Phase 5 verifier are security-auditor; every brief opens with the JSON-only, no-network-audit-tools instruction), a note that a heading without subagent_type runs as general, and the concurrency cap sentence (CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS, 5) (spec 011)"
+      - "SKILL.md: 'Universal execution safety' gains the Claude Code source-only paragraph (execution_policy source-only, nothing from the target is run, execution disabled in every brief, tell the user before wave 1); the run-metadata execution_policy line names both values (spec 011)"
+      - "SKILL.md: guidance mode names what to read (ATTACK-CLASSES.md and the one matching companion) and creates no files (spec 011)"
+      - "SKILL.md: 'Full audit setup' adds that the parent writes the files under the output directory and runs the validators itself, never delegating to coder, and asks the mode, profile, scope, budget and output-directory questions once inside the plan with the estimated agent count (spec 011)"
+      - "SKILL.md: terminal-state paragraph adds 'unless the user stops the run' and run_status incomplete with incomplete_reason validators_unavailable when node is missing (spec 011)"
+      - "RECONNAISSANCE.md: Contents list added; recon 1a item 6 and 1d items 6-7 removed from the explorer prompts and replaced by a paragraph telling the parent to probe the host with Bash (uname -s; command -v node python3 docker); the two budget-gate pointers repointed from SKILL.md to PLANNING.md; the link to ATTACK-CLASSES.md became a code span (spec 011)"
+      - "HUNTING.md: Contents list added; the promotion procedure block and its heading removed, with the prompt list item 6 and the prompt text that cited it reworded; the coverage critic receives the absolute paths of architecture.md and coverage-ledger.json instead of the pasted ledger; the promotion and budget pointers repointed to WRITE-ISOLATION.md and PLANNING.md (spec 011)"
+      - "VALIDATION-AND-REPORTING.md: Contents list added; '### Phase 3-6' headings promoted to '##' so the list can pass the contents check; the promotion procedure block and the references to it removed; the budget pointer repointed to PLANNING.md (spec 011)"
+      - "ATTACK-CLASSES.md: Contents list added; the nine bold class names promoted to '##' headings with the '(subagent_type: general)' suffix dropped; the 11 links to companion files became code spans; the 'Obvious things' block gains a secrets rule (never print or store a secret value, history checks without patch output, credential files checked only with test -f, git ls-files and git check-ignore, in-scope source files whose path matches the credential-name rule are not read and are recorded deferred with reason credential_path_rule) and the lockfile advisory check is limited to a local source (spec 011)"
+      - "MEMORY-SAFETY-AND-BINARY.md, WEB-PROTOCOL-AND-AUTH.md: Contents list added; the '(subagent_type: general)' suffix dropped from the '##' headings so the anchors stay readable (spec 011)"
+      - "PLANNING.md and WRITE-ISOLATION.md are new files holding text moved from SKILL.md; every other file (the remaining 8 companions, report-schema.json and both validators) is byte-identical to the pin (spec 011)"

@@ -389,6 +389,7 @@ Load the docker-compose skill for multi-service setup
 - `/research` — Investigate a question against primary sources and capture findings as Markdown
 - `/prototype` — Throwaway prototypes: terminal app for logic or UI variations for visual
 - `/setup-agent-tracker` — One-time per-repo setup of the issue tracker, triage labels, and domain doc layout
+- `/security-audit` — Multi-phase security audit or pen test of a codebase with independent verification and a report; user-only, source-only on Claude Code, and needs Node.js for its validators
 
 </details>
 

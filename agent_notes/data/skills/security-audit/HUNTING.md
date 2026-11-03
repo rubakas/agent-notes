@@ -1,5 +1,13 @@
 # Vulnerability Hunting
 
+## Contents
+
+- [Required hunter prompt](#required-hunter-prompt)
+- [Local validation boundaries](#local-validation-boundaries)
+- [Structured hunter result](#structured-hunter-result)
+- [Parent consolidation and ledger update](#parent-consolidation-and-ledger-update)
+- [Coverage-critic waves](#coverage-critic-waves)
+
 ### Phase 2: Run coverage-led hunting waves
 
 The parent assigns `planned` ledger units to `general` agents. Use enough focused hunters to cover the units without combining unrelated boundaries. One hunter may own closely related units in one subsystem; no unit may be silently unassigned because of an agent-count limit — a unit the budget cannot reach is explicitly `deferred` with reason `budget_cannot_reserve_critics_and_validation`.
@@ -17,7 +25,7 @@ Every hunter prompt contains these parts in this order:
 3. Assigned coverage IDs, subsystem, boundary, repository-relative starting paths, and each unit's assignment block map from `coverage-ledger.json`.
 4. The exact selected blocks, copied verbatim: each selected ordinary attack-class block from `ATTACK-CLASSES.md`, and from each selected companion its `Core discipline`, each chosen attack-class subsection, `Universal moves`, and `Validation rules`. Ordinary blocks are self-contained and carry no companion-style `Core discipline`, `Universal moves`, or `Validation rules` sections. Do not send block or companion names alone.
 5. Explicit excluded ordinary and companion blocks with a reason for each exclusion.
-6. The core hunting method below, followed by the promotion procedure block.
+6. The core hunting method below.
 7. The core validation rules below.
 8. Carried same-source prior confirmed exclusions, each limited to fingerprint, title, and root cause, plus peer-owned current coverage IDs that this hunter must not duplicate.
 9. The unique scratch/artifact paths, safe agent ID, predeclared promotion allowlist and byte limits, and the structured-result contract, including the Structured hunter result block below and the `confirmed` and `needs_validation` branches of `report-schema.json` copied verbatim.
@@ -84,8 +92,7 @@ record only allowlisted variable names and safe non-secret values needed to repr
 the check. Never capture the ambient environment, inherited variables, credentials,
 authentication state, or unrelated host paths. The target-controlled process writes
 only in scratch. After the sandbox and all its processes terminate, only trusted
-parent-side code may promote predeclared scratch-relative files, following the
-promotion procedure block included verbatim in this prompt. You and target code never
+parent-side code may promote predeclared scratch-relative files. You and target code never
 write retained artifacts. If promotion is unavailable or fails for decisive evidence,
 return needs_validation with the exact promotion blocker.
 Never stress availability, invoke a live target, use a real credential, publish an
@@ -94,45 +101,6 @@ artifact, or continue past the minimum observed effect.
 A deployment, browser, provider, broker, OS, proxy, package, secret, or identity fact
 outside source is not proof either way. If one such fact is decisive, return a
 needs_validation record with the exact missing observation and safe owner-observed check.
-```
-
-#### Promotion procedure — copy this promotion procedure verbatim into every hunter prompt
-
-```text
-Artifact promotion procedure (trusted parent-side code only):
-Reference only for you: the parent performs these steps; you never perform them.
-
-Before execution, the parent opens and retains trusted, non-inheritable directory
-descriptors for the agent's scratch/ and artifacts/ roots, and records an allowlist
-of expected scratch-relative artifact files plus explicit per-file and cumulative
-byte limits. Never pass those descriptors to the agent or sandbox. After the sandbox
-and all its processes terminate, trusted parent-side code promotes each allowlisted
-file separately:
-
-1. Validate the declared relative path: reject absolute, empty, `.`, `..`, or
-   symlinked components.
-2. Walk each parent component from the retained scratch-root descriptor with
-   no-follow directory-relative operations; never reopen by path.
-3. Open the leaf no-follow and nonblocking.
-4. Verify with `fstat` that it is a regular file with link count exactly one and
-   within the recorded per-file and cumulative byte limits.
-5. Enforce those limits again while reading from that descriptor.
-6. Copy exactly the verified size, repeat `fstat`, and reject a changed identity,
-   type, link count, or size.
-7. For the destination, walk every parent component from the retained
-   artifacts-root descriptor with no-follow directory-relative operations; require
-   each existing component to be a real directory, and create any missing directory
-   exclusively before reopening and verifying it no-follow.
-8. Create the leaf exclusively without following links, verify that the opened
-   destination is a regular file with link count exactly one, and copy from the
-   verified source descriptor without reopening either path.
-9. Use equivalent race-safe APIs on non-POSIX systems.
-10. Never recursively copy or glob scratch, extract an archive into artifacts, or
-    open or promote a symlink, FIFO, socket, device, directory, hard-linked file,
-    changing file, or file that exceeds its bound.
-11. If any check is unavailable, cannot be enforced, or fails, discard the scratch
-    entry; if it is decisive evidence, retain `needs_validation` with the exact
-    promotion blocker.
 ```
 
 #### Core validation rules — include in every hunter prompt
@@ -163,7 +131,7 @@ Local execution is for confirmation, not impact expansion:
 - **Allowed only in the required OS sandbox:** offline builds with present dependencies; isolated-loopback processes using dummy state; unit and integration tests; small fixture processing; sanitizers; bounded fuzz/regression tests; deterministic concurrency checks; local browser/emulator tests with dummy accounts; rendered manifests and policy evaluation with dummy identities; mocked external or paid calls.
 - **Disallowed:** live or deployed traffic; requests to services not started for this isolated check; network dependency installation; real accounts or credentials; production data; shared queues, cloud resources, runners, registries, signing or release services; publishing; stress, saturation, or cost generation; any work after the minimum dummy-data boundary result.
 
-The sandbox starts with an empty environment, gives target code no external network or host writable path, and enforces explicit low resource and time limits for every check, not only checks expected to be expensive. Scratch output remains target-controlled after exit. Promote it only with the no-follow, path-confined, regular-file, bounded-size host procedure in `SKILL.md`. Missing any sandbox or promotion capability does not erase a source-grounded candidate; represent the exact blocker in `needs_validation`.
+The sandbox starts with an empty environment, gives target code no external network or host writable path, and enforces explicit low resource and time limits for every check, not only checks expected to be expensive. Scratch output remains target-controlled after exit. Promote it only with the no-follow, path-confined, regular-file, bounded-size host procedure in `WRITE-ISOLATION.md`. Missing any sandbox or promotion capability does not erase a source-grounded candidate; represent the exact blocker in `needs_validation`.
 
 ## Structured hunter result
 
@@ -220,7 +188,7 @@ Consolidate candidate entries by fingerprint and then by root cause. One root ca
 
 ## Coverage-critic waves
 
-Immediately after each hunter wave, spend the reserved invocation on one fresh `research` post-wave coverage critic. It receives `architecture.md`, the full coverage ledger including each assignment block map, current candidate fingerprints and states, and the prior-ledger gap summary. It reads source but does not write or run targets. Require exactly this JSON:
+Immediately after each hunter wave, spend the reserved invocation on one fresh `research` post-wave coverage critic. It receives the absolute paths of `architecture.md` and `coverage-ledger.json` (the ledger includes each assignment block map) and reads both files itself, plus current candidate fingerprints and states and the prior-ledger gap summary. It reads source but does not write or run targets. Require exactly this JSON:
 
 ```json
 {
@@ -248,4 +216,4 @@ The parent rejects proposed units outside the review scope or source/local bound
 
 The run profile bounds this loop. A `quick` run has exactly one hunter wave followed by exactly one final critic pass. Add each accepted `missing_unit` to the current ledger and mark it `deferred` with reason `quick_profile_final_critic`. For each legitimate evidence-bearing `reassign_id`, archive the live terminal state in `attempts`, increment `wave`, and set the live state to unassigned `deferred` with empty evidence and reason `quick_profile_final_critic`. Do not launch a second hunter wave or another critic. In a scoped run, the critic still reports out-of-scope gaps it notices, but the parent records them as `out_of_scope` with the critic's reason instead of assigning them. The early-stop rule above is the same mechanism: `quick` is a pre-declared early stop, not evidence of complete coverage.
 
-A budget bounds it the same way. Before assigning each wave, compare remaining budget against its hunter count, the validation reserve, the immediate post-wave critic, and the retained final-clean critic (`quick` reserves only its single final post-wave critic). Shrink the hunter wave to fit, taking units in priority order. If those mandatory reserves do not fit, launch no hunter from that wave and mark its planned units `deferred` with reason `budget_cannot_reserve_critics_and_validation`. Critic-proposed units enter the same ranked queue rather than extending the budget. If surviving candidates exceed the validation reserve, follow the incomplete-run rule in `SKILL.md`: stop hunting, validate in fingerprint order, retain unvalidated units as unresolved candidates, and never present them as findings.
+A budget bounds it the same way. Before assigning each wave, compare remaining budget against its hunter count, the validation reserve, the immediate post-wave critic, and the retained final-clean critic (`quick` reserves only its single final post-wave critic). Shrink the hunter wave to fit, taking units in priority order. If those mandatory reserves do not fit, launch no hunter from that wave and mark its planned units `deferred` with reason `budget_cannot_reserve_critics_and_validation`. Critic-proposed units enter the same ranked queue rather than extending the budget. If surviving candidates exceed the validation reserve, follow the incomplete-run rule in `PLANNING.md`: stop hunting, validate in fingerprint order, retain unvalidated units as unresolved candidates, and never present them as findings.

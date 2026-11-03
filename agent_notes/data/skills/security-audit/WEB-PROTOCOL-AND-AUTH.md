@@ -1,5 +1,16 @@
 # HTTP-Protocol and Authentication Hunting
 
+## Contents
+
+- [Core discipline (include in every agent prompt for this domain)](#core-discipline-include-in-every-agent-prompt-for-this-domain)
+- [HTTP framing and cache attack classes](#http-framing-and-cache-attack-classes)
+- [Browser-session attack classes](#browser-session-attack-classes)
+- [Federated-identity attack classes](#federated-identity-attack-classes)
+- [MFA, passkey, and account-transition attack classes](#mfa-passkey-and-account-transition-attack-classes)
+- [API-key and mTLS attack classes](#api-key-and-mtls-attack-classes)
+- [Universal moves (apply across the above)](#universal-moves-apply-across-the-above)
+- [Validation rules (apply before reporting ANY finding here)](#validation-rules-apply-before-reporting-any-finding-here)
+
 #### When to use this file
 
 Reach for this file when the target speaks HTTP at a parsing, caching, browser-authentication, or identity boundary: web applications, APIs, reverse proxies, CDNs, gateways, custom HTTP servers, and services implementing sessions, JWT, OAuth/OIDC, SAML, password recovery, MFA, passkeys, API keys, or mTLS. Use this with `ATTACK-CLASSES.md`: access-control review asks whether a principal may perform an operation; this file asks whether the HTTP or identity layer can confuse which principal, request, assurance level, or token the operation belongs to.
@@ -16,7 +27,7 @@ Pick classes from Phase 1. Split a large target into request framing and cache p
 - Classify `confirmed` only from complete source evidence and bounded local request/token tests. Use `needs_validation` when proxy, IdP, browser, certificate, secret, or deployed configuration is required but not visible.
 ```
 
-## HTTP framing and cache attack classes (subagent_type: `general`)
+## HTTP framing and cache attack classes
 
 **Request framing and desynchronization**
 Front end and back end disagree on request length or header normalization. Review multiple `Content-Length` values, `Transfer-Encoding`, HTTP/2 or HTTP/3 downgrade, header-name normalization, forbidden connection headers, and CR/LF conversion. Confirm which bytes one component assigns to a request and which bytes its peer assigns to the next request.
@@ -33,7 +44,7 @@ Untrusted host/proxy metadata determines absolute URLs, tenant routing, callback
 **Response-header injection**
 Untrusted data reaches `Location`, `Set-Cookie`, CSP, or another response header with unsafe control characters or normalization. Verify framework rejection before reporting and require a security-relevant response change.
 
-## Browser-session attack classes (subagent_type: `general`)
+## Browser-session attack classes
 
 **Ordinary CSRF**
 A browser sends ambient credentials to a state-changing endpoint that accepts a cross-site request without an effective anti-CSRF token, same-site request binding, or strict Origin/Referer validation. Inventory every cookie-authenticated mutation, including form, JSON-like, multipart, method-override, and legacy routes. SameSite is effective only for the cookie and browser contexts actually used; login CSRF and cross-site subresource requests can have different requirements.
@@ -44,7 +55,7 @@ Session identifiers are not rotated on login, account switch, MFA completion, im
 **Cookie scope and transport**
 A sensitive cookie has an over-broad `Domain` or `Path`, can cross an insecure transport, or conflicts with a sibling cookie that another component selects differently. Bare missing flags remain hardening notes unless a realistic less-trusted origin, network position, or browser path can gain or replace the credential.
 
-## Federated-identity attack classes (subagent_type: `general`)
+## Federated-identity attack classes
 
 First establish role. Authorization-server controls such as redirect allowlisting and code issuance do not belong to a relying-party client. Verification and binding defects belong to the component consuming the artifact.
 
@@ -57,7 +68,7 @@ Validate exact `redirect_uri` ownership where the target is the authorization se
 **SAML signed-object and assertion binding**
 Ensure the element whose signature is validated is the element used as identity. Review unsigned/fallback paths, safe XML parser configuration, canonicalization differences, and freshness/binding fields such as validity windows, audience/recipient, request correlation, and replay state.
 
-## MFA, passkey, and account-transition attack classes (subagent_type: `general`)
+## MFA, passkey, and account-transition attack classes
 
 **MFA enrollment and assurance downgrade**
 Enrollment, replacement, disablement, recovery-code generation, trusted-device creation, and fallback login require the intended prior assurance. Check that a valid first factor cannot enroll or replace the second factor without policy-required fresh authentication, and that disabled or stale factors stop authorizing sessions.
@@ -74,7 +85,7 @@ Adding an IdP, passkey, email, phone, device, or external account to an existing
 **Password reset and broader recovery**
 Recovery tokens, support/admin recovery, backup codes, device migration, and email or phone change often become the weakest authentication path. Verify token randomness, user/action binding, expiry, one-time state, rate/accounting controls, delivery URL trust, and invalidation of prior tokens and sessions. Different responses that only reveal public account existence are not automatically security findings.
 
-## API-key and mTLS attack classes (subagent_type: `general`)
+## API-key and mTLS attack classes
 
 **API-key scope and resource binding**
 A key authenticates to broader tenants, resources, actions, or environments than its server-side record grants, or request parameters override those bindings. Review key lookup, prefix/full-secret verification, type confusion between publishable and secret keys, scope checks, rotation, revocation caches, and bulk endpoints.

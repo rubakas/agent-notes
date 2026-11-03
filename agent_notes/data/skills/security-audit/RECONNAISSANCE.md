@@ -1,8 +1,14 @@
 # Reconnaissance
 
+## Contents
+
+- [Prior-run input](#prior-run-input)
+- [Architecture summary and companion selection](#architecture-summary-and-companion-selection)
+- [Deterministic coverage ledger](#deterministic-coverage-ledger)
+
 ### Phase 1: Map the source and plan coverage
 
-The parent initializes `run-metadata.json`, applies the strict pre-reconnaissance budget gate in `SKILL.md`, then creates agent scratch roots and the shared ledger before hunting. If the gate fails, record the incomplete status in metadata and launch no reconnaissance agent. Reconnaissance reads the target and locally available build/configuration state only. It does not contact deployed endpoints, external identity providers, registries, brokers, cloud APIs, or other shared services.
+The parent initializes `run-metadata.json`, applies the strict pre-reconnaissance budget gate in `PLANNING.md`, then creates agent scratch roots and the shared ledger before hunting. If the gate fails, record the incomplete status in metadata and launch no reconnaissance agent. Reconnaissance reads the target and locally available build/configuration state only. It does not contact deployed endpoints, external identity providers, registries, brokers, cloud APIs, or other shared services.
 
 Launch several `research` agents in parallel. They return structured facts to the parent and do not write files.
 
@@ -15,7 +21,6 @@ Read the target at <target>. Do not use network access. Return:
 3. Repository-relative entry points and subsystem boundaries.
 4. Exact build and test commands that could run offline with local dependencies, their expected write locations, and the target-controlled inputs they process. Do not run them during reconnaissance.
 5. Comparable software or protocol visible from local documentation and dependencies. If no useful comparison is source-grounded, say so.
-6. Missing local toolchains or runtime facts that limit bounded execution.
 Return only source facts with repository-relative file:line references.
 ```
 
@@ -50,11 +55,11 @@ Read tests, build definitions, manifests, packaging, and maintained environment 
 3. Commands that would fetch dependencies, publish artifacts, contact paid/provider APIs, or affect shared state; mark them prohibited for this run.
 4. Deployed controls and attachments that source cannot establish and therefore require needs_validation if decisive.
 5. The final active source path for each deployment mode only where the repository selects it deterministically.
-6. Whether the local platform can enforce an empty allowlisted environment, no external network, read-only target/toolchain mounts, scratch-only writes, and explicit CPU, memory, process, file-size, disk, and wall-clock limits. Missing controls block target-controlled execution.
-7. Whether trusted parent-side code can promote predeclared scratch files with path-confined no-follow descriptor traversal, nonblocking regular-file checks, no-follow traversal of every destination parent, exclusive regular-file destination creation, and explicit per-file and cumulative size bounds. Missing promotion controls block use of scratch files as evidence.
 ```
 
-Add focused reconnaissance agents for materially distinct deployment modes or subsystems that these four do not map. Do not silently omit them: if the budget gate in `SKILL.md` blocks a focused agent, launch nothing for it, seed the unmapped area as a `deferred` ledger unit with reason `budget_cannot_reserve_critics_and_validation`, and disclose the gap in the report.
+The parent probes the host itself with Bash (`uname -s`; `command -v node python3 docker`) and records the verdict: missing local toolchains, whether the platform can enforce the sandbox controls, and whether trusted parent-side promotion code exists.
+
+Add focused reconnaissance agents for materially distinct deployment modes or subsystems that these four do not map. Do not silently omit them: if the budget gate in `PLANNING.md` blocks a focused agent, launch nothing for it, seed the unmapped area as a `deferred` ledger unit with reason `budget_cannot_reserve_critics_and_validation`, and disclose the gap in the report.
 
 ## Prior-run input
 
@@ -81,7 +86,7 @@ The parent synthesizes `<output-dir>/architecture.md`, with a hard cap of about 
 5. Trust boundaries and the strongest source-visible control on each.
 6. Repository-relative starting paths.
 7. Prior coverage gaps, changed-source and blocked revalidation targets, and same-source confirmed exclusions.
-8. A short companion-selection summary derived from [ATTACK-CLASSES.md](ATTACK-CLASSES.md): selected files and the source-visible boundaries that require them.
+8. A short companion-selection summary derived from `ATTACK-CLASSES.md`: selected files and the source-visible boundaries that require them.
 
 Keep the assignment-level ordinary block, selected companion blocks, and excluded blocks with reasons in each ledger unit, not in `architecture.md`. This keeps the architecture cap valid for large runs and makes the exact hunter prompt map machine-checkable.
 

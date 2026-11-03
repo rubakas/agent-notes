@@ -42,6 +42,8 @@ All notable changes to this project will be documented in this file.
 
 - **`browser-tester` agent (Claude Code only).** It runs a `chrome-test` request in the user's Chrome through the Claude-in-Chrome tools, overwrites `progress-<uuid>.md` after each step, and returns the report as its final message, because Claude Code refuses report files written by subagents. It is excluded from OpenCode and Codex.
 
+- **`security-audit` skill, vendored from [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) ([`c1c8a8c`](https://github.com/cloudflare/security-audit-skill/commit/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8), MIT).** A full, multi-phase security audit or pen test with a reconnaissance, hunting, verification and report workflow. It is user-only (`/security-audit`), needs Node.js for its two validators, and on Claude Code runs source-only: it never executes target code, and leads that need a run stay `needs_validation`. Local changes are listed in `THIRD_PARTY_SKILLS.yaml`.
+
 - **Claude Haiku 5.5 added to the model catalog and priced at its own rate;** it becomes the default scout model via a provisional coding score.
 
 - **Model catalog refreshed against the vendor docs.** The retired `claude-sonnet-4` and `claude-opus-4-1` are removed, and `gpt-6.1-terra` is added (priced at its own rate, classed as the middle tier). Deprecations now follow Anthropic's and OpenAI's pages: `claude-opus-4-5`, `claude-opus-4-6` and `claude-opus-4-7` are active again, while `gpt-5-mini`, `gpt-5-nano`, `gpt-5.1` and `gpt-5.4-nano` are deprecated. Claude Sonnet 5.5 is priced at its own rate, with cache reads at $0.10 per million tokens instead of Sonnet 5's $0.20. The restricted `gpt-5.6-cyber` stays out of the catalog.

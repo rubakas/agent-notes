@@ -1,42 +1,54 @@
 # Attack Classes
 
+## Contents
+
+- [Injection](#injection)
+- [Access control](#access-control)
+- [Resource and file handling](#resource-and-file-handling)
+- [Cryptography and secrets](#cryptography-and-secrets)
+- [Business logic](#business-logic)
+- [Feature abuse and data leakage](#feature-abuse-and-data-leakage)
+- [Chained vulnerabilities and trust boundaries](#chained-vulnerabilities-and-trust-boundaries)
+- [Wildcard](#wildcard)
+- [Obvious things](#obvious-things)
+
 #### Attack classes — choose and split based on Phase 1
 
 Select attack classes relevant to the application type. Not every class applies to every codebase. The list below is a starting point; add application-specific classes from Phase 1 and split large codebases per subsystem. Frame work as finding, validating, fixing, and prioritizing vulnerabilities. Keep validation to source review and bounded local fixtures; do not develop payload chains, test availability on live services, or take action in shared environments.
 
 Use `confirmed` only when source evidence and bounded validation establish the full boundary and meaningful result. Use `needs_validation` when a specific deployment, provider, platform, identity, or runtime fact is unavailable; state the missing fact and the safe owner-observed or local check that resolves it.
 
-> **Native / binary / kernel targets** (C/C++/Rust-unsafe, kernel modules, parsers and decoders, FFI, concurrent runtimes, binary loaders, JITs, firmware): use the memory-safety, integer/ABI, concurrency, binary-loader, and privileged-interface classes in [MEMORY-SAFETY-AND-BINARY.md](MEMORY-SAFETY-AND-BINARY.md).
+> **Native / binary / kernel targets** (C/C++/Rust-unsafe, kernel modules, parsers and decoders, FFI, concurrent runtimes, binary loaders, JITs, firmware): use the memory-safety, integer/ABI, concurrency, binary-loader, and privileged-interface classes in `MEMORY-SAFETY-AND-BINARY.md`.
 >
-> **AI / LLM / agent targets** (chatbots, RAG, persistent memory, tool-calling agents, MCP servers/clients, prompt assembly, or model-controlled actions): use the context, memory-poisoning, action-binding, tool-schema, MCP-identity, and output classes in [AI-AND-LLM.md](AI-AND-LLM.md).
+> **AI / LLM / agent targets** (chatbots, RAG, persistent memory, tool-calling agents, MCP servers/clients, prompt assembly, or model-controlled actions): use the context, memory-poisoning, action-binding, tool-schema, MCP-identity, and output classes in `AI-AND-LLM.md`.
 >
-> **HTTP, web, and identity targets** (ordinary web apps, APIs, reverse proxies, CDNs, gateways, custom HTTP parsers, sessions, CSRF, JWT, OAuth/OIDC, SAML, MFA, passkeys, account recovery/linking, API keys, or mTLS): use [WEB-PROTOCOL-AND-AUTH.md](WEB-PROTOCOL-AND-AUTH.md).
+> **HTTP, web, and identity targets** (ordinary web apps, APIs, reverse proxies, CDNs, gateways, custom HTTP parsers, sessions, CSRF, JWT, OAuth/OIDC, SAML, MFA, passkeys, account recovery/linking, API keys, or mTLS): use `WEB-PROTOCOL-AND-AUTH.md`.
 >
-> **Client-side and browser targets** (SPAs, browser extensions, embedded webviews, service workers, browser storage, cross-window messaging, CORS, WebSockets, or DOM rendering): use [CLIENT-SIDE.md](CLIENT-SIDE.md).
+> **Client-side and browser targets** (SPAs, browser extensions, embedded webviews, service workers, browser storage, cross-window messaging, CORS, WebSockets, or DOM rendering): use `CLIENT-SIDE.md`.
 >
-> **Supply-chain and release targets** (dependency resolution, generated inputs, CI, release/signing/promotion, updates, plugins, or extensions): use [SUPPLY-CHAIN-AND-RELEASE.md](SUPPLY-CHAIN-AND-RELEASE.md).
+> **Supply-chain and release targets** (dependency resolution, generated inputs, CI, release/signing/promotion, updates, plugins, or extensions): use `SUPPLY-CHAIN-AND-RELEASE.md`.
 >
-> **Cloud and deployment targets** (IAM, infrastructure as code, containers/Kubernetes, service mesh, serverless/edge, ingress, provider events, or runtime configuration): use [CLOUD-AND-DEPLOYMENT.md](CLOUD-AND-DEPLOYMENT.md).
+> **Cloud and deployment targets** (IAM, infrastructure as code, containers/Kubernetes, service mesh, serverless/edge, ingress, provider events, or runtime configuration): use `CLOUD-AND-DEPLOYMENT.md`.
 >
-> **Protocol, RPC, and messaging targets** (gRPC, GraphQL transports, Protobuf/Cap'n Proto/Thrift, custom protocols, queues, brokers, pub/sub, webhooks, or streaming RPC): use [PROTOCOLS-RPC-AND-MESSAGING.md](PROTOCOLS-RPC-AND-MESSAGING.md).
+> **Protocol, RPC, and messaging targets** (gRPC, GraphQL transports, Protobuf/Cap'n Proto/Thrift, custom protocols, queues, brokers, pub/sub, webhooks, or streaming RPC): use `PROTOCOLS-RPC-AND-MESSAGING.md`.
 >
-> **Resource-exhaustion and availability targets** (untrusted work can consume shared CPU, memory, disk, connections, workers, queues, quotas, or operator-owned spend): use [RESOURCE-EXHAUSTION-AND-AVAILABILITY.md](RESOURCE-EXHAUSTION-AND-AVAILABILITY.md).
+> **Resource-exhaustion and availability targets** (untrusted work can consume shared CPU, memory, disk, connections, workers, queues, quotas, or operator-owned spend): use `RESOURCE-EXHAUSTION-AND-AVAILABILITY.md`.
 >
-> **Data-isolation and lifecycle targets** (multi-tenant stores, caches/search, object links, analytics, export/backup, migration, deletion, retention, or restore): use [DATA-ISOLATION-AND-LIFECYCLE.md](DATA-ISOLATION-AND-LIFECYCLE.md).
+> **Data-isolation and lifecycle targets** (multi-tenant stores, caches/search, object links, analytics, export/backup, migration, deletion, retention, or restore): use `DATA-ISOLATION-AND-LIFECYCLE.md`.
 >
-> **Desktop, mobile, and local-IPC targets** (native apps, deep links, webview bridges, exported components, privileged helpers, local daemons, Unix sockets/XPC/Binder/D-Bus): use [DESKTOP-MOBILE-AND-LOCAL-IPC.md](DESKTOP-MOBILE-AND-LOCAL-IPC.md).
+> **Desktop, mobile, and local-IPC targets** (native apps, deep links, webview bridges, exported components, privileged helpers, local daemons, Unix sockets/XPC/Binder/D-Bus): use `DESKTOP-MOBILE-AND-LOCAL-IPC.md`.
 
-**Injection** (subagent_type: `general`)
+## Injection
 Trace untrusted input from entry point to dangerous sink. What counts as a "dangerous sink" depends on the application:
 - Web apps: SQL queries, HTML output, shell commands, template engines, file paths, HTTP redirects, deserialization
 - Libraries: any function that processes caller-supplied data without validation — buffer operations, parsers, format strings
 - CLI tools: shell command construction, file path handling, environment variable interpolation
 - Services: query construction, message serialization, log injection, LDAP/XPATH queries
-- Client-side (browser/JS): DOM XSS, prototype pollution, `postMessage`/origin trust, and other browser-side classes — covered by the [CLIENT-SIDE.md](CLIENT-SIDE.md) companion blocks when selected
+- Client-side (browser/JS): DOM XSS, prototype pollution, `postMessage`/origin trust, and other browser-side classes — covered by the `CLIENT-SIDE.md` companion blocks when selected
 
 Do not stop at the obvious direct paths. Look for indirect injection: data stored safely, then retrieved and used in a dangerous context by different code. Look for injection through field names, keys, headers, and metadata — not just values. Look for injection into secondary systems (logs, caches, search indexes, analytics).
 
-**Access control** (subagent_type: `general`)
+## Access control
 Verify that a caller cannot do something outside its authority. Go beyond checking whether permission checks exist — verify they check the *right* permission for the *right* resource via the *right* mechanism:
 - Is there a path to the same state change that checks a different (weaker) permission?
 - Can a field in the request body override what the permission system intended to restrict?
@@ -46,14 +58,14 @@ Verify that a caller cannot do something outside its authority. Go beyond checki
 
 For complex access models, split into separate agents for auth bypass vs authorization logic.
 
-**Resource and file handling** (subagent_type: `general`)
+## Resource and file handling
 - Path traversal (reading/writing outside intended directories) — including through symlinks, encoded sequences, and null bytes
 - SSRF (making the application fetch attacker-controlled URLs) — including through redirects, DNS rebinding, and URL parser differentials
 - Unsafe deserialization, archive extraction (zip slip), temp file handling
 - Memory safety (if applicable): buffer overflows, use-after-free, integer overflow
 - Race conditions on file operations (TOCTOU between check and use)
 
-**Cryptography and secrets** (subagent_type: `general`)
+## Cryptography and secrets
 - Weak randomness for security-critical values (tokens, keys, nonces)
 - Hardcoded secrets, secrets in logs, error messages, URLs, or client-visible responses
 - Broken key derivation, missing HMAC verification, nonce reuse
@@ -61,7 +73,7 @@ For complex access models, split into separate agents for auth bypass vs authori
 - Misuse of crypto primitives (ECB mode, unauthenticated encryption, static IVs, etc.)
 - What happens when crypto operations fail? Does the error path fall back to no-crypto?
 
-**Business logic** (subagent_type: `general`)
+## Business logic
 Hunt logic errors by hand: standard scanners cannot find them, and they yield high-impact findings. For each major workflow:
 - **State machine violations**: Can you skip steps? Go backwards? Reach an invalid state? What happens if you replay a completed flow? What about partial failure — if step 2 of 3 fails, is step 1 rolled back?
 - **Race conditions with business impact**: Concurrent operations that produce invalid states (double-spend, double-approve, lost updates). Focus on operations that check-then-act non-atomically.
@@ -71,7 +83,7 @@ Hunt logic errors by hand: standard scanners cannot find them, and they yield hi
 - **Time-based logic**: Expiry checks, scheduling, rate windows, clock skew. What happens at exact boundary moments? What about timezone differences between components?
 - **Default and fallback behavior**: What is the security posture when config is missing? When a feature flag is off? When a dependency is unavailable? When the system is mid-migration?
 
-**Feature abuse and data leakage** (subagent_type: `general`)
+## Feature abuse and data leakage
 Legitimate features used for unintended purposes. Look for bugs in the design, not only in the code:
 - **Export/backup as exfiltration**: Can a low-privilege user trigger an export, snapshot, or backup that includes data above their access level? Can they export other users' data? Does the export include deleted/draft/private content? Revision history that was supposed to be pruned?
 - **Import/restore as injection**: Can import overwrite existing data? Can it create records that bypass normal validation? Can it inject content into collections the user has no write access to? Does it respect the same permission model as the UI?
@@ -80,7 +92,7 @@ Legitimate features used for unintended purposes. Look for bugs in the design, n
 - **Preview/draft/staging leakage**: Are preview tokens scoped to one item or do they unlock broader access? Can draft content be discovered through search, RSS feeds, sitemaps, or API listing endpoints? Can cache headers cause a CDN to serve private content publicly?
 - **Notification/webhook as SSRF**: Can a user set a notification URL, webhook URL, or callback URL that the server fetches? Is it validated against internal networks? What about after a redirect?
 
-**Chained vulnerabilities and trust boundaries** (subagent_type: `general`)
+## Chained vulnerabilities and trust boundaries
 Individually allowed or contained behavior can become a vulnerability when another component or lifecycle step relies on a stronger guarantee:
 - **Multi-step boundary failures**: Map what a low-privilege principal may read, write, invoke, and retain, then connect only concrete outputs to later trust decisions. Confirm each prerequisite and do not assume a downstream effect.
 - **Cross-component trust gaps**: Component A validates input and passes it to component B. Compare the exact guarantee A produces with what B assumes, including truncation, type coercion, normalization, tenant scope, and plugin/extension access.
@@ -89,7 +101,7 @@ Individually allowed or contained behavior can become a vulnerability when anoth
 - **Timing and ordering**: Review setup, migration, soft-delete, revoke/cache expiry, check/use, and validate/consume windows. Confirm stale state is accepted before reporting.
 - **Rollback and recovery**: Undelete, restore, revision rollback, and cancellation must apply current ownership, validation, and authorization. Confirm which invalid state is restored.
 
-**Wildcard** (subagent_type: `general`)
+## Wildcard
 You are not given a category. Find vulnerabilities outside the standard classes already assigned.
 
 Read code that looks boring or disconnected from security. Follow incomplete, experimental, compatibility, and fallback features, but retain the same concrete boundary and validation requirements as every other class.
@@ -108,7 +120,7 @@ Use these starting points, but do not limit yourself to them:
 
 Pursue anomalies inside your assigned scope until the invariant is settled. If something looks strange, read it until you can state whether it is safe. If a function has a comment explaining why it is safe, verify the explanation. If a variable is named `temp` or `hack` or `legacy`, read it closely.
 
-**Obvious things** (subagent_type: `general`)
+## Obvious things
 Other agents hunt subtle bugs. This agent checks the basic exposures that are easy to overlook because everyone assumes someone else already checked them:
 - Are there any hardcoded passwords, API keys, tokens, or secrets in the source? (grep for `password`, `secret`, `apikey`, `token`, `Bearer`, `-----BEGIN`, common default passwords)
 - Are there any TODO/FIXME/HACK/XXX comments that reference security? (`TODO: add auth`, `FIXME: validate input`, `HACK: skip permission check`)
@@ -117,13 +129,19 @@ Other agents hunt subtle bugs. This agent checks the basic exposures that are ea
 - Is there a `/debug`, `/admin`, `/test`, `/status`, `/health`, `/metrics`, `/env`, `/.env`, `/config` endpoint that is unprotected?
 - Are there any `.env`, `.env.local`, `credentials.json`, `*.pem`, `*.key` files checked into the repo?
 - Does the `.gitignore` actually cover secrets, uploads, and local config?
-- Are dependencies pinned? Are there known CVEs in the dependency tree? (check lockfiles)
+- Are dependencies pinned? Are there known CVEs in the dependency tree? (check lockfiles; compare their versions to advisories only from a local source, otherwise `needs_validation`)
 - Are there any `eval()`, `exec()`, `child_process`, `Function()`, `vm.runInContext`, `import()` with dynamic input?
 - Are CORS headers set to `*` or overly permissive? Is `Access-Control-Allow-Credentials` combined with a wildcard origin?
 - Are cookies missing `HttpOnly`, `Secure`, or `SameSite` attributes?
 - Are there any open redirects? (parameters named `redirect`, `return`, `next`, `url`, `goto`, `continue` that feed into redirects without validation)
 - Is TLS enforced? Are there any HTTP-only endpoints?
 - Are error responses in production returning stack traces, internal paths, or SQL errors?
+
+Secrets rule for every item above:
+- Never print, quote, or store a secret value. Cite file:line and the secret type only, and use `grep -l` / `grep -c` rather than a grep that echoes matches.
+- For history, use `git log --stat --diff-filter=D -- <path>`; never `-p` or `-S`.
+- Check credential files (`.env*`, `*.pem`, `*.key`, `*.p12`, `credentials.*`, `secrets.*`) only with `test -f`, `git ls-files`, and `git check-ignore`.
+- If an in-scope source file's path matches the credential-name rule (it contains `secret`, `credential`, `token`, `apikey`, `auth-key`, or `private-key`), do not read it; record its coverage unit `deferred` with reason `credential_path_rule`, and tell the user which paths were skipped.
 
 This agent does not need to be creative. It needs to be thorough and literal. Check every item. Report each result.
 
