@@ -66,6 +66,7 @@ For complex access models, split into separate agents for auth bypass vs authori
 - Race conditions on file operations (TOCTOU between check and use)
 
 ## Cryptography and secrets
+Never print or quote a secret value; cite file:line and type.
 - Weak randomness for security-critical values (tokens, keys, nonces)
 - Hardcoded secrets, secrets in logs, error messages, URLs, or client-visible responses
 - Broken key derivation, missing HMAC verification, nonce reuse
@@ -112,7 +113,7 @@ Use these starting points, but do not limit yourself to them:
 - What happens if you use the API in a way the frontend never would? The UI constrains users, but the API does not. What API calls are possible but never made by the client?
 - Are there any hidden or undocumented endpoints, parameters, headers, or features? Look at route registrations, middleware, and config for things that are not in the docs.
 - What happens when you mix features that were not designed to work together? Localization + preview + caching. Import + plugins + webhooks. OAuth + impersonation + API keys.
-- Is there anything interesting in the git history? Reverted security fixes, commented-out auth checks, secrets that were committed then removed (still in history).
+- Is there anything interesting in the git history? Reverted security fixes, commented-out auth checks, secrets that were committed then removed: check with `git log --stat --diff-filter=D` only (Worker safety block).
 - Which valid-account actions affect other users, shared integrity, availability, or operator-owned cost? Verify containment, quotas, authorization, and recovery around those actions.
 - Which operations are irreversible or require elevated confirmation? Bind authorization and approval to the final principal, action, and resource.
 - What assumptions does the code make about the environment? That the database is local, that the clock is accurate, that DNS is trustworthy, that the filesystem is case-sensitive?
@@ -137,11 +138,9 @@ Other agents hunt subtle bugs. This agent checks the basic exposures that are ea
 - Is TLS enforced? Are there any HTTP-only endpoints?
 - Are error responses in production returning stack traces, internal paths, or SQL errors?
 
-Secrets rule for every item above:
-- Never print, quote, or store a secret value. Cite file:line and the secret type only, and use `grep -l` / `grep -c` rather than a grep that echoes matches.
-- For history, use `git log --stat --diff-filter=D -- <path>`; never `-p` or `-S`.
-- Check credential files (`.env*`, `*.pem`, `*.key`, `*.p12`, `credentials.*`, `secrets.*`) only with `test -f`, `git ls-files`, and `git check-ignore`.
-- If an in-scope source file's path matches the credential-name rule (it contains `secret`, `credential`, `token`, `apikey`, `auth-key`, or `private-key`), do not read it; record its coverage unit `deferred` with reason `credential_path_rule`, and tell the user which paths were skipped.
+Secrets rule for every item above: follow item 3 of the Worker safety block.
+- Check credential files (`.env*`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.truststore`, `credentials.*`, `secrets.*`, `*-secrets.*`, `service-account*.json`) only with Glob, `git ls-files`, and `git check-ignore`.
+- If an in-scope source file's path matches the credential-name rule, do not read it; record its coverage unit `deferred` with reason `credential_path_rule`, and tell the user which paths were skipped.
 
 This agent does not need to be creative. It needs to be thorough and literal. Check every item. Report each result.
 

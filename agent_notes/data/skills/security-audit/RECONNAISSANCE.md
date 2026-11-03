@@ -10,9 +10,11 @@
 
 The parent initializes `run-metadata.json`, applies the strict pre-reconnaissance budget gate in `PLANNING.md`, then creates agent scratch roots and the shared ledger before hunting. If the gate fails, record the incomplete status in metadata and launch no reconnaissance agent. Reconnaissance reads the target and locally available build/configuration state only. It does not contact deployed endpoints, external identity providers, registries, brokers, cloud APIs, or other shared services.
 
-Launch several `research` agents in parallel. They return structured facts to the parent and do not write files.
+Launch several `research` agents in parallel (on Claude Code: `explorer` for 1a, 1c, and 1d; `security-auditor` for 1b). They return structured facts to the parent and do not write files.
 
 **Agent 1a: Product, stack, and local operation**
+
+Paste the Worker safety block from `HUNTING.md` verbatim first.
 
 ```text
 Read the target at <target>. Do not use network access. Return:
@@ -25,6 +27,8 @@ Return only source facts with repository-relative file:line references.
 ```
 
 **Agent 1b: Principals, authority, and controls**
+
+Paste the Worker safety block from `HUNTING.md` verbatim first.
 
 ```text
 Read all source that establishes identity, authorization, isolation, and privilege. Map:
@@ -39,6 +43,8 @@ Return trust boundaries and control locations with repository-relative file:line
 
 **Agent 1c: Entry surfaces, copies, and sinks**
 
+Paste the Worker safety block from `HUNTING.md` verbatim first.
+
 ```text
 Inventory every source-visible place external or lower-trust input enters:
 - HTTP/browser, RPC/message/protocol, files/archive/document, CLI/env/config, plugins/dependencies/CI, cloud events/IAM selectors, model context/tool arguments, mobile/deep-link/webview, and local IPC.
@@ -47,6 +53,8 @@ Return repository-relative paths and line numbers. Be complete, but do not execu
 ```
 
 **Agent 1d: Local execution and deployment visibility**
+
+Paste the Worker safety block from `HUNTING.md` verbatim first.
 
 ```text
 Read tests, build definitions, manifests, packaging, and maintained environment overlays. Return:
@@ -57,7 +65,7 @@ Read tests, build definitions, manifests, packaging, and maintained environment 
 5. The final active source path for each deployment mode only where the repository selects it deterministically.
 ```
 
-The parent probes the host itself with Bash (`uname -s`; `command -v node python3 docker`) and records the verdict: missing local toolchains, whether the platform can enforce the sandbox controls, and whether trusted parent-side promotion code exists.
+The parent probes the host itself with Bash (`uname -s`; `command -v node python3 docker`) and records the verdict: missing local toolchains, whether the platform can enforce the sandbox controls, and whether trusted parent-side promotion code exists. The probe never enables execution; only a user-named sandbox command that enforces every control does. A missing control blocks target-controlled execution.
 
 Add focused reconnaissance agents for materially distinct deployment modes or subsystems that these four do not map. Do not silently omit them: if the budget gate in `PLANNING.md` blocks a focused agent, launch nothing for it, seed the unmapped area as a `deferred` ledger unit with reason `budget_cannot_reserve_critics_and_validation`, and disclose the gap in the report.
 
@@ -158,4 +166,4 @@ Canonical agent IDs match `^[a-z0-9][a-z0-9_-]{0,63}$` and are not Windows devic
 
 The ledger is the coverage claim. An architecture summary, agent count, or generic "auth reviewed" sentence is not coverage evidence. Phase 2 closes units only from the paths and checks in a hunter's structured result.
 
-Run `node <skill-dir>/validate-coverage-ledger.cjs <output-dir>/coverage-ledger.json` after seeding, after every parent update, and before Phase 6. The validator rejects input beyond 5 MiB, 64 nesting levels, 10,000 units, 1,000 entries in a nested collection, or 500,000 traversed values, and caps reported validation errors at 100. In practice the 5 MiB byte limit holds roughly 2,000-5,000 realistic units, so it binds before the 10,000-unit cap. Fix every error before assigning work or making a coverage claim.
+Run `node "<skill-dir>/validate-coverage-ledger.cjs" "<output-dir>/coverage-ledger.json"` after seeding, after every parent update, and before Phase 6. The validator rejects input beyond 5 MiB, 64 nesting levels, 10,000 units, 1,000 entries in a nested collection, or 500,000 traversed values, and caps reported validation errors at 100. In practice the 5 MiB byte limit holds roughly 2,000-5,000 realistic units, so it binds before the 10,000-unit cap. Fix every error before assigning work or making a coverage claim.

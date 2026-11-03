@@ -15,6 +15,8 @@ Assign each verifier a canonical lowercase unique ID and `<output-dir>/agents/<v
 
 #### Candidate-verifier prompt
 
+Paste the Worker safety block from `HUNTING.md` verbatim first.
+
 ```text
 You did not write this candidate. Try to refute it from repository source and bounded
 local evidence. Do not contact deployed endpoints or external/shared services. Run
@@ -78,15 +80,15 @@ Every record has a stable fingerprint, title, description, and repository-relati
 Run:
 
 ```sh
-node <skill-dir>/validate-findings.cjs <output-dir>/findings.json
-node <skill-dir>/validate-coverage-ledger.cjs <output-dir>/coverage-ledger.json
+node "<skill-dir>/validate-findings.cjs" "<output-dir>/findings.json"
+node "<skill-dir>/validate-coverage-ledger.cjs" "<output-dir>/coverage-ledger.json"
 ```
 
 Fix every structural and semantic error before continuing. The findings validator rejects input beyond 5 MiB, 1,000 top-level findings, or 64 nesting levels, and caps reported error output at 100 messages. Validator success proves format and ledger consistency only.
 
 ## Phase 5: Verify the final records with fresh eyes
 
-Launch one fresh `research` verifier per final `confirmed` and `needs_validation` record, in parallel. This verifier checks the structured record, not the hunter write-up, and remains inside source/local boundaries.
+Launch one fresh `research` verifier (`security-auditor` on Claude Code) per final `confirmed` and `needs_validation` record, in parallel. This verifier checks the structured record, not the hunter write-up, and remains inside source/local boundaries. Paste the Worker safety block from `HUNTING.md` verbatim first.
 
 In a `quick` run, Phase 3 and Phase 5 merge: the Phase 3 verifier also performs these record checks and returns the final schema-shaped record, so each candidate gets one fresh independent reviewer instead of two. Every other profile keeps the two passes separate. Never skip independent review of a `confirmed` record in any profile.
 
