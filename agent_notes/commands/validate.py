@@ -14,6 +14,10 @@ from ..services.skill_validation import check_skill_dir, count_lines, read_markd
 from ..services.ui import printable
 
 
+# every agent carries the ~26-line shared rules block (agents/shared/agent_rules.md)
+AGENT_TRIM_LINES = 110
+
+
 def _agent_line_limit(local_name: str) -> int:
     """Line-count ceiling for a built agent file. The lead orchestrator is
     intentionally the largest agent (it composes many shared includes), so it
@@ -62,8 +66,8 @@ def validate() -> None:
             limit = _agent_line_limit(local_name)
             if lines > limit:
                 errors.append(ValidationError(label, f"exceeds {limit} line limit"))
-            elif lines > 80:
-                warnings.append(ValidationWarning(label, "over 80 lines (consider trimming)"))
+            elif lines > AGENT_TRIM_LINES:
+                warnings.append(ValidationWarning(label, f"over {AGENT_TRIM_LINES} lines (consider trimming)"))
             else:
                 print(f"  {Color.GREEN}OK{Color.NC}    {label}")
 
@@ -92,8 +96,8 @@ def validate() -> None:
             limit = _agent_line_limit(local_name)
             if lines > limit:
                 errors.append(ValidationError(label, f"exceeds {limit} line limit"))
-            elif lines > 80:
-                warnings.append(ValidationWarning(label, "over 80 lines (consider trimming)"))
+            elif lines > AGENT_TRIM_LINES:
+                warnings.append(ValidationWarning(label, f"over {AGENT_TRIM_LINES} lines (consider trimming)"))
             else:
                 print(f"  {Color.GREEN}OK{Color.NC}    {label}")
 
