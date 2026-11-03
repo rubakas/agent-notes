@@ -18,7 +18,7 @@ This is the ticket index for `spec.md`.
 
   **Acceptance**: spec.md records which of CLAUDE.md and rules each agent saw. Req 1c's block content is decided from that.
 
-- [ ] **T02 Claude frontmatter template** (Req 1b, 6a)
+- [x] **T02 Claude frontmatter template** (Req 1b, 6a)
 
   **Files**: `templates/frontmatter/claude.py`, `tests/unit/templates/test_claude_frontmatter.py`
 
