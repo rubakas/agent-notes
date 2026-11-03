@@ -23,15 +23,15 @@
 - skill: chrome-test
   category: should_trigger
   prompt: "I just finished the new checkout form and it runs locally. Can you get it browser tested?"
-  expected_behaviour: "Loads chrome-test, mints a uuid, writes request-<uuid>.md to the file bus and hands the operator only the request path."
+  expected_behaviour: "Loads chrome-test, mints a uuid, writes request-<uuid>.md to the file bus and dispatches the browser-tester agent with only the request path."
 - skill: chrome-test
   category: should_trigger
   prompt: "chrome-test the signup flow, the layout broke on mobile widths last time"
-  expected_behaviour: "Loads chrome-test and writes a request file with signup and mobile-width scenarios, then waits for report-<uuid>.md."
+  expected_behaviour: "Loads chrome-test and writes a request file with signup and mobile-width scenarios, dispatches the browser-tester agent, and saves the report it returns to report-<uuid>.md."
 - skill: chrome-test
   category: should_trigger
   prompt: "run a browser test on the dashboard before I commit"
-  expected_behaviour: "Loads chrome-test in end-state mode, writes the request file, and prints operator instructions for starting a claude --chrome session."
+  expected_behaviour: "Loads chrome-test in end-state mode, writes the request file and dispatches one browser-tester agent; it prints operator instructions for a claude --chrome session only if the chrome tools or a browser are unavailable."
 - skill: chrome-test
   category: should_trigger
   prompt: "there's a report-3f9a.md in the bus folder from the chrome session, go through the failures"
@@ -39,7 +39,7 @@
 - skill: chrome-test
   category: near_miss
   prompt: "write a Playwright spec that clicks through the login page and asserts the redirect"
-  expected_behaviour: "Does not load chrome-test. This is writing an automated test file, handled by the test-writer agent, not a chrome-session handoff."
+  expected_behaviour: "Does not load chrome-test. This is writing an automated test file, handled by the test-writer agent, not a browser-test handoff."
 - skill: chrome-test
   category: near_miss
   prompt: "why does the login page throw a 500 when the session cookie is missing?"
