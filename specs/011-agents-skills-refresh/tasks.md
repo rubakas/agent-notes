@@ -126,7 +126,7 @@ This is the ticket index for `spec.md`.
 
 ## Phase C — Skills (T08–T09)
 
-- [ ] **T08a Skill fixes: process and quality skills** (Req 7; after T09 for any file both tickets touch)
+- [x] **T08a Skill fixes: process and quality skills** (Req 7; after T09 for any file both tickets touch)
 
   **Skills**: code-review (with the new `SMELLS.md`), rsi, refactoring-protocol, diagnosing-bugs (and `scripts/hitl-loop.template.sh`), improve-codebase-architecture, to-spec, to-tickets, wayfinder, triage, setup-agent-tracker and handoff.
 
@@ -139,6 +139,21 @@ This is the ticket index for `spec.md`.
   - The ticket note lists every ID as done or skipped.
   - SC-014 passes for these skills.
   - `agent-notes validate` reports 0 errors.
+
+  **Note** (2026-11-03; every ID, `done` unless marked):
+  - code-review: CR-1 to CR-7 done. The smell list moved verbatim (lines 47-60) to `code-review/SMELLS.md`. The upstream `3da8c01` hunks (standards files, foreground sub-agents) were already in by T09.
+  - rsi: RS-1 to RS-9 done; RS-10 skipped (characterization tests stay as the safety net). RS-4 points at `code-review/SMELLS.md` by path, not as a markdown link, because the validator's `link-outside-skill` rule rejects `../code-review/SMELLS.md`. Also added the inline-scan rule (at most 3 scanners) and "reviewer per batch".
+  - refactoring-protocol: RP-1 to RP-6 done, plus `argument-hint`. RP-2 uses the same path reference as rsi.
+  - diagnosing-bugs: DB-1 to DB-7 done (DB-3 is Low but applied), plus `argument-hint` and the `scripts/hitl-loop.template.sh` header. The header takes upstream `efce423`'s `capture` comment, reworded because the user pastes the output. DB-7: the sentence is added; the "ensure the `debugger` description says single failure" half was not applied (agent file, out of this ticket).
+  - improve-codebase-architecture: IA-1 to IA-10 done, plus `argument-hint`. IA-8 trimmed to 243 characters to stay under the 250 recommendation.
+  - to-spec: TS-1 (sentence split only; label semantics unchanged), TS-2, TS-3, TS-4 done.
+  - to-tickets: TT-1 to TT-6 done. TT-3 moved the wide-refactor block verbatim to `to-tickets/wide-refactors.md`. TT-4 cut the third example, so the intro says "Two tickets".
+  - wayfinder: WF-1, WF-3, WF-4, WF-6, WF-7 done; WF-2 done via ST-5 (the frontier query). WF-5 done in part: the repeat in the step-3 resolve line is gone, and the chart-the-map step 3 ("including which skills Notes names") stays because it is the user-approval step the allowlist rule depends on.
+  - triage: TR-1 to TR-5 done.
+  - setup-agent-tracker: ST-1, ST-2, ST-3, ST-6, ST-7, ST-8, ST-9, ST-10, ST-11 done. ST-4 done by T09 (`gh issue view --json`). ST-5 done by T09 (sub-issue command); the runnable frontier query in the same finding is added here.
+  - handoff: HO-1 done, with the user-only `/name` wording in "Suggested skills"; HO-2 skipped (optional).
+  - glab flags (checked 2026-11-03 against docs.gitlab.com/cli): `-O json` only on `glab issue list` (https://docs.gitlab.com/cli/issue/list/); `--output json` kept on `glab issue view` (https://docs.gitlab.com/cli/issue/view/), `glab mr list` (https://docs.gitlab.com/cli/mr/list/) and `glab label list` (https://docs.gitlab.com/cli/label/list/); `glab issue note` reads stdin (https://docs.gitlab.com/cli/issue/note/); `glab mr note create` takes `-m` (https://docs.gitlab.com/cli/mr/note/); `glab issue update --assignee` takes a username, `@me` undocumented (https://docs.gitlab.com/cli/issue/update/).
+  - Gates: validate shows no FAIL or WARN for these 11 skills; its 18 errors are all `security-audit/` (T13). pytest has 5 failures, all `security-audit` (T13: no `group`, no provenance row, no eval prompts).
 
 - [ ] **T08b Skill fixes: design, tooling and the grill descriptions** (Req 7)
 
