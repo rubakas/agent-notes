@@ -19,7 +19,7 @@ Also add your own observations from reading the code that reviewers may have mis
 ### 2. Decide: approve or return
 
 - **If no actionable findings**: approve, move to Phase 4.
-- **If findings exist**: compile a single, prioritized feedback message and send it back to the same coder session. Include:
+- **If findings exist**: compile a single, prioritized feedback message and send it back to the same coder session ({{RESUME_TOOL}}). Include:
   - Which findings to fix (with your reasoning, not just the reviewer's words)
   - Your own additional comments
   - What NOT to change (to prevent scope creep)

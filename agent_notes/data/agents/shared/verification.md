@@ -10,7 +10,7 @@ For every agent result, make an explicit decision: **APPROVE** or **REJECT**.
 - Did it miss anything? Did it change things outside scope?
 - Is the quality acceptable?
 
-**If REJECT**: re-delegate to the same agent session with what is wrong, what the expected output should look like, and only the correction (not the whole task).
+**If REJECT**: re-delegate to the same agent session ({{RESUME_TOOL}}) with what is wrong, what the expected output should look like, and only the correction (not the whole task).
 
 **Maximum 2 rejection rounds per agent.** If still wrong after 2 attempts, do it yourself or reassign to a different agent.
 

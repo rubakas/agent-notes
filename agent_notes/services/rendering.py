@@ -74,6 +74,45 @@ def expand_includes(text: str, shared_dir: Path, skip: Optional[set] = None) -> 
     return re.sub(pattern, replace_include, text, flags=re.MULTILINE)
 
 
+# Per-backend tool names for the shared lead text. Claude Code's names come from
+# code.claude.com/docs/en/sub-agents; OpenCode's from opencode.ai/docs/tools and
+# /agents (no resume tool is documented); Codex names no tool functions
+# (learn.chatgpt.com/docs/agent-configuration/subagents), so it gets neutral wording.
+_NEUTRAL_TOOL_NAMES = {
+    "AGENT_TOOL": "spawn a subagent",
+    "RESUME_TOOL": "steer the same subagent thread",
+    "TODO_LINE": "",
+}
+_TOOL_NAMES = {
+    "claude": {
+        "AGENT_TOOL": "the `Agent` tool",
+        "RESUME_TOOL": "continue it with `SendMessage` to its id or name",
+        "TODO_LINE": "",
+    },
+    "opencode": {
+        "AGENT_TOOL": "the `task` tool",
+        "RESUME_TOOL": ("send the correction to the same subagent session if your CLI supports it; "
+                        "otherwise start a new one with the prior findings"),
+        "TODO_LINE": "- Track progress with `todowrite`",
+    },
+}
+
+
+def _substitute_tool_names(text: str, backend_name: str) -> str:
+    """Fill {{AGENT_TOOL}}, {{RESUME_TOOL}} and {{TODO_LINE}} for one backend.
+
+    An empty {{TODO_LINE}} removes its whole line, so no blank list item is left behind.
+    """
+    names = _TOOL_NAMES.get(backend_name, _NEUTRAL_TOOL_NAMES)
+    for key, value in names.items():
+        placeholder = "{{" + key + "}}"
+        if value:
+            text = text.replace(placeholder, value)
+        else:
+            text = re.sub(r"^[ \t]*" + re.escape(placeholder) + r"[ \t]*\n?", "", text, flags=re.MULTILINE)
+    return text
+
+
 def _load_frontmatter_template(template_name):
     """Load a frontmatter template plugin by name.
     
@@ -483,7 +522,7 @@ def generate_agent_files(agents_config: Dict[str, Any],
             }
             
             # Apply post-processing transformation (e.g., strip memory section)
-            body = template.post_process(prompt_content, ctx)
+            body = template.post_process(_substitute_tool_names(prompt_content, backend.name), ctx)
 
             # Apply user patch if present
             patch = get_patch(agent_name, user_config)
@@ -545,6 +584,7 @@ def render_globals(memory=None, enabled_plugins: Optional[Dict[str, bool]] = Non
     claude_global_content = claude_global_content.replace(
         "{{MEMORY_INSTRUCTIONS}}", _memory_instructions(st)
     )
+    claude_global_content = _substitute_tool_names(claude_global_content, "claude")
     claude_global = DIST_CLAUDE_DIR / 'CLAUDE.md'
     claude_global.parent.mkdir(parents=True, exist_ok=True)
     claude_global.write_text(claude_global_content)
@@ -552,6 +592,7 @@ def render_globals(memory=None, enabled_plugins: Optional[Dict[str, bool]] = Non
 
     # Copy global-opencode.md to AGENTS.md
     opencode_global_content = expand_includes(GLOBAL_OPENCODE_MD.read_text(), AGENTS_DIR / "shared", skip=_include_skip)
+    opencode_global_content = _substitute_tool_names(opencode_global_content, "opencode")
     agents_global = DIST_OPENCODE_DIR / 'AGENTS.md'
     agents_global.parent.mkdir(parents=True, exist_ok=True)
     agents_global.write_text(opencode_global_content)
@@ -559,6 +600,7 @@ def render_globals(memory=None, enabled_plugins: Optional[Dict[str, bool]] = Non
 
     # Copy global-copilot.md to copilot-instructions.md
     copilot_content = expand_includes(GLOBAL_COPILOT_MD.read_text(), AGENTS_DIR / "shared", skip=_include_skip)
+    copilot_content = _substitute_tool_names(copilot_content, "copilot")
     copilot_global = DIST_GITHUB_DIR / 'copilot-instructions.md'
     copilot_global.parent.mkdir(parents=True, exist_ok=True)
     copilot_global.write_text(copilot_content)
@@ -583,6 +625,7 @@ def render_globals(memory=None, enabled_plugins: Optional[Dict[str, bool]] = Non
         # Substitute {{MEMORY_INSTRUCTIONS}} to empty string for memory-less backends
         # (e.g. codex has features.memory=false) so no literal placeholder leaks.
         _content = _content.replace("{{MEMORY_INSTRUCTIONS}}", "")
+        _content = _substitute_tool_names(_content, _backend.name)
         _out_path.parent.mkdir(parents=True, exist_ok=True)
         _out_path.write_text(_content)
         copied_files.append(_out_path)

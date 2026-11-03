@@ -102,7 +102,7 @@ This is the ticket index for `spec.md`.
   - The spec SC-006 and SC-007 gates pass on the rendered `~/.claude/CLAUDE.md` equivalent in the build output.
   - The OpenCode lead renders without errors.
 
-- [ ] **T07 Backend-specific tool names** (Req 5a; after T06)
+- [x] **T07 Backend-specific tool names** (Req 5a; after T06)
 
   **Files**: `agent_notes/services/rendering.py`, the shared files that name dispatch, resume or todo tools, and tests.
 
@@ -118,6 +118,11 @@ This is the ticket index for `spec.md`.
   - Verify the OpenCode and Codex names against their docs, and cite the URLs in the commit's ticket note.
 
   **Acceptance**: the rendered Claude CLAUDE.md has no `todowrite`, `` `task` `` or `task_id`, and the OpenCode lead keeps working names. Both are covered by tests.
+
+  **Note** (names verified 2026-11-03; substitution is `_substitute_tool_names` in `agent_notes/services/rendering.py`):
+  - Claude Code: `Agent`, `SendMessage`, no todo tool. Source: https://code.claude.com/docs/en/sub-agents.md
+  - OpenCode: `task` and `todowrite`. Sources: https://opencode.ai/docs/tools/ (built-in tool list) and https://opencode.ai/docs/agents/ ("subagents via the Task tool with `permission.task`"). No resume parameter is documented, so the text says: send the correction to the same subagent session if the CLI supports it, otherwise start a new one with the prior findings.
+  - Codex: neutral wording only ("spawn a subagent", "steer the same subagent thread"), no todo line. The page names no tool functions: https://developers.openai.com/codex/subagents, which redirects to https://learn.chatgpt.com/docs/agent-configuration/subagents
 
 ## Phase C — Skills (T08–T09)
 
