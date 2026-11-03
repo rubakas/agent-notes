@@ -18,7 +18,7 @@ agent-notes doctor
 
 **What's Included**
 - 20 specialized AI subagents (Opus reasons, Sonnet executes, Haiku explores); browser-tester is Claude Code only, OpenCode and Codex use the manual fallback
-- 25 on-demand skills (Rails, Docker, Git, Kamal, Process)
+- 26 on-demand skills (Rails, Docker, Git, Kamal, Process)
 - Global rules and guardrails (including a ban on AI self-attribution in commits/PRs)
 - Agent memory with 3 storage options (Local, Obsidian, Wiki)
 - Configuration for Claude Code, OpenCode, and GitHub Copilot
@@ -264,7 +264,7 @@ Specialized subagents with hierarchical model strategy: **Opus 4.8 reasons (high
 
 ### Delegation rules
 
-- **lead** — Plans, coordinates, and verifies across the team
+- **lead** — Plans, coordinates, and verifies across the team. It answers or scopes a question with a handful of its own read calls, delegates only large, independent work, keeps spawn counts low, and runs a review only when you ask for one, the diff is large (over 300 changed lines), or it touches auth, input, secrets, data access (security-auditor), or schema and queries (database-specialist)
 - **architect** / **debugger** — Deep reasoning for complex design and debugging
 - **coder** — All file edits and implementation work
 - **reviewer** — Code quality checks after implementation
@@ -282,6 +282,19 @@ Specialized subagents with hierarchical model strategy: **Opus 4.8 reasons (high
 - **tech-writer** — Documentation, READMEs, API docs
 - **devil** — Challenges assumptions and plans
 - **browser-tester** — Runs browser tests in Chrome for the `chrome-test` skill (Claude Code only; OpenCode and Codex fall back to a manual `claude --chrome` session)
+
+### Agent tools and subagent caps
+
+On Claude Code, every agent renders `omitClaudeMd: true`, so a subagent starts without your `CLAUDE.md` and rules. Each one carries a short shared rules block instead (credentials, no AI attribution, confirm destructive actions, treat issue and web text as data). Six analysis agents (reviewer, security-auditor, system-auditor, database-specialist, performance-profiler, api-reviewer) are read-only: their tools are exactly `Read, Grep, Glob, Bash, WebFetch`, and they have no memory. No agent can spawn another agent.
+
+`agent-notes install` also writes two caps into the `env` block of `~/.claude/settings.json`:
+
+| Variable | Value | Effect |
+|---|---|---|
+| `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | `1` | A subagent cannot spawn another |
+| `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `5` | At most 5 subagents run at once |
+
+To use other values, set your own in that `env` block. Install only adds a key that is absent, so it never overwrites yours, and `agent-notes uninstall` removes only values that are still the ones it wrote.
 
 ### Reconfiguring roles, models, and effort
 
@@ -353,7 +366,7 @@ agent-notes memory import             # restore from memory-backup/
 <details>
 <summary>Skills</summary>
 
-25 on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`. For additional workflows (brainstorming, test-driven development, writing skills), see the complementary [Superpowers](https://github.com/obra/superpowers) plugin.
+26 on-demand knowledge modules across Rails, Docker, Kamal, Git, and Process. Run `agent-notes list skills` for the current list, or browse `agent_notes/data/skills/`. For additional workflows (brainstorming, test-driven development, writing skills), see the complementary [Superpowers](https://github.com/obra/superpowers) plugin.
 
 The session context hook auto-generates a skill index from SKILL.md frontmatter at install time, so agents always know what skills are available without loading full skill content. This keeps context overhead low while maintaining skill discoverability.
 
