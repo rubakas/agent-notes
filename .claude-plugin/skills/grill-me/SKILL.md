@@ -1,6 +1,7 @@
 ---
 name: grill-me
-description: A relentless interview to sharpen a plan or design.
+description: Interviews the user about a plan or design one question at a time. Use when the user types /grill-me.
+argument-hint: "[plan or design]"
 disable-model-invocation: true
 group: process
 ---

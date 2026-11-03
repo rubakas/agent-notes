@@ -1,6 +1,7 @@
 ---
 name: grilling
-description: Grill the user relentlessly about a plan or design. Use when the user wants to stress-test a plan before building, or uses any 'grill' trigger phrases.
+description: Interviews the user about a plan or design, one question at a time, until they agree it is sound. Use when the user wants to stress-test a plan before building, or says "grill me".
+argument-hint: "[plan or design]"
 group: process
 ---
 

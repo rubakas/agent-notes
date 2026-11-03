@@ -1,6 +1,12 @@
 # Writing Agent Briefs
 
-An agent brief is a structured comment posted on a GitHub issue or PR when it moves to `ready-for-agent`. It is the authoritative specification that an AFK agent will work from. The original body and discussion are context — the agent brief is the contract.
+An agent brief is a structured comment posted on an issue or PR on the tracker (or appended to the local issue file) when it moves to `ready-for-agent`. It is the authoritative specification that an AFK agent will work from. The original body and discussion are context — the agent brief is the contract.
+
+## Contents
+
+- [Principles](#principles)
+- [Template](#template)
+- [Examples](#examples)
 
 The brief states **what the agent should do**, which stretches to both surfaces: for an issue, that's building the change from nothing; for a PR, it's what's left to do *to the existing diff* — finish it, close gaps, address review points. Same principles either way; the PR example below shows the difference.
 
@@ -113,16 +119,13 @@ and append "..." to indicate truncation.
 **Summary:** Add `.out-of-scope/` directory support for tracking rejected feature requests
 
 **Current behavior:**
-When a feature request is rejected, the issue is closed with a `wontfix` label
-and a comment. There is no persistent record of the decision or reasoning.
-Future similar requests require the maintainer to recall or search for the
-prior discussion.
+A rejected feature request is closed with a `wontfix` label and a comment.
+There is no persistent record of the decision or reasoning.
 
 **Desired behavior:**
-Rejected feature requests should be documented in `.out-of-scope/<concept>.md`
-files that capture the decision, reasoning, and links to all issues that
-requested the feature. When triaging new issues, these files should be
-checked for matches.
+Rejected requests are documented in `.out-of-scope/<concept>.md` files with the
+decision, reasoning, and links to every issue that requested the feature. New
+issues are checked against these files.
 
 **Key interfaces:**
 - Markdown file format in `.out-of-scope/` — each file should have a
@@ -141,7 +144,6 @@ checked for matches.
 
 **Out of scope:**
 - Automated matching (human confirms the match)
-- Reopening previously rejected features
 - Bug reports (only enhancement rejections go to `.out-of-scope/`)
 ```
 
@@ -197,11 +199,3 @@ The function around line 150 has the issue.
 - src/triage/handler.ts (line 150)
 - src/types.ts (line 42)
 ```
-
-This is bad because:
-- No category
-- Vague description ("the triage thing is broken")
-- References file paths and line numbers that will go stale
-- No acceptance criteria
-- No scope boundaries
-- No description of current vs desired behavior
