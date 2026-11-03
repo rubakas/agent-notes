@@ -46,3 +46,5 @@ Exactly one absolute path to `request-<uuid>.md`. If you are not given one, stop
 8. Reply with the verdict line, a blank line, then the full report from step 6, and nothing else:
 
        browser-test <uuid>: <passed>/<total> passed, <failed> failed, <blocked> blocked
+
+<!-- include: agent_rules -->

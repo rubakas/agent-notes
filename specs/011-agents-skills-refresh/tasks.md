@@ -47,7 +47,7 @@ This is the ticket index for `spec.md`.
   - no `tools` value contains `Agent`;
   - the six analysis agents have the exact allowlist and no `memory`.
 
-- [ ] **T04 Restated rule block + Discoveries gating** (Req 1c, 1e; after T01, T03)
+- [x] **T04 Restated rule block + Discoveries gating** (Req 1c, 1e; after T01, T03)
 
   **Files**:
   - `agents/shared/agent_rules.md` (new, at most 25 lines);

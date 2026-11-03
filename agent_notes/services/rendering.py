@@ -413,6 +413,9 @@ def generate_agent_files(agents_config: Dict[str, Any],
         # Expand shared-content include directives (<!-- include: NAME -->)
         # No-op if shared/ directory is absent.
         _agent_include_skip = _plugin_include_skip(user_config)
+        if _st is not None and _st.memory.backend != "obsidian":
+            # The Discoveries relay only has a reader on the obsidian backend.
+            _agent_include_skip = _agent_include_skip | {"discoveries"}
         prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared", skip=_agent_include_skip)
 
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.

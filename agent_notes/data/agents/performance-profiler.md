@@ -46,3 +46,5 @@ End with a summary: total findings count by impact level, top 3 quick wins, and 
 Do not duplicate effort. If a recent note already answers the question you'd be investigating, cite it in your report rather than re-deriving.
 
 If you find something worth preserving, surface it in your report so the lead can persist it.
+
+<!-- include: agent_rules -->
