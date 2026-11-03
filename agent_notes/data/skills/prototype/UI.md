@@ -4,19 +4,9 @@ Generate **several radically different UI variations** on a single route, switch
 
 ## Contents
 
-- [When this is the right shape](#when-this-is-the-right-shape)
 - [Two sub-shapes](#two-sub-shapes--strongly-prefer-sub-shape-a)
 - [Process](#process)
 - [Anti-patterns](#anti-patterns)
-
-If the question is about logic/state rather than what something looks like — wrong branch. Use `LOGIC.md`.
-
-## When this is the right shape
-
-- "What should this page look like?"
-- "I want to see a few options for this dashboard before committing."
-- "Try a different layout for the settings screen."
-- Any time the user would otherwise spend a day picking between three vague mockups in their head.
 
 ## Two sub-shapes — strongly prefer sub-shape A
 
@@ -79,7 +69,7 @@ return (
 
 For sub-shape A (existing page): keep all the existing data fetching above the switcher; only the rendered subtree changes per variant.
 
-For sub-shape B (new page): the throwaway route under `/prototype/<name>` mounts the same switcher.
+For sub-shape B (new page): the throwaway route, named per the project's routing convention with `prototype` in its path or filename, mounts the same switcher.
 
 ### 4. Build the floating switcher
 
@@ -104,12 +94,12 @@ Surface the URL (and the `?variant=` keys). The user will flip through whenever 
 
 ### 6. Capture the answer and clean up
 
-Once a variant has won, capture the answer — which variant and why — then capture the prototype the way the [SKILL](SKILL.md) describes. Fold the winner into the real code and move the rest onto the throwaway branch, not into main:
+Once a variant has won, capture the answer — which variant and why — then capture the prototype the way the [SKILL](SKILL.md) describes. Fold the winner into the real code; the rest stays out of main:
 
 - **Sub-shape A** — fold the winner into the existing page; drop the losing variants and the switcher from main.
 - **Sub-shape B** — promote the winning variant to a real route; drop the throwaway route and the switcher from main.
 
-The full set of variants is the primary source, so it lands on the throwaway branch, not the bin — variant components and the switcher left in the main branch rot fast and confuse the next reader.
+If the user agreed (SKILL.md rule 6), the full variant set goes on the throwaway branch, not main; otherwise delete it. Variant components and the switcher left in the main branch rot fast and confuse the next reader.
 
 ## Anti-patterns
 
