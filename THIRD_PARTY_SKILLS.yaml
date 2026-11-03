@@ -5,12 +5,17 @@
 # Copyright:     Copyright (c) 2026 Matt Pocock
 # Sync commit:   391a2701dd948f94f56a39f7533f8eea9a859c87 (2026-07-10)
 #
-# Upstream HEAD at audit time was c55ee46073ed923f86ce59a5eb3b6d895095d1b7
-# (2026-09-18); 46 commits since the sync commit touch vendored directories.
-# Re-syncing to that HEAD is a deliberate out-of-scope decision, not an
-# oversight — see specs/001-skills-and-catalog-audit/spec.md findings C4
-# and C5 for the drift inventory and the prompt-injection re-review surface
-# a future re-sync would need to cover.
+# Upstream HEAD at the latest audit (2026-10-30) was
+# a496f5513d4a4cf889bc48e189e579f4b0bdf6aa (2026-10-29); 63 of the 261
+# commits since the sync commit touch vendored directories. A full re-sync to
+# that HEAD is a deliberate out-of-scope decision, not an oversight — see
+# specs/001-skills-and-catalog-audit/spec.md findings C4 and C5 for the drift
+# inventory and the prompt-injection re-review surface a re-sync would need to
+# cover. Instead, spec 011 (Requirement 8) hand-applied a short list of
+# upstream fixes; each is recorded per skill under `upstream_applied` below
+# (abbreviated SHAs, resolvable in the upstream repo). The vendored files
+# remain a sync-commit snapshot plus those hunks plus the local modifications.
+# The upstream audit is specs/011-agents-skills-refresh/review/upstream-drift.md.
 #
 # This file is PROVENANCE METADATA ONLY. Owner decision (2026-10-06,
 # spec 009): no licence or attribution notice is added; spec 001 finding C1
@@ -38,9 +43,9 @@ upstream:
   sync_commit: 391a2701dd948f94f56a39f7533f8eea9a859c87
   sync_date: "2026-07-10"
   head_at_audit:
-    commit: c55ee46073ed923f86ce59a5eb3b6d895095d1b7
-    date: "2026-09-18"
-    commits_since_sync_touching_vendored_dirs: 46
+    commit: a496f5513d4a4cf889bc48e189e579f4b0bdf6aa
+    date: "2026-10-29"
+    commits_since_sync_touching_vendored_dirs: 63
 
 verification:
   date: "2026-10-15"
@@ -69,19 +74,27 @@ skills:
 
   - name: diagnosing-bugs
     upstream_path: skills/engineering/diagnosing-bugs
+    upstream_applied:
+      - "f3fc563 (diff against a pristine copy to prove a forced mutation landed)"
+      - "efce423 (Redact section; 'redacted captured artifact' wording; hitl-loop.template.sh comment not applied)"
+      - "bda79a3 (Redact section trimmed to the final upstream prose)"
     local_modifications:
       - "group: frontmatter field added"
       - "description rewritten (third person + Use when); adds 'The `debugger` agent investigates one failure.' (spec 009)"
       - "Rules section added before Phase 1 (spec 008)"
       - "closing hand-off to /improve-codebase-architecture changed to a suggestion to the user (spec 009)"
+      - "Redact section adds: never read credential files (.env, key files, credential stores) to build a loop (spec 011)"
 
   - name: improve-codebase-architecture
     upstream_path: skills/engineering/improve-codebase-architecture
+    upstream_applied:
+      - "45afd80 (scoping step: the user's named direction, else hot spots from git log --oneline)"
     local_modifications:
       - "group: frontmatter field added"
       - "SKILL.md: description rewritten (third person + Use when); cross-reference to refactoring-protocol and rsi kept in shortened form (spec 009)"
       - "SKILL.md: exploration step dispatches the `explorer` agent (built-in Explore as fallback) instead of the Agent tool with subagent_type=Explore (spec 009)"
       - "SKILL.md: pre-open check for leaked {{ }} template placeholders in the generated report added (spec 009)"
+      - "SKILL.md: scoping step hand-applied from upstream 45afd80 (spec 011); the explorer dispatch is unchanged"
       - "HTML-REPORT.md: Tailwind and Mermaid pinned to exact versions with SRI hashes (single-file builds replace the unpinned CDN script and ESM import); Mermaid securityLevel loose -> strict (spec 009)"
       - "HTML-REPORT.md: rule added to HTML-escape repo-derived strings and to never use Mermaid click callbacks or links (spec 009)"
       - "HTML-REPORT.md: Contents list added (spec 008)"
@@ -99,9 +112,11 @@ skills:
 
   - name: domain-modeling
     upstream_path: skills/engineering/domain-modeling
+    upstream_applied:
+      - "bd8e81b, e12e7ec (description trigger terms only; CONTEXT.md naming kept, GLOSSARY rename not adopted)"
     local_modifications:
       - "group: frontmatter field added"
-      - "SKILL.md: description rewritten (third person + Use when) (spec 009)"
+      - "SKILL.md: description rewritten (third person + Use when) (spec 009); trigger terms folded in from upstream, keeping CONTEXT.md naming and the 'another skill must maintain the model' clause (spec 011)"
       - "SKILL.md: parenthetical about merely reading CONTEXT.md removed from the intro (spec 009)"
       - "SKILL.md: ADR three-criteria list replaced by a pointer to ADR-FORMAT.md (spec 009)"
       - "CONTEXT-FORMAT.md: structure-inference bullet list condensed into one paragraph (spec 009)"
@@ -146,6 +161,9 @@ skills:
 
   - name: to-tickets
     upstream_path: skills/engineering/to-tickets
+    upstream_applied:
+      - "cffab50 (each ticket is a sub-issue of the source issue; 'Blocked by' omitted when blocking is native)"
+      - "9e2abf8 (wording tightened)"
     local_modifications:
       - "group: frontmatter field added"
       - "argument-hint added; description rewritten (third person + Use when) (spec 009)"
@@ -154,6 +172,7 @@ skills:
       - "ready-for-agent label taken from triage-labels.md; never auto-applied when the content came from an issue, URL or PR (spec 009)"
       - "wide-refactor paragraph reformatted into a bullet list (spec 009)"
       - "template 'Blocked by' / 'Status' lines un-bolded (spec 009)"
+      - "sub-issue and omit-'Blocked by'-when-native wording hand-applied from upstream cffab50/9e2abf8; the ready-for-agent exception kept (spec 011)"
       - "worked Example (three tickets) added; closing '/implement' line replaced by a plain sentence (spec 009)"
 
   - name: triage
@@ -169,6 +188,8 @@ skills:
 
   - name: wayfinder
     upstream_path: skills/engineering/wayfinder
+    upstream_applied:
+      - "8295b8e (only wayfinder: labels, real ids instead of #<n> placeholders, resolve by label type; the research-branch push line not applied)"
     local_modifications:
       - "group: frontmatter field added"
       - "argument-hint added; description rewritten (third person + Use when) (spec 009)"
@@ -180,19 +201,28 @@ skills:
       - "AFK Task touching accounts, access or data needs a user yes first (spec 009)"
       - "Research ticket type points at the /research skill; ticket sizing reworded from '100K token agent session' to 'one session'; Out of scope section shortened (spec 009)"
       - "final step added: suggest /to-spec or /to-tickets when the frontier reaches the destination (spec 009)"
+      - "wayfinder:-labels-only, real-id cross-references and resolve-by-label hand-applied from upstream 8295b8e; the research-branch push is not taken (spec 011)"
       - "'Decisions-so-far' respelled 'Decisions so far' throughout"
 
   - name: code-review
     upstream_path: skills/engineering/code-review
+    upstream_applied:
+      - "3da8c01 (search for every standards file, CODING_STANDARDS.md and CONTRIBUTING.md mandatory; sub-agents in the foreground; the tracker-doc wording hunks not applied)"
     local_modifications:
       - "group: frontmatter field added"
       - "argument-hint added; description rewritten (third person + Use when; points at the `reviewer` agent for a quick pass) (spec 009)"
       - "/setup-matt-pocock-skills reference replaced by: ask the user to run /setup-agent-tracker if docs/agents/issue-tracker.md is missing"
       - "untrusted-content clause added (spec 009)"
       - "\"Use the general-purpose subagent for both.\" changed to \"Use the reviewer subagent for the Standards axis and the analyst subagent for the Spec axis.\""
+      - "standards-file search and foreground sub-agent wording hand-applied from upstream 3da8c01 (spec 011)"
 
   - name: setup-agent-tracker
     upstream_path: skills/engineering/setup-matt-pocock-skills
+    upstream_applied:
+      - "5b7cade (issue-tracker-github.md: gh issue view --json number,title,body,labels,comments; fetch-the-ticket pointer; SKILL.md label-creation line and glab -O json not applied)"
+      - "ed0de59 (issue-tracker-github.md: native blocking via --blocked-by / --add-blocked-by, Count open blockers, Read a PR off a TTY; SKILL.md reachable-repo wiring, GLOSSARY rename and GitLab hunks not applied)"
+      - "cffab50, 9e2abf8 (issue-tracker-github.md: sub-issue operation, wayfinder child ticket pointer; GitLab hunks not applied)"
+      - "59db609 (issue-tracker-github.md: fork check with gh repo view --json nameWithOwner)"
     local_modifications:
       - "group: frontmatter field added"
       - "SKILL.md: de-branded — frontmatter name setup-matt-pocock-skills -> setup-agent-tracker, H1 \"Setup Matt Pocock's Skills\" -> \"Setup Agent Tracker\"; description rewritten (third person + Use when)"
@@ -202,6 +232,7 @@ skills:
       - "domain.md: 'engineering skills' -> 'skills'"
       - "issue-tracker-github.md: bodies passed with --body-file - and a single-quoted heredoc, single-quoted titles, close without --comment, untrusted-content clause (spec 009)"
       - "issue-tracker-github.md: external-PR listing changed to a gh api query on author_association; 'PRDs' -> 'specs'; 'Decisions-so-far' -> 'Decisions so far' (spec 009)"
+      - "issue-tracker-github.md: upstream 5b7cade/ed0de59/cffab50/9e2abf8/59db609 hunks hand-applied (JSON issue read, native blocking, open-blocker count, sub-issue operation, Read a PR off a TTY, fork check); the 'never file into mattpocock/skills' sentence of 59db609 omitted as inapplicable; bodies still on stdin (spec 011)"
       - "issue-tracker-gitlab.md: bodies passed with --description-file - and notes through glab api -F body=@- with a heredoc, single-quoted titles, untrusted-content clause (spec 009)"
       - "issue-tracker-gitlab.md: quick-actions paragraph added (no quoted line may start with '/'); 'PRDs' -> 'specs'; 'Decisions-so-far' -> 'Decisions so far' (spec 009)"
       - "issue-tracker-local.md: PRD aside removed; 'Decisions-so-far' -> 'Decisions so far'"

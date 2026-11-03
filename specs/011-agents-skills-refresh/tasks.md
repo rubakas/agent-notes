@@ -157,7 +157,7 @@ This is the ticket index for `spec.md`.
   - chrome-test SKILL.md is at most 14,000 bytes.
   - `agent-notes validate` reports 0 errors and 0 warnings once both T08 tickets are done.
 
-- [ ] **T09 Upstream partial pulls** (Req 8)
+- [x] **T09 Upstream partial pulls** (Req 8)
 
   **Files**:
   - `skills/setup-agent-tracker/issue-tracker-github.md`, `issue-tracker-gitlab.md` and `SKILL.md`;

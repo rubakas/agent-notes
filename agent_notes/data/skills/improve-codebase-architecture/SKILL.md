@@ -18,6 +18,11 @@ This command is _informed_ by the project's domain model and built on a shared d
 
 ### 1. Explore
 
+**Scope before you scan — YAGNI.** Deepening a module pays off by making future changes to it easier, so put extra weight on the parts of the codebase that have recently changed. Decide *where* to look before you look:
+
+- If the user named a direction — a module, a subsystem, a pain point — take it, and skip the inference below.
+- Otherwise, walk back a good stretch of the commit history (`git log --oneline`) to find the codebase's hot spots — the files and areas that keep coming up — and let those paths pull your attention first. If the changes are scattered with no clear hot spot, widen the net.
+
 Read the project's domain glossary (`CONTEXT.md`) and any ADRs in the area you're touching first.
 
 Then dispatch the `explorer` agent to walk the codebase; if it isn't installed, fall back to the built-in Explore agent. Don't follow rigid heuristics — explore organically and note where you experience friction:
