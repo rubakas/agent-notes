@@ -22,6 +22,7 @@ def render(ctx: dict) -> str:
     frontmatter = ['---']
     frontmatter.append(f'name: {agent_name}')
     description = agent_config["description"].replace('\\', '\\\\').replace('"', '\\"')
+    description = description.replace('\n', '\\n').replace('\r', '\\r')
     frontmatter.append(f'description: "{description}"')
     frontmatter.append(f'model: {model_str}')
     

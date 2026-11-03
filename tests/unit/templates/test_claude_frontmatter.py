@@ -61,6 +61,11 @@ class TestDescriptionQuoting:
         result = render(_make_ctx(description=description))
         assert _frontmatter(result)["description"] == description
 
+    def test_newlines_round_trip(self):
+        description = "First line.\nSecond line.\r\nThird: \"quoted\"."
+        result = render(_make_ctx(description=description))
+        assert _frontmatter(result)["description"] == description
+
     def test_description_is_double_quoted(self):
         result = render(_make_ctx(description="Plain text."))
         assert 'description: "Plain text."' in result

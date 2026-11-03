@@ -51,12 +51,17 @@ def expand_includes(text: str, shared_dir: Path, skip: Optional[set] = None) -> 
 
     # Pattern matches <!-- include: NAME --> on its own line with optional whitespace
     # NAME must be [a-z0-9_-]+
-    pattern = r'^\s*<!--\s*include:\s*([a-z0-9_-]+)\s*-->\s*$'
+    pattern = r'^[ \t]*<!--\s*include:\s*([a-z0-9_-]+)\s*-->[ \t]*$'
+
+    # A skipped include goes with the blank lines before it, so it leaves no gap behind.
+    for name in _skip:
+        text = re.sub(
+            r'\n*^[ \t]*<!--\s*include:\s*' + re.escape(name) + r'\s*-->[ \t]*$',
+            '', text, flags=re.MULTILINE,
+        )
 
     def replace_include(match):
         include_name = match.group(1)
-        if include_name in _skip:
-            return ""
         include_file = shared_dir / f"{include_name}.md"
 
         if not include_file.exists():

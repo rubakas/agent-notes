@@ -45,6 +45,7 @@ def test_every_agent_omits_claude_md(claude_frontmatter):
 
 def test_no_agent_can_spawn_agents(claude_frontmatter):
     for name, fm in claude_frontmatter.items():
+        assert "tools" in fm, name
         tools = [t.strip().split("(")[0] for t in str(fm.get("tools", "")).split(",")]
         assert "Agent" not in tools, name
 

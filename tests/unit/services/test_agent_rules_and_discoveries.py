@@ -1,5 +1,6 @@
 """The restated rule block lands in every agent body, and the Discoveries relay
 renders only on the obsidian backend."""
+import tomllib
 from unittest.mock import patch
 
 import pytest
@@ -53,6 +54,7 @@ def test_every_claude_agent_gets_the_block_exactly_once(local_dist):
     for f in files:
         text = f.read_text()
         assert text.count(RULES) == 1, f.name
+        assert text.count("\n\n## Rules that always apply") == 1, f.name
         assert "<!-- include:" not in text, f.name
 
 
@@ -64,7 +66,8 @@ def test_opencode_and_codex_agents_get_the_block_once(local_dist):
         expected = 0 if f.stem == "lead" else 1
         assert f.read_text().count(RULES) == expected, f.name
     for f in codex:
-        assert "Rules that always apply" in f.read_text(), f.name
+        body = tomllib.loads(f.read_text())["developer_instructions"]
+        assert body.count("\n\n## Rules that always apply") == 1, f.name
 
 
 @pytest.mark.parametrize("name", DISCOVERY_WRITERS)
@@ -79,9 +82,22 @@ def test_obsidian_backend_keeps_discoveries_section(obsidian_dist, name):
     text = (obsidian_dist / "claude" / "agents" / f"{name}.md").read_text()
     assert "Report discoveries" in text
     assert "`## Discoveries`" in text
+    assert "\n\n### Report discoveries" in text
     assert text.index("Rules that always apply") < text.index("Report discoveries")
 
 
-def test_local_render_leaves_no_run_of_blank_lines_at_the_end(local_dist):
-    text = (local_dist / "claude" / "agents" / "coder.md").read_text()
-    assert not text.endswith("\n\n\n")
+@pytest.mark.parametrize("name", DISCOVERY_WRITERS)
+def test_local_render_ends_with_a_single_newline(local_dist, name):
+    text = (local_dist / "claude" / "agents" / f"{name}.md").read_text()
+    assert text == text.rstrip() + "\n"
+
+
+def test_discoveries_survive_when_no_state_is_loaded(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    dist = tmp_path / "dist"
+    with patch.object(config_mod, "DIST_DIR", dist), \
+         patch("agent_notes.services.user_config.load_user_config", return_value={}), \
+         patch("agent_notes.services.state_store.load_state", return_value=None):
+        generate_agent_files(load_agents_config(), memory=None)
+    text = (dist / "claude" / "agents" / "coder.md").read_text()
+    assert "\n\n### Report discoveries" in text
