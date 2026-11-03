@@ -66,22 +66,25 @@ skills:
     upstream_path: skills/productivity/grill-me
     local_modifications:
       - "group: frontmatter field added"
+      - "description rewritten (third person + Use when) and argument-hint added; the body is unchanged (spec 011 Req 7: GM-1, GM-2)"
 
   - name: grilling
     upstream_path: skills/productivity/grilling
     local_modifications:
       - "group: frontmatter field added"
+      - "description rewritten (third person + Use when) and argument-hint added; the body is unchanged (spec 011 Req 7: GR-1, GR-5)"
 
   - name: grill-with-docs
     upstream_path: skills/engineering/grill-with-docs
     local_modifications:
       - "group: frontmatter field added"
+      - "description rewritten (third person + Use when) and argument-hint added; the body is unchanged (spec 011 Req 7: GD-1, GD-2)"
 
   - name: diagnosing-bugs
     upstream_path: skills/engineering/diagnosing-bugs
     upstream_applied:
       - "f3fc563 (diff against a pristine copy to prove a forced mutation landed)"
-      - "efce423 (Redact section; 'redacted captured artifact' wording; hitl-loop.template.sh comment not applied)"
+      - "efce423 (Redact section; 'redacted captured artifact' wording; hitl-loop.template.sh comment applied, reworded)"
       - "bda79a3 (Redact section trimmed to the final upstream prose)"
     local_modifications:
       - "group: frontmatter field added"
@@ -89,6 +92,8 @@ skills:
       - "Rules section added before Phase 1 (spec 008)"
       - "closing hand-off to /improve-codebase-architecture changed to a suggestion to the user (spec 009)"
       - "Redact section adds: never read credential files (.env, key files, credential stores) to build a loop (spec 011)"
+      - "SKILL.md: argument-hint added; Rules block replaced by one ordering sentence; the Be-aggressive and 90%-fixed filler, the This-is-the-skill emphasis and the debugging-superpower phrase removed; completion criterion compressed; one sentence says this skill is the main-session loop and `debugger` is for isolated read-only reproduction or bisecting (spec 011 Req 7: DB-2 to DB-7)"
+      - "SKILL.md and scripts/hitl-loop.template.sh: the HITL script is run by the user in their own terminal and the KEY=VALUE output pasted back, because an agent Bash tool has no TTY; the script header says so and carries a reworded form of the upstream efce423 capture comment (spec 011 Req 7: DB-1)"
 
   - name: improve-codebase-architecture
     upstream_path: skills/engineering/improve-codebase-architecture
@@ -103,6 +108,8 @@ skills:
       - "HTML-REPORT.md: Tailwind and Mermaid pinned to exact versions with SRI hashes (single-file builds replace the unpinned CDN script and ESM import); Mermaid securityLevel loose -> strict (spec 009)"
       - "HTML-REPORT.md: rule added to HTML-escape repo-derived strings and to never use Mermaid click callbacks or links (spec 009)"
       - "HTML-REPORT.md: Contents list added (spec 008)"
+      - "SKILL.md: description rewritten, argument-hint added; explorer brief tells the main session to paste the friction questions and glossary terms; candidate-card fields renamed to match HTML-REPORT.md (Wins); Windows start command, leaked-token grep rule and stop condition added; domain-modeling bullets replaced by one pointer; Be-visual filler removed (spec 011 Req 7: IA-2 to IA-5, IA-7 to IA-10)"
+      - "HTML-REPORT.md: Tone section replaced by one sentence pointing at the codebase-design glossary; dependency-category tag points at codebase-design DEEPENING.md (spec 011 Req 7: IA-1, IA-6)"
 
   - name: codebase-design
     upstream_path: skills/engineering/codebase-design
@@ -114,6 +121,9 @@ skills:
       - "SKILL.md: 'Boundary' avoid-term bullet removed (spec 009)"
       - "DEEPENING.md: 'network boundary' -> 'network seam'; two seam-discipline bullets collapsed into one that points at SKILL.md (spec 009)"
       - "DESIGN-IT-TWICE.md: three markdown links to DEEPENING.md replaced by plain code spans (spec 009)"
+      - "SKILL.md: description names the user as the one who runs /improve-codebase-architecture; user-invocable: false added; Deep-vs-shallow, Designing-for-testability and Relationships sections condensed into the vocabulary (spec 011 Req 7: CD-8 and related)"
+      - "DEEPENING.md: the old-tests deletion rule requires interface-level tests that cover the same behaviour and pass; the Seam discipline section removed; dependency categories spelled out instead of pointing at DEEPENING.md (spec 011 Req 7: CD-7)"
+      - "DESIGN-IT-TWICE.md: spawns 3 `architect` sub-agents, with the Claude Code and OpenCode tool names; the optional fourth agent replaced by a ports-and-adapters instruction to all three (spec 011 Req 7: CD-6)"
 
   - name: domain-modeling
     upstream_path: skills/engineering/domain-modeling
@@ -125,6 +135,7 @@ skills:
       - "SKILL.md: parenthetical about merely reading CONTEXT.md removed from the intro (spec 009)"
       - "SKILL.md: ADR three-criteria list replaced by a pointer to ADR-FORMAT.md (spec 009)"
       - "CONTEXT-FORMAT.md: structure-inference bullet list condensed into one paragraph (spec 009)"
+      - "SKILL.md: ADR numbering scans the target docs/adr/; file-structure tree replaced by a sentence; stop-writing rule added; ADR-FORMAT.md and CONTEXT-FORMAT.md: lock-in list and placeholder example trimmed (spec 011 Req 7: DM-series)"
 
   - name: prototype
     upstream_path: skills/engineering/prototype
@@ -134,6 +145,8 @@ skills:
       - "SKILL.md: rule 6 requires asking before committing the throwaway branch and separately before commenting on the issue, never push; verdict goes to the session if both are declined (spec 009)"
       - "SKILL.md, LOGIC.md, UI.md: markdown links between sibling files replaced by plain code spans (spec 009)"
       - "UI.md: Contents list added (spec 008)"
+      - "SKILL.md: argument-hint added; rule 6 restructured into explicit asks (throwaway branch, issue comment, verdict, never push) (spec 011 Req 7: PR-4, PR-series)"
+      - "LOGIC.md and UI.md: When-this-is-the-right-shape sections and repeated rules removed; the new-page route follows the project's routing convention instead of /prototype/<name>; the variant set goes on the throwaway branch only if the user agreed (spec 011 Req 7: PR-1, PR-2, PR-4)"
 
   - name: handoff
     upstream_path: skills/productivity/handoff
@@ -142,6 +155,7 @@ skills:
       - "description rewritten (third person + Use when) (spec 009)"
       - "document saved in a fresh `mktemp -d` directory and its absolute path printed, instead of 'the OS temp directory' (spec 009)"
       - "section skeleton added (Goal, State, Next steps, References, Suggested skills, Open questions) in place of the one-line 'suggested skills' instruction (spec 009)"
+      - "SKILL.md: argument-hint uses the [..] convention; Suggested skills lists user-only skills as /name for the user to run (spec 011 Req 7: HO-1)"
 
   - name: research
     upstream_path: skills/engineering/research
@@ -152,6 +166,7 @@ skills:
       - "brief to the agent fixed to four parts: question, decision it informs, output path, citation standard (spec 009)"
       - "unconfirmed claims must be labelled unverified; user told the file path and a 2-3 line summary (spec 009)"
       - "untrusted-content clause added (spec 009)"
+      - "SKILL.md: the agent is a background `general-purpose` agent that returns the Markdown as text, and the main session saves it to the output path; the injection rule is carried into the brief as item 5 (spec 011 Req 7: RE-1, RE-2)"
 
   - name: to-spec
     upstream_path: skills/engineering/to-spec
@@ -163,6 +178,7 @@ skills:
       - "user sees the final spec text and says yes before publishing; ready-for-agent never auto-applied when the content came from an issue, URL or PR (spec 009)"
       - "untrusted-content clause added (spec 009)"
       - "'LONG' / 'extremely extensive' user-story instructions replaced by one story per distinct behaviour (spec 009)"
+      - "SKILL.md: the publish sentence split into three (label semantics unchanged); interview wording shortened; missing triage-labels.md falls back to ready-for-agent; good-test bullet removed (spec 011 Req 7: TS-1 to TS-4)"
 
   - name: to-tickets
     upstream_path: skills/engineering/to-tickets
@@ -179,6 +195,7 @@ skills:
       - "template 'Blocked by' / 'Status' lines un-bolded (spec 009)"
       - "sub-issue and omit-'Blocked by'-when-native wording hand-applied from upstream cffab50/9e2abf8; the ready-for-agent exception kept (spec 011)"
       - "worked Example (three tickets) added; closing '/implement' line replaced by a plain sentence (spec 009)"
+      - "SKILL.md: frontier sentence says this skill only publishes; wide-refactor block moved verbatim to the new wide-refactors.md; third example ticket and closing sentence removed; Status-line exception stated in prose above the local template; emphasis lowercased; missing triage-labels.md falls back to ready-for-agent (spec 011 Req 7: TT-1 to TT-6)"
 
   - name: triage
     upstream_path: skills/engineering/triage
@@ -190,6 +207,8 @@ skills:
       - "SKILL.md: verify step reads the PR diff first (gh pr diff), never checks a PR out in the primary working tree, and asks the user each time before running PR code or reporter steps in a separate worktree (spec 009)"
       - "AGENT-BRIEF.md: Contents list added (spec 008)"
       - "OUT-OF-SCOPE.md: Contents list added; sample markdown fence widened to four backticks (spec 008)"
+      - "SKILL.md: description rewritten; Reference docs list removed; quick-override question replaced by a mention and an offer (spec 011 Req 7: TR-1, TR-4, TR-5)"
+      - "AGENT-BRIEF.md: tracker-neutral first sentence; bad-brief explanation list removed and the enhancement example shortened (spec 011 Req 7: TR-2, TR-3)"
 
   - name: wayfinder
     upstream_path: skills/engineering/wayfinder
@@ -208,6 +227,7 @@ skills:
       - "final step added: suggest /to-spec or /to-tickets when the frontier reaches the destination (spec 009)"
       - "wayfinder:-labels-only, real-id cross-references and resolve-by-label hand-applied from upstream 8295b8e; the research-branch push is not taken (spec 011)"
       - "'Decisions-so-far' respelled 'Decisions so far' throughout"
+      - "SKILL.md: description rewritten; delete changed to close with a confirm (never delete); local-markdown fallback layout stated; emphatic Never/Always rules reworded; the repeated allowlist wording at the Notes-skills step shortened; final period added (spec 011 Req 7: WF-1, WF-3 to WF-7)"
 
   - name: code-review
     upstream_path: skills/engineering/code-review
@@ -220,6 +240,7 @@ skills:
       - "untrusted-content clause added (spec 009)"
       - "\"Use the general-purpose subagent for both.\" changed to \"Use the reviewer subagent for the Standards axis and the analyst subagent for the Spec axis.\""
       - "standards-file search and foreground sub-agent wording hand-applied from upstream 3da8c01 (spec 011)"
+      - "SKILL.md: the diff is written to a mktemp -d file and its path passed to both sub-agents; the tracker doc is read only when a spec is fetched; argument-hint takes an optional spec path; tool names for both backends; smell list moved to the new SMELLS.md and pasted into the Standards brief; emphasis lowercased; committed-work-only note (spec 011 Req 7: CR-1 to CR-7)"
 
   - name: setup-agent-tracker
     upstream_path: skills/engineering/setup-matt-pocock-skills
@@ -242,6 +263,8 @@ skills:
       - "issue-tracker-gitlab.md: quick-actions paragraph added (no quoted line may start with '/'); 'PRDs' -> 'specs'; 'Decisions-so-far' -> 'Decisions so far' (spec 009)"
       - "issue-tracker-local.md: PRD aside removed; 'Decisions-so-far' -> 'Decisions so far'"
       - "triage-labels.md: table header column \"Label in mattpocock/skills\" -> \"Canonical role label\"; example 'AFK-ready' -> 'ready-for-agent'"
+      - "issue-tracker-gitlab.md: glab issue list -O json; --output json on view and mr list; notes through glab issue note and glab mr note create with a heredoc on stdin; --assignee takes a username; plan-neutral blocking wording; repeated /-prefix warnings removed (spec 011 Req 7: ST-1, ST-2, ST-7 to ST-9, ST-11)"
+      - "issue-tracker-github.md: gh issue list --limit 200; gh api --paginate for the external-PR listing; runnable frontier query (spec 011 Req 7: ST-3, ST-5, ST-6). SKILL.md: seed-file destinations stated (ST-10)"
 
   - name: security-audit
     upstream_path: skills/security-audit

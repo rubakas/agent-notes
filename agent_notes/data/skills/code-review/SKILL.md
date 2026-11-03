@@ -20,7 +20,7 @@ Both axes run as **parallel sub-agents** so they don't pollute each other's cont
 
 Whatever the user said is the fixed point — a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it.
 
-Write the diff once to a file: `d=$(mktemp -d) && git diff <fixed-point>...HEAD > "$d/review.diff"` (three-dot, so the comparison is against the merge-base). Both sub-agents get the path and read it, because `analyst` has no Bash. Also note the list of commits via `git log <fixed-point>..HEAD --oneline`. The diff covers committed work only; for uncommitted changes, add `git diff HEAD` to the file.
+Write the diff once to a file: `d=$(mktemp -d) && git diff <fixed-point>...HEAD > "$d/review.diff" && echo "$d/review.diff"` (three-dot, so the comparison is against the merge-base). Both sub-agents get the path and read it, because `analyst` has no Bash. Also note the list of commits via `git log <fixed-point>..HEAD --oneline`. The diff covers committed work only; for uncommitted changes, add `git diff HEAD` to the file.
 
 Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel sub-agents.
 

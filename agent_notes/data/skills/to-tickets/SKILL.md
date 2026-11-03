@@ -68,6 +68,8 @@ The **frontier** (any ticket whose blockers are all done) is what an agent sessi
 
 Don't close or modify any parent issue.
 
+When the source was an issue, URL or PR, omit the `Status:` line and ask the user.
+
 <local-ticket-template>
 
 # <NN> — <Ticket title>
@@ -76,7 +78,7 @@ Don't close or modify any parent issue.
 
 Blocked by: the numbers/titles of the tickets that gate this one, or "None — can start immediately".
 
-Status: ready-for-agent  <!-- omit when the source was an issue, URL or PR; ask the user -->
+Status: ready-for-agent
 
 - [ ] Acceptance criterion 1
 - [ ] Acceptance criterion 2

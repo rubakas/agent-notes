@@ -33,7 +33,7 @@ File issues only into the user's own repo. In a fork, `gh` can default to the up
 When set to `yes`, PRs run through the same labels and states as issues, using the `gh pr` equivalents:
 
 - **Read a PR**: `gh pr view <number>`, then `gh pr view <number> --comments` (off a TTY, `--comments` prints only the comments, not the body), and `gh pr diff <number>` for the diff.
-- **List external PRs for triage**: `gh api --paginate 'repos/{owner}/{repo}/pulls?state=open' --jq '[.[] | select(.author_association | IN("OWNER","MEMBER","COLLABORATOR") | not) | {number, title, author: .user.login, association: .author_association}]'`. An external PR is one whose `author_association` is not `OWNER`, `MEMBER` or `COLLABORATOR` (`gh` fills in `{owner}`/`{repo}` from the current clone). Then read each PR's body with `gh pr view <n>`, its comments with `gh pr view <n> --comments` and its diff with `gh pr diff <n>`.
+- **List external PRs for triage**: `gh api --paginate 'repos/{owner}/{repo}/pulls?state=open' --jq '.[] | select(.author_association | IN("OWNER","MEMBER","COLLABORATOR") | not) | {number, title, author: .user.login, association: .author_association}'`. An external PR is one whose `author_association` is not `OWNER`, `MEMBER` or `COLLABORATOR` (`gh` fills in `{owner}`/`{repo}` from the current clone). Then read each PR's body with `gh pr view <n>`, its comments with `gh pr view <n> --comments` and its diff with `gh pr diff <n>`.
 - **Comment / label / close**: `gh pr comment`, `gh pr edit --add-label`/`--remove-label`, `gh pr close`.
 
 GitHub shares one number space across issues and PRs, so a bare `#42` may be either — resolve with `gh pr view 42` and fall back to `gh issue view 42`.

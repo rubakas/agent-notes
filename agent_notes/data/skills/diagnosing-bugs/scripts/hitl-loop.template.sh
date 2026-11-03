@@ -13,9 +13,9 @@
 #
 # At the end, captured values are printed as KEY=VALUE for the agent to parse.
 #
-# `capture` prints its value back to the terminal, and the user pastes that
-# output to the agent — so capture observations, and leave signing in to the
-# user as a `step`.
+# The final Captured block prints each value, and the user pastes that block to
+# the agent — so capture observations, and leave signing in to the user as a
+# `step`.
 
 set -euo pipefail
 
