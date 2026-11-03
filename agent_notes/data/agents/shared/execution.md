@@ -1,6 +1,6 @@
 ## Phase 1: Prompt analysis (do this first, before any action)
 
-Stop and think. Do NOT touch any tool until you complete this analysis internally.
+Do this analysis before touching any tool.
 
 ### 1. Understand intent
 
@@ -13,14 +13,14 @@ Stop and think. Do NOT touch any tool until you complete this analysis internall
 
 - **Trivial** (answer a question, single grep, one-line fix): do it yourself, no agents.
 - **Small** (1-3 files, single concern): one agent, maybe two sequential.
-- **Medium** (multiple files, cross-cutting concern): plan needed, 2-4 agents.
-- **Large** (whole codebase, multiple domains): full plan, parallel agents.
+- **Medium** (multiple files, cross-cutting concern): plan needed; one agent where one suffices.
+- **Large** (whole codebase, multiple domains): full plan; parallel agents for the independent parts only.
 
 ### 3. Decompose into subtasks
 
 - Break the request into discrete, independently verifiable units of work.
 - For each subtask define: what needs to happen, what files are involved, what the output is.
-- Identify hidden subtasks the user didn't mention but the work requires (e.g., user asks for a feature → you also need tests if the project has them, migration if DB changes).
+- Identify subtasks the user didn't mention but the work requires (e.g., user asks for a feature → tests if the project has them, a migration if DB changes). List them in the plan as proposals; don't add them silently.
 
 ### 4. Map dependencies and execution order
 
@@ -31,58 +31,40 @@ Stop and think. Do NOT touch any tool until you complete this analysis internall
 ### 5. Assign agents (cheapest that can do the job)
 
 For each subtask, pick the cheapest capable agent:
-- **Free** (do it yourself): one Read/Grep/Glob answers it.
-- **Cheap** (`explorer`, Haiku): read-only discovery, structure mapping, pattern search. One `explorer` call beats multiple self-reads.
+- **Free** (do it yourself): a handful of Read/Grep/Glob calls answers it.
+- **Cheap** (`explorer`, Haiku): read-only discovery, structure mapping, pattern search. One `explorer` call beats many self-reads.
 - **Medium** (`reviewer`, `security-auditor`, `system-auditor`, `database-specialist`, `performance-profiler`, `api-reviewer`): focused analysis of known files.
 - **Reasoner** (`architect`, Opus): deep system design, complex root-cause analysis. Use only when the problem requires multi-step reasoning that Sonnet cannot handle.
 - **Expensive** (`coder`, `test-writer`, `test-runner`): writes files, open-ended work.
 
 Rules:
-- Never use `coder` for read-only analysis. Never use Sonnet for a Haiku job.
-- Batch related edits: one `coder` call with 5 file edits beats 5 `coder` calls with 1 edit each.
-- Never spawn one agent per bullet point. Combine related subtasks into one agent call.
+- Never use `coder` for read-only analysis.
+- Batch related edits: one `coder` call with 5 file edits beats 5 `coder` calls with 1 edit each. Never spawn one agent per bullet point; combine related subtasks into one agent call.
 
-Verify the target agent has required tools — read-only agents cannot write files. Route edits to `coder` / `test-writer` / `refactorer` / `tech-writer` / `devops`.
-
-### 6. Write the plan
-
-Before delegating, output a brief plan to the user:
-```
-Plan:
-1. [subtask] → [agent] (parallel group A)
-2. [subtask] → [agent] (parallel group A)
-3. [subtask] → [agent] (after group A)
-4. Verify → lead reviews all results
-```
-This keeps the user informed and lets them course-correct before work starts.
+Verify the target agent has required tools — read-only agents cannot write files. Route edits to `coder` / `test-writer` / `refactorer` / `tech-writer` / `devops` / `integrations`.
 
 ## Phase 2: Execution
 
 ### Execution order
 
-**Broad tasks** (whole codebase, multiple domains, full audits): skip self-exploration — delegate immediately to specialized agents in parallel. Your job is to synthesize, not explore. If the project is already known from prior sessions or vault context, skip serial discovery and delegate immediately. If the project is new or unfamiliar, dispatch one `explorer` for structure mapping before parallel specialist dispatch.
+**Broad tasks** (whole codebase, multiple domains, full audits): your job is to synthesize, not explore. If the project is new or unfamiliar, dispatch one `explorer` for structure mapping, then dispatch specialists for the independent parts. If the project is already known from prior sessions or vault context, go straight to the specialists.
 
 **Narrow tasks** (known files, specific questions):
-1. Do free tasks yourself first (one or two reads/greps)
+1. Do lookups yourself first (a handful of reads/greps)
 2. One consolidated `explorer` call for remaining read-only work
-3. Parallel medium/expensive agents for what's left
-
-Never spawn one agent per bullet point from the user's prompt. Combine related subtasks into one agent call.
+3. Dispatch agents for what's left; run them in parallel only when the work is independent
 
 ### Delegation rules
 
-- `explorer` — file discovery, structure mapping, pattern search (Haiku, cheap)
+Delegate only work that is large, independent and parallelizable. Do not delegate work you can finish yourself in a handful of tool calls, and do not use subagents to verify or double-check your own work. Use one agent rather than several when one suffices. Keep spawn counts low.
+
+Each agent's description says what it does. Routing rules the descriptions do not state:
 - `coder` — all file edits and implementation work
-- `reviewer` — code quality checks after implementation
-- `architect` — system design, module boundaries, refactor planning (Opus, expensive — use sparingly)
-- `debugger` — bug investigation, root-cause analysis (Sonnet — hand fix to `coder`)
-- `security-auditor` — auth, input handling, data access
-- `test-writer` — create tests, `test-runner` — fix failing tests
-- `system-auditor` — codebase health: N+1, duplication, dead code
-- `database-specialist` — schema design, indexes, query performance, migrations
-- `performance-profiler` — response times, memory, caching, bundle size
-- `api-reviewer` — REST conventions, versioning, error handling, backward compatibility
-- `tech-writer` — documentation, `devops` — infrastructure
+- `architect` — system design, module boundaries, refactor planning (expensive — use sparingly)
+- `analyst` — when the request is vague, turn it into requirements and acceptance criteria before planning
+- `devil` — challenge a plan or design when the user asks, or before a large irreversible design
+- `integrations` — OAuth, webhooks, payments, third-party API clients
+- `refactorer` — behaviour-preserving cleanup
 
 Skip agents for: simple questions (answer directly), single-file edits (coder alone), or two-grep lookups (do it yourself).
 
@@ -92,10 +74,10 @@ Give each agent a specific task with all context (paths, criteria).
 
 Before dispatching `coder` / `refactorer` / `test-writer`, convert investigation output into an ordered execution checklist. Each item is one concrete change: `file path → exact edit → reason`, ordered by dependency. The lead owns decomposition; the agent owns execution.
 
-- Pass the investigation's concrete findings (`file:line` + the precise change) into the brief VERBATIM. Never re-summarize them into vague prose that forces the agent to re-discover what was already mapped.
-- The agent EXECUTES the checklist as a batch and must NOT re-read or re-explore code the checklist already specifies. It stops and reports only if a chunk's premise turns out wrong.
+- Pass the investigation's concrete findings (`file:line` + the precise change) into the brief verbatim. Don't re-summarize them into vague prose that forces the agent to re-discover what was already mapped.
+- The agent executes the checklist as a batch and does not re-read or re-explore code the checklist already specifies. It stops and reports only if a chunk's premise turns out wrong.
 - Calibrate chunk size: avoid both extremes — many one-edit micro-dispatches AND a single vague monolith task. Prefer medium, pre-chunked batches.
 
-### Permission pre-check (HARD RULE)
+### Background and foreground
 
-Before dispatching writing agents (`coder`, `test-writer`, `devops`, `refactorer`, `tech-writer`) in background: confirm Write/Edit/Bash permissions are granted. Background agents cannot surface permission prompts — they fail silently. Prefer foreground for writing agents, or ask the user to pre-approve. If a background agent fails on permissions, explain the blocker — do NOT write files yourself.
+Dispatch independent work in the background and keep working while it runs. Background permission prompts surface in the main session; prefer the foreground when an agent needs many approvals.

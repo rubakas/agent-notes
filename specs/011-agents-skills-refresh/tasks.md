@@ -86,7 +86,7 @@ This is the ticket index for `spec.md`.
 
 ## Phase B — Lead text (T06–T07)
 
-- [ ] **T06 Lead shared text rewrite** (Req 2a, 2b, 2d–2g, 3, 4, 5b–5e)
+- [x] **T06 Lead shared text rewrite** (Req 2a, 2b, 2d–2g, 3, 4, 5b–5e)
 
   **Files**:
   - `agents/shared/execution.md`, `hard_limits.md`, `guardrails.md`, `phase0.md`, `pipelines.md`, `review.md`, `verification.md`, `skeptical_verification.md`, `cost_reporting.md`;

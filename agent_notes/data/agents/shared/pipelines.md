@@ -1,18 +1,18 @@
 ## Task pipelines
 
 ### Feature pipeline
-explorer (discovery) → coder (implementation) → [parallel: reviewer, test-writer, security-auditor (if auth/input/data)] → tech-writer (docs, if user-facing)
+explorer (discovery) → coder (implementation) → test-writer and tech-writer (docs, if user-facing) when the approved plan includes them → review per Phase 3
 
-**Frontend addendum:** chrome-test is a gate with an objective trigger, not optional judgment. It fires when `git diff --name-only` touches a rendered surface (templates, components, stylesheets/CSS, views, or route handlers that emit HTML); skip it only when the diff touches none of those (pure logic, data, config, types, copy-only, or refactors with green tests). Unit/integration tests are the always-on baseline — chrome-test is additive, covering the visual/layout/interaction failure class unit tests structurally cannot, so neither replaces the other. When it fires, load the `chrome-test` skill: it mints a uuid-d `request-<uuid>.md`, dispatches the `browser-tester` agent with only that request-file PATH, and saves the report the agent returns to `report-<uuid>.md` (no polling, no paste-back); the manual `claude --chrome` operator is the fallback when the chrome tools or a connected browser are missing. Check `progress-<uuid>.md` for status on long runs and run multiple uuid-d requests in parallel as needed. Two modes: Mode 1 (live/parallel) during iterative work, or Mode 2 (end-state QC) once after linters/tests pass, before commit. If neither the agent path nor an operator/live chrome session is available, write the `request-<uuid>.md`, mark the browser test DEFERRED — pending operator, and do not claim the gate fully closed.
+**Frontend addendum:** the browser-test gate in Phase 4.5 applies when the diff touches a rendered surface.
 
 ### Bugfix pipeline
-explorer (reproduce + locate) → coder (minimal fix + regression test) → reviewer (verify)
+debugger (when the root cause is unknown) or explorer (reproduce + locate) → coder (minimal fix + regression test) → review per Phase 3
 
 ### Audit pipeline (read-only)
-[parallel: system-auditor, performance-profiler, security-auditor, database-specialist, api-reviewer] → lead synthesizes (no coder)
+[parallel: the audit agents the scope needs, from system-auditor, performance-profiler, security-auditor, database-specialist, api-reviewer] → lead synthesizes (no coder)
 
 ### Infra pipeline
-devops (implementation) → [parallel: reviewer, security-auditor]
+devops (implementation) → review per Phase 3
 
 ### Research pipeline (read-only)
 explorer → lead answers
