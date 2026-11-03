@@ -255,7 +255,7 @@ This is the ticket index for `spec.md`.
 
   **Note** (2026-11-03): passed; see spec T11 results.
 
-- [ ] **T12 Final validation** (all)
+- [x] **T12 Final validation** (all)
 
   Run:
   - `uv run pytest` on 3.14 and 3.11;
@@ -263,6 +263,8 @@ This is the ticket index for `spec.md`.
   - `agent-notes validate`;
   - the SC-005 to SC-009 gates;
   - the real-HOME snapshot diff before and after the test suite.
+
+  **Result (2026-11-03):** passed. `uv run pytest -q`: 3166 passed on Python 3.14 and 3.11. `agent-notes build`: ok. `agent-notes validate`: 0 errors, 0 warnings. SC-005: 19 of 19 rendered Claude agents parse with `yaml.safe_load`, carry `omitClaudeMd: true` and have no `Agent` tool. SC-006: the rendered CLAUDE.md is 287 lines (330 at `6b5f77a`; the spec baseline was 317 at `f20fff2`). SC-007, SC-014 and SC-015: every grep gate returns 0 hits, and chrome-test SKILL.md is 13,482 bytes. SC-011: `find -newer` over `~/.claude`, `~/.agent-notes`, `~/.config/opencode`, `~/.codex` and `~/.agents` was empty after both suite runs, excluding Claude Code's own session and runtime dirs.
 
 ## Dependencies
 

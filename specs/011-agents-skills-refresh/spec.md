@@ -2,7 +2,7 @@
 
 **Feature Branch**: `feat/agents-skills-refresh`, cut from `feat/chrome-test-agent` (PR #48, stacked on #47)
 **Created**: 2026-10-30
-**Status**: Draft
+**Status**: Implemented 2026-11-03 on feat/agents-skills-refresh (not pushed)
 **Input**: The owner, 2026-10-30:
 - "review our skills and their content, recheck each skill except rails, some of them imported from open source, update them if needed"
 - "check the agents instructions, i guess some rules updated in claude - read the off doc"
