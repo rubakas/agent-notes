@@ -28,7 +28,7 @@ This is the ticket index for `spec.md`.
 
   **Acceptance**: unit tests cover a quoted description containing `: ` and `"`, `omitClaudeMd` emitted and absent, and `background` emitted.
 
-- [ ] **T03 agents.yaml** (Req 1b, 1d, 1e, 1f, 6b; after T02)
+- [x] **T03 agents.yaml** (Req 1b, 1d, 1e, 1f, 6b; after T02)
 
   **Files**: `agents/agents.yaml`, `tests/unit/services/` (new test file, or extend `test_browser_tester_agent.py`)
 
