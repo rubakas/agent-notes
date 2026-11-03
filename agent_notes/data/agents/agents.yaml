@@ -10,9 +10,6 @@ agents:
     effort: high
     claude_exclude: true
     codex_exclude: true
-    claude:
-      tools: "Agent(coder, reviewer, security-auditor, test-writer, test-runner, system-auditor, database-specialist, performance-profiler, api-reviewer, tech-writer, devops, explorer), Read, Grep, Glob, Bash"
-      memory: user
     opencode:
       permission:
         edit: allow
@@ -27,6 +24,7 @@ agents:
     claude:
       tools: "Read, Write, Edit, Bash, Grep, Glob"
       memory: user
+      omitClaudeMd: true
     opencode:
       permission:
         edit: allow
@@ -39,8 +37,8 @@ agents:
     color: yellow
     effort: medium
     claude:
-      disallowedTools: "Write, Edit"
-      memory: user
+      tools: "Read, Grep, Glob, Bash, WebFetch"
+      omitClaudeMd: true
     opencode:
       permission:
         edit: deny
@@ -59,8 +57,8 @@ agents:
     color: red
     effort: medium
     claude:
-      disallowedTools: "Write, Edit"
-      memory: user
+      tools: "Read, Grep, Glob, Bash, WebFetch"
+      omitClaudeMd: true
     opencode:
       permission:
         edit: deny
@@ -81,6 +79,7 @@ agents:
     claude:
       tools: "Read, Grep, Glob"
       disallowedTools: "Write, Edit, Bash"
+      omitClaudeMd: true
     opencode:
       permission:
         edit: deny
@@ -99,6 +98,7 @@ agents:
     claude:
       tools: "Read, Write, Edit, Bash, Grep, Glob"
       memory: user
+      omitClaudeMd: true
     opencode:
       permission:
         edit: allow
@@ -113,6 +113,7 @@ agents:
     claude:
       tools: "Read, Write, Edit, Bash, Grep, Glob"
       memory: user
+      omitClaudeMd: true
     opencode:
       permission:
         edit: allow
@@ -125,8 +126,8 @@ agents:
     color: orange
     effort: medium
     claude:
-      disallowedTools: "Write, Edit"
-      memory: user
+      tools: "Read, Grep, Glob, Bash, WebFetch"
+      omitClaudeMd: true
     opencode:
       permission:
         edit: deny
@@ -144,8 +145,8 @@ agents:
     color: cyan
     effort: medium
     claude:
-      disallowedTools: "Write, Edit"
-      memory: user
+      tools: "Read, Grep, Glob, Bash, WebFetch"
+      omitClaudeMd: true
     opencode:
       permission:
         edit: deny
@@ -163,8 +164,8 @@ agents:
     color: purple
     effort: medium
     claude:
-      disallowedTools: "Write, Edit"
-      memory: user
+      tools: "Read, Grep, Glob, Bash, WebFetch"
+      omitClaudeMd: true
     opencode:
       permission:
         edit: deny
@@ -184,8 +185,8 @@ agents:
     color: cyan
     effort: medium
     claude:
-      disallowedTools: "Write, Edit"
-      memory: user
+      tools: "Read, Grep, Glob, Bash, WebFetch"
+      omitClaudeMd: true
     opencode:
       permission:
         edit: deny
@@ -206,6 +207,7 @@ agents:
       tools: "Read, Write, Edit, Grep, Glob"
       disallowedTools: "Bash"
       memory: user
+      omitClaudeMd: true
     opencode:
       permission:
         edit: allow
@@ -223,6 +225,7 @@ agents:
     claude:
       tools: "Read, Write, Edit, Bash, Grep, Glob"
       memory: user
+      omitClaudeMd: true
     opencode:
       permission:
         edit: allow
@@ -251,6 +254,7 @@ agents:
     claude:
       tools: "Read, Grep, Glob, WebFetch"
       disallowedTools: "Write, Edit, Bash"
+      omitClaudeMd: true
     opencode:
       permission:
         edit: deny
@@ -270,6 +274,7 @@ agents:
     claude:
       tools: "Read, Grep, Glob, WebFetch"
       disallowedTools: "Write, Edit, Bash"
+      omitClaudeMd: true
     opencode:
       permission:
         edit: deny
@@ -288,6 +293,7 @@ agents:
     claude:
       tools: "Read, Grep, Glob, WebFetch"
       disallowedTools: "Write, Edit, Bash"
+      omitClaudeMd: true
     opencode:
       permission:
         edit: deny
@@ -305,6 +311,7 @@ agents:
     claude:
       tools: "Read, Grep, Glob, Bash, WebFetch"
       disallowedTools: "Write, Edit"
+      omitClaudeMd: true
     opencode:
       permission:
         edit: deny
@@ -333,6 +340,7 @@ agents:
     claude:
       tools: "Read, Write, Edit, Bash, Grep, Glob, WebFetch"
       memory: user
+      omitClaudeMd: true
     opencode:
       permission:
         edit: allow
@@ -347,6 +355,7 @@ agents:
     claude:
       tools: "Read, Write, Edit, Bash, Grep, Glob"
       memory: user
+      omitClaudeMd: true
     opencode:
       permission:
         edit: allow
@@ -360,6 +369,8 @@ agents:
     effort: medium
     claude:
       tools: "ToolSearch, Read, Write, mcp__claude-in-chrome__list_connected_browsers, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__tabs_close_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__find, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__javascript_tool, mcp__claude-in-chrome__read_console_messages, mcp__claude-in-chrome__read_network_requests, mcp__claude-in-chrome__resize_window"
+      omitClaudeMd: true
+      background: true
     opencode:
       exclude: true
     codex:

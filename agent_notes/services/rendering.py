@@ -51,12 +51,17 @@ def expand_includes(text: str, shared_dir: Path, skip: Optional[set] = None) -> 
 
     # Pattern matches <!-- include: NAME --> on its own line with optional whitespace
     # NAME must be [a-z0-9_-]+
-    pattern = r'^\s*<!--\s*include:\s*([a-z0-9_-]+)\s*-->\s*$'
+    pattern = r'^[ \t]*<!--\s*include:\s*([a-z0-9_-]+)\s*-->[ \t]*$'
+
+    # A skipped include goes with the blank lines before it, so it leaves no gap behind.
+    for name in _skip:
+        text = re.sub(
+            r'\n*^[ \t]*<!--\s*include:\s*' + re.escape(name) + r'\s*-->[ \t]*$',
+            '', text, flags=re.MULTILINE,
+        )
 
     def replace_include(match):
         include_name = match.group(1)
-        if include_name in _skip:
-            return ""
         include_file = shared_dir / f"{include_name}.md"
 
         if not include_file.exists():
@@ -67,6 +72,45 @@ def expand_includes(text: str, shared_dir: Path, skip: Optional[set] = None) -> 
         return content.rstrip('\n')
 
     return re.sub(pattern, replace_include, text, flags=re.MULTILINE)
+
+
+# Per-backend tool names for the shared lead text. Claude Code's names come from
+# code.claude.com/docs/en/sub-agents; OpenCode's from opencode.ai/docs/tools and
+# /agents (no resume tool is documented); Codex names no tool functions
+# (learn.chatgpt.com/docs/agent-configuration/subagents), so it gets neutral wording.
+_NEUTRAL_TOOL_NAMES = {
+    "AGENT_TOOL": "spawn a subagent",
+    "RESUME_TOOL": "steer the same subagent thread",
+    "TODO_LINE": "",
+}
+_TOOL_NAMES = {
+    "claude": {
+        "AGENT_TOOL": "the `Agent` tool",
+        "RESUME_TOOL": "continue it with `SendMessage` to its id or name",
+        "TODO_LINE": "",
+    },
+    "opencode": {
+        "AGENT_TOOL": "the `task` tool",
+        "RESUME_TOOL": ("send the correction to the same subagent session if your CLI supports it; "
+                        "otherwise start a new one with the prior findings"),
+        "TODO_LINE": "- Track progress with `todowrite`",
+    },
+}
+
+
+def _substitute_tool_names(text: str, backend_name: str) -> str:
+    """Fill {{AGENT_TOOL}}, {{RESUME_TOOL}} and {{TODO_LINE}} for one backend.
+
+    An empty {{TODO_LINE}} removes its whole line, so no blank list item is left behind.
+    """
+    names = _TOOL_NAMES.get(backend_name, _NEUTRAL_TOOL_NAMES)
+    for key, value in names.items():
+        placeholder = "{{" + key + "}}"
+        if value:
+            text = text.replace(placeholder, value)
+        else:
+            text = re.sub(r"^[ \t]*" + re.escape(placeholder) + r"[ \t]*\n?", "", text, flags=re.MULTILINE)
+    return text
 
 
 def _load_frontmatter_template(template_name):
@@ -413,6 +457,9 @@ def generate_agent_files(agents_config: Dict[str, Any],
         # Expand shared-content include directives (<!-- include: NAME -->)
         # No-op if shared/ directory is absent.
         _agent_include_skip = _plugin_include_skip(user_config)
+        if _st is not None and _st.memory.backend != "obsidian":
+            # The Discoveries relay only has a reader on the obsidian backend.
+            _agent_include_skip = _agent_include_skip | {"discoveries"}
         prompt_content = expand_includes(prompt_content, AGENTS_DIR / "shared", skip=_agent_include_skip)
 
         # Substitute {{MEMORY_PATH}} with the configured vault/memory path.
@@ -475,7 +522,7 @@ def generate_agent_files(agents_config: Dict[str, Any],
             }
             
             # Apply post-processing transformation (e.g., strip memory section)
-            body = template.post_process(prompt_content, ctx)
+            body = template.post_process(_substitute_tool_names(prompt_content, backend.name), ctx)
 
             # Apply user patch if present
             patch = get_patch(agent_name, user_config)
@@ -537,6 +584,7 @@ def render_globals(memory=None, enabled_plugins: Optional[Dict[str, bool]] = Non
     claude_global_content = claude_global_content.replace(
         "{{MEMORY_INSTRUCTIONS}}", _memory_instructions(st)
     )
+    claude_global_content = _substitute_tool_names(claude_global_content, "claude")
     claude_global = DIST_CLAUDE_DIR / 'CLAUDE.md'
     claude_global.parent.mkdir(parents=True, exist_ok=True)
     claude_global.write_text(claude_global_content)

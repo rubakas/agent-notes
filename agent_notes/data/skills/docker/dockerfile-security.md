@@ -18,7 +18,7 @@ By default, Docker containers run as UID 0 (root). If the container is compromis
 
 **UIDs below 10,000 are a security risk** on several systems. If someone manages to escalate privileges outside the Docker container, their Docker container UID may overlap with a more privileged system user's UID, granting them additional permissions.
 
-**Best Practice**: Always run processes as a **UID above 10,000**.
+**Best Practice**: Always run processes as a **UID above 10,000**. (The stock Rails Dockerfile in `dockerfile-patterns.md` uses UID 1000.)
 
 ```dockerfile
 # Alpine - Use UID > 10000 for security

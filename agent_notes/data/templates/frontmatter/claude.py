@@ -21,7 +21,9 @@ def render(ctx: dict) -> str:
     
     frontmatter = ['---']
     frontmatter.append(f'name: {agent_name}')
-    frontmatter.append(f'description: {agent_config["description"]}')
+    description = agent_config["description"].replace('\\', '\\\\').replace('"', '\\"')
+    description = description.replace('\n', '\\n').replace('\r', '\\r')
+    frontmatter.append(f'description: "{description}"')
     frontmatter.append(f'model: {model_str}')
     
     # Add Claude-specific settings
@@ -32,6 +34,9 @@ def render(ctx: dict) -> str:
         frontmatter.append(f'disallowedTools: {claude_config["disallowedTools"]}')
     if 'memory' in claude_config:
         frontmatter.append(f'memory: {claude_config["memory"]}')
+    for flag in ('omitClaudeMd', 'background'):
+        if flag in claude_config:
+            frontmatter.append(f'{flag}: {"true" if claude_config[flag] else "false"}')
     
     # Add metadata
     frontmatter.append(f'color: {agent_config["color"]}')

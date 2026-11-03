@@ -24,13 +24,8 @@ Recommendation shape: *"Define a port at the seam, implement an HTTP adapter for
 
 Third-party services (Stripe, Twilio, etc.) you don't control. The deepened module takes the external dependency as an injected port; tests provide a mock adapter.
 
-## Seam discipline
-
-- Apply the one-adapter-is-hypothetical rule from [SKILL.md](SKILL.md): don't introduce a port unless at least two adapters are justified (typically production + test). A single-adapter seam is just indirection.
-
 ## Testing strategy: replace, don't layer
 
-- Old unit tests on shallow modules become waste once tests at the deepened module's interface exist — delete them.
+- Old unit tests on shallow modules become waste once interface-level tests cover the same behaviour and pass — then delete them.
 - Write new tests at the deepened module's interface. The **interface is the test surface**.
-- Tests assert on observable outcomes through the interface, not internal state.
-- Tests should survive internal refactors — they describe behaviour, not implementation. If a test has to change when the implementation changes, it's testing past the interface.
+- Tests assert on observable outcomes through the interface, not internal state, and should survive internal refactors. If a test has to change when the implementation changes, it's testing past the interface.

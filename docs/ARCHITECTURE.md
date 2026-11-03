@@ -142,6 +142,7 @@ allow:
 - `stop_hook` — Backend supports Stop hook (Claude: yes, OpenCode: yes, GitHub Copilot: no)
 - `allow_entries` — Backend supports permission allow-list (Claude: yes, OpenCode: no)
 - `pretooluse_hooks` — Backend supports PreToolUse hooks (Claude: yes, OpenCode: yes, GitHub Copilot: no)
+- `subagent_caps` — Backend takes the subagent depth and concurrency caps (Claude only): `install` merges `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` and `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` into the `env` block of settings.json.
 
 If a plugin's hook or allow-entry has a `requires` gate, it is only installed if the backend supports that capability. This allows plugins to gracefully degrade on backends that don't support all features.
 

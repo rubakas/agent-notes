@@ -1,6 +1,6 @@
 ---
 name: git
-description: "Guides git work: analyzing changes, chunking commits, writing conventional commit messages and pull requests. Use when the user asks to commit, create a PR, or says 'git'."
+description: "Splits changes into logical commits, writes '#<ticket> type(scope): description' messages, and drafts pull requests. Use when the user asks to commit or create a PR."
 group: process
 ---
 
@@ -34,6 +34,7 @@ Group related changes into small, focused commits. Each commit should represent 
 - Don't mix formatting with bug fixes
 - Separate test changes if they cover different features
 - New file + its test = one commit is fine
+- If one file holds two chunks, commit it with the chunk it mostly belongs to, or tell the user (staging is by file; `git add -p` is interactive)
 
 ### 3. Stage and commit each chunk
 
@@ -59,7 +60,7 @@ git status
 
 - **No body, no description** — title only
 - **Short** — under 72 characters
-- **Lowercase** — no capital letters after the colon
+- **Lowercase** — start the description lowercase
 - Extract ticket number from branch name when available
 - **No AI attribution** — never add `Co-Authored-By`, "Generated with", `🤖`, or any model/tool signature to commit messages or PR descriptions (see the no-ai-attribution rule)
 

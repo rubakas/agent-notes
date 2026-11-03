@@ -31,9 +31,9 @@ fewer than 100 entries.
 
 ### User-only skills
 
-Nine skills set `disable-model-invocation: true`: grill-me, grill-with-docs, handoff,
-improve-codebase-architecture, setup-agent-tracker, to-spec, to-tickets, triage,
-wayfinder. The model cannot auto-trigger them. For these:
+Twelve skills set `disable-model-invocation: true`: grill-me, grill-with-docs, handoff,
+improve-codebase-architecture, migrate-memory, rsi, security-audit, setup-agent-tracker,
+to-spec, to-tickets, triage, wayfinder. The model cannot auto-trigger them. For these:
 
 - `should_trigger` prompts are slash invocations (`/to-tickets specs/012/spec.md`);
   `expected_behaviour` describes what the skill must do once invoked.

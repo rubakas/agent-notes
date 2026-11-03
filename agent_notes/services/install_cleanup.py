@@ -355,11 +355,13 @@ def dropped_hook_backends(old: Optional[ScopeState], new_clis: Iterable[str], sc
     return dropped
 
 
-def remove_dropped_hooks(backends: Iterable, scope: str) -> None:
+def remove_dropped_hooks(backends: Iterable, scope: str, old: Optional[ScopeState] = None) -> None:
+    """*old* is the replaced install: its record says which settings.json env keys are ours."""
     from . import installer
     for backend in backends:
+        env = installer._recorded_env(old, backend.name)
         if _fs.silent_file_ops:
             with _fs.quiet_output():
-                installer._uninstall_session_hook(backend, scope)
+                installer._uninstall_session_hook(backend, scope, env=env)
         else:
-            installer._uninstall_session_hook(backend, scope)
+            installer._uninstall_session_hook(backend, scope, env=env)

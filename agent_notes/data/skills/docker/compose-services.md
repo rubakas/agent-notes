@@ -103,6 +103,7 @@ volumes:
 ## Python/Django with Celery
 
 ```yaml
+# db, redis and app_network are defined in compose-infrastructure.md
 services:
   web:
     build:

@@ -9,15 +9,18 @@
 # Coverage rule (enforced by test_evals.py): every skill directory has at least
 # 3 should_trigger and 1 near_miss entry, and the file has at least 100 entries.
 #
-# USER-ONLY SKILLS. Nine skills set `disable-model-invocation: true`:
+# USER-ONLY SKILLS. Twelve skills set `disable-model-invocation: true`:
 # grill-me, grill-with-docs, handoff, improve-codebase-architecture,
-# setup-agent-tracker, to-spec, to-tickets, triage, wayfinder.
+# migrate-memory, rsi, security-audit, setup-agent-tracker, to-spec,
+# to-tickets, triage, wayfinder.
 # The model cannot auto-trigger them, so for these skills:
 #   - should_trigger prompts are SLASH INVOCATIONS (the user types /<skill> ...),
 #     and expected_behaviour describes what the skill must do once invoked.
 #   - near_miss prompts are NATURAL requests where the model must NOT run the
 #     skill itself. It may suggest that the user run the slash command.
 # Model-invocable skills use natural-language prompts for both categories.
+# codebase-design sets `user-invocable: false`: it is background vocabulary the
+# model loads itself, and it has no slash command, so it stays on natural prompts.
 
 # ---------------------------------------------------------------- chrome-test
 - skill: chrome-test
@@ -518,6 +521,28 @@
   category: near_miss
   prompt: "the export endpoint returns a 500 intermittently, find out why"
   expected_behaviour: "Does not load rsi. Routes to diagnosing-bugs (a specific failing behaviour to diagnose)."
+
+# ------------------------------------------------------------- security-audit
+- skill: security-audit
+  category: should_trigger
+  prompt: "/security-audit audit ."
+  expected_behaviour: "Runs full audit mode: states that execution is source-only on Claude Code, asks the mode, profile, scope, budget and output-directory questions once inside the plan with the estimated agent count, then starts reconnaissance."
+- skill: security-audit
+  category: should_trigger
+  prompt: "/security-audit guide the webhook handler in src/hooks"
+  expected_behaviour: "Runs guidance mode: reads ATTACK-CLASSES.md and the one matching companion, applies Universal execution safety, creates no files, and answers in chat."
+- skill: security-audit
+  category: should_trigger
+  prompt: "/security-audit full pen test of this repo, I want a report with the verified findings"
+  expected_behaviour: "Runs full audit mode: fans out hunters in batches within the concurrency cap, verifies each candidate with a fresh agent, validates findings.json with the two validators and writes the report outside the repo."
+- skill: security-audit
+  category: near_miss
+  prompt: "can you do a security audit of this codebase?"
+  expected_behaviour: "Does not run the security-audit skill itself, since it is user-only. May suggest the user run /security-audit; may route a diff-level review to the security-auditor agent."
+- skill: security-audit
+  category: near_miss
+  prompt: "review my changes on this branch for security problems"
+  expected_behaviour: "Does not load security-audit. Routes to the security-auditor agent or the code-review skill (a diff review, not a codebase audit)."
 
 # ---------------------------------------------------------- setup-agent-tracker
 - skill: setup-agent-tracker

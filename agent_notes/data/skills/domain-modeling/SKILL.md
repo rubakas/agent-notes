@@ -1,26 +1,18 @@
 ---
 name: domain-modeling
-description: "Builds and sharpens a project's domain model: terminology, ubiquitous language and architectural decisions. Use when the user wants to pin down domain terms or record an architectural decision, or when another skill must maintain the model."
+description: "Builds and sharpens a project's domain model: terminology and architectural decisions. Use when discussing codebase terminology, writing or editing a CONTEXT.md, recording or editing an ADR, or when another skill must maintain the model."
 group: domain
 ---
 
 # Domain Modeling
 
-Actively build and sharpen the project's domain model as you design. This is the *active* discipline — challenging terms, inventing edge-case scenarios, and writing the glossary and decisions down the moment they crystallise.
+Actively build and sharpen the project's domain model as you design: challenge terms, invent edge-case scenarios, and write the glossary and decisions down the moment they crystallise.
+
+Stop writing when the user ends the discussion; leave unresolved terms out of `CONTEXT.md`.
 
 ## File structure
 
-Most repos have a single context:
-
-```
-/
-├── CONTEXT.md
-├── docs/
-│   └── adr/
-│       ├── 0001-event-sourced-orders.md
-│       └── 0002-postgres-for-write-model.md
-└── src/
-```
+Most repos have a single context: one `CONTEXT.md` and a `docs/adr/` directory at the root.
 
 If a `CONTEXT-MAP.md` exists at the root, the repo has multiple contexts. The map points to where each one lives:
 

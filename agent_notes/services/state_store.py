@@ -235,6 +235,8 @@ def _backend_to_dict(b: BackendState) -> dict:
         d["local_dir_override"] = b.local_dir_override
     if b.global_home_override:
         d["global_home_override"] = b.global_home_override
+    if b.settings_env:
+        d["settings_env"] = dict(b.settings_env)
     return d
 
 
@@ -299,6 +301,7 @@ def _backend_from_dict(data: dict) -> BackendState:
         installed=installed,
         local_dir_override=data.get("local_dir_override", ""),
         global_home_override=data.get("global_home_override", ""),
+        settings_env={k: v for k, v in (data.get("settings_env") or {}).items() if isinstance(v, str)},
     )
 
 

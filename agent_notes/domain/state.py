@@ -29,6 +29,8 @@ class BackendState:
     # e.g. installed["agents"]["lead.md"] = InstalledItem(...)
     local_dir_override: str = ""     # e.g. ".claude-work", empty = use backend default
     global_home_override: str = ""   # e.g. "~/.claude-work", empty = use backend default
+    settings_env: dict[str, str] = field(default_factory=dict)
+    # settings_env: settings.json env keys agent-notes added -> the value it wrote
 
 
 @dataclass

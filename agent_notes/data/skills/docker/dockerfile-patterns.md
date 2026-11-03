@@ -36,7 +36,7 @@ RUN addgroup -g 10001 -S nodejs && \
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production && \
+RUN npm ci --omit=dev && \
     npm cache clean --force
 
 # Copy built assets
@@ -195,7 +195,7 @@ ARG BUILD_DATE
 ARG VERSION
 
 RUN if [ "$NODE_ENV" = "production" ]; then \
-      npm ci --only=production; \
+      npm ci --omit=dev; \
     else \
       npm ci; \
     fi
@@ -243,7 +243,7 @@ RUN addgroup -g 10001 -S nodejs && \
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 COPY --chown=nodejs:nodejs . .
 
