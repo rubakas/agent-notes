@@ -1,7 +1,8 @@
 ---
 name: migrate-memory
-description: "Reconcile the Obsidian vault to the latest canonical format. Use after upgrading agent-notes or when vault structure looks outdated or inconsistent."
+description: "Reconciles the Obsidian vault to the current folder layout, note frontmatter, filenames and Index.md format. Use when the user says 'migrate memory' or runs /migrate-memory, after upgrading agent-notes, or when vault notes look outdated."
 group: process
+disable-model-invocation: true
 requires_memory: obsidian
 ---
 
