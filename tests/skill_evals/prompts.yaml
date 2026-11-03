@@ -9,15 +9,18 @@
 # Coverage rule (enforced by test_evals.py): every skill directory has at least
 # 3 should_trigger and 1 near_miss entry, and the file has at least 100 entries.
 #
-# USER-ONLY SKILLS. Nine skills set `disable-model-invocation: true`:
+# USER-ONLY SKILLS. Twelve skills set `disable-model-invocation: true`:
 # grill-me, grill-with-docs, handoff, improve-codebase-architecture,
-# setup-agent-tracker, to-spec, to-tickets, triage, wayfinder.
+# migrate-memory, rsi, security-audit, setup-agent-tracker, to-spec,
+# to-tickets, triage, wayfinder.
 # The model cannot auto-trigger them, so for these skills:
 #   - should_trigger prompts are SLASH INVOCATIONS (the user types /<skill> ...),
 #     and expected_behaviour describes what the skill must do once invoked.
 #   - near_miss prompts are NATURAL requests where the model must NOT run the
 #     skill itself. It may suggest that the user run the slash command.
 # Model-invocable skills use natural-language prompts for both categories.
+# codebase-design sets `user-invocable: false`: it is background vocabulary the
+# model loads itself, and it has no slash command, so it stays on natural prompts.
 
 # ---------------------------------------------------------------- chrome-test
 - skill: chrome-test

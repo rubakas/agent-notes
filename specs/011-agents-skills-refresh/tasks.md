@@ -236,11 +236,16 @@ This is the ticket index for `spec.md`.
 
 ## Phase D — Docs, live check, validation (T10–T12)
 
-- [ ] **T10 Docs and evals** (Req 9)
+- [x] **T10 Docs and evals** (Req 9)
 
   **Files**: `CHANGELOG.md` (Unreleased), `README.md` (agent tools and lead wording), `tests/skill_evals/prompts.yaml` (changed descriptions only).
 
   **Acceptance**: `uv run pytest tests/skill_evals -q` passes.
+
+  **Note** (2026-11-03):
+  - CHANGELOG Unreleased, the README (agent tools, lead wording, the two env caps, skill count 25 to 26), and the `subagent_caps` flag in `docs/ARCHITECTURE.md` and `docs/WRITING_A_PLUGIN.md`.
+  - The `prompts.yaml` and `tests/skill_evals/README.md` user-only lists now name all 12 skills with `disable-model-invocation: true`, and note that codebase-design is `user-invocable: false`. No prompt entry changed.
+  - The `rsi` and `migrate-memory` `should_trigger` prompts are still natural language, not slash invocations; no test requires the change.
 
 - [x] **T11 Live dispatch check** (SC-010; done by the lead, after `agent-notes build` into a sandbox HOME or a headless run with the rendered agent file)
 
