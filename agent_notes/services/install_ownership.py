@@ -182,15 +182,17 @@ def path_key(path: Path) -> str:
 _records: dict[str, list[InstalledItem]] = {}
 _placed: Optional[dict[str, str]] = None   # copies this run wrote: path key -> tree sha then
 _claimed: Optional[Callable[[Path, str], bool]] = None
+_env: dict[str, dict[str, str]] = {}   # cli name -> the settings.json env keys it recorded
 
 
 @contextmanager
 def replacing(scope_state, claimed: Optional[Callable[[Path, str], bool]] = None) -> Iterator[None]:
     """Judge ownership against *scope_state*'s manifest for the duration of the block.
     *claimed(path, cli)* says whether another install still uses a path."""
-    global _records, _placed, _claimed
-    previous = _records, _placed, _claimed
+    global _records, _placed, _claimed, _env
+    previous = _records, _placed, _claimed, _env
     _records, _placed = {}, {}
+    _env = {name: dict(bs.settings_env) for name, bs in (scope_state.clis.items() if scope_state else ())}
     for bs in (scope_state.clis.values() if scope_state else ()):
         for items in bs.installed.values():
             for item in items.values():
@@ -203,7 +205,12 @@ def replacing(scope_state, claimed: Optional[Callable[[Path, str], bool]] = None
     try:
         yield
     finally:
-        _records, _placed, _claimed = previous
+        _records, _placed, _claimed, _env = previous
+
+
+def recorded_env(cli: str) -> dict[str, str]:
+    """The settings.json env keys (and values) the install in progress recorded for *cli*."""
+    return dict(_env.get(cli, {}))
 
 
 def note_placed(path: Path) -> None:

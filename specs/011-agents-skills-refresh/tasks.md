@@ -65,7 +65,7 @@ This is the ticket index for `spec.md`.
   - On the local backend it has no `## Discoveries`; on obsidian it does.
   - OpenCode and Codex output is unchanged apart from the include.
 
-- [ ] **T05 Subagent caps in settings.json** (Req 2c)
+- [x] **T05 Subagent caps in settings.json** (Req 2c)
 
   **Files**:
   - `agent_notes/services/settings_writer.py` (an env entry install/remove, following `install_allow_entry`/`remove_allow_entry`);

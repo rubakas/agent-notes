@@ -15,6 +15,14 @@ class Obsidian:
     SESSION_CAP = 5
 
 
+class SubagentCaps:
+    """Claude Code env settings that bound subagent fan-out (settings.json "env")."""
+    ENV = {
+        "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "1",
+        "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "5",
+    }
+
+
 class Hooks:
     """Hook command strings used in Claude Code settings.json."""
     MEMORY_BRIDGE = "agent-notes hook memory-bridge"

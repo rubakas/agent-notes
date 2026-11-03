@@ -22,7 +22,7 @@ from .. import config
 from . import fs as _fs
 from .ui import printable
 from .install_cleanup import claims_of_others, home_claimed, is_claimed
-from .install_ownership import home_is_valid, replacing
+from .install_ownership import home_is_valid, recorded_env, replacing
 from .state_store import load_state, get_scope
 
 # ---------------------------------------------------------------------------
@@ -242,8 +242,8 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
       pretooluse_hooks — PreToolUse credential guard (claude: true, codex: false)
       allow_entries    — Bash permission allow-list entries (claude: true, codex: false)
     """
-    from .settings_writer import install_hook, install_allow_entry, remove_allow_entry, remove_matching_allow_entries, remove_hook
-    from ..constants import Hooks
+    from .settings_writer import install_hook, install_allow_entry, remove_allow_entry, remove_matching_allow_entries, remove_hook, install_env_entries
+    from ..constants import Hooks, SubagentCaps
     from .session_context import write_context
     from ..registries.skill_registry import default_skill_registry
     from .. import config
@@ -299,6 +299,9 @@ def _install_session_hook(backend, scope: str, memory_backend: str = "", memory_
         remove_allow_entry(settings_path, "Bash(cost-report)")
         install_memory_allow_entries(settings_path, memory_backend, memory_path, current_state)
 
+    if backend.supports("subagent_caps"):
+        install_env_entries(settings_path, SubagentCaps.ENV)
+
     # Plugin-driven hooks and allow-entries (no-op until Task 5 ships manifests)
     _apply_plugin_settings(settings_path, backend, user_config)
 
@@ -312,7 +315,7 @@ def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memor
       pretooluse_hooks — PreToolUse credential guard (claude: true, codex: false)
       allow_entries    — Bash permission allow-list entries (claude: true, codex: false)
     """
-    from .settings_writer import remove_hook, remove_allow_entry, remove_matching_allow_entries
+    from .settings_writer import remove_hook, remove_allow_entry, remove_matching_allow_entries, remove_env_entries
     from ..constants import Hooks
     from ..memory.install import uninstall_memory_hooks
 
@@ -334,6 +337,9 @@ def _uninstall_session_hook(backend, scope: str, memory_backend: str = "", memor
         remove_allow_entry(settings_path, "Bash(cost-report)")
         # Read/Write/Edit entries for memory vault paths are intentionally kept —
         # the user may still want Claude to access their vault without agent-notes.
+
+    if backend.supports("subagent_caps"):
+        remove_env_entries(settings_path, recorded_env(backend.name))
 
     # Plugin-driven hooks and allow-entries — disable all so contributions are removed
     _all_disabled = {"enabled_plugins": {p.name: False for p in default_plugin_registry().all()}}
