@@ -2,11 +2,14 @@
 name: diagnosing-bugs
 description: Drives a reproduce, hypothesise, instrument, fix loop for hard bugs and performance regressions. Use when the user says 'diagnose' or 'debug this', or reports something broken, throwing, failing or slow. The `debugger` agent investigates one failure.
 group: process
+argument-hint: "[symptom or failing test]"
 ---
 
 # Diagnosing Bugs
 
-A discipline for hard bugs. Skip phases only when explicitly justified.
+A discipline for hard bugs. Phases 1-6 below are in order; skip one only with a stated reason.
+
+This skill is the main-session loop. The `debugger` agent is only for isolated read-only reproduction or bisecting.
 
 When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
 
@@ -16,25 +19,13 @@ This skill has you show commands, outputs and captured artifacts. **Redact every
 
 If the redacted output is not enough to diagnose the bug, say so and ask the user.
 
-## Rules
-
-- Build a tight feedback loop first (red-capable, deterministic, fast, agent-runnable)
-- Never jump to hypothesis or code without a red-capable feedback loop
-- Always reproduce the user's exact symptom (not a nearby bug)
-- Minimize to smallest scenario that still fails (every element must be load-bearing)
-- Generate and rank 3-5 hypotheses before testing any one
-- Change one variable at a time during instrumentation
-- Tag every debug log with a unique prefix for cleanup (e.g., `[DEBUG-a4f2]`)
-- Write regression test before the fix (only if a correct seam exists)
-- Re-run Phase 1 loop against the original scenario after the fix
-
 ---
 
 ## Phase 1 — Build a feedback loop
 
-**This is the skill.** Everything else is mechanical. If you have a **tight** pass/fail signal for the bug — one that goes red on _this_ bug — you will find the cause; bisection, hypothesis-testing, and instrumentation all just consume it. If you don't have one, no amount of staring at code will save you.
+Everything else is mechanical. If you have a **tight** pass/fail signal for the bug — one that goes red on _this_ bug — you will find the cause; bisection, hypothesis-testing, and instrumentation all just consume it. If you don't have one, no amount of staring at code will save you.
 
-Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give up.**
+Spend disproportionate effort here.
 
 ### Ways to construct one — try them in roughly this order
 
@@ -47,9 +38,7 @@ Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give
 7. **Property / fuzz loop.** If the bug is "sometimes wrong output", run 1000 random inputs and look for the failure mode.
 8. **Bisection harness.** If the bug appeared between two known states (commit, dataset, version), automate "boot at state X, check, repeat" so you can `git bisect run` it.
 9. **Differential loop.** Run the same input through old-version vs new-version (or two configs) and diff outputs.
-10. **HITL bash script.** Last resort. If a human must click, drive _them_ with `scripts/hitl-loop.template.sh` so the loop is still structured. Captured output feeds back to you.
-
-Build the right feedback loop, and the bug is 90% fixed.
+10. **HITL bash script.** Last resort. If a human must click, drive _them_: copy `scripts/hitl-loop.template.sh`, edit the steps, and ask the user to run it in their own terminal (Claude Code: `! bash <path>`) and paste the `KEY=VALUE` output. Your Bash tool has no TTY, so don't run it yourself.
 
 ### Tighten the loop
 
@@ -59,7 +48,7 @@ Treat the loop as a product. Once you have _a_ loop, **tighten** it:
 - Can I make the signal sharper? (Assert on the specific symptom, not "didn't crash".)
 - Can I make it more deterministic? (Pin time, seed RNG, isolate filesystem, freeze network.)
 
-A 30-second flaky loop is barely better than no loop; a 2-second deterministic one is tight — a debugging superpower.
+A 30-second flaky loop is barely better than no loop; a 2-second deterministic one is tight.
 
 ### Non-deterministic bugs
 
@@ -71,14 +60,14 @@ Stop and say so explicitly. List what you tried. Ask the user for: (a) access to
 
 ### Completion criterion — a tight loop that goes red
 
-Phase 1 is done when the loop is **tight** and **red-capable**: you can name **one command** — a script path, a test invocation, a curl — that you have **already run at least once** (show the invocation and its output, redacted), and that is:
+Phase 1 is done when you can name **one command** — a script path, a test invocation, a curl — that you have already run at least once (paste the invocation and its output, redacted), and that is:
 
-- [ ] **Red-capable** — it drives the actual bug code path and asserts the **user's exact symptom**, so it can go red on this bug and green once fixed. Not "runs without erroring" — it must be able to _catch this specific bug_.
+- [ ] **Red-capable** — it drives the actual bug code path and asserts the user's exact symptom, so it can go red on this bug and green once fixed. Not "runs without erroring".
 - [ ] **Deterministic** — same verdict every run (flaky bugs: a pinned, high reproduction rate, per above).
 - [ ] **Fast** — seconds, not minutes.
 - [ ] **Agent-runnable** — you can run it unattended; a human in the loop only via `scripts/hitl-loop.template.sh`.
 
-If you catch yourself reading code to build a theory before this command exists, **stop — jumping straight to a hypothesis is the exact failure this skill prevents.** No red-capable command, no Phase 2.
+No red-capable command, no Phase 2.
 
 ## Phase 2 — Reproduce + minimise
 
@@ -120,7 +109,7 @@ Tool preference:
 
 1. **Debugger / REPL inspection** if the env supports it. One breakpoint beats ten logs.
 2. **Targeted logs** at the boundaries that distinguish hypotheses.
-3. Never "log everything and grep".
+3. Don't "log everything and grep".
 
 **Tag every debug log** with a unique prefix, e.g. `[DEBUG-a4f2]`. Cleanup at the end becomes a single grep. Untagged logs survive; tagged logs die.
 

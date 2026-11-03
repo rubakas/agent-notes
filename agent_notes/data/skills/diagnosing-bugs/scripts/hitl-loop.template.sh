@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Human-in-the-loop reproduction loop.
 # Copy this file, edit the steps below, and run it.
-# The agent runs the script; the user follows prompts in their terminal.
+# The user runs the script in their own terminal (an agent's Bash tool has no TTY)
+# and pastes the KEY=VALUE output back to the agent.
 #
 # Usage:
 #   bash hitl-loop.template.sh
@@ -11,6 +12,10 @@
 #   capture VAR "<question>"      → show question, read response into VAR
 #
 # At the end, captured values are printed as KEY=VALUE for the agent to parse.
+#
+# `capture` prints its value back to the terminal, and the user pastes that
+# output to the agent — so capture observations, and leave signing in to the
+# user as a `step`.
 
 set -euo pipefail
 
