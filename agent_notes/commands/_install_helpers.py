@@ -145,7 +145,7 @@ def commit_install(new_state, snapshot, scope: str, project_path, profile_label:
     try:
         removed = cleanup.remove_stale(stale)
         cleanup.remove_dropped_hooks(
-            cleanup.dropped_hook_backends(old, new.clis, scope, project_path, claims, registry), scope)
+            cleanup.dropped_hook_backends(old, new.clis, scope, project_path, claims, registry), scope, old)
         cleanup.prune_empty(cleanup.prunable_dirs(old, scope, project_path, registry))
     except OSError as e:
         print(f"Error: the install was placed but could not remove the old install's files "

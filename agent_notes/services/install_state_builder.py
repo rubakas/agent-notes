@@ -8,7 +8,7 @@ from typing import Iterable, Optional
 
 from ..domain.state import State, ScopeState, BackendState, InstalledItem
 from ..services.install_ownership import tree_sha
-from ..services.state_store import load_state, now_iso, sha256_of, set_scope
+from ..services.state_store import load_state, now_iso, sha256_of, set_scope, get_scope
 
 CONTEXT_FILE = "agent-notes-context.md"
 
@@ -78,7 +78,7 @@ def build_install_state(
     
     # Import here to avoid circular import
     from ..registries.cli_registry import load_registry
-    from ..config import PKG_DIR, DIST_DIR, DIST_SKILLS_DIR, DIST_RULES_DIR, AGENTS_HOME
+    from ..config import PKG_DIR, DIST_DIR, DIST_SKILLS_DIR, DIST_RULES_DIR, AGENTS_HOME, placeable_skill_dirs
 
     # Build scope-specific install
     try:
@@ -93,10 +93,8 @@ def build_install_state(
     timestamp = now_iso()
 
     wanted = None if selected_skills is None else set(selected_skills)
-    placed_skills = sorted(
-        d for d in (DIST_SKILLS_DIR.iterdir() if DIST_SKILLS_DIR.exists() else ())
-        if d.is_dir() and (wanted is None or d.name in wanted)
-    )
+    placed_skills = [d for d in placeable_skill_dirs(DIST_SKILLS_DIR)
+                     if wanted is None or d.name in wanted]
     
     # Build CLIs dict for this scope
     clis = {}
@@ -226,6 +224,10 @@ def build_install_state(
                     sha=_skill_sha(skill_dir, mode), target=str(AGENTS_HOME / "skills" / skill_dir.name), mode=mode
                 )
 
+        if effective_backend.supports("subagent_caps"):
+            backend_state.settings_env = _owned_env(
+                effective_backend, scope, _prior_env(state, scope, project_path, profile_label, backend.name))
+
         if backend_has_content:
             clis[backend.name] = backend_state
     
@@ -244,6 +246,27 @@ def build_install_state(
     set_scope(state, scope, new_scope_state, project_path, profile_label=profile_label)
     
     return state
+
+
+def _prior_env(state: State, scope: str, project_path: Optional[Path], profile_label: str,
+               cli: str) -> dict[str, str]:
+    """The env keys the install being replaced recorded for *cli*."""
+    prior = get_scope(state, scope, project_path, profile_label)
+    backend_state = prior.clis.get(cli) if prior else None
+    return backend_state.settings_env if backend_state else {}
+
+
+def _owned_env(backend, scope: str, prior: dict[str, str]) -> dict[str, str]:
+    """The cap keys settings.json still holds at the value agent-notes wrote: those it added in
+    this run, and those the replaced install recorded."""
+    from ..constants import SubagentCaps
+    from .install_plan import _session_hook_paths
+    from .settings_writer import env_entries, env_written_this_run
+
+    settings_path = _session_hook_paths(backend, scope)[0]
+    held, written = env_entries(settings_path), env_written_this_run(settings_path)
+    return {key: value for key, value in SubagentCaps.ENV.items()
+            if held.get(key) == value and (key in written or prior.get(key) == value)}
 
 
 def _skill_sha(skill_dir: Path, mode: str) -> str:

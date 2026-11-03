@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import List
 
+from ... import config as _config
 from ...domain.diagnostics import Issue, FixAction
 from ..install_ownership import is_ours, lexical_target
 from ..ui import printable
@@ -92,6 +93,9 @@ def do_fix(issues: List[Issue], fix_actions: List[FixAction]) -> bool:
 
                 if source_file.exists():
                     file_path = Path(action.file)
+                    if _config.is_reserved_skill_entry(file_path):
+                        print(f"  {Color.RED}SKIPPED{Color.NC}   {printable(action.file)} (reserved by Claude Code)")
+                        continue
                     # What is there goes to a fresh backup, unless it is our own link
                     if file_path.is_symlink() and is_ours(file_path):
                         file_path.unlink()

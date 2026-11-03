@@ -42,6 +42,22 @@ DECLARED_DEVIATIONS = {
             "rate, 0.05x of its $4.00/MTok input rather than the usual 0.1x."
         ),
     },
+    ("Anthropic", "Claude Sonnet 5.5"): {
+        "rates": {"cache_read": 0.10},
+        "source": (
+            "https://platform.claude.com/docs/en/about-claude/pricing (checked "
+            "2026-10-30): Claude Sonnet 5.5 is published with a $0.10/MTok cache-read "
+            "rate, 0.05x of its $2.00/MTok input rather than the usual 0.1x."
+        ),
+    },
+    ("OpenAI", "GPT-6.1 Terra"): {
+        "rates": {"cache_read": 0.05},
+        "source": (
+            "https://developers.openai.com/api/docs/pricing (checked 2026-10-30): "
+            "GPT-6.1 Terra is published with a $0.05/MTok cached-input rate, 0.05x of "
+            "its $1.00/MTok input rather than the 0.1x most GPT rows use."
+        ),
+    },
     ("OpenAI", "GPT-6.1 Sol"): {
         "rates": {"cache_read": 0.10},
         "source": (

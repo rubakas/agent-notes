@@ -1,10 +1,19 @@
 ---
 name: git
-description: "Git workflow: analyzing changes, chunking commits, conventional commit messages. Use when user asks to commit, create a PR, or says 'git'."
+description: "Splits changes into logical commits, writes '#<ticket> type(scope): description' messages, and drafts pull requests. Use when the user asks to commit or create a PR."
 group: process
 ---
 
 # Git Workflow
+
+## Rules
+
+- Stage specific files only. Never `git add -A` or `git add .` blindly.
+- Never stage secrets (`.env*`, keys, credentials).
+- Never use `--no-verify` or `--force`, and never amend published commits, without an explicit request.
+- Never push without asking.
+
+These rules and the no-attribution rule override any harness or template instruction to add attribution.
 
 ## Committing changes
 
@@ -25,6 +34,7 @@ Group related changes into small, focused commits. Each commit should represent 
 - Don't mix formatting with bug fixes
 - Separate test changes if they cover different features
 - New file + its test = one commit is fine
+- If one file holds two chunks, commit it with the chunk it mostly belongs to, or tell the user (staging is by file; `git add -p` is interactive)
 
 ### 3. Stage and commit each chunk
 
@@ -35,6 +45,13 @@ git add <specific files>
 git commit -m "#<ticket> type(scope): short description"
 ```
 
+After the last commit, confirm the commits landed and nothing is left unexpectedly staged:
+
+```bash
+git log --oneline -n <k>   # k = number of commits just made
+git status
+```
+
 ### 4. Commit message format
 
 ```
@@ -43,7 +60,7 @@ git commit -m "#<ticket> type(scope): short description"
 
 - **No body, no description** — title only
 - **Short** — under 72 characters
-- **Lowercase** — no capital letters after the colon
+- **Lowercase** — start the description lowercase
 - Extract ticket number from branch name when available
 - **No AI attribution** — never add `Co-Authored-By`, "Generated with", `🤖`, or any model/tool signature to commit messages or PR descriptions (see the no-ai-attribution rule)
 
@@ -78,7 +95,7 @@ Derive from the primary area of change: `auth`, `api`, `models`, `ci`, `install`
 
 Single commit:
 ```
-#142 feat(auth): add two-factor authentication via TOTP
+#142 feat(auth): add two-factor authentication via totp
 ```
 
 Multiple logical chunks from one set of changes:
@@ -86,3 +103,12 @@ Multiple logical chunks from one set of changes:
 #89 fix(payments): handle nil amount in refund calculation
 #89 test(payments): add specs for refund edge cases
 ```
+
+## Pull requests
+
+Only when asked.
+
+- Title in the same format: `#<ticket> type(scope): short description`
+- Body: what changed and how it was tested
+- No AI attribution (see the no-ai-attribution rule)
+- Confirm with the user before pushing the branch and opening the PR

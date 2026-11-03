@@ -16,6 +16,7 @@ from typing import Iterator, Optional
 _backed_up: dict[str, Optional[Path]] = {}   # real path -> its backup (None: the file did not exist)
 _warned: set[str] = set()
 _open: dict[str, dict] = {}   # files inside a transaction: real path -> the dict being edited
+_env_written: dict[str, set[str]] = {}   # real path -> env keys this run added to it
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -83,7 +84,9 @@ def _write(path: Path, data: dict) -> None:
         _backed_up[str(real)] = backup_copy(real) if real.exists() else None
     tmp = real.with_name(f".{real.name}.tmp-{os.getpid()}")
     try:
-        tmp.write_text(json.dumps(data, indent=2) + "\n")
+        # private from the first byte: the source's mode is applied only once the content is written
+        with os.fdopen(os.open(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), "w") as f:
+            f.write(json.dumps(data, indent=2) + "\n")
         if real.exists():
             shutil.copymode(real, tmp)
         os.replace(tmp, real)
@@ -188,6 +191,60 @@ def remove_allow_entry(settings_path: Path, pattern: str) -> None:
         return
     allow.remove(pattern)
     _write(settings_path, data)
+
+
+def install_env_entries(settings_path: Path, entries: dict[str, str]) -> list[str]:
+    """Add each env key of *entries* to settings.json only when it is absent: a value the user
+    set stays. Returns the keys this call wrote. An "env" that is not an object is left alone."""
+    data = _load_settings(settings_path)
+    if data is None:
+        return []
+
+    env = data.get("env", {})
+    if not isinstance(env, dict):
+        return []
+    missing = {k: v for k, v in entries.items() if k not in env}
+    if not missing:
+        return []
+
+    data["env"] = {**env, **missing}
+    _write(settings_path, data)
+    _env_written.setdefault(os.path.realpath(settings_path), set()).update(missing)
+    return list(missing)
+
+
+def remove_env_entries(settings_path: Path, written: dict[str, str]) -> None:
+    """Remove each env key of *written* (key -> the value we wrote) whose value is still that
+    value; one the user changed stays. An env object our removal empties goes too."""
+    data = _load_settings(settings_path)
+    if not data:
+        return
+
+    env = data.get("env")
+    if not isinstance(env, dict):
+        return
+    ours = [k for k, v in written.items() if k in env and env[k] == v]
+    if not ours:
+        return
+
+    _env_written.get(os.path.realpath(settings_path), set()).difference_update(ours)
+    kept = {k: v for k, v in env.items() if k not in ours}
+    if kept:
+        data["env"] = kept
+    else:
+        data.pop("env")
+    _write(settings_path, data)
+
+
+def env_entries(settings_path: Path) -> dict:
+    """The env object of settings.json ({} if absent, unreadable or not an object)."""
+    env = (_load_settings(settings_path, consequence=None) or {}).get("env")
+    return env if isinstance(env, dict) else {}
+
+
+def env_written_this_run(settings_path: Path) -> set[str]:
+    """The env keys install_env_entries added to this file in this process."""
+    return set(_env_written.get(os.path.realpath(settings_path), ()))
 
 
 def _is_ours(entry, prefix: str) -> bool:

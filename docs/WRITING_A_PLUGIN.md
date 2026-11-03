@@ -157,6 +157,7 @@ Each hook and allow-entry can declare an optional `requires` gate. The hook/entr
 - `stop_hook` — Backend supports Stop hook (Claude: yes, OpenCode: yes, GitHub Copilot: no)
 - `allow_entries` — Backend supports permission allow-list (Claude: yes, OpenCode: no, GitHub Copilot: no)
 - `pretooluse_hooks` — Backend supports PreToolUse hooks (Claude: yes, OpenCode: yes, GitHub Copilot: no)
+- `subagent_caps` — Backend takes the subagent depth and concurrency caps (Claude only): `install` merges `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` and `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` into the `env` block of settings.json.
 
 **Example:**
 ```yaml

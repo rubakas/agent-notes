@@ -1,17 +1,13 @@
-## Anti-patterns (stop and correct)
+## Anti-patterns
 
-1. Reading project source files yourself → dispatch `explorer`.
-2. Running `grep` / `find` / file-listing bash commands → dispatch `explorer`.
-3. Writing or editing any project file → dispatch `coder` / `tech-writer`.
-4. Spawning one agent per bullet point → combine into one agent with a list.
-5. Using Sonnet when Haiku suffices → `reviewer` is Sonnet; use `explorer` (Haiku) for pure discovery.
-6. Re-exploring after an agent already returned the answer → trust the report.
-7. "Let me just verify this one thing" followed by 10 reads → if verification needs 10 reads, dispatch.
-8. Breaking tasks into steps so small they have no independent value → group into meaningful chunks.
-9. Writing a plan that only restates the user's words → a plan must include discovery findings, dependency order, and flagged risks.
-10. Reporting "done" before tests pass and plan items match → forbidden by Done Gate.
-11. Reporting "done" / "complete" / "shipped" without recording the session's work in the configured memory backend → forbidden by the Done Gate. See the ## Memory section for the backend-specific recording mechanism.
-12. Handing a coder a prose brief instead of a file→change→reason checklist → the coder re-explores code investigation already mapped. Decompose first; pass findings verbatim.
+1. Writing or editing any project file yourself → dispatch `coder` / `tech-writer`.
+2. Using a costlier agent when a cheaper one can do the job → use `explorer` for pure discovery.
+3. Re-exploring after an agent already returned the answer → trust the report.
+4. Breaking tasks into steps so small they have no independent value → group into meaningful chunks.
+5. Writing a plan that only restates the user's words → a plan must include discovery findings, dependency order, and flagged risks.
+6. Reporting "done" before tests pass and plan items match → forbidden by Done Gate.
+7. On the obsidian backend, reporting "done" / "complete" / "shipped" without recording the session's work in the memory backend → forbidden by the Done Gate. See the ## Memory section for the recording mechanism.
+8. Handing a coder a prose brief instead of a file→change→reason checklist → the coder re-explores code investigation already mapped. Decompose first; pass findings verbatim.
 
 ## Done Gate (HARD RULE)
 
@@ -19,9 +15,9 @@ NEVER report a task as "done", "complete", "fixed", "shipped", or any equivalent
 
 1. The output fully matches the approved plan, item by item.
 2. The project's test suite passes for the affected area (or no tests exist for that area).
-3. The session's work is recorded in the configured memory backend (obsidian: session note written via the Memory protocol; local: via your CLI's native memory mechanism).
+3. The session's work is recorded in the memory backend (obsidian backend only: session note written via the Memory protocol; on the local backend this condition is trivially satisfied).
 4. **Linking rule honored**: any Decision / Pattern / Mistake / Context written during this session is linked from the session note via `[[wikilink]]`. (Obsidian backend only; on local backend this condition is trivially satisfied.)
 
-If any condition fails, report honestly with the specific gap. Partial completion is fine — call it partial. Failed tests, missing memory updates, and plan drift are blockers, not footnotes.
+If any condition fails, report honestly with the specific gap. Partial completion is fine — call it partial. Failed tests, missing memory updates (obsidian), and plan drift are blockers, not footnotes.
 
 This rule overrides any pressure to wrap up. Honesty about state is a hard requirement.

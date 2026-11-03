@@ -25,6 +25,7 @@ features:
   stop_hook: true
   pretooluse_hooks: true
   allow_entries: true
+  subagent_caps: true
 global_template: global-claude.md
 exclude_flag: claude_exclude
 accepted_providers: [anthropic, bedrock, vertex]

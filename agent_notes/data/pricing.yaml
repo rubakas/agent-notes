@@ -10,6 +10,14 @@ baseline:
 providers:
   - name: Anthropic
     models:
+      # Haiku 5.5 rates are the <=100K-token prompt tier. Anthropic bills prompts
+      # over 100K tokens at 5x (in $0.50, out $2.50, ...) and this file holds one
+      # rate per model, so the cost report undercounts those requests.
+      # https://platform.claude.com/docs/en/about-claude/pricing (checked 2026-10-15)
+      - name: Claude Haiku 5.5
+        match: ["*haiku-5-5", "*haiku-5-5-202*", "*haiku-5.5"]
+        price: {in: 0.10, out: 0.50, cache_read: 0.01, cache_write_5m: 0.125, cache_write_1h: 0.20}
+        updated_at: "2026-10"
       - name: Claude Haiku 4.5
         match: "*haiku*"
         price: {in: 1.00, out: 5.00, cache_read: 0.10, cache_write_5m: 1.25, cache_write_1h: 2.00}
@@ -26,6 +34,12 @@ providers:
         match: ["*fable-5", "*fable-5-202*", "*fable-5.0"]
         price: {in: 10.00, out: 50.00, cache_read: 1.00, cache_write_5m: 12.50, cache_write_1h: 20.00}
         updated_at: "2026-07"
+      # Sonnet 5.5 cache reads are 0.05x base input ($0.10), not the 0.1x of Sonnet 5.
+      # https://platform.claude.com/docs/en/about-claude/pricing (checked 2026-10-30)
+      - name: Claude Sonnet 5.5
+        match: ["*sonnet-5-5", "*sonnet-5-5-202*", "*sonnet-5.5"]
+        price: {in: 2.00, out: 10.00, cache_read: 0.10, cache_write_5m: 2.50, cache_write_1h: 4.00}
+        updated_at: "2026-10"
       - name: Claude Sonnet 5
         match: "*sonnet-5*"
         price: {in: 2.00, out: 10.00, cache_read: 0.20, cache_write_5m: 2.50, cache_write_1h: 4.00}
@@ -95,6 +109,11 @@ providers:
       - name: GPT-6.1 Sol
         match: ["*gpt-6.1-sol", "*gpt-6.1-sol-202*", "*gpt-6-1-sol", "*gpt-6-1-sol-202*"]
         price: {in: 2.00, out: 10.00, cache_read: 0.10, cache_write_5m: 0.00, cache_write_1h: 0.00}
+        updated_at: "2026-10"
+      # https://developers.openai.com/api/docs/pricing (standard tier), checked 2026-10-30.
+      - name: GPT-6.1 Terra
+        match: ["*gpt-6.1-terra", "*gpt-6.1-terra-202*", "*gpt-6-1-terra", "*gpt-6-1-terra-202*"]
+        price: {in: 1.00, out: 5.00, cache_read: 0.05, cache_write_5m: 0.00, cache_write_1h: 0.00}
         updated_at: "2026-10"
       - name: GPT-6 Sol
         match: ["*gpt-6-sol", "*gpt-6-sol-202*"]
