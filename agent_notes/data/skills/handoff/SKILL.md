@@ -1,7 +1,7 @@
 ---
 name: handoff
 description: Compacts the current conversation into a handoff document for another agent to pick up. Use when the user wants to pause or end a session and continue it in a fresh one.
-argument-hint: "What will the next session be used for?"
+argument-hint: "[what the next session is for]"
 disable-model-invocation: true
 group: process
 ---
@@ -26,7 +26,7 @@ Use this skeleton, keeping each section short:
 <paths and URLs of specs, plans, ADRs, issues, commits>
 
 ## Suggested skills
-<skills the next agent should invoke>
+<skills the next agent should invoke, by name; skills only the user can invoke (`disable-model-invocation`) as `/name` for the user to run>
 
 ## Open questions
 <what still needs a decision>
