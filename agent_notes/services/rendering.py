@@ -592,7 +592,6 @@ def render_globals(memory=None, enabled_plugins: Optional[Dict[str, bool]] = Non
 
     # Copy global-opencode.md to AGENTS.md
     opencode_global_content = expand_includes(GLOBAL_OPENCODE_MD.read_text(), AGENTS_DIR / "shared", skip=_include_skip)
-    opencode_global_content = _substitute_tool_names(opencode_global_content, "opencode")
     agents_global = DIST_OPENCODE_DIR / 'AGENTS.md'
     agents_global.parent.mkdir(parents=True, exist_ok=True)
     agents_global.write_text(opencode_global_content)
@@ -600,7 +599,6 @@ def render_globals(memory=None, enabled_plugins: Optional[Dict[str, bool]] = Non
 
     # Copy global-copilot.md to copilot-instructions.md
     copilot_content = expand_includes(GLOBAL_COPILOT_MD.read_text(), AGENTS_DIR / "shared", skip=_include_skip)
-    copilot_content = _substitute_tool_names(copilot_content, "copilot")
     copilot_global = DIST_GITHUB_DIR / 'copilot-instructions.md'
     copilot_global.parent.mkdir(parents=True, exist_ok=True)
     copilot_global.write_text(copilot_content)
@@ -625,7 +623,6 @@ def render_globals(memory=None, enabled_plugins: Optional[Dict[str, bool]] = Non
         # Substitute {{MEMORY_INSTRUCTIONS}} to empty string for memory-less backends
         # (e.g. codex has features.memory=false) so no literal placeholder leaks.
         _content = _content.replace("{{MEMORY_INSTRUCTIONS}}", "")
-        _content = _substitute_tool_names(_content, _backend.name)
         _out_path.parent.mkdir(parents=True, exist_ok=True)
         _out_path.write_text(_content)
         copied_files.append(_out_path)

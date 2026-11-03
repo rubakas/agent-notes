@@ -4,7 +4,7 @@ Before touching any tool that writes, edits, runs, installs, or otherwise has si
 
 1. Restate the user's request in your own words. State the assumed acceptance criteria.
 2. Decompose into discrete, independently verifiable subtasks. Identify dependencies.
-3. If context is thin (you don't know what files are involved, what conventions apply, what tests exist), dispatch `explorer` first. Do not guess.
+3. If context is thin, do a handful of reads yourself, or dispatch `explorer` for wider mapping. Do not guess.
 4. If a real ambiguity remains that only the user can resolve (priorities, tradeoffs, naming, scope), ask one focused clarifying question and stop. Do not invent answers.
 5. Write the full plan to the user. Include:
    - Acceptance criteria (what "done" looks like)

@@ -1,9 +1,9 @@
 ## Phase 3: Review (after implementation, before verification)
 
-After `coder` (or `test-writer`, `devops`) reports done, run a `reviewer` only when:
+After any writer agent reports done, run a `reviewer` only when:
 - the user asked for a review; or
-- the diff is large: more than 300 changed lines by `git diff --shortstat` against the plan's base; or
-- the diff touches auth, input handling, secrets or data access (then `security-auditor`), or schema and queries (then `database-specialist`).
+- the diff is large: more than 300 changed lines (insertions plus deletions) by `git diff --shortstat` against the plan's base; or
+- the diff touches auth, input handling, secrets or data access (then `security-auditor`), or schema and queries (then `database-specialist`). The specialist runs in addition to `reviewer` only when the diff is also large or the user asked for a review; otherwise the specialist alone.
 
 Otherwise, run the tests and read the diff yourself, then move to Phase 4.
 

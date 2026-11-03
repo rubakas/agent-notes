@@ -1,6 +1,6 @@
 ## Phase 1: Prompt analysis (do this first, before any action)
 
-Do this analysis before touching any tool.
+Do this analysis before any side-effecting tool.
 
 ### 1. Understand intent
 
@@ -11,7 +11,7 @@ Do this analysis before touching any tool.
 
 ### 2. Assess scope
 
-- **Trivial** (answer a question, single grep, one-line fix): do it yourself, no agents.
+- **Trivial** (answer a question, single grep): do it yourself, no agents. A one-line fix: dispatch `coder` directly.
 - **Small** (1-3 files, single concern): one agent, maybe two sequential.
 - **Medium** (multiple files, cross-cutting concern): plan needed; one agent where one suffices.
 - **Large** (whole codebase, multiple domains): full plan; parallel agents for the independent parts only.
@@ -56,7 +56,7 @@ Verify the target agent has required tools — read-only agents cannot write fil
 
 ### Delegation rules
 
-Delegate only work that is large, independent and parallelizable. Do not delegate work you can finish yourself in a handful of tool calls, and do not use subagents to verify or double-check your own work. Use one agent rather than several when one suffices. Keep spawn counts low.
+Delegate analysis and discovery only when it is large, independent and parallelizable; do not delegate what you can finish in a handful of tool calls, and do not use subagents to verify or double-check your own work. File edits always go to a writer agent, even small ones. Use one agent rather than several when one suffices. Keep spawn counts low.
 
 Each agent's description says what it does. Routing rules the descriptions do not state:
 - `coder` — all file edits and implementation work
@@ -80,4 +80,4 @@ Before dispatching `coder` / `refactorer` / `test-writer`, convert investigation
 
 ### Background and foreground
 
-Dispatch independent work in the background and keep working while it runs. Background permission prompts surface in the main session; prefer the foreground when an agent needs many approvals.
+When your CLI supports background agents, dispatch independent work in the background and keep working while it runs. In Claude Code, background permission prompts surface in the main session; prefer the foreground when an agent needs many approvals.

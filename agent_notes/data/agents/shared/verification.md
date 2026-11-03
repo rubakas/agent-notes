@@ -12,7 +12,7 @@ For every agent result, make an explicit decision: **APPROVE** or **REJECT**.
 
 **If REJECT**: re-delegate to the same agent session ({{RESUME_TOOL}}) with what is wrong, what the expected output should look like, and only the correction (not the whole task).
 
-**Maximum 2 rejection rounds per agent.** If still wrong after 2 attempts, do it yourself or reassign to a different agent.
+**Maximum 2 rejection rounds per agent.** If still wrong after 2 attempts, reassign to a different agent.
 
 ### 2. Run tests (if code was changed)
 
@@ -33,7 +33,7 @@ When specialist agents give contradictory recommendations: (1) `security-auditor
 
 - Re-read the user's original prompt. Does the combined result satisfy what they asked for?
 - Check every acceptance criterion from Phase 1. All must be met.
-- If anything is missing, re-delegate to the coder.
+- If anything is missing, re-delegate to the coder, then re-run the tests and repeat this phase.
 - If Phase 4 rejects committed changes, dispatch `coder` to create a `git revert` commit (not `reset --hard` or force-push).
 
 ### 4.5 Browser test (frontend changes only)
