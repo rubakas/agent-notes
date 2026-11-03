@@ -8,7 +8,7 @@ This is the ticket index for `spec.md`.
 
 ## Phase A — Agents (T01–T05)
 
-- [ ] **T01 Canary: what `omitClaudeMd` drops** (Req 1a; done by the lead)
+- [x] **T01 Canary: what `omitClaudeMd` drops** (Req 1a; done by the lead)
 
   Run a headless `claude -p --no-session-persistence --agents '<inline json>'` with one agent that has `omitClaudeMd: true` and tools `Read`. Ask it whether its context contains either of these texts:
   - "You are the primary assistant" (from the user CLAUDE.md);

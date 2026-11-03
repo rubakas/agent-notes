@@ -395,6 +395,43 @@ Docs and evals:
   - SA-28: compare lockfile versions to advisories only from a local source, otherwise `needs_validation`.
 - **Not applied.** SA-16 to SA-24 are economy and prompt-assembly redesigns. Each raises the re-sync cost, and they are listed in the scorecard for a later decision.
 
+## T01 results (2026-11-03)
+
+**Setup:**
+- Claude Code 2.1.314.
+- Command: `claude -p --no-session-persistence --model sonnet --agents agents.json`, run from a scratch directory outside any repo.
+- Two inline agents, `canary-omit` and `canary-control`. Both had `tools: ["Glob"]`, `model: haiku`, and the system prompt "answer only from your own context; never call a tool". Only `canary-omit` set `omitClaudeMd: true`.
+- Each was asked whether three markers were in its context and, if so, to quote the 8 words that follow:
+  1. "You are the primary assistant", from the user `~/.claude/CLAUDE.md`;
+  2. "# Code Quality", from `~/.claude/rules/code-quality.md`;
+  3. "NEVER read, open, cat, grep", from `~/.claude/rules/safety.md`.
+
+**Observed, verbatim:**
+
+```
+canary-omit:
+1. 'You are the primary assistant': ABSENT
+2. '# Code Quality': ABSENT
+3. 'NEVER read, open, cat, grep': ABSENT
+
+None of the three markers appears in my system prompt or injected context. My context has a "# Environment" section, and the opening line reads "You are a Claude agent, built on Anthropic's Claude Agent SDK." Because all three are absent, there are no 8-word quotes to report.
+
+canary-control:
+(1) 'You are the primary assistant': PRESENT. The 8 words that follow are: "You operate as the lead orchestrator on every". This is in the user's global CLAUDE.md, under "# Primary Assistant Instructions".
+
+(2) '# Code Quality': PRESENT. The 8 words that follow are: "Read existing code first. Match project indentation, naming,". This is the heading of the code-quality rules file.
+
+(3) 'NEVER read, open, cat, grep': PRESENT. The 8 words that follow are: "analyze, summarize, or store the contents of credential". This is in the safety rules file, in the "Credentials — ABSOLUTE PROHIBITION" section.
+```
+
+The control agent's quotes match the real files word for word. So the control agent really sees them, and the omit agent really does not.
+
+**Conclusion:**
+- `omitClaudeMd: true` drops the user CLAUDE.md and `~/.claude/rules/*.md` alike.
+- The Req 1c block (`agents/shared/agent_rules.md`) therefore restates all four safety rules in full: credentials (with the complete file-pattern list), no AI attribution, destructive and outward-facing actions, and untrusted content. It adds one line of code-quality guidance.
+
+**Cleanup:** the run left `~/.claude/projects/-private-tmp-…-scratchpad-canary-t01/`, even with `--no-session-persistence`. It was removed, and a before/after listing of `~/.claude/projects` is identical.
+
 ## Success Criteria
 
 - **SC-001:** T01 canary result recorded in this spec, with the exact observation.
