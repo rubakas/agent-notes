@@ -1,5 +1,7 @@
 # Multi-Stage Builds and Layer Optimization
 
+Version tags are examples as of 2026-10; use current releases.
+
 ## Contents
 
 - [Multi-Stage Builds](#multi-stage-builds-security-critical)
@@ -39,20 +41,27 @@ CMD ["/bin/hello"]
 
 ```dockerfile
 # Copy from any image, not just previous stages
-COPY --from=nginx:latest /etc/nginx/nginx.conf /nginx.conf
+COPY --from=nginx:1.27-alpine /etc/nginx/nginx.conf /nginx.conf
 ```
 
 ### Named Stages for Maintainability
 
 ```dockerfile
 FROM node:24-alpine AS dependencies
-RUN npm ci --only=production
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
 
 FROM node:24-alpine AS builder
-COPY --from=dependencies /app/node_modules ./node_modules
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
 RUN npm run build
 
 FROM node:24-alpine AS production
+WORKDIR /app
+COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 ```
 
@@ -62,7 +71,7 @@ Use `AS <NAME>` to reference stages by name rather than numeric index—improves
 
 ## Layer Optimization
 
-### Order by Change Frequency (Critical for Caching)
+### Order by Change Frequency
 
 ```dockerfile
 # ❌ BAD - Changes frequently, invalidates cache
@@ -87,7 +96,7 @@ RUN apt-get install -y git
 RUN rm -rf /var/lib/apt/lists/*
 
 # ✅ GOOD - Single layer, smaller image
-# CRITICAL: Combine apt-get update with install in same RUN
+# Always combine apt-get update with install (avoids stale package caches)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       curl \
@@ -100,10 +109,12 @@ Sort arguments alphanumerically for maintainability.
 ### Use Pipefail for Error Detection
 
 ```dockerfile
-# IMPORTANT: Prepend set -o pipefail to catch errors at any stage
+# Prepend set -o pipefail to catch errors in any pipe stage
 RUN set -o pipefail && \
     curl -sL https://example.com/install.sh | bash
 ```
+
+Not every shell supports `pipefail`: on Debian-based images `/bin/sh` is dash, which does not. Use `SHELL ["/bin/bash", "-o", "pipefail", "-c"]` before the `RUN`.
 
 Without pipefail, errors in piped commands may be silently ignored. Piping a script into a shell runs whatever the server returns: pin the version and verify a checksum or signature before executing, or install from a package instead.
 

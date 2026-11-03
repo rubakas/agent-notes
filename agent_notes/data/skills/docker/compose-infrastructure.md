@@ -19,13 +19,12 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Performance tuning: the image has no env vars for server settings; pass them as -c flags
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "effective_cache_size=1GB"]
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME:-myapp}
-      # Performance tuning
-      POSTGRES_SHARED_BUFFERS: 256MB
-      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
     volumes:
       # Data persistence
       - postgres_data:/var/lib/postgresql/data
@@ -127,13 +126,14 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
-      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
       - app_network
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5

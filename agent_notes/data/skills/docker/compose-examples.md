@@ -6,9 +6,7 @@ Version tags are examples as of 2026-10; use current releases.
 
 - [Development vs Production](#development-vs-production)
 - [Full Stack Application Example](#full-stack-application-example)
-- [Best Practices Summary](#best-practices-summary)
 - [Common Commands](#common-commands)
-- [References and Sources](#references-and-sources)
 
 ---
 
@@ -55,7 +53,7 @@ services:
     build:
       target: production
     restart: always
-    # Don't expose ports directly in production - use reverse proxy
+    # base ports are merged, not replaced; omit ports: from the base file for prod, or use !reset
     expose:
       - "3000"
     environment:
@@ -210,34 +208,6 @@ networks:
 
 ---
 
-## Best Practices Summary
-
-### DO
-
-1. **Remove version field** - It's obsolete in Compose v2
-2. **Use health checks** - Unless an orchestrator or proxy already checks health (Kubernetes probes, Kamal proxy, ECS)
-3. **Use named volumes** - Data persistence
-4. **Set resource limits** - Prevent resource exhaustion
-5. **Use restart policies** - Automatic recovery
-6. **Isolate with networks** - Security
-7. **Pin image versions** - Use specific tags, not :latest
-8. **Use .env files** - Centralized configuration
-9. **Separate dev/prod configs** - Different requirements
-10. **Use depends_on conditions** - Proper startup order
-
-### DON'T
-
-1. **Include version field** - Generates warnings in Compose v2
-2. **Use :latest in production** - Unpredictable
-3. **Expose database ports** - Security risk in production
-4. **Hardcode secrets** - Use environment variables
-5. **Use privileged mode** - Security risk
-6. **Mount sensitive host directories** - Security risk
-7. **Forget resource limits** - Can exhaust host
-8. **Use bridge network for everything** - Proper isolation matters
-
----
-
 ## Common Commands
 
 ```bash
@@ -277,15 +247,3 @@ docker compose ps
 # View resource usage
 docker compose stats
 ```
-
----
-
-## References and Sources
-
-This guide is based on official Docker Compose documentation:
-
-- [Docker Compose Specification](https://docs.docker.com/reference/compose-file/)
-- [Docker Compose Services Reference](https://docs.docker.com/reference/compose-file/services/)
-- [Docker Compose Health Checks](https://docs.docker.com/reference/compose-file/services/#healthcheck)
-- [Docker Compose depends_on](https://docs.docker.com/reference/compose-file/services/#depends_on)
-- [Docker Compose Legacy Versions](https://docs.docker.com/reference/compose-file/legacy-versions/)

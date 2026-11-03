@@ -116,8 +116,7 @@ FROM node:24-slim
 FROM python:3.12-slim
 FROM ruby:3.4-slim
 
-# CRITICAL: Always combine apt-get update with install
-# Prevents cache issues that could install outdated packages
+# Always combine apt-get update with install (avoids stale package caches)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       curl \
